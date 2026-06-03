@@ -310,6 +310,49 @@ const priceIntentTerms = [
   "\u20b1",
 ];
 
+const materialEstimateIntentTerms = [
+  "cost of materials",
+  "estimated materials",
+  "estimate materials",
+  "material budget",
+  "material cost",
+  "material costs",
+  "materials budget",
+  "materials cost",
+  "materials needed",
+  "needed materials",
+  "parts cost",
+  "parts needed",
+  "replacement parts",
+  "supplies cost",
+  "supplies needed",
+];
+
+const materialItemTerms = [
+  "material",
+  "materials",
+  "part",
+  "parts",
+  "supply",
+  "supplies",
+];
+
+const repairScopeTerms = [
+  "broken",
+  "damage",
+  "damaged",
+  "fix",
+  "fixing",
+  "install",
+  "installation",
+  "leak",
+  "replace",
+  "replacement",
+  "repair",
+  "repairing",
+  "service",
+];
+
 const searchStopWords = new Set([
   "a",
   "about",
@@ -837,6 +880,40 @@ const hasAnyTerm = (value: string, terms: string[]) => {
   return terms.some((term) => lowerValue.includes(term));
 };
 
+const hasAnyToken = (value: string, terms: string[]) => {
+  const tokenSet = new Set(tokenize(value));
+  return terms.some((term) => tokenSet.has(term));
+};
+
+const isMaterialEstimateRequest = (value: string) => {
+  const cleanValue = value.trim();
+  if (!cleanValue) return false;
+
+  const lowerValue = cleanValue.toLowerCase();
+  const hasExplicitMaterialIntent = hasAnyTerm(lowerValue, materialEstimateIntentTerms);
+  const hasMaterialItem = hasAnyToken(lowerValue, materialItemTerms);
+  const hasCostIntent = hasAnyToken(lowerValue, [
+    "budget",
+    "cost",
+    "costs",
+    "estimate",
+    "estimated",
+    "fee",
+    "fees",
+    "php",
+    "peso",
+    "pesos",
+    "price",
+    "prices",
+    "pricing",
+    "quote",
+  ]) || lowerValue.includes("how much");
+  const hasRepairScope = hasAnyToken(lowerValue, repairScopeTerms)
+    || getServiceFamilyEvidence(cleanValue, "queryTerms").length > 0;
+
+  return hasExplicitMaterialIntent || (hasMaterialItem && (hasCostIntent || hasRepairScope));
+};
+
 const getSearchTerms = (value: string) => {
   const seen = new Set<string>();
 
@@ -1041,9 +1118,13 @@ const normalizeProblemMaterials = (value: unknown): ProblemMaterialHint[] => (
     : []
 );
 
-const normalizeProblemAnalysis = (payload: Record<string, unknown>): ProblemAnalysis => ({
-  problemTitle: getText(payload["problemTitle"] || payload["problem_title"]) || "Photo problem estimate",
-  problemSummary: getText(payload["problemSummary"] || payload["problem_summary"]) || "The uploaded photo needs worker review before a final quote.",
+const normalizeProblemAnalysis = (
+  payload: Record<string, unknown>,
+  fallbackTitle = "Photo problem estimate",
+  fallbackSummary = "The described issue needs worker review before a final quote."
+): ProblemAnalysis => ({
+  problemTitle: getText(payload["problemTitle"] || payload["problem_title"]) || fallbackTitle,
+  problemSummary: getText(payload["problemSummary"] || payload["problem_summary"]) || fallbackSummary,
   likelyServiceTypes: toStringList(payload["likelyServiceTypes"] || payload["likely_service_types"], 5),
   materials: normalizeProblemMaterials(payload["materials"]),
   urgency: getText(payload["urgency"]) || "medium",
@@ -1209,6 +1290,40 @@ const buildPhotoEstimateReply = (
     `Estimated materials: ${formatPesoRange(budgetEstimate.materialSubtotalLow, budgetEstimate.materialSubtotalHigh)}.`,
     `Likely starting budget with listed worker rates: ${formatPesoRange(budgetEstimate.totalLow, budgetEstimate.totalHigh)}.`,
     materialLines.length > 0 ? `\nMaterial search snapshot:\n${materialLines.join("\n")}` : "",
+    workerText,
+    safety,
+].filter(Boolean).join("\n");
+};
+
+const buildTextMaterialEstimateReply = (
+  problemAnalysis: ProblemAnalysis,
+  budgetEstimate: BudgetEstimate,
+  marketplaceSearch: MarketplaceSearch,
+  materialResearch: MaterialResearch
+) => {
+  const materialLines = materialResearch.items.slice(0, 5).map((item) =>
+    `- ${item.name}: ${formatPesoRange(item.low, item.high)}${item.quantity ? ` (${item.quantity})` : ""}`
+  );
+  const workerLines = marketplaceSearch.records.slice(0, 3).map((record, index) =>
+    `${index + 1}. ${record.providerName} - ${record.serviceType}, ${record.priceLabel}${record.location ? `, ${record.location}` : ""}`
+  );
+  const desiredFamilyLabel = formatServiceFamilyList(marketplaceSearch.desiredFamilies);
+  const workerHeading = marketplaceSearch.desiredFamilies.length > 0 && !marketplaceSearch.hasExactFamilyMatch
+    ? `Closest worker matches${desiredFamilyLabel ? ` (no exact ${desiredFamilyLabel} listing is active)` : ""}:`
+    : "Fit workers:";
+  const workerText = workerLines.length > 0
+    ? `\n\n${workerHeading}\n${workerLines.join("\n")}\n\nUse Chat with worker to confirm scope, materials, and final quote.`
+    : "\n\nI could not find a matching active worker listing yet. Try Browse with a broader service type.";
+  const safety = problemAnalysis.safetyNotes.length > 0
+    ? `\n\nSafety note: ${problemAnalysis.safetyNotes[0]}`
+    : "";
+
+  return [
+    `Based on your description, this sounds like: ${problemAnalysis.problemTitle}.`,
+    problemAnalysis.problemSummary,
+    `Estimated materials needed: ${formatPesoRange(budgetEstimate.materialSubtotalLow, budgetEstimate.materialSubtotalHigh)}.`,
+    `Likely starting budget with listed worker rates: ${formatPesoRange(budgetEstimate.totalLow, budgetEstimate.totalHigh)}.`,
+    materialLines.length > 0 ? `\nMaterial cost snapshot:\n${materialLines.join("\n")}` : "",
     workerText,
     safety,
   ].filter(Boolean).join("\n");
@@ -1390,9 +1505,58 @@ const analyzeProblemImage = async (
     }, getGroqVisionModels(), "vision");
 
     const content = getGroqMessageContent(payload);
-    return normalizeProblemAnalysis(parseJsonObject(content));
+    return normalizeProblemAnalysis(
+      parseJsonObject(content),
+      "Photo problem estimate",
+      "The uploaded photo needs worker review before a final quote."
+    );
   } catch (error) {
     console.error("giglink-chatbot vision analysis error", {
+      message: error instanceof Error ? error.message : String(error),
+    });
+    return null;
+  }
+};
+
+const analyzeProblemText = async (
+  groqApiKey: string,
+  latestUserMessage: string
+): Promise<ProblemAnalysis | null> => {
+  try {
+    const { payload } = await callGroqWithModelFallback(groqApiKey, {
+      messages: [
+        {
+          role: "system",
+          content: [
+            "You infer a local-service repair or installation problem from a user's text for GigLink material-cost estimation.",
+            "Return JSON only with keys: problemTitle, problemSummary, likelyServiceTypes, materials, urgency, safetyNotes, confidence, searchQuery.",
+            "likelyServiceTypes should be service labels such as Plumber, Electrician, Technician, Cleaner, Carpenter, Appliance Repair, Painter, or General Repair.",
+            "materials must be an array of {name, quantity, searchTerm}. Include likely consumables and replacement parts, not labor. Use uncertainty when details are missing.",
+            "searchQuery should target current Philippine material prices for the inferred repair.",
+          ].join(" "),
+        },
+        {
+          role: "user",
+          content: `${latestUserMessage}\nInfer the likely materials needed and the best worker/service category for this request.`,
+        },
+      ],
+      temperature: 0.1,
+      max_completion_tokens: 650,
+      response_format: { type: "json_object" },
+    }, getGroqChatModels(), "text-material-analysis");
+
+    const content = getGroqMessageContent(payload);
+    const analysis = normalizeProblemAnalysis(
+      parseJsonObject(content),
+      "Material estimate",
+      "The described issue needs worker review before a final quote."
+    );
+
+    return analysis.materials.length > 0 || analysis.likelyServiceTypes.length > 0
+      ? analysis
+      : null;
+  } catch (error) {
+    console.error("giglink-chatbot text material analysis error", {
       message: error instanceof Error ? error.message : String(error),
     });
     return null;
@@ -1424,7 +1588,7 @@ const fetchMaterialResearch = async (
           role: "user",
           content: [
             `User request: ${latestUserMessage}`,
-            `Photo triage: ${problemAnalysis.problemTitle} - ${problemAnalysis.problemSummary}`,
+            `Problem triage: ${problemAnalysis.problemTitle} - ${problemAnalysis.problemSummary}`,
             `Likely materials to price: ${materialHints}`,
             `Search query: ${problemAnalysis.searchQuery || `${problemAnalysis.problemTitle} materials price Philippines`}`,
           ].join("\n"),
@@ -2097,6 +2261,34 @@ serve(async (req: Request) => {
       return jsonResponse({
         message: buildPhotoEstimateReply(problemAnalysis, budgetEstimate, marketplaceSearch, materialResearch),
         model: "giglink-photo-budget-estimator",
+        matches: buildMatchesPayload(marketplaceSearch),
+        diagnosis: problemAnalysis,
+        estimate: budgetEstimate,
+        sources: materialResearch.sources,
+      });
+    }
+
+    if (isMaterialEstimateRequest(latestUserMessage)) {
+      if (!groqApiKey) {
+        return jsonResponse({ error: "The material estimator is not configured yet." }, 503);
+      }
+
+      const problemAnalysis = await analyzeProblemText(groqApiKey, latestUserMessage);
+      if (!problemAnalysis) {
+        return jsonResponse({ error: "The assistant could not estimate materials for that request right now." }, 502);
+      }
+
+      const marketplaceSearch = await fetchMarketplaceSearch(
+        req,
+        buildProblemSearchText(latestUserMessage, problemAnalysis),
+        body.context
+      );
+      const materialResearch = await fetchMaterialResearch(groqApiKey, problemAnalysis, latestUserMessage);
+      const budgetEstimate = buildBudgetEstimate(problemAnalysis, materialResearch, marketplaceSearch);
+
+      return jsonResponse({
+        message: buildTextMaterialEstimateReply(problemAnalysis, budgetEstimate, marketplaceSearch, materialResearch),
+        model: "giglink-text-material-estimator",
         matches: buildMatchesPayload(marketplaceSearch),
         diagnosis: problemAnalysis,
         estimate: budgetEstimate,

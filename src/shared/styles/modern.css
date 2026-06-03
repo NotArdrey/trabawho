@@ -1031,11 +1031,11 @@ select:not([multiple]) {
   overscroll-behavior: contain;
   scrollbar-color: color-mix(in srgb, var(--gl-text-3) 42%, transparent) transparent;
   scrollbar-width: thin;
-  padding: 14px;
+  padding: 14px 12px;
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  background: var(--gl-page);
+  gap: 8px;
+  background: color-mix(in srgb, var(--gl-page) 88%, var(--gl-surface-2));
 }
 
 .gl-chatbot-messages::-webkit-scrollbar {
@@ -1054,14 +1054,15 @@ select:not([multiple]) {
 
 .gl-chatbot-message {
   flex: 0 0 auto;
-  max-width: 88%;
-  border-radius: 8px;
-  padding: 10px 12px;
+  max-width: min(80%, 340px);
+  border-radius: 18px;
+  padding: 9px 13px;
   font-size: 13px;
   line-height: 1.5;
   overflow: visible;
   overflow-wrap: break-word;
   white-space: pre-wrap;
+  box-shadow: 0 1px 2px color-mix(in srgb, var(--gl-text) 8%, transparent);
 }
 
 .gl-chatbot-message.assistant {
@@ -1069,6 +1070,7 @@ select:not([multiple]) {
   border: 1px solid var(--gl-border);
   background: var(--gl-surface);
   color: var(--gl-text);
+  border-radius: 18px 18px 18px 5px;
 }
 
 .gl-chatbot-message.user {
@@ -1076,6 +1078,7 @@ select:not([multiple]) {
   border: 1px solid var(--gl-blue);
   background: var(--gl-blue);
   color: #ffffff;
+  border-radius: 18px 18px 5px 18px;
 }
 
 .gl-chatbot-message.loading {
@@ -1083,6 +1086,7 @@ select:not([multiple]) {
   align-items: center;
   gap: 7px;
   color: var(--gl-text-2);
+  width: fit-content;
 }
 
 .gl-chatbot-attachment {
@@ -1159,6 +1163,49 @@ select:not([multiple]) {
 .gl-chatbot-estimate b {
   color: var(--gl-text);
   text-align: right;
+}
+
+.gl-chatbot-materials {
+  list-style: none;
+  margin: 2px 0 0;
+  padding: 8px 0 0;
+  border-top: 1px solid var(--gl-border);
+  display: grid;
+  gap: 7px;
+}
+
+.gl-chatbot-materials li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: start;
+  color: var(--gl-text-2);
+  font-size: 12px;
+}
+
+.gl-chatbot-materials span {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.gl-chatbot-materials strong {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  color: var(--gl-text);
+  font-size: 12px;
+  line-height: 1.25;
+}
+
+.gl-chatbot-materials small {
+  color: var(--gl-text-3);
+  font-size: 11px;
+  line-height: 1.25;
+}
+
+.gl-chatbot-materials b {
+  font-size: 12px;
+  white-space: nowrap;
 }
 
 .gl-chatbot-matches {
@@ -1316,6 +1363,7 @@ select:not([multiple]) {
 .gl-chatbot-attach {
   width: 40px;
   height: 44px;
+  border-radius: 999px;
   background: var(--gl-surface-2);
   color: var(--gl-text-2);
   align-self: end;
@@ -1337,8 +1385,8 @@ select:not([multiple]) {
   min-height: 44px;
   max-height: 116px;
   border: 1px solid var(--gl-border-strong);
-  border-radius: 8px;
-  background: var(--gl-surface);
+  border-radius: 22px;
+  background: var(--gl-surface-2);
   color: var(--gl-text);
   padding: 10px 12px;
   resize: none;
@@ -1357,6 +1405,7 @@ select:not([multiple]) {
 .gl-chatbot-send {
   width: 44px;
   height: 44px;
+  border-radius: 999px;
   background: var(--gl-blue);
   border-color: var(--gl-blue);
   color: #ffffff;
@@ -3767,6 +3816,10 @@ textarea {
     width: calc(100vw - 24px);
     height: calc(100svh - 156px);
     max-height: calc(100svh - 112px);
+  }
+
+  .gl-chatbot-message {
+    max-width: 86%;
   }
 
   .gl-chatbot-toggle {
