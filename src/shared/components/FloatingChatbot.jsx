@@ -493,6 +493,9 @@ function FloatingChatbot({
 
     const materialRange = formatRange(estimate.materialSubtotalLow, estimate.materialSubtotalHigh);
     const totalRange = formatRange(estimate.totalLow, estimate.totalHigh);
+    const materials = (Array.isArray(estimate.materials) ? estimate.materials : [])
+      .filter((material) => material?.name)
+      .slice(0, 5);
 
     return (
       <div className="gl-chatbot-estimate" aria-label="Estimated budget">
@@ -506,6 +509,22 @@ function FloatingChatbot({
           <span>Likely total</span>
           <b>{totalRange}</b>
         </div>
+        {materials.length > 0 && (
+          <ul className="gl-chatbot-materials" aria-label="Estimated material items">
+            {materials.map((material, index) => {
+              const quantity = String(material.quantity || material.unit || '').trim();
+              return (
+                <li key={`${material.name}-${index}`}>
+                  <span>
+                    <strong>{material.name}</strong>
+                    {quantity && <small>{quantity}</small>}
+                  </span>
+                  <b>{formatRange(material.low, material.high)}</b>
+                </li>
+              );
+            })}
+          </ul>
+        )}
       </div>
     );
   };

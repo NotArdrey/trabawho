@@ -33,7 +33,22 @@ describe('FloatingChatbot worker matches', () => {
       message: 'I found a qualified worker for that problem.',
       matches: [workerMatch],
       diagnosis: { problemTitle: 'Leaking pipe' },
-      estimate: { totalLow: 800, totalHigh: 1500 },
+      estimate: {
+        problemTitle: 'Leaking pipe',
+        problemSummary: 'A visible leak may need pipe replacement and sealant.',
+        materialSubtotalLow: 120,
+        materialSubtotalHigh: 260,
+        totalLow: 800,
+        totalHigh: 1500,
+        materials: [
+          {
+            name: 'PVC pipe',
+            quantity: '1 piece',
+            low: 80,
+            high: 160,
+          },
+        ],
+      },
       sources: [],
     });
     startServiceConversationByServiceId.mockResolvedValue({ id: 'conversation-456' });
@@ -51,6 +66,8 @@ describe('FloatingChatbot worker matches', () => {
     await userEvent.click(screen.getByRole('button', { name: /^send message$/i }));
 
     await expect(screen.findByText('Alex Reyes')).resolves.toBeInTheDocument();
+    expect(screen.getByText('PVC pipe')).toBeInTheDocument();
+    expect(screen.getByText('PHP 80 - PHP 160')).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: /chat with worker/i }));
 
     await waitFor(() => {
