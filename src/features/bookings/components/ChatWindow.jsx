@@ -352,13 +352,17 @@ const ChatWindow = ({ appTheme = 'light', booking, onApproveQuote, onRejectQuote
   };
 
   const getMessageStyle = (msg) => {
-    if (msg.sender === 'client') return { ...styles.chatMessage, ...styles.chatMessageClient };
-    if (msg.sender === 'worker') return { ...styles.chatMessage, ...styles.chatMessageWorker };
+    if (msg.sender === 'system') return { ...styles.chatMessage, ...styles.chatMessageSystem };
+
+    const isOwnMessage = isSellerView ? msg.sender === 'worker' : msg.sender === 'client';
+    if (isOwnMessage) return { ...styles.chatMessage, ...styles.chatMessageClient };
+    if (msg.sender === 'client' || msg.sender === 'worker') return { ...styles.chatMessage, ...styles.chatMessageWorker };
     return { ...styles.chatMessage, ...styles.chatMessageSystem };
   };
 
-  const getMessageTextStyle = (sender) => {
-    if (sender === 'client') return { ...styles.chatMessageTextBase, ...styles.chatMessageTextClient };
+  const getMessageTextStyle = (msg) => {
+    const isOwnMessage = isSellerView ? msg.sender === 'worker' : msg.sender === 'client';
+    if (isOwnMessage) return { ...styles.chatMessageTextBase, ...styles.chatMessageTextClient };
     return { ...styles.chatMessageTextBase, ...styles.chatMessageTextWorker };
   };
 
@@ -527,7 +531,7 @@ const ChatWindow = ({ appTheme = 'light', booking, onApproveQuote, onRejectQuote
                 <div key={msg.id} style={getMessageStyle(msg)}>
                   {msg.type === 'text' && msg.sender !== 'system' && (
                     <>
-                      <p style={getMessageTextStyle(msg.sender)}>{msg.content}</p>
+                      <p style={getMessageTextStyle(msg)}>{msg.content}</p>
                       <span style={styles.chatMessageTime}>{msg.timestamp}</span>
                     </>
                   )}

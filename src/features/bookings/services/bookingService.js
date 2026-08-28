@@ -752,9 +752,15 @@ const getBookingParticipantIds = (booking = {}, userId = '') => {
 
 const getMessageSenderRole = (message = {}, booking = {}) => {
   const row = booking.raw?.booking || {};
-  if (message.sender_id && row.buyer_id && String(message.sender_id) === String(row.buyer_id)) return 'client';
-  if (message.sender_id && row.seller_id && String(message.sender_id) === String(row.seller_id)) return 'worker';
-  return 'system';
+  const buyerId = row.buyer_id || booking.buyerId || booking.clientId;
+  const sellerId = row.seller_id || booking.sellerId || booking.workerId;
+
+  if (message.sender_id && buyerId && String(message.sender_id) === String(buyerId)) return 'client';
+  if (message.sender_id && sellerId && String(message.sender_id) === String(sellerId)) return 'worker';
+
+  // Persisted chat messages always come from a participant. Reserve the centered
+  // system treatment for messages the UI explicitly creates as system messages.
+  return 'client';
 };
 
 export const mapMessageRowToUiMessage = (message = {}, booking = {}) => {
