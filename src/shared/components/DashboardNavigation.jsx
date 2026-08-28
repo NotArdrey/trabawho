@@ -6,12 +6,10 @@ import {
   Home,
   LogOut,
   MessageCircle,
-  Moon,
   Search,
   Settings,
   Shield,
   Store,
-  Sun,
   UserRound,
 } from 'lucide-react';
 import LogoutConfirmModal from '../../features/auth/components/LogoutConfirmModal';
@@ -94,14 +92,9 @@ function DashboardNavigation({
 
   const profilePhotoUrl = getProfilePhotoUrl(sellerProfile?.profilePhoto);
   const unreadCount = notifications.filter((item) => !item.isRead).length;
-  const isDarkMode = appTheme === 'dark';
-  const ThemeIcon = isDarkMode ? Moon : Sun;
   const normalizedRole = String(sellerProfile?.role || '').trim().toLowerCase();
   const isAdminAccount = Boolean(sellerProfile?.isAdmin) || normalizedRole === 'admin';
   const isWorkerAccount = isWorkerProfile(sellerProfile);
-  const handleThemeToggle = () => {
-    onThemeChange?.(isDarkMode ? 'light' : 'dark');
-  };
 
   const clientNavItems = [
     { key: 'home', label: 'Home', icon: Home, onClick: onOpenDashboard },
@@ -174,24 +167,6 @@ function DashboardNavigation({
         </div>
 
         {renderNavButtons()}
-
-        <button
-          type="button"
-          className="gl-app-theme-toggle"
-          onClick={handleThemeToggle}
-          aria-label={isDarkMode ? 'Switch to light mode' : 'Switch to dark mode'}
-          aria-pressed={isDarkMode}
-          title={isDarkMode ? 'Switch to light mode' : 'Switch to dark mode'}
-        >
-          <span className="gl-app-theme-icon">
-            <ThemeIcon size={17} aria-hidden="true" />
-          </span>
-          <span>
-            <strong>{isDarkMode ? 'Dark mode' : 'Light mode'}</strong>
-            <small>{themeMode === 'system' ? 'Device theme active' : `Click for ${isDarkMode ? 'light' : 'dark'}`}</small>
-          </span>
-        </button>
-
       </aside>
 
       <header className="gl-app-topbar">
