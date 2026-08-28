@@ -6,8 +6,8 @@ const {
   prepareWorkerDemoData,
 } = require('./helpers/supabase');
 
-const CASH_KEY = 'giglink_cash_confirmation_requests';
-const REFUND_KEY = 'giglink_refund_requests';
+const CASH_KEY = 'trabawho_cash_confirmation_requests';
+const REFUND_KEY = 'trabawho_refund_requests';
 
 function collectConsoleFailures(page) {
   const failures = [];
@@ -107,7 +107,7 @@ test('admin demo account logs in and can access the admin dashboard', async ({ p
   const consoleFailures = collectConsoleFailures(page);
 
   await loginAs(page, DEMO_ADMIN_EMAIL);
-  await expect(page.getByRole('heading', { name: 'GigLink Admin Dashboard' })).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByRole('heading', { name: 'TrabaWho Admin Dashboard' })).toBeVisible({ timeout: 20_000 });
   await expect(page.getByText('Admin Portal UI')).toBeVisible();
   await page.getByRole('button', { name: 'Back to App' }).click();
   await expect(page.getByLabel('My Work')).toBeVisible();

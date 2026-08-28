@@ -3,8 +3,8 @@ function BrandWordmark({ className = '', ...props }) {
 
   return (
     <span className={classes} {...props}>
-      <span className="gl-wordmark-gig">Gig</span>
-      <span className="gl-wordmark-link">Link</span>
+      <span className="gl-wordmark-traba">Traba</span>
+      <span className="gl-wordmark-who">Who</span>
     </span>
   );
 }

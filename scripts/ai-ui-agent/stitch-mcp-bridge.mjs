@@ -69,7 +69,7 @@ async function handleRequest(message) {
           tools: {},
         },
         serverInfo: {
-          name: 'giglink-stitch-ui-bridge',
+          name: 'trabawho-stitch-ui-bridge',
           version: '0.1.0',
         },
       });

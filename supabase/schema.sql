@@ -1,4 +1,4 @@
--- GigLink Supabase schema
+-- TrabaWho Supabase schema
 -- Run this in the Supabase SQL editor or via the CLI after linking the project.
 
 create table if not exists public.profiles (

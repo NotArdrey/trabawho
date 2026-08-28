@@ -22,7 +22,7 @@ Deno.serve(async (req: Request) => {
   }
 
   return new Response(
-    "<!doctype html><html><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\"><title>Verification Complete</title></head><body><main style=\"font-family:system-ui,sans-serif;max-width:640px;margin:12vh auto;padding:24px;\"><h1>Verification complete</h1><p>You can return to GigLink and log in.</p></main></body></html>",
+    "<!doctype html><html><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\"><title>Verification Complete</title></head><body><main style=\"font-family:system-ui,sans-serif;max-width:640px;margin:12vh auto;padding:24px;\"><h1>Verification complete</h1><p>You can return to TrabaWho and log in.</p></main></body></html>",
     {
       headers: {
         "Content-Type": "text/html; charset=utf-8",

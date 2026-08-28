@@ -188,7 +188,7 @@ const buildProfilePayload = (user, source = {}, existingProfile = null) => {
     address: source.address ?? metadata.address ?? existingProfile?.address,
   });
   const nameParts = resolveNameParts(source, metadata, existingProfile);
-  const fullName = buildDisplayName(nameParts) || readNameField(source, ['fullName', 'name']) || readNameField(metadata, ['full_name', 'name']) || user.email?.split('@')[0] || 'GigLink User';
+  const fullName = buildDisplayName(nameParts) || readNameField(source, ['fullName', 'name']) || readNameField(metadata, ['full_name', 'name']) || user.email?.split('@')[0] || 'TrabaWho User';
   const resolvedRole = getNormalizedRole(
     source.role
       || metadata.role
@@ -202,7 +202,7 @@ const buildProfilePayload = (user, source = {}, existingProfile = null) => {
     first_name: getNullableString(nameParts.firstName),
     middle_name: getNullableString(nameParts.middleName),
     last_name: getNullableString(nameParts.lastName),
-    full_name: getNullableString(fullName) || 'GigLink User',
+    full_name: getNullableString(fullName) || 'TrabaWho User',
     email: user.email,
     phone_number: getNullableString(source.phoneNumber ?? metadata.phone_number ?? existingProfile?.phone_number),
     profile_photo: getProfilePhotoUrl(
@@ -275,7 +275,7 @@ const ensureWorkerProfileBaseRow = async (userId, source = {}) => {
     || buildDisplayName(resolveNameParts(source, {}, { full_name: existingFullName }))
     || getNullableString(source.fullName || source.name)
     || resolvedEmail.split('@')[0]
-    || 'GigLink User';
+    || 'TrabaWho User';
 
   const nameParts = resolveNameParts(source, {}, { full_name: existingFullName });
 

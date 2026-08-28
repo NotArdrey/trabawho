@@ -104,7 +104,7 @@ async function fillDiditSignup(page, email = 'verified-user@example.com') {
   await page.getByLabel('Email').fill(email);
   await page.getByLabel('Password', { exact: true }).fill('Password123!');
   await page.getByLabel('Confirm password').fill('Password123!');
-  await page.getByLabel(/I consent to GigLink/i).check();
+  await page.getByLabel(/I consent to TrabaWho/i).check();
   await page.getByRole('button', { name: /Start Didit Verification/i }).click();
 }
 
@@ -205,7 +205,7 @@ test.describe('identity-first registration', () => {
       mimeType: 'image/png',
       buffer: Buffer.from('selfie-image'),
     });
-    await page.getByLabel(/I consent to GigLink/i).check();
+    await page.getByLabel(/I consent to TrabaWho/i).check();
     await page.getByRole('button', { name: /Submit Manual Review/i }).click();
 
     await expect(page.getByTestId('identity-outcome')).toContainText('Manual review submitted');

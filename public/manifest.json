@@ -1,17 +1,12 @@
 {
-  "short_name": "GigLink",
-  "name": "GigLink",
+  "short_name": "TrabaWho",
+  "name": "TrabaWho Service Marketplace",
   "icons": [
     {
-      "src": "giglink-logo.svg",
+      "src": "trabawho-logo.svg",
       "sizes": "any",
       "type": "image/svg+xml",
       "purpose": "any maskable"
-    },
-    {
-      "src": "favicon.ico",
-      "sizes": "64x64 32x32 24x24 16x16",
-      "type": "image/x-icon"
     },
     {
       "src": "logo192.png",
@@ -26,6 +21,6 @@
   ],
   "start_url": ".",
   "display": "standalone",
-  "theme_color": "#0c507e",
+  "theme_color": "#1557c0",
   "background_color": "#ffffff"
 }

@@ -1,4 +1,4 @@
-# GigLink - Complete Presentation & Defense Guide (ENHANCED)
+# TrabaWho - Complete Presentation & Defense Guide (ENHANCED)
 **A Comprehensive Breakdown of React Principles & Code Implementations**
 
 ---
@@ -143,7 +143,7 @@ When your professor asks "how does your app handle navigation?", you can point t
 - Tightly coupled to one page's logic
 - Just a visual wrapper with no logic
 
-**Real Examples in GigLink:**
+**Real Examples in TrabaWho:**
 
 **`SkeletonCard.js` - MUST be component because:**
 - Used in MyBookings.js (Line 749)
@@ -242,7 +242,7 @@ If `HeroSlider.js` was in `/components`:
 
 **Definition:** Centralized location for mock data, constants, and test fixtures
 
-**What GigLink Stores Here:**
+**What TrabaWho Stores Here:**
 
 **`MockWorkers.js` contains:**
 - `MOCK_WORKERS` - 5 fake worker profiles with services, ratings, availability
@@ -398,7 +398,7 @@ const [transactions, setTransactions] = useState(INITIAL_TRANSACTIONS);
 - **Debuggable:** Easy to trace problems
 - **Testable:** Can pass different props to test behavior
 
-**Real Example in GigLink:**
+**Real Example in TrabaWho:**
 
 **Parent: MyBookings.js (Lines 33-36, 762-764, 780)**
 
@@ -488,7 +488,7 @@ const PaymentModal = ({ booking }) => {
 };
 ```
 
-✅ **Good (Correct - This is what GigLink does):**
+✅ **Good (Correct - This is what TrabaWho does):**
 ```javascript
 // Parent owns state, child receives callbacks
 const PaymentModal = ({ booking, onSelectPayment }) => {
@@ -501,7 +501,7 @@ const PaymentModal = ({ booking, onSelectPayment }) => {
 
 ---
 
-### 1.3 Application in GigLink: HOW & WHY
+### 1.3 Application in TrabaWho: HOW & WHY
 
 **Real Feature: Cash Payment Confirmation Toggle (NEW)**
 
@@ -583,7 +583,7 @@ const cashConfirmationNotifications =
 - Professional, modern UX
 - Progressive enhancement
 
-**Real Example in GigLink: `SkeletonCard.js`**
+**Real Example in TrabaWho: `SkeletonCard.js`**
 
 **How It Works (Lines 10-47):**
 
@@ -613,7 +613,7 @@ const skeletonLine: {
 
 **Application: HOW & WHY It's Used**
 
-**Where Used in GigLink:**
+**Where Used in TrabaWho:**
 
 **1. Dashboard.js (Lines 177-185)**
 ```javascript
@@ -857,7 +857,7 @@ is_logged_in, IsLoggedIn, handlePaymentClick (bad), cash_confirmation_status
 - Self-documenting (var name tells you what it is)
 - Community expectation
 
-### Naming Patterns Used Throughout GigLink:
+### Naming Patterns Used Throughout TrabaWho:
 
 **1. Boolean Variables (Prefix: `is`, `has`, `should`)**
 
@@ -966,7 +966,7 @@ const [booking, setBooking] = useState([]);         // ❌ Singular for array is
 | **Single Item** | Singular + context | `selectedBooking` | MyBookings.js:33 |
 
 **Defense Point:**
-*"Consistent naming conventions make our code self-documenting. When someone reads `handlePaymentSubmit`, they know it's an event handler. When they see `isLoading`, they know it's a boolean. This reduces cognitive load and makes maintainability easier. Throughout GigLink, we follow these patterns consistently."*
+*"Consistent naming conventions make our code self-documenting. When someone reads `handlePaymentSubmit`, they know it's an event handler. When they see `isLoading`, they know it's a boolean. This reduces cognitive load and makes maintainability easier. Throughout TrabaWho, we follow these patterns consistently."*
 
 ---
 
@@ -990,7 +990,7 @@ Content that changes based on **state/props at runtime**, without page reloads o
 - Responds to user, real-time
 ```
 
-**How GigLink Does It: Navigation Switch (Dynamic View)**
+**How TrabaWho Does It: Navigation Switch (Dynamic View)**
 
 **Location:** App.js Lines 40-230
 

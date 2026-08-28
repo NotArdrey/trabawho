@@ -725,7 +725,7 @@ export const buildProfilePayload = ({
   return {
     user_id: user?.id || user,
     email: normalizeEmail(email || user?.email),
-    full_name: cleanString(fullName) || normalizeEmail(email || user?.email).split("@")[0] || "GigLink User",
+    full_name: cleanString(fullName) || normalizeEmail(email || user?.email).split("@")[0] || "TrabaWho User",
     is_client: true,
     is_worker: resolvedAppRole === "worker",
     role: resolvedAppRole,
@@ -742,8 +742,8 @@ export const buildProfilePayload = ({
 };
 
 export const sendEmailConfirmation = async (email: string, redirectTo = "") => {
-  const supabaseUrl = Deno.env.get("GIGLINK_SUPABASE_URL") || Deno.env.get("SUPABASE_URL") || "";
-  const anonKey = Deno.env.get("GIGLINK_SUPABASE_ANON_KEY") || Deno.env.get("SUPABASE_ANON_KEY") || "";
+  const supabaseUrl = Deno.env.get("TRABAWHO_SUPABASE_URL") || Deno.env.get("SUPABASE_URL") || "";
+  const anonKey = Deno.env.get("TRABAWHO_SUPABASE_ANON_KEY") || Deno.env.get("SUPABASE_ANON_KEY") || "";
   if (!supabaseUrl || !anonKey) {
     return { sent: false, provider: "supabase_auth", error: "Missing SUPABASE_URL or SUPABASE_ANON_KEY" };
   }

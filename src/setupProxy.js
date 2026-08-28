@@ -1,4 +1,4 @@
-const REGISTRATION_TERMINAL_LOG_ENDPOINT = '/__giglink_registration_log';
+const REGISTRATION_TERMINAL_LOG_ENDPOINT = '/__trabawho_registration_log';
 const MAX_LOG_BYTES = 64 * 1024;
 
 const safeParseJson = (value) => {
@@ -29,7 +29,7 @@ module.exports = function setupProxy(app) {
       const eventName = body.eventName || 'unknown_event';
       const payload = body.payload || {};
 
-      console[method](`[GigLink Registration Terminal] ${eventName}`, {
+      console[method](`[TrabaWho Registration Terminal] ${eventName}`, {
         ...payload,
         truncated: bodyTooLarge || undefined,
       });
@@ -39,7 +39,7 @@ module.exports = function setupProxy(app) {
     });
 
     req.on('error', (error) => {
-      console.error('[GigLink Registration Terminal] log_forward_failed', {
+      console.error('[TrabaWho Registration Terminal] log_forward_failed', {
         message: error.message,
       });
       res.statusCode = 204;

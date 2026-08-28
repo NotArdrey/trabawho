@@ -25,7 +25,7 @@ const getSystemTheme = () => {
 };
 
 const getStoredThemeMode = () => {
-  const savedThemeMode = localStorage.getItem('giglink-theme-mode');
+  const savedThemeMode = localStorage.getItem('trabawho-theme-mode');
   return savedThemeMode === 'light' || savedThemeMode === 'dark' || savedThemeMode === 'system'
     ? savedThemeMode
     : 'system';
@@ -69,7 +69,7 @@ const buildAuthOnlyProfile = (user, source = {}) => {
     || source?.name
     || metadata?.full_name
     || metadata?.name
-    || (email ? email.split('@')[0] : 'GigLink User');
+    || (email ? email.split('@')[0] : 'TrabaWho User');
 
   const role = normalizeRole(
     typeof source?.role === 'string'
@@ -116,7 +116,7 @@ export const useAppNavigation = () => {
     return initialMode === 'system' ? getSystemTheme() : initialMode;
   });
   const [appLanguage, setAppLanguage] = useState(
-    () => localStorage.getItem('giglink-language') || 'en'
+    () => localStorage.getItem('trabawho-language') || 'en'
   );
   const [isSellerOnboardingOpen, setIsSellerOnboardingOpen] = useState(false);
   const [resetToken, setResetToken] = useState(null);
@@ -242,7 +242,7 @@ export const useAppNavigation = () => {
     const nextTheme = themeMode === 'system' ? getSystemTheme() : themeMode;
 
     setAppTheme(nextTheme);
-    localStorage.setItem('giglink-theme-mode', themeMode);
+    localStorage.setItem('trabawho-theme-mode', themeMode);
 
     if (themeMode !== 'system' || typeof window === 'undefined' || !window.matchMedia) {
       return;
@@ -273,41 +273,41 @@ export const useAppNavigation = () => {
     document.documentElement.style.colorScheme = isDarkTheme ? 'dark' : 'light';
 
     const cssVars = {
-      '--giglink-page-bg': tokens.pageBg,
-      '--giglink-page-bg-alt': tokens.pageBgAlt,
-      '--giglink-surface': tokens.surface,
-      '--giglink-surface-alt': tokens.surfaceAlt,
-      '--giglink-surface-soft': tokens.surfaceSoft,
-      '--giglink-border': tokens.border,
-      '--giglink-text-primary': tokens.textPrimary,
-      '--giglink-text-secondary': tokens.textSecondary,
-      '--giglink-text-muted': tokens.textMuted,
-      '--giglink-input-bg': tokens.inputBg,
-      '--giglink-input-border': tokens.inputBorder,
-      '--giglink-input-text': tokens.inputText,
-      '--giglink-accent': tokens.accent,
-      '--giglink-accent-hover': tokens.accentHover || tokens.accent,
-      '--giglink-accent-deep': tokens.accentDeep || tokens.accent,
-      '--giglink-accent-soft': tokens.accentSoft,
-      '--giglink-accent-border': tokens.accentBorder,
-      '--giglink-accent-ring': tokens.accentRing,
-      '--giglink-accent-shadow': tokens.accentShadow,
-      '--giglink-shadow': tokens.shadow,
-      '--giglink-shadow-soft': tokens.shadowSoft,
-      '--giglink-nav-bg': tokens.navBg,
-      '--giglink-nav-border': tokens.navBorder,
-      '--giglink-badge-bg': tokens.badgeBg,
-      '--giglink-badge-text': tokens.badgeText,
-      '--giglink-success-bg': tokens.successBg,
-      '--giglink-success': tokens.success,
-      '--giglink-success-text': tokens.successText,
-      '--giglink-success-border': tokens.successBorder,
-      '--giglink-danger': tokens.danger,
-      '--giglink-danger-bg': tokens.dangerBg,
-      '--giglink-danger-border': tokens.dangerBorder,
-      '--giglink-warning': tokens.warning,
-      '--giglink-warning-bg': tokens.warningBg,
-      '--giglink-warning-border': tokens.warningBorder,
+      '--trabawho-page-bg': tokens.pageBg,
+      '--trabawho-page-bg-alt': tokens.pageBgAlt,
+      '--trabawho-surface': tokens.surface,
+      '--trabawho-surface-alt': tokens.surfaceAlt,
+      '--trabawho-surface-soft': tokens.surfaceSoft,
+      '--trabawho-border': tokens.border,
+      '--trabawho-text-primary': tokens.textPrimary,
+      '--trabawho-text-secondary': tokens.textSecondary,
+      '--trabawho-text-muted': tokens.textMuted,
+      '--trabawho-input-bg': tokens.inputBg,
+      '--trabawho-input-border': tokens.inputBorder,
+      '--trabawho-input-text': tokens.inputText,
+      '--trabawho-accent': tokens.accent,
+      '--trabawho-accent-hover': tokens.accentHover || tokens.accent,
+      '--trabawho-accent-deep': tokens.accentDeep || tokens.accent,
+      '--trabawho-accent-soft': tokens.accentSoft,
+      '--trabawho-accent-border': tokens.accentBorder,
+      '--trabawho-accent-ring': tokens.accentRing,
+      '--trabawho-accent-shadow': tokens.accentShadow,
+      '--trabawho-shadow': tokens.shadow,
+      '--trabawho-shadow-soft': tokens.shadowSoft,
+      '--trabawho-nav-bg': tokens.navBg,
+      '--trabawho-nav-border': tokens.navBorder,
+      '--trabawho-badge-bg': tokens.badgeBg,
+      '--trabawho-badge-text': tokens.badgeText,
+      '--trabawho-success-bg': tokens.successBg,
+      '--trabawho-success': tokens.success,
+      '--trabawho-success-text': tokens.successText,
+      '--trabawho-success-border': tokens.successBorder,
+      '--trabawho-danger': tokens.danger,
+      '--trabawho-danger-bg': tokens.dangerBg,
+      '--trabawho-danger-border': tokens.dangerBorder,
+      '--trabawho-warning': tokens.warning,
+      '--trabawho-warning-bg': tokens.warningBg,
+      '--trabawho-warning-border': tokens.warningBorder,
       '--gl-page': tokens.pageBg,
       '--gl-page-soft': tokens.surfaceSoft,
       '--gl-surface': tokens.surface,
@@ -320,7 +320,7 @@ export const useAppNavigation = () => {
       '--gl-text-3': tokens.textMuted,
       '--gl-blue': tokens.accent,
       '--gl-blue-2': tokens.accentHover || tokens.accentDeep || tokens.accent,
-      '--gl-cyan': '#10b0d1',
+      '--gl-cyan': '#ff7a00',
       '--gl-green': tokens.success,
       '--gl-amber': tokens.warning,
       '--gl-red': tokens.danger,
@@ -353,7 +353,7 @@ export const useAppNavigation = () => {
 
   // Language effect
   useEffect(() => {
-    localStorage.setItem('giglink-language', appLanguage);
+    localStorage.setItem('trabawho-language', appLanguage);
     document.documentElement.lang = appLanguage === 'fil' ? 'fil' : 'en';
   }, [appLanguage]);
 
@@ -483,7 +483,7 @@ export const useAppNavigation = () => {
         },
         isWorker: false,
       });
-      showSuccessNotification('Account created successfully! Welcome to GigLink.');
+      showSuccessNotification('Account created successfully! Welcome to TrabaWho.');
       setIsLoadingTransition(false);
       return result.user;
     } catch (error) {

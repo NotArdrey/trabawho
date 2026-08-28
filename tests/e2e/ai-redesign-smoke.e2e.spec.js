@@ -146,7 +146,7 @@ test.describe('AI redesign smoke verification', () => {
     await page.setViewportSize({ width: 1366, height: 900 });
     await loginAs(page, DEMO_ADMIN_EMAIL);
 
-    await expect(page.getByRole('heading', { name: 'GigLink Admin Dashboard' })).toBeVisible({ timeout: 20_000 });
+    await expect(page.getByRole('heading', { name: 'TrabaWho Admin Dashboard' })).toBeVisible({ timeout: 20_000 });
     await page.getByRole('button', { name: 'Back to App' }).click();
     await expect(page.getByTestId('client-home-dashboard')).toBeVisible({ timeout: 20_000 });
     await page.getByRole('button', { name: /^Browse$/ }).click();

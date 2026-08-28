@@ -41,7 +41,7 @@ function ServiceCard({ provider, onViewProfile, onViewReviews, onChat }) {
           <strong className="service-result-price">{formatPrice(provider)}</strong>
         </div>
 
-        <p>{provider.description || 'Professional service available through GigLink.'}</p>
+        <p>{provider.description || 'Professional service available through TrabaWho.'}</p>
 
         <div className="service-result-meta">
           <span><Star size={14} fill="currentColor" aria-hidden="true" /> {provider.rating || 'New'} ({provider.reviews || 0})</span>

@@ -37,7 +37,7 @@ const FOOTER_COLUMNS = [
   {
     title: 'For Clients',
     links: [
-      'How GigLink Works',
+      'How TrabaWho Works',
       'Find a Professional',
       'Book by Schedule',
       'Track Bookings',
@@ -57,7 +57,7 @@ const FOOTER_COLUMNS = [
   {
     title: 'Company',
     links: [
-      'About GigLink',
+      'About TrabaWho',
       'Trust & Safety',
       'Terms of Service',
       'Privacy Policy',
@@ -444,12 +444,12 @@ function GoalsSection({ onLoginClick, isMobile, isTablet }) {
   return (
     <section style={styles.goalsSection}>
       <div style={styles.goalsSectionHeader}>
-        <span style={styles.goalsSectionEyebrow}>Powered by GigLink</span>
+        <span style={styles.goalsSectionEyebrow}>Powered by TrabaWho</span>
         <h2 style={styles.goalsSectionTitle}>
           Set Your <em style={styles.goalsSectionTitleEm}>Professional Goals</em>
         </h2>
         <p style={styles.goalsSectionSubtitle}>
-          Turn your ambitions into milestones. Pick a goal and let GigLink connect you
+          Turn your ambitions into milestones. Pick a goal and let TrabaWho connect you
           with the right opportunities, clients, and tools to get there.
         </p>
       </div>
@@ -763,10 +763,10 @@ function LandingPage({ appTheme = 'light', onLogin, onResendVerification, onForg
 
         <GoalsSection onLoginClick={handleLoginClick} isMobile={isMobile} isTablet={isTablet} />
 
-        <section style={styles.landingStatsSection} aria-label="GigLink performance highlights">
+        <section style={styles.landingStatsSection} aria-label="TrabaWho performance highlights">
           <div style={styles.landingStatsHeader}>
             <span style={styles.landingStatsHeaderSpan}>Platform Snapshot</span>
-            <h2 style={styles.landingStatsHeaderH2}>Why GigLink Delivers</h2>
+            <h2 style={styles.landingStatsHeaderH2}>Why TrabaWho Delivers</h2>
             <p style={styles.landingStatsHeaderP}>Quick metrics that show activity and trust across our service marketplace.</p>
           </div>
           <div style={styles.landingStatsGrid}>
@@ -779,7 +779,7 @@ function LandingPage({ appTheme = 'light', onLogin, onResendVerification, onForg
           </div>
         </section>
 
-        <section style={styles.landingLinksSection} aria-label="GigLink quick links">
+        <section style={styles.landingLinksSection} aria-label="TrabaWho quick links">
           <div style={styles.landingLinksGrid}>
             {FOOTER_COLUMNS.map((column) => (
               <div key={column.title}>
@@ -802,8 +802,8 @@ function LandingPage({ appTheme = 'light', onLogin, onResendVerification, onForg
           </div>
 
           <div style={styles.landingFooterBottom} id="landing-footer">
-            <p style={styles.landingCopyright}>Copyright GigLink 2026. All rights reserved.</p>
-            <div style={styles.landingSocialLinks} aria-label="GigLink social media">
+            <p style={styles.landingCopyright}>Copyright TrabaWho 2026. All rights reserved.</p>
+            <div style={styles.landingSocialLinks} aria-label="TrabaWho social media">
               {SOCIAL_LINKS.map((social) => (
                 <a
                   key={social.id}

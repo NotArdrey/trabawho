@@ -135,7 +135,7 @@ function Navigation({ onLoginClick, onBrowseServices }) {
       <div style={styles.navContainer}>
         {/* Logo */}
         <div style={styles.navLogo.wrap}>
-          <img src="/giglink-logo.svg" alt="" aria-hidden="true" style={styles.navLogo.img} />
+          <img src="/trabawho-logo.svg" alt="" aria-hidden="true" style={styles.navLogo.img} />
           <h1 style={styles.navLogo.h1}><BrandWordmark /></h1>
         </div>
 

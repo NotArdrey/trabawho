@@ -110,7 +110,7 @@ function Profile({ appTheme = 'light', themeMode = 'system', onThemeChange, curr
   useEffect(() => {
     if (!sellerProfile?.userId) return;
     try {
-      const saved = window.localStorage.getItem(`giglink-portfolio-documents-${sellerProfile.userId}`);
+      const saved = window.localStorage.getItem(`trabawho-portfolio-documents-${sellerProfile.userId}`);
       setPortfolioDocuments(saved ? JSON.parse(saved) : []);
     } catch (error) {
       setPortfolioDocuments([]);
@@ -249,7 +249,7 @@ function Profile({ appTheme = 'light', themeMode = 'system', onThemeChange, curr
   const persistPortfolioDocuments = (documents) => {
     setPortfolioDocuments(documents);
     if (!sellerProfile?.userId) return;
-    window.localStorage.setItem(`giglink-portfolio-documents-${sellerProfile.userId}`, JSON.stringify(documents));
+    window.localStorage.setItem(`trabawho-portfolio-documents-${sellerProfile.userId}`, JSON.stringify(documents));
   };
 
   const handlePortfolioDocumentSelection = async (event) => {
@@ -448,12 +448,12 @@ function Profile({ appTheme = 'light', themeMode = 'system', onThemeChange, curr
 
   const boostTerms = [
     'You agree that the selected gig, duration, and budget are accurate before the ad boost is activated.',
-    'GigLink may use your service title, profile details, location, category, and boost settings to prioritize this gig in marketplace recommendation views.',
+    'TrabaWho may use your service title, profile details, location, category, and boost settings to prioritize this gig in marketplace recommendation views.',
     'This test payment flow records a sandbox payment reference only. No real GCash or cash transfer is processed.',
     'Boost placement can improve visibility, but it does not guarantee client inquiries, bookings, or earnings.',
   ];
   const boostPaymentBooking = pendingBoost ? {
-    workerName: 'GigLink Ad Booster',
+    workerName: 'TrabaWho Ad Booster',
     serviceType: pendingBoost.serviceTitle,
     quoteAmount: pendingBoost.budget,
     allowGcashAdvance: true,
@@ -752,10 +752,10 @@ function Profile({ appTheme = 'light', themeMode = 'system', onThemeChange, curr
             isOpen={isBoostTermsOpen}
             appTheme={appTheme}
             title="Agree Before Boost Payment"
-            subtitle="Please review these GigLink ad boost terms before continuing to payment."
+            subtitle="Please review these TrabaWho ad boost terms before continuing to payment."
             confirmLabel="Agree and Open Payment"
             terms={boostTerms}
-            agreementLabel="I agree to the GigLink ad boost Terms and Conditions for this selected gig."
+            agreementLabel="I agree to the TrabaWho ad boost Terms and Conditions for this selected gig."
             onCancel={handleCancelBoostFlow}
             onConfirm={handleConfirmBoostTerms}
           />

@@ -1,4 +1,4 @@
-# GigLink - Complete Presentation & Defense Guide
+# TrabaWho - Complete Presentation & Defense Guide
 **A Comprehensive Breakdown of React Principles & Code Implementations**
 
 ---
@@ -23,7 +23,7 @@
 
 **Definition:** Parent components manage business logic and state. Child components receive data via props and communicate back through callback functions.
 
-#### **Hierarchy in GigLink:**
+#### **Hierarchy in TrabaWho:**
 
 ```
 App.js (Root Parent)
@@ -149,7 +149,7 @@ const [cashPaymentView, setCashPaymentView] = useState('pending');
 useEffect(() => {
   const nextTheme = themeMode === 'system' ? getSystemTheme() : themeMode;
   setAppTheme(nextTheme);
-  localStorage.setItem('giglink-theme-mode', themeMode);
+  localStorage.setItem('trabawho-theme-mode', themeMode);
   // Updates DOM and listens to system theme changes
 }, [themeMode]);
 ```
@@ -414,7 +414,7 @@ const handleReviewCashConfirmation = (transactionId, decision) => {
 **Correct:** `isLoggedIn`, `currentView`, `handlePaymentClick`
 **Incorrect:** `is_logged_in`, `IsLoggedIn`, `currentview`
 
-### 5.2 camelCase Usage in GigLink
+### 5.2 camelCase Usage in TrabaWho
 
 #### **State Variables (Line 40-50 in App.js):**
 ```javascript
@@ -962,7 +962,7 @@ const cashConfirmationNotifications =
 
 ### 9.3 Redux-Like Pattern (No Redux Needed)
 
-**Custom Hook Pattern Used in GigLink:**
+**Custom Hook Pattern Used in TrabaWho:**
 
 ```javascript
 // Instead of Redux, use local state + handlers
@@ -1056,7 +1056,7 @@ function GenericModal({ isOpen, onClose, onConfirm, children }) {
 </GenericModal>
 ```
 
-**Similar Modals in GigLink:**
+**Similar Modals in TrabaWho:**
 - `PaymentModal.js` - Payment method selection
 - `BookingCalendarModal.js` - Calendar booking
 - `ProfileEditModal.js` - Edit profile
@@ -1195,7 +1195,7 @@ src/
 
 ## CONCLUSION
 
-GigLink demonstrates mastery of:
+TrabaWho demonstrates mastery of:
 ✅ **React Hooks** (useState, useEffect, useMemo)  
 ✅ **Component Architecture** (Parent-Child pattern)  
 ✅ **State Management** (Unidirectional data flow)  

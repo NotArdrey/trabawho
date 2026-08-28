@@ -1,4 +1,4 @@
--- GigLink Complete Schema - Consolidated
+-- TrabaWho Complete Schema - Consolidated
 -- Run this complete file in Supabase SQL Editor to set up all necessary tables and RLS policies
 -- This file includes: profiles, worker_profiles, sellers, services, and all related tables with RLS
 

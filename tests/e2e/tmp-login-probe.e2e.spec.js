@@ -28,7 +28,7 @@ test('temporary login probe', async ({ page }) => {
 
   await page.goto('/');
   await page.getByRole('button', { name: /^Login$/ }).first().click();
-  await page.getByLabel('Email').fill('demo.user@giglink.test');
+  await page.getByLabel('Email').fill('demo.user@trabawho.test');
   await page.getByLabel('Password').fill('pass123');
   await page.locator('form').getByRole('button', { name: /^Login$/ }).click();
   await page.waitForTimeout(12000);

@@ -1,5 +1,5 @@
 -- Dedicated worker demo account for development and E2E runs.
--- Email: demo.worker@giglink.test
+-- Email: demo.worker@trabawho.test
 -- Password: pass123
 
 create extension if not exists pgcrypto with schema extensions;
@@ -7,7 +7,7 @@ create extension if not exists pgcrypto with schema extensions;
 with desired_user as (
   select
     '00000000-0000-4000-8000-000000000103'::uuid as target_id,
-    'demo.worker@giglink.test'::text as email,
+    'demo.worker@trabawho.test'::text as email,
     'Demo Worker'::text as full_name,
     'worker'::text as app_role,
     'Demo'::text as first_name,
@@ -174,7 +174,7 @@ begin
           null::text as middle_name,
           'Worker'::text as last_name
         from auth.users users
-        where lower(users.email::text) = 'demo.worker@giglink.test'
+        where lower(users.email::text) = 'demo.worker@trabawho.test'
       )
       insert into public.profiles (
         id,
@@ -242,7 +242,7 @@ begin
           null::text as middle_name,
           'Worker'::text as last_name
         from auth.users users
-        where lower(users.email::text) = 'demo.worker@giglink.test'
+        where lower(users.email::text) = 'demo.worker@trabawho.test'
       )
       insert into public.profiles (
         user_id,
@@ -302,7 +302,7 @@ end $$;
 with worker_user as (
   select id
   from auth.users
-  where lower(email::text) = 'demo.worker@giglink.test'
+  where lower(email::text) = 'demo.worker@trabawho.test'
 )
 insert into public.worker_profiles (
   user_id,
@@ -353,7 +353,7 @@ on conflict (user_id) do update set
 with worker_user as (
   select id
   from auth.users
-  where lower(email::text) = 'demo.worker@giglink.test'
+  where lower(email::text) = 'demo.worker@trabawho.test'
 )
 insert into public.sellers (
   user_id,
@@ -410,7 +410,7 @@ on conflict (user_id) do update set
 with worker_user as (
   select id
   from auth.users
-  where lower(email::text) = 'demo.worker@giglink.test'
+  where lower(email::text) = 'demo.worker@trabawho.test'
 ),
 worker_service as (
   insert into public.services (
@@ -443,7 +443,7 @@ worker_service as (
       'pricing_model', 'fixed',
       'booking_mode', 'with-slots',
       'rate_basis', 'per-project',
-      'seed_account', 'demo.worker@giglink.test'
+      'seed_account', 'demo.worker@trabawho.test'
     ),
     now(),
     now()
@@ -465,7 +465,7 @@ cleared_seed_slots as (
   delete from public.service_slots slot
   using worker_service
   where slot.service_id = worker_service.id
-    and slot.metadata ->> 'seed_account' = 'demo.worker@giglink.test'
+    and slot.metadata ->> 'seed_account' = 'demo.worker@trabawho.test'
   returning slot.id
 )
 insert into public.service_slots (
@@ -488,7 +488,7 @@ select
   3,
   'available',
   slot_plan.note,
-  jsonb_build_object('seed_account', 'demo.worker@giglink.test'),
+  jsonb_build_object('seed_account', 'demo.worker@trabawho.test'),
   now(),
   now()
 from worker_service

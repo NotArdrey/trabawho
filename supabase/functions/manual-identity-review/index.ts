@@ -109,7 +109,7 @@ const ensureManualReviewAuthUser = async (
     verification_status: "PENDING_REVIEW",
     identity_required: true,
     is_verified: false,
-    full_name: cleanString(fullName) || normalizeEmail(email).split("@")[0] || "GigLink User",
+    full_name: cleanString(fullName) || normalizeEmail(email).split("@")[0] || "TrabaWho User",
     selected_document_type: documentType,
     selected_document_type_key: documentTypeKey,
     verification_mode: "manual_upload",

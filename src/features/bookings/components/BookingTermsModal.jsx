@@ -3,7 +3,7 @@ import { getThemeTokens } from '../../../shared/styles/themeTokens';
 
 const TERMS = [
   'You agree to share accurate booking, schedule, payment, and contact details needed to complete this service.',
-  'GigLink will process booking records, chat messages, proof of payment, and uploaded files only for service coordination, verification, safety, and support.',
+  'TrabaWho will process booking records, chat messages, proof of payment, and uploaded files only for service coordination, verification, safety, and support.',
   'Mock payment steps in this test flow do not move real money. Final payment responsibility remains between the client and worker until production payment is enabled.',
   'Both client and worker must act honestly, avoid fraudulent proof, and keep agreed service details inside the booking conversation for traceability.',
 ];
@@ -12,10 +12,10 @@ function BookingTermsModal({
   isOpen,
   appTheme = 'light',
   title = 'Confirm Booking Terms',
-  subtitle = 'Please review these GigLink booking terms before continuing.',
+  subtitle = 'Please review these TrabaWho booking terms before continuing.',
   confirmLabel = 'Agree and Continue',
   terms = TERMS,
-  agreementLabel = 'I agree to the GigLink booking Terms and Conditions for this booking.',
+  agreementLabel = 'I agree to the TrabaWho booking Terms and Conditions for this booking.',
   onCancel,
   onConfirm,
 }) {

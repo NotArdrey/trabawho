@@ -64,7 +64,7 @@ const fetchLiveDiditDecision = async (sessionId: string) => {
 };
 
 const isDiditAutoApproveEnabled = () => {
-  const value = cleanString(Deno.env.get("GIGLINK_DIDIT_AUTO_APPROVE") || Deno.env.get("DIDIT_AUTO_APPROVE"));
+  const value = cleanString(Deno.env.get("TRABAWHO_DIDIT_AUTO_APPROVE") || Deno.env.get("DIDIT_AUTO_APPROVE"));
   return ["1", "true", "yes", "on"].includes(value.toLowerCase());
 };
 
@@ -80,7 +80,7 @@ const ensureSignupAuthUser = async (
     verification_status: normalizeStatus(identityStatus),
     identity_required: true,
     is_verified: false,
-    full_name: cleanString(fullName) || normalizeEmail(email).split("@")[0] || "GigLink User",
+    full_name: cleanString(fullName) || normalizeEmail(email).split("@")[0] || "TrabaWho User",
     selected_document_type: cleanString(documentType),
     selected_document_type_key: cleanString(documentTypeKey),
     verification_mode: "didit",

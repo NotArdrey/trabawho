@@ -4,10 +4,10 @@ import { sendChatbotMessage } from '../services/chatbotService';
 import { startServiceConversationByServiceId } from '../../features/bookings/services/bookingService';
 
 const MAX_IMAGE_BYTES = 2_900_000;
-const PHOTO_HELP_PROMPT = 'Please identify the problem in this photo, estimate the likely budget, and find a qualified GigLink worker.';
+const PHOTO_HELP_PROMPT = 'Please identify the problem in this photo, estimate the likely budget, and find a qualified TrabaWho worker.';
 const SUPPORTED_IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
-const WELCOME_MESSAGE = 'Hi! I can help you browse services, understand bookings, set up seller tools, or find the right next step in GigLink.';
-const CHATBOT_SIZE_STORAGE_KEY = 'giglink-chatbot-size';
+const WELCOME_MESSAGE = 'Hi! I can help you browse services, understand bookings, set up seller tools, or find the right next step in TrabaWho.';
+const CHATBOT_SIZE_STORAGE_KEY = 'trabawho-chatbot-size';
 const CHATBOT_DEFAULT_SIZE = { width: 430, height: 680 };
 const CHATBOT_MIN_SIZE = { width: 320, height: 380 };
 const CHATBOT_RESIZE_HANDLES = ['n', 'e', 's', 'w', 'ne', 'nw', 'se', 'sw'];
@@ -53,13 +53,13 @@ const QUICK_PROMPTS_BY_VIEW = {
 };
 
 const LOCAL_SHORTCUT_REPLIES = {
-  hi: 'Hi. What would you like to do in GigLink: find a service, check a booking, or set up seller tools?',
-  hello: 'Hi. What would you like to do in GigLink: find a service, check a booking, or set up seller tools?',
-  hey: 'Hi. What would you like to do in GigLink: find a service, check a booking, or set up seller tools?',
+  hi: 'Hi. What would you like to do in TrabaWho: find a service, check a booking, or set up seller tools?',
+  hello: 'Hi. What would you like to do in TrabaWho: find a service, check a booking, or set up seller tools?',
+  hey: 'Hi. What would you like to do in TrabaWho: find a service, check a booking, or set up seller tools?',
   help: 'I can help with services, bookings, seller setup, quotes, payments, refunds, profiles, or settings. What are you trying to do right now?',
   qr: 'Do you mean a seller payment QR, identity verification, or a booking payment step?',
   id: 'Do you mean identity verification, your profile details, or an account issue?',
-  ok: 'Got it. What would you like to do next in GigLink?',
+  ok: 'Got it. What would you like to do next in TrabaWho?',
 };
 
 const LOW_CONFIDENCE_REPLIES_BY_VIEW = {
@@ -458,7 +458,7 @@ function FloatingChatbot({
       const conversation = await startServiceConversationByServiceId({
         serviceId: match.id,
         assistantContext: {
-          source: 'giglink-chatbot',
+          source: 'trabawho-chatbot',
           problem: assistantMessage?.diagnosis || null,
           estimate: assistantMessage?.estimate || null,
           selected_match: match,
@@ -568,7 +568,7 @@ function FloatingChatbot({
         <section
           className="gl-chatbot-panel"
           role="dialog"
-          aria-label="GigLink assistant"
+          aria-label="TrabaWho assistant"
           aria-modal="false"
           style={panelStyle}
         >
@@ -586,13 +586,13 @@ function FloatingChatbot({
               <BotMessageSquare size={19} aria-hidden="true" />
             </span>
             <div>
-              <h2>GigLink Assistant</h2>
+              <h2>TrabaWho Assistant</h2>
               <p>Marketplace and booking help</p>
             </div>
             <button
               type="button"
               className="gl-chatbot-icon-button"
-              aria-label="Reset GigLink assistant chat"
+              aria-label="Reset TrabaWho assistant chat"
               title="Reset chat"
               disabled={isSending || Boolean(isStartingBookingId)}
               onClick={resetChat}
@@ -602,7 +602,7 @@ function FloatingChatbot({
             <button
               type="button"
               className="gl-chatbot-icon-button"
-              aria-label="Close GigLink assistant"
+              aria-label="Close TrabaWho assistant"
               onClick={() => setIsOpen(false)}
             >
               <X size={18} aria-hidden="true" />
@@ -643,7 +643,7 @@ function FloatingChatbot({
           )}
 
           <form className="gl-chatbot-form" onSubmit={handleSendMessage}>
-            <div className="gl-chatbot-suggestions" aria-label="Suggested GigLink questions">
+            <div className="gl-chatbot-suggestions" aria-label="Suggested TrabaWho questions">
               {quickPrompts.map((prompt) => (
                 <button
                   key={prompt}
@@ -690,7 +690,7 @@ function FloatingChatbot({
                   handleSendMessage(event);
                 }
               }}
-              aria-label="Message GigLink assistant"
+              aria-label="Message TrabaWho assistant"
               placeholder="Ask or add photo"
               rows={1}
             />
@@ -709,7 +709,7 @@ function FloatingChatbot({
       <button
         type="button"
         className="gl-chatbot-toggle"
-        aria-label={isOpen ? 'Close GigLink assistant' : 'Open GigLink assistant'}
+        aria-label={isOpen ? 'Close TrabaWho assistant' : 'Open TrabaWho assistant'}
         aria-expanded={isOpen}
         onClick={() => setIsOpen((value) => !value)}
       >

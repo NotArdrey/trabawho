@@ -35,7 +35,7 @@ npm.cmd start             # Restart dev server
 | `.env.local` | ✅ Supabase credentials (auto-created) |
 | `supabase/COMPLETE_SCHEMA_CONSOLIDATED.sql` | ✅ Complete database schema |
 | `SUPABASE_SETUP_GUIDE.md` | 📖 Detailed step-by-step guide |
-| `GIGLINK_DATABASE_VERIFICATION.md` | ✅ Full verification checklist |
+| `TRABAWHO_DATABASE_VERIFICATION.md` | ✅ Full verification checklist |
 
 ---
 
@@ -54,7 +54,7 @@ After restart, try this in your app:
 
 ## ❌ Still Getting Error?
 
-See complete troubleshooting in: [`GIGLINK_DATABASE_VERIFICATION.md`](./GIGLINK_DATABASE_VERIFICATION.md#-troubleshooting)
+See complete troubleshooting in: [`TRABAWHO_DATABASE_VERIFICATION.md`](./TRABAWHO_DATABASE_VERIFICATION.md#-troubleshooting)
 
 Or follow detailed setup guide: [`SUPABASE_SETUP_GUIDE.md`](./SUPABASE_SETUP_GUIDE.md)
 

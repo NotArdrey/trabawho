@@ -214,7 +214,7 @@ function WorkerDetailModal({ isOpen, worker, onClose, onBookNow }) {
 
               {/* Description */}
               <p className="worker-modal-description">
-                {worker.description || 'Professional service available through GigLink. Message this provider for full project details.'}
+                {worker.description || 'Professional service available through TrabaWho. Message this provider for full project details.'}
               </p>
 
               {/* Rate card */}

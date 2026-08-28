@@ -394,7 +394,7 @@ function Header({ searchQuery, onSearchChange, onLogout, onOpenSellerSetup, onOp
             }
           }}
         >
-          <img src="/giglink-logo.svg" alt="" aria-hidden="true" style={styles.logoImg} />
+          <img src="/trabawho-logo.svg" alt="" aria-hidden="true" style={styles.logoImg} />
           <BrandWordmark />
         </a>
 

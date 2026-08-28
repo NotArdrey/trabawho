@@ -166,7 +166,7 @@ function DashboardNavigation({
     <>
       <aside className="gl-app-sidebar">
         <button type="button" className="gl-app-brand" onClick={() => onOpenDashboard?.()} aria-label="Open home">
-          <img src="/giglink-logo.svg" alt="" aria-hidden="true" />
+          <img src="/trabawho-logo.svg" alt="" aria-hidden="true" />
           <strong><BrandWordmark /></strong>
         </button>
 
@@ -202,7 +202,7 @@ function DashboardNavigation({
 
       <header className="gl-app-topbar">
         <button type="button" className="gl-app-mobile-brand" onClick={() => onOpenDashboard?.()} aria-label="Open home">
-          <img src="/giglink-logo.svg" alt="" aria-hidden="true" />
+          <img src="/trabawho-logo.svg" alt="" aria-hidden="true" />
           <strong><BrandWordmark /></strong>
         </button>
 

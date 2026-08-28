@@ -7,12 +7,12 @@ with desired_workers as (
   select *
   from (
     values
-      ('00000000-0000-4000-8000-000000000104'::uuid, 'demo.worker.cleaning@giglink.test'::text, 'Maria Teresa Cruz'::text, 'Maria Teresa'::text, null::text, 'Cruz'::text, 'Apartment Cleaning & Organization'::text, 'Apartment Cleaning & Organization'::text, 'Cleans small apartments, organizes rooms, wipes surfaces, and prepares units for guests or move-ins.'::text, 900::numeric, 'per-project'::text, 'with-slots'::text, '09271230001'::text, 'Bulacan'::text, 'Malolos'::text, 'Tikay'::text, 'Tikay, Malolos, Bulacan'::text, 31::int, 6::int),
-      ('00000000-0000-4000-8000-000000000105'::uuid, 'demo.worker.appliance@giglink.test'::text, 'Jose Miguel Ramos'::text, 'Jose Miguel'::text, null::text, 'Ramos'::text, 'Appliance Installation & Repair'::text, 'Appliance Installation & Repair'::text, 'Installs and troubleshoots small household appliances, fans, outlets, and basic kitchen equipment.'::text, 850::numeric, 'per-project'::text, 'with-slots'::text, '09271230002'::text, 'Bulacan'::text, 'Baliuag'::text, 'San Roque'::text, 'San Roque, Baliuag, Bulacan'::text, 36::int, 9::int),
-      ('00000000-0000-4000-8000-000000000106'::uuid, 'demo.worker.laundry@giglink.test'::text, 'Carla Bautista Garcia'::text, 'Carla'::text, 'Bautista'::text, 'Garcia'::text, 'Laundry Pickup & Folding'::text, 'Laundry Pickup & Folding'::text, 'Handles laundry pickup coordination, sorting, folding, and tidy delivery for busy households.'::text, 550::numeric, 'per-project'::text, 'with-slots'::text, '09271230003'::text, 'Bulacan'::text, 'Meycauayan'::text, 'Poblacion'::text, 'Poblacion, Meycauayan, Bulacan'::text, 28::int, 4::int),
-      ('00000000-0000-4000-8000-000000000107'::uuid, 'demo.worker.garden@giglink.test'::text, 'Ramon De Leon Torres'::text, 'Ramon'::text, 'De Leon'::text, 'Torres'::text, 'Garden Cleanup & Yard Work'::text, 'Garden Cleanup & Yard Work'::text, 'Clears leaves, trims small plants, hauls light garden waste, and tidies outdoor areas.'::text, 950::numeric, 'per-project'::text, 'with-slots'::text, '09271230004'::text, 'Bulacan'::text, 'Marilao'::text, 'Lias'::text, 'Lias, Marilao, Bulacan'::text, 42::int, 11::int),
-      ('00000000-0000-4000-8000-000000000108'::uuid, 'demo.worker.events@giglink.test'::text, 'Nina Mercado Flores'::text, 'Nina'::text, 'Mercado'::text, 'Flores'::text, 'Event Setup & Cleanup'::text, 'Event Setup & Cleanup'::text, 'Sets up tables, chairs, simple decor, and post-event cleanup for small home gatherings.'::text, 1100::numeric, 'per-project'::text, 'with-slots'::text, '09271230005'::text, 'Bulacan'::text, 'Plaridel'::text, 'Banga 1st'::text, 'Banga 1st, Plaridel, Bulacan'::text, 33::int, 7::int),
-      ('00000000-0000-4000-8000-000000000109'::uuid, 'demo.worker.plumbing@giglink.test'::text, 'Arnold Lim Castillo'::text, 'Arnold'::text, 'Lim'::text, 'Castillo'::text, 'Plumbing Leak Repair'::text, 'Plumbing Leak Repair'::text, 'Repairs minor sink leaks, replaces faucets, clears simple clogs, and checks basic pipe fittings.'::text, 800::numeric, 'per-project'::text, 'with-slots'::text, '09271230006'::text, 'Bulacan'::text, 'Guiguinto'::text, 'Tabang'::text, 'Tabang, Guiguinto, Bulacan'::text, 39::int, 10::int)
+      ('00000000-0000-4000-8000-000000000104'::uuid, 'demo.worker.cleaning@trabawho.test'::text, 'Maria Teresa Cruz'::text, 'Maria Teresa'::text, null::text, 'Cruz'::text, 'Apartment Cleaning & Organization'::text, 'Apartment Cleaning & Organization'::text, 'Cleans small apartments, organizes rooms, wipes surfaces, and prepares units for guests or move-ins.'::text, 900::numeric, 'per-project'::text, 'with-slots'::text, '09271230001'::text, 'Bulacan'::text, 'Malolos'::text, 'Tikay'::text, 'Tikay, Malolos, Bulacan'::text, 31::int, 6::int),
+      ('00000000-0000-4000-8000-000000000105'::uuid, 'demo.worker.appliance@trabawho.test'::text, 'Jose Miguel Ramos'::text, 'Jose Miguel'::text, null::text, 'Ramos'::text, 'Appliance Installation & Repair'::text, 'Appliance Installation & Repair'::text, 'Installs and troubleshoots small household appliances, fans, outlets, and basic kitchen equipment.'::text, 850::numeric, 'per-project'::text, 'with-slots'::text, '09271230002'::text, 'Bulacan'::text, 'Baliuag'::text, 'San Roque'::text, 'San Roque, Baliuag, Bulacan'::text, 36::int, 9::int),
+      ('00000000-0000-4000-8000-000000000106'::uuid, 'demo.worker.laundry@trabawho.test'::text, 'Carla Bautista Garcia'::text, 'Carla'::text, 'Bautista'::text, 'Garcia'::text, 'Laundry Pickup & Folding'::text, 'Laundry Pickup & Folding'::text, 'Handles laundry pickup coordination, sorting, folding, and tidy delivery for busy households.'::text, 550::numeric, 'per-project'::text, 'with-slots'::text, '09271230003'::text, 'Bulacan'::text, 'Meycauayan'::text, 'Poblacion'::text, 'Poblacion, Meycauayan, Bulacan'::text, 28::int, 4::int),
+      ('00000000-0000-4000-8000-000000000107'::uuid, 'demo.worker.garden@trabawho.test'::text, 'Ramon De Leon Torres'::text, 'Ramon'::text, 'De Leon'::text, 'Torres'::text, 'Garden Cleanup & Yard Work'::text, 'Garden Cleanup & Yard Work'::text, 'Clears leaves, trims small plants, hauls light garden waste, and tidies outdoor areas.'::text, 950::numeric, 'per-project'::text, 'with-slots'::text, '09271230004'::text, 'Bulacan'::text, 'Marilao'::text, 'Lias'::text, 'Lias, Marilao, Bulacan'::text, 42::int, 11::int),
+      ('00000000-0000-4000-8000-000000000108'::uuid, 'demo.worker.events@trabawho.test'::text, 'Nina Mercado Flores'::text, 'Nina'::text, 'Mercado'::text, 'Flores'::text, 'Event Setup & Cleanup'::text, 'Event Setup & Cleanup'::text, 'Sets up tables, chairs, simple decor, and post-event cleanup for small home gatherings.'::text, 1100::numeric, 'per-project'::text, 'with-slots'::text, '09271230005'::text, 'Bulacan'::text, 'Plaridel'::text, 'Banga 1st'::text, 'Banga 1st, Plaridel, Bulacan'::text, 33::int, 7::int),
+      ('00000000-0000-4000-8000-000000000109'::uuid, 'demo.worker.plumbing@trabawho.test'::text, 'Arnold Lim Castillo'::text, 'Arnold'::text, 'Lim'::text, 'Castillo'::text, 'Plumbing Leak Repair'::text, 'Plumbing Leak Repair'::text, 'Repairs minor sink leaks, replaces faucets, clears simple clogs, and checks basic pipe fittings.'::text, 800::numeric, 'per-project'::text, 'with-slots'::text, '09271230006'::text, 'Bulacan'::text, 'Guiguinto'::text, 'Tabang'::text, 'Tabang, Guiguinto, Bulacan'::text, 39::int, 10::int)
   ) as rows(
     target_id,
     email,
@@ -127,12 +127,12 @@ with desired_workers as (
   select *
   from (
     values
-      ('00000000-0000-4000-8000-000000000204'::uuid, 'demo.worker.cleaning@giglink.test'::text, 'Maria Teresa Cruz'::text),
-      ('00000000-0000-4000-8000-000000000205'::uuid, 'demo.worker.appliance@giglink.test'::text, 'Jose Miguel Ramos'::text),
-      ('00000000-0000-4000-8000-000000000206'::uuid, 'demo.worker.laundry@giglink.test'::text, 'Carla Bautista Garcia'::text),
-      ('00000000-0000-4000-8000-000000000207'::uuid, 'demo.worker.garden@giglink.test'::text, 'Ramon De Leon Torres'::text),
-      ('00000000-0000-4000-8000-000000000208'::uuid, 'demo.worker.events@giglink.test'::text, 'Nina Mercado Flores'::text),
-      ('00000000-0000-4000-8000-000000000209'::uuid, 'demo.worker.plumbing@giglink.test'::text, 'Arnold Lim Castillo'::text)
+      ('00000000-0000-4000-8000-000000000204'::uuid, 'demo.worker.cleaning@trabawho.test'::text, 'Maria Teresa Cruz'::text),
+      ('00000000-0000-4000-8000-000000000205'::uuid, 'demo.worker.appliance@trabawho.test'::text, 'Jose Miguel Ramos'::text),
+      ('00000000-0000-4000-8000-000000000206'::uuid, 'demo.worker.laundry@trabawho.test'::text, 'Carla Bautista Garcia'::text),
+      ('00000000-0000-4000-8000-000000000207'::uuid, 'demo.worker.garden@trabawho.test'::text, 'Ramon De Leon Torres'::text),
+      ('00000000-0000-4000-8000-000000000208'::uuid, 'demo.worker.events@trabawho.test'::text, 'Nina Mercado Flores'::text),
+      ('00000000-0000-4000-8000-000000000209'::uuid, 'demo.worker.plumbing@trabawho.test'::text, 'Arnold Lim Castillo'::text)
   ) as rows(identity_id, email, full_name)
 ),
 identity_rows as (
@@ -183,12 +183,12 @@ with desired_workers as (
   select *
   from (
     values
-      ('demo.worker.cleaning@giglink.test'::text, 'Maria Teresa Cruz'::text, 'Maria Teresa'::text, null::text, 'Cruz'::text, 'Apartment Cleaning & Organization'::text, 'Cleans small apartments, organizes rooms, wipes surfaces, and prepares units for guests or move-ins.'::text, 'Bulacan'::text, 'Malolos'::text, 'Tikay'::text, 'Tikay, Malolos, Bulacan'::text),
-      ('demo.worker.appliance@giglink.test'::text, 'Jose Miguel Ramos'::text, 'Jose Miguel'::text, null::text, 'Ramos'::text, 'Appliance Installation & Repair'::text, 'Installs and troubleshoots small household appliances, fans, outlets, and basic kitchen equipment.'::text, 'Bulacan'::text, 'Baliuag'::text, 'San Roque'::text, 'San Roque, Baliuag, Bulacan'::text),
-      ('demo.worker.laundry@giglink.test'::text, 'Carla Bautista Garcia'::text, 'Carla'::text, 'Bautista'::text, 'Garcia'::text, 'Laundry Pickup & Folding'::text, 'Handles laundry pickup coordination, sorting, folding, and tidy delivery for busy households.'::text, 'Bulacan'::text, 'Meycauayan'::text, 'Poblacion'::text, 'Poblacion, Meycauayan, Bulacan'::text),
-      ('demo.worker.garden@giglink.test'::text, 'Ramon De Leon Torres'::text, 'Ramon'::text, 'De Leon'::text, 'Torres'::text, 'Garden Cleanup & Yard Work'::text, 'Clears leaves, trims small plants, hauls light garden waste, and tidies outdoor areas.'::text, 'Bulacan'::text, 'Marilao'::text, 'Lias'::text, 'Lias, Marilao, Bulacan'::text),
-      ('demo.worker.events@giglink.test'::text, 'Nina Mercado Flores'::text, 'Nina'::text, 'Mercado'::text, 'Flores'::text, 'Event Setup & Cleanup'::text, 'Sets up tables, chairs, simple decor, and post-event cleanup for small home gatherings.'::text, 'Bulacan'::text, 'Plaridel'::text, 'Banga 1st'::text, 'Banga 1st, Plaridel, Bulacan'::text),
-      ('demo.worker.plumbing@giglink.test'::text, 'Arnold Lim Castillo'::text, 'Arnold'::text, 'Lim'::text, 'Castillo'::text, 'Plumbing Leak Repair'::text, 'Repairs minor sink leaks, replaces faucets, clears simple clogs, and checks basic pipe fittings.'::text, 'Bulacan'::text, 'Guiguinto'::text, 'Tabang'::text, 'Tabang, Guiguinto, Bulacan'::text)
+      ('demo.worker.cleaning@trabawho.test'::text, 'Maria Teresa Cruz'::text, 'Maria Teresa'::text, null::text, 'Cruz'::text, 'Apartment Cleaning & Organization'::text, 'Cleans small apartments, organizes rooms, wipes surfaces, and prepares units for guests or move-ins.'::text, 'Bulacan'::text, 'Malolos'::text, 'Tikay'::text, 'Tikay, Malolos, Bulacan'::text),
+      ('demo.worker.appliance@trabawho.test'::text, 'Jose Miguel Ramos'::text, 'Jose Miguel'::text, null::text, 'Ramos'::text, 'Appliance Installation & Repair'::text, 'Installs and troubleshoots small household appliances, fans, outlets, and basic kitchen equipment.'::text, 'Bulacan'::text, 'Baliuag'::text, 'San Roque'::text, 'San Roque, Baliuag, Bulacan'::text),
+      ('demo.worker.laundry@trabawho.test'::text, 'Carla Bautista Garcia'::text, 'Carla'::text, 'Bautista'::text, 'Garcia'::text, 'Laundry Pickup & Folding'::text, 'Handles laundry pickup coordination, sorting, folding, and tidy delivery for busy households.'::text, 'Bulacan'::text, 'Meycauayan'::text, 'Poblacion'::text, 'Poblacion, Meycauayan, Bulacan'::text),
+      ('demo.worker.garden@trabawho.test'::text, 'Ramon De Leon Torres'::text, 'Ramon'::text, 'De Leon'::text, 'Torres'::text, 'Garden Cleanup & Yard Work'::text, 'Clears leaves, trims small plants, hauls light garden waste, and tidies outdoor areas.'::text, 'Bulacan'::text, 'Marilao'::text, 'Lias'::text, 'Lias, Marilao, Bulacan'::text),
+      ('demo.worker.events@trabawho.test'::text, 'Nina Mercado Flores'::text, 'Nina'::text, 'Mercado'::text, 'Flores'::text, 'Event Setup & Cleanup'::text, 'Sets up tables, chairs, simple decor, and post-event cleanup for small home gatherings.'::text, 'Bulacan'::text, 'Plaridel'::text, 'Banga 1st'::text, 'Banga 1st, Plaridel, Bulacan'::text),
+      ('demo.worker.plumbing@trabawho.test'::text, 'Arnold Lim Castillo'::text, 'Arnold'::text, 'Lim'::text, 'Castillo'::text, 'Plumbing Leak Repair'::text, 'Repairs minor sink leaks, replaces faucets, clears simple clogs, and checks basic pipe fittings.'::text, 'Bulacan'::text, 'Guiguinto'::text, 'Tabang'::text, 'Tabang, Guiguinto, Bulacan'::text)
   ) as rows(email, full_name, first_name, middle_name, last_name, service_type, service_description, province, city, barangay, address)
 ),
 profile_rows as (
@@ -286,12 +286,12 @@ with worker_service_map as (
   select users.id as user_id, seed.*
   from (
     values
-      ('demo.worker.cleaning@giglink.test'::text, 'Apartment Cleaning & Organization'::text, 'Cleans small apartments, organizes rooms, wipes surfaces, and prepares units for guests or move-ins.'::text, 900::numeric, 'per-project'::text, 'with-slots'::text, '09271230001'::text, 31::int, 6::int),
-      ('demo.worker.appliance@giglink.test'::text, 'Appliance Installation & Repair'::text, 'Installs and troubleshoots small household appliances, fans, outlets, and basic kitchen equipment.'::text, 850::numeric, 'per-project'::text, 'with-slots'::text, '09271230002'::text, 36::int, 9::int),
-      ('demo.worker.laundry@giglink.test'::text, 'Laundry Pickup & Folding'::text, 'Handles laundry pickup coordination, sorting, folding, and tidy delivery for busy households.'::text, 550::numeric, 'per-project'::text, 'with-slots'::text, '09271230003'::text, 28::int, 4::int),
-      ('demo.worker.garden@giglink.test'::text, 'Garden Cleanup & Yard Work'::text, 'Clears leaves, trims small plants, hauls light garden waste, and tidies outdoor areas.'::text, 950::numeric, 'per-project'::text, 'with-slots'::text, '09271230004'::text, 42::int, 11::int),
-      ('demo.worker.events@giglink.test'::text, 'Event Setup & Cleanup'::text, 'Sets up tables, chairs, simple decor, and post-event cleanup for small home gatherings.'::text, 1100::numeric, 'per-project'::text, 'with-slots'::text, '09271230005'::text, 33::int, 7::int),
-      ('demo.worker.plumbing@giglink.test'::text, 'Plumbing Leak Repair'::text, 'Repairs minor sink leaks, replaces faucets, clears simple clogs, and checks basic pipe fittings.'::text, 800::numeric, 'per-project'::text, 'with-slots'::text, '09271230006'::text, 39::int, 10::int)
+      ('demo.worker.cleaning@trabawho.test'::text, 'Apartment Cleaning & Organization'::text, 'Cleans small apartments, organizes rooms, wipes surfaces, and prepares units for guests or move-ins.'::text, 900::numeric, 'per-project'::text, 'with-slots'::text, '09271230001'::text, 31::int, 6::int),
+      ('demo.worker.appliance@trabawho.test'::text, 'Appliance Installation & Repair'::text, 'Installs and troubleshoots small household appliances, fans, outlets, and basic kitchen equipment.'::text, 850::numeric, 'per-project'::text, 'with-slots'::text, '09271230002'::text, 36::int, 9::int),
+      ('demo.worker.laundry@trabawho.test'::text, 'Laundry Pickup & Folding'::text, 'Handles laundry pickup coordination, sorting, folding, and tidy delivery for busy households.'::text, 550::numeric, 'per-project'::text, 'with-slots'::text, '09271230003'::text, 28::int, 4::int),
+      ('demo.worker.garden@trabawho.test'::text, 'Garden Cleanup & Yard Work'::text, 'Clears leaves, trims small plants, hauls light garden waste, and tidies outdoor areas.'::text, 950::numeric, 'per-project'::text, 'with-slots'::text, '09271230004'::text, 42::int, 11::int),
+      ('demo.worker.events@trabawho.test'::text, 'Event Setup & Cleanup'::text, 'Sets up tables, chairs, simple decor, and post-event cleanup for small home gatherings.'::text, 1100::numeric, 'per-project'::text, 'with-slots'::text, '09271230005'::text, 33::int, 7::int),
+      ('demo.worker.plumbing@trabawho.test'::text, 'Plumbing Leak Repair'::text, 'Repairs minor sink leaks, replaces faucets, clears simple clogs, and checks basic pipe fittings.'::text, 800::numeric, 'per-project'::text, 'with-slots'::text, '09271230006'::text, 39::int, 10::int)
   ) as seed(email, service_type, service_description, base_price, rate_basis, booking_mode, gcash_number, age, experience_years)
   join auth.users users on lower(users.email::text) = lower(seed.email)
 )
@@ -357,12 +357,12 @@ with worker_service_map as (
   select users.id as user_id, seed.*
   from (
     values
-      ('demo.worker.cleaning@giglink.test'::text, 'Maria Teresa Cruz'::text, 'Apartment Cleaning & Organization'::text, 'Cleans small apartments, organizes rooms, wipes surfaces, and prepares units for guests or move-ins.'::text, 'with-slots'::text, 'Bulacan'::text, 'Malolos'::text, 'Tikay'::text),
-      ('demo.worker.appliance@giglink.test'::text, 'Jose Miguel Ramos'::text, 'Appliance Installation & Repair'::text, 'Installs and troubleshoots small household appliances, fans, outlets, and basic kitchen equipment.'::text, 'with-slots'::text, 'Bulacan'::text, 'Baliuag'::text, 'San Roque'::text),
-      ('demo.worker.laundry@giglink.test'::text, 'Carla Bautista Garcia'::text, 'Laundry Pickup & Folding'::text, 'Handles laundry pickup coordination, sorting, folding, and tidy delivery for busy households.'::text, 'with-slots'::text, 'Bulacan'::text, 'Meycauayan'::text, 'Poblacion'::text),
-      ('demo.worker.garden@giglink.test'::text, 'Ramon De Leon Torres'::text, 'Garden Cleanup & Yard Work'::text, 'Clears leaves, trims small plants, hauls light garden waste, and tidies outdoor areas.'::text, 'with-slots'::text, 'Bulacan'::text, 'Marilao'::text, 'Lias'::text),
-      ('demo.worker.events@giglink.test'::text, 'Nina Mercado Flores'::text, 'Event Setup & Cleanup'::text, 'Sets up tables, chairs, simple decor, and post-event cleanup for small home gatherings.'::text, 'with-slots'::text, 'Bulacan'::text, 'Plaridel'::text, 'Banga 1st'::text),
-      ('demo.worker.plumbing@giglink.test'::text, 'Arnold Lim Castillo'::text, 'Plumbing Leak Repair'::text, 'Repairs minor sink leaks, replaces faucets, clears simple clogs, and checks basic pipe fittings.'::text, 'with-slots'::text, 'Bulacan'::text, 'Guiguinto'::text, 'Tabang'::text)
+      ('demo.worker.cleaning@trabawho.test'::text, 'Maria Teresa Cruz'::text, 'Apartment Cleaning & Organization'::text, 'Cleans small apartments, organizes rooms, wipes surfaces, and prepares units for guests or move-ins.'::text, 'with-slots'::text, 'Bulacan'::text, 'Malolos'::text, 'Tikay'::text),
+      ('demo.worker.appliance@trabawho.test'::text, 'Jose Miguel Ramos'::text, 'Appliance Installation & Repair'::text, 'Installs and troubleshoots small household appliances, fans, outlets, and basic kitchen equipment.'::text, 'with-slots'::text, 'Bulacan'::text, 'Baliuag'::text, 'San Roque'::text),
+      ('demo.worker.laundry@trabawho.test'::text, 'Carla Bautista Garcia'::text, 'Laundry Pickup & Folding'::text, 'Handles laundry pickup coordination, sorting, folding, and tidy delivery for busy households.'::text, 'with-slots'::text, 'Bulacan'::text, 'Meycauayan'::text, 'Poblacion'::text),
+      ('demo.worker.garden@trabawho.test'::text, 'Ramon De Leon Torres'::text, 'Garden Cleanup & Yard Work'::text, 'Clears leaves, trims small plants, hauls light garden waste, and tidies outdoor areas.'::text, 'with-slots'::text, 'Bulacan'::text, 'Marilao'::text, 'Lias'::text),
+      ('demo.worker.events@trabawho.test'::text, 'Nina Mercado Flores'::text, 'Event Setup & Cleanup'::text, 'Sets up tables, chairs, simple decor, and post-event cleanup for small home gatherings.'::text, 'with-slots'::text, 'Bulacan'::text, 'Plaridel'::text, 'Banga 1st'::text),
+      ('demo.worker.plumbing@trabawho.test'::text, 'Arnold Lim Castillo'::text, 'Plumbing Leak Repair'::text, 'Repairs minor sink leaks, replaces faucets, clears simple clogs, and checks basic pipe fittings.'::text, 'with-slots'::text, 'Bulacan'::text, 'Guiguinto'::text, 'Tabang'::text)
   ) as seed(email, full_name, service_type, service_description, booking_mode, province, city, barangay)
   join auth.users users on lower(users.email::text) = lower(seed.email)
 )
@@ -429,12 +429,12 @@ with worker_service_map as (
   select users.id as user_id, seed.*
   from (
     values
-      ('demo.worker.cleaning@giglink.test'::text, 'Apartment Cleaning & Organization'::text, 'Cleans small apartments, organizes rooms, wipes surfaces, and prepares units for guests or move-ins.'::text, 900::numeric, 'per-project'::text, 'with-slots'::text),
-      ('demo.worker.appliance@giglink.test'::text, 'Appliance Installation & Repair'::text, 'Installs and troubleshoots small household appliances, fans, outlets, and basic kitchen equipment.'::text, 850::numeric, 'per-project'::text, 'with-slots'::text),
-      ('demo.worker.laundry@giglink.test'::text, 'Laundry Pickup & Folding'::text, 'Handles laundry pickup coordination, sorting, folding, and tidy delivery for busy households.'::text, 550::numeric, 'per-project'::text, 'with-slots'::text),
-      ('demo.worker.garden@giglink.test'::text, 'Garden Cleanup & Yard Work'::text, 'Clears leaves, trims small plants, hauls light garden waste, and tidies outdoor areas.'::text, 950::numeric, 'per-project'::text, 'with-slots'::text),
-      ('demo.worker.events@giglink.test'::text, 'Event Setup & Cleanup'::text, 'Sets up tables, chairs, simple decor, and post-event cleanup for small home gatherings.'::text, 1100::numeric, 'per-project'::text, 'with-slots'::text),
-      ('demo.worker.plumbing@giglink.test'::text, 'Plumbing Leak Repair'::text, 'Repairs minor sink leaks, replaces faucets, clears simple clogs, and checks basic pipe fittings.'::text, 800::numeric, 'per-project'::text, 'with-slots'::text)
+      ('demo.worker.cleaning@trabawho.test'::text, 'Apartment Cleaning & Organization'::text, 'Cleans small apartments, organizes rooms, wipes surfaces, and prepares units for guests or move-ins.'::text, 900::numeric, 'per-project'::text, 'with-slots'::text),
+      ('demo.worker.appliance@trabawho.test'::text, 'Appliance Installation & Repair'::text, 'Installs and troubleshoots small household appliances, fans, outlets, and basic kitchen equipment.'::text, 850::numeric, 'per-project'::text, 'with-slots'::text),
+      ('demo.worker.laundry@trabawho.test'::text, 'Laundry Pickup & Folding'::text, 'Handles laundry pickup coordination, sorting, folding, and tidy delivery for busy households.'::text, 550::numeric, 'per-project'::text, 'with-slots'::text),
+      ('demo.worker.garden@trabawho.test'::text, 'Garden Cleanup & Yard Work'::text, 'Clears leaves, trims small plants, hauls light garden waste, and tidies outdoor areas.'::text, 950::numeric, 'per-project'::text, 'with-slots'::text),
+      ('demo.worker.events@trabawho.test'::text, 'Event Setup & Cleanup'::text, 'Sets up tables, chairs, simple decor, and post-event cleanup for small home gatherings.'::text, 1100::numeric, 'per-project'::text, 'with-slots'::text),
+      ('demo.worker.plumbing@trabawho.test'::text, 'Plumbing Leak Repair'::text, 'Repairs minor sink leaks, replaces faucets, clears simple clogs, and checks basic pipe fittings.'::text, 800::numeric, 'per-project'::text, 'with-slots'::text)
   ) as seed(email, service_title, service_description, base_price, rate_basis, booking_mode)
   join auth.users users on lower(users.email::text) = lower(seed.email)
 ),
@@ -534,12 +534,12 @@ with new_workers as (
   select users.id as seller_id, row_number() over (order by users.email) as seller_idx
   from auth.users users
   where lower(users.email::text) in (
-    'demo.worker.cleaning@giglink.test',
-    'demo.worker.appliance@giglink.test',
-    'demo.worker.laundry@giglink.test',
-    'demo.worker.garden@giglink.test',
-    'demo.worker.events@giglink.test',
-    'demo.worker.plumbing@giglink.test'
+    'demo.worker.cleaning@trabawho.test',
+    'demo.worker.appliance@trabawho.test',
+    'demo.worker.laundry@trabawho.test',
+    'demo.worker.garden@trabawho.test',
+    'demo.worker.events@trabawho.test',
+    'demo.worker.plumbing@trabawho.test'
   )
 ),
 deleted_seed_reviews as (

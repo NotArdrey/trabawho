@@ -696,19 +696,19 @@ function AuthPage({
   return (
     <main className="auth-page">
       <header className="auth-topbar">
-        <button type="button" className="auth-brand" onClick={onBack} aria-label="Back to GigLink home">
-          <img src="/giglink-logo.svg" alt="" aria-hidden="true" />
+        <button type="button" className="auth-brand" onClick={onBack} aria-label="Back to TrabaWho home">
+          <img src="/trabawho-logo.svg" alt="" aria-hidden="true" />
           <strong><BrandWordmark /></strong>
         </button>
 
-        <button type="button" className="auth-back-button" onClick={onBack} aria-label="Back to GigLink home">
+        <button type="button" className="auth-back-button" onClick={onBack} aria-label="Back to TrabaWho home">
           <ArrowLeft size={18} aria-hidden="true" />
           Back
         </button>
       </header>
 
-      <section className="auth-shell" aria-label="GigLink authentication">
-        <aside className="auth-visual" aria-label="GigLink marketplace preview">
+      <section className="auth-shell" aria-label="TrabaWho authentication">
+        <aside className="auth-visual" aria-label="TrabaWho marketplace preview">
           <img
             src="https://images.unsplash.com/photo-1556761175-b413da4baf72?w=1400&h=1600&fit=crop"
             alt="Local professionals collaborating with clients"
@@ -718,11 +718,11 @@ function AuthPage({
           <div className="auth-visual-content">
             <h2>Find help, book work, and manage every job in one place.</h2>
             <p>
-              GigLink connects clients with service providers for real schedules,
+              TrabaWho connects clients with service providers for real schedules,
               transparent rates, and clean booking handoffs.
             </p>
 
-            <div className="auth-proof-grid" aria-label="GigLink trust highlights">
+            <div className="auth-proof-grid" aria-label="TrabaWho trust highlights">
               <div>
                 <strong>80+</strong>
                 <span>Service categories</span>
@@ -1191,7 +1191,7 @@ function AuthPage({
                         onChange={handleInputChange}
                         required
                       />
-                      <span>I agree to GigLink collecting and processing my registration, identity, location, booking, and contact information under Republic Act No. 10173, the Data Privacy Act of 2012.</span>
+                      <span>I agree to TrabaWho collecting and processing my registration, identity, location, booking, and contact information under Republic Act No. 10173, the Data Privacy Act of 2012.</span>
                     </div>
                   </label>
                 </>

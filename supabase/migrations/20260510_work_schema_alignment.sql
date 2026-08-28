@@ -545,7 +545,7 @@ begin
     nullif(concat_ws(' ', first_name, middle_name, last_name), ''),
     nullif(new.raw_user_meta_data ->> 'name', ''),
     split_part(new.email, '@', 1),
-    'GigLink User'
+    'TrabaWho User'
   );
 
   select exists (

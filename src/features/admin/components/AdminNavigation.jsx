@@ -102,7 +102,7 @@ function AdminNavigation({ appTheme = 'light', activeSection = 'accounts', onSec
     <nav className="gl-admin-nav" style={styles.nav}>
       <div className="gl-admin-nav-inner" style={styles.inner}>
         <div className="gl-admin-nav-brand" style={styles.brandWrap}>
-          <img src="/giglink-logo.svg" alt="" aria-hidden="true" style={styles.brandLogo} />
+          <img src="/trabawho-logo.svg" alt="" aria-hidden="true" style={styles.brandLogo} />
           <h1 style={styles.brand}><BrandWordmark /></h1>
           <span style={styles.badge}>Admin</span>
         </div>

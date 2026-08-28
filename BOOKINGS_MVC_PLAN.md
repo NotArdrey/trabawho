@@ -466,8 +466,8 @@ export function MyBookings(props) {
 ## 5. localStorage Integration
 
 ### Current localStorage Keys
-- `giglink_cash_confirmation_requests` - Array of cash confirmation requests
-- `giglink_refund_requests` - Array of refund requests
+- `trabawho_cash_confirmation_requests` - Array of cash confirmation requests
+- `trabawho_refund_requests` - Array of refund requests
 
 ### New Pattern
 Move localStorage logic into controller hooks:

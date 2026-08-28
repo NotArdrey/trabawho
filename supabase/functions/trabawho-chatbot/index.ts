@@ -339,7 +339,7 @@ const searchStopWords = new Set([
   "for",
   "from",
   "get",
-  "giglink",
+  "trabawho",
   "have",
   "help",
   "how",
@@ -695,13 +695,13 @@ const serviceFamilyRank: Record<MarketplaceFamilyMatch, number> = {
 };
 
 const shortcutReplies: Record<string, string> = {
-  hi: "Hi. What would you like to do in GigLink: find a service, check a booking, or set up seller tools?",
-  hello: "Hi. What would you like to do in GigLink: find a service, check a booking, or set up seller tools?",
-  hey: "Hi. What would you like to do in GigLink: find a service, check a booking, or set up seller tools?",
+  hi: "Hi. What would you like to do in TrabaWho: find a service, check a booking, or set up seller tools?",
+  hello: "Hi. What would you like to do in TrabaWho: find a service, check a booking, or set up seller tools?",
+  hey: "Hi. What would you like to do in TrabaWho: find a service, check a booking, or set up seller tools?",
   help: "I can help with services, bookings, seller setup, quotes, payments, refunds, profiles, or settings. What are you trying to do right now?",
   qr: "Do you mean a seller payment QR, identity verification, or a booking payment step?",
   id: "Do you mean identity verification, your profile details, or an account issue?",
-  ok: "Got it. What would you like to do next in GigLink?",
+  ok: "Got it. What would you like to do next in TrabaWho?",
 };
 
 const lowConfidenceRepliesByView: Record<string, string> = {
@@ -1152,7 +1152,7 @@ const buildBudgetEstimate = (
     materials: materialResearch.items,
     assumptions: [
       ...materialResearch.assumptions,
-      "Worker rates are from active GigLink listings and may be hourly, daily, or project-based.",
+      "Worker rates are from active TrabaWho listings and may be hourly, daily, or project-based.",
       "Final quote depends on on-site inspection, severity, schedule, and worker confirmation.",
     ].slice(0, 7),
     confidence: problemAnalysis.confidence,
@@ -1311,7 +1311,7 @@ const callGroqWithModelFallback = async (
         throw error;
       }
 
-      console.warn("giglink-chatbot groq model fallback", {
+      console.warn("trabawho-chatbot groq model fallback", {
         label,
         failedModel: model,
         nextModel: models[index + 1],
@@ -1364,7 +1364,7 @@ const analyzeProblemImage = async (
         {
           role: "system",
           content: [
-            "You identify visible local-service problems from user-uploaded photos for GigLink.",
+            "You identify visible local-service problems from user-uploaded photos for TrabaWho.",
             "Return JSON only with keys: problemTitle, problemSummary, likelyServiceTypes, materials, urgency, safetyNotes, confidence, searchQuery.",
             "likelyServiceTypes should be service labels such as Plumber, Electrician, Technician, Cleaner, Carpenter, Appliance Repair, Painter, or General Repair.",
             "materials must be an array of {name, quantity, searchTerm}. Use visible evidence and uncertainty. Do not infer identities or private details.",
@@ -1392,7 +1392,7 @@ const analyzeProblemImage = async (
     const content = getGroqMessageContent(payload);
     return normalizeProblemAnalysis(parseJsonObject(content));
   } catch (error) {
-    console.error("giglink-chatbot vision analysis error", {
+    console.error("trabawho-chatbot vision analysis error", {
       message: error instanceof Error ? error.message : String(error),
     });
     return null;
@@ -1437,7 +1437,7 @@ const fetchMaterialResearch = async (
     const content = getGroqMessageContent(payload);
     return normalizeMaterialResearch(parseJsonObject(content), extractGroqSources(payload));
   } catch (error) {
-    console.error("giglink-chatbot material search error", {
+    console.error("trabawho-chatbot material search error", {
       message: error instanceof Error ? error.message : String(error),
     });
 
@@ -1488,7 +1488,7 @@ const normalizeMarketplaceRecord = (row: Record<string, unknown>): MarketplaceRe
     || getText(row["description"])
     || getText(seller["tagline"])
     || getText(seller["about"])
-    || "Professional service available through GigLink.";
+    || "Professional service available through TrabaWho.";
   const bookingMode =
     getText(metadata["booking_mode"] || metadata["bookingMode"] || sellerMeta["booking_mode"])
     || "with-slots";
@@ -1578,10 +1578,10 @@ const createSupabaseClient = (req: Request) => {
   return createClient(supabaseUrl, apiKey, {
     global: {
       headers: serviceRoleKey
-        ? { "X-Client-Info": "giglink-chatbot" }
+        ? { "X-Client-Info": "trabawho-chatbot" }
         : {
           Authorization: req.headers.get("Authorization") || `Bearer ${anonKey}`,
-          "X-Client-Info": "giglink-chatbot",
+          "X-Client-Info": "trabawho-chatbot",
         },
     },
     auth: {
@@ -1608,7 +1608,7 @@ const getAuthenticatedUserId = async (req: Request) => {
 
   const { data, error } = await supabase.auth.getUser(token);
   if (error) {
-    console.error("giglink-chatbot auth lookup error", {
+    console.error("trabawho-chatbot auth lookup error", {
       message: error.message,
       status: error.status,
     });
@@ -1739,7 +1739,7 @@ const fetchBookingLookup = async (
     .limit(MAX_BOOKING_MATCHES);
 
   if (error) {
-    console.error("giglink-chatbot booking lookup relation error", {
+    console.error("trabawho-chatbot booking lookup relation error", {
       message: error.message,
       code: error.code,
       details: error.details,
@@ -1753,7 +1753,7 @@ const fetchBookingLookup = async (
       .limit(MAX_BOOKING_MATCHES);
 
     if (fallback.error) {
-      console.error("giglink-chatbot booking lookup error", {
+      console.error("trabawho-chatbot booking lookup error", {
         message: fallback.error.message,
         code: fallback.error.code,
         details: fallback.error.details,
@@ -1821,7 +1821,7 @@ const fetchMarketplaceSearch = async (
   const { data, error } = await query;
 
   if (error) {
-    console.error("giglink-chatbot marketplace search error", {
+    console.error("trabawho-chatbot marketplace search error", {
       message: error.message,
       code: error.code,
       details: error.details,
@@ -1940,7 +1940,7 @@ const buildBookingFallbackReply = (bookingLookup: BookingLookup) => {
   }
 
   if (bookingLookup.records.length === 0) {
-    return "I checked your GigLink bookings and did not find any recent booking records. You can start one from Browse by opening a provider profile.";
+    return "I checked your TrabaWho bookings and did not find any recent booking records. You can start one from Browse by opening a provider profile.";
   }
 
   const lines = bookingLookup.records.slice(0, 4).map((record, index) =>
@@ -1961,16 +1961,16 @@ const buildDatabaseFallbackReply = (marketplaceSearch: MarketplaceSearch, bookin
   }
 
   if (marketplaceSearch.records.length === 0) {
-    return "I checked the active GigLink listings, but I could not find a matching service price for that search. Try a broader service name, location, or budget.";
+    return "I checked the active TrabaWho listings, but I could not find a matching service price for that search. Try a broader service name, location, or budget.";
   }
 
   const desiredFamilyLabel = formatServiceFamilyList(marketplaceSearch.desiredFamilies);
   const isFallbackOnly = marketplaceSearch.desiredFamilies.length > 0 && !marketplaceSearch.hasExactFamilyMatch;
   const intro = isFallbackOnly
-    ? `I did not find an exact active ${desiredFamilyLabel || "specialist"} listing, but these are the closest current GigLink matches:`
+    ? `I did not find an exact active ${desiredFamilyLabel || "specialist"} listing, but these are the closest current TrabaWho matches:`
     : marketplaceSearch.isPriceIntent
-      ? "I found these current prices from active GigLink listings:"
-      : "I found these active GigLink services:";
+      ? "I found these current prices from active TrabaWho listings:"
+      : "I found these active TrabaWho services:";
   const lines = marketplaceSearch.records.slice(0, 5).map((record, index) => {
     const location = record.location ? ` in ${record.location}` : "";
     return `${index + 1}. ${record.title} by ${record.providerName}${location}: ${record.priceLabel}`;
@@ -2008,10 +2008,10 @@ const buildSystemPrompt = (
   const isLoggedIn = Boolean(context.isLoggedIn);
 
   return [
-    "You are the GigLink Assistant inside a local-service marketplace web app.",
+    "You are the TrabaWho Assistant inside a local-service marketplace web app.",
     "Help users understand service discovery, bookings, seller onboarding, quotes, scheduling, payments, refunds, profile settings, and account navigation.",
     "Act like a smart in-app copilot: infer the user's likely intent from typos, partial words, and the screen they are on, but ask a clarifying question when confidence is low.",
-    "Keep answers concise, practical, and specific to GigLink. Prefer 2 to 4 direct steps or one short paragraph.",
+    "Keep answers concise, practical, and specific to TrabaWho. Prefer 2 to 4 direct steps or one short paragraph.",
     "Do not give a giant menu of every feature unless the user explicitly asks what the app can do.",
     "For accidental or low-signal input such as repeated letters, one or two random characters, or keyboard mashes, say you did not catch it and offer three likely directions based on the current screen.",
     "Do not claim to access private account data, bookings, payments, or database records unless the user provides the details in the chat.",
@@ -2069,7 +2069,7 @@ serve(async (req: Request) => {
     if (deterministicReply) {
       return jsonResponse({
         message: deterministicReply,
-        model: "giglink-intent-router",
+        model: "trabawho-intent-router",
         matches: [],
       });
     }
@@ -2096,7 +2096,7 @@ serve(async (req: Request) => {
 
       return jsonResponse({
         message: buildPhotoEstimateReply(problemAnalysis, budgetEstimate, marketplaceSearch, materialResearch),
-        model: "giglink-photo-budget-estimator",
+        model: "trabawho-photo-budget-estimator",
         matches: buildMatchesPayload(marketplaceSearch),
         diagnosis: problemAnalysis,
         estimate: budgetEstimate,
@@ -2111,12 +2111,12 @@ serve(async (req: Request) => {
       if (fallbackReply) {
         return jsonResponse({
           message: fallbackReply,
-          model: "giglink-db-search",
+          model: "trabawho-db-search",
           matches: buildMatchesPayload(marketplaceSearch),
         });
       }
 
-      console.error("giglink-chatbot missing GROQ_API_KEY secret");
+      console.error("trabawho-chatbot missing GROQ_API_KEY secret");
       return jsonResponse({ error: "The assistant is not configured yet." }, 503);
     }
 
@@ -2136,7 +2136,7 @@ serve(async (req: Request) => {
       groqPayload = result.payload;
       usedGroqModel = result.model;
     } catch (error) {
-      console.error("giglink-chatbot provider error", {
+      console.error("trabawho-chatbot provider error", {
         status: error instanceof GroqProviderError ? error.status : undefined,
         model: error instanceof GroqProviderError ? error.model : undefined,
         retryAfter: error instanceof GroqProviderError ? error.retryAfter : undefined,
@@ -2148,7 +2148,7 @@ serve(async (req: Request) => {
       if (fallbackReply) {
         return jsonResponse({
           message: fallbackReply,
-          model: "giglink-db-search",
+          model: "trabawho-db-search",
           matches: buildMatchesPayload(marketplaceSearch),
         });
       }
@@ -2168,7 +2168,7 @@ serve(async (req: Request) => {
       matches: buildMatchesPayload(marketplaceSearch),
     });
   } catch (error) {
-    console.error("giglink-chatbot unexpected error", error);
+    console.error("trabawho-chatbot unexpected error", error);
     return jsonResponse({ error: "The assistant is unavailable right now." }, 500);
   }
 });

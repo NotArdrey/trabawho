@@ -1,0 +1,8 @@
+<svg width="100%" height="100%" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <title>TrabaWho Logo</title>
+  <desc>A blue profile silhouette framed by an open circle, with an orange and blue question mark.</desc>
+  <path d="M164 402C99 366 66 291 88 218C113 136 199 89 281 114C363 139 410 225 385 307C373 347 348 380 314 402" stroke="#1557C0" stroke-width="36" stroke-linecap="square"/>
+  <path d="M164 402L254 447L278 383C257 365 238 356 220 356C200 356 181 372 164 402Z" fill="#1557C0"/>
+  <path d="M184 220C187 174 220 147 264 147C310 147 342 173 342 214C342 249 326 268 298 285C282 295 275 307 275 324V333H235V315C235 288 246 271 270 255C289 243 299 233 299 216C299 195 284 183 263 183C240 183 226 196 223 221L184 220Z" fill="#FF7A00"/>
+  <circle cx="255" cy="359" r="23" fill="#1557C0"/>
+</svg>

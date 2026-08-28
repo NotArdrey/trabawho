@@ -573,8 +573,8 @@ function IdentityRegistrationPage({ onBack, onLogin }) {
   return (
     <main style={styles.page} data-testid="identity-registration-page">
       <header style={styles.topbar}>
-        <button type="button" style={styles.brand} onClick={onBack} aria-label="Back to GigLink home">
-          <img src="/giglink-logo.svg" alt="" aria-hidden="true" style={styles.brandImg} />
+        <button type="button" style={styles.brand} onClick={onBack} aria-label="Back to TrabaWho home">
+          <img src="/trabawho-logo.svg" alt="" aria-hidden="true" style={styles.brandImg} />
           <BrandWordmark />
         </button>
         <button type="button" style={styles.backButton} onClick={onBack}>
@@ -588,7 +588,7 @@ function IdentityRegistrationPage({ onBack, onLogin }) {
           <div>
             <h1 style={styles.asideTitle}>Identity first. Account second.</h1>
             <p style={styles.asideText}>
-              GigLink verifies your identity before creating a usable account. Approved users still confirm email before login; pending cases go to manual review.
+              TrabaWho verifies your identity before creating a usable account. Approved users still confirm email before login; pending cases go to manual review.
             </p>
           </div>
           <div style={styles.trustGrid} aria-label="Identity registration safeguards">
@@ -779,7 +779,7 @@ function IdentityRegistrationPage({ onBack, onLogin }) {
                     onChange={(event) => updateField('acceptedTerms', event.target.checked)}
                   />
                   <span>
-                    I consent to GigLink collecting registration details and sending me through Didit or manual identity review before creating account access.
+                    I consent to TrabaWho collecting registration details and sending me through Didit or manual identity review before creating account access.
                   </span>
                 </label>
 
@@ -791,7 +791,7 @@ function IdentityRegistrationPage({ onBack, onLogin }) {
                     required
                   />
                   <span>
-                    I agree to GigLink collecting and processing my registration, identity, location, booking, and contact information under Republic Act No. 10173, the Data Privacy Act of 2012.
+                    I agree to TrabaWho collecting and processing my registration, identity, location, booking, and contact information under Republic Act No. 10173, the Data Privacy Act of 2012.
                   </span>
                 </label>
 

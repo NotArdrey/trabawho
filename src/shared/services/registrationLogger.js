@@ -1,5 +1,5 @@
-const REGISTRATION_LOG_PREFIX = '[GigLink Registration]';
-const REGISTRATION_TERMINAL_LOG_ENDPOINT = '/__giglink_registration_log';
+const REGISTRATION_LOG_PREFIX = '[TrabaWho Registration]';
+const REGISTRATION_TERMINAL_LOG_ENDPOINT = '/__trabawho_registration_log';
 
 const SENSITIVE_KEYS = new Set([
   'password',

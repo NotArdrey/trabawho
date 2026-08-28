@@ -9,7 +9,7 @@ with desired_users as (
     values
       (
         '00000000-0000-4000-8000-000000000101'::uuid,
-        'demo.user@giglink.test'::text,
+        'demo.user@trabawho.test'::text,
         'Demo User'::text,
         'client'::text,
         'Demo'::text,
@@ -18,7 +18,7 @@ with desired_users as (
       ),
       (
         '00000000-0000-4000-8000-000000000102'::uuid,
-        'demo.admin@giglink.test'::text,
+        'demo.admin@trabawho.test'::text,
         'Demo Admin'::text,
         'admin'::text,
         'Demo'::text,
@@ -123,7 +123,7 @@ upserted_users as (
 identity_rows as (
   select
     case
-      when resolved_users.email = 'demo.user@giglink.test'
+      when resolved_users.email = 'demo.user@trabawho.test'
         then '00000000-0000-4000-8000-000000000201'::uuid
       else '00000000-0000-4000-8000-000000000202'::uuid
     end as identity_id,
@@ -189,8 +189,8 @@ begin
           desired.last_name
         from (
           values
-            ('demo.user@giglink.test'::text, 'Demo User'::text, 'client'::text, 'Demo'::text, null::text, 'User'::text),
-            ('demo.admin@giglink.test'::text, 'Demo Admin'::text, 'admin'::text, 'Demo'::text, null::text, 'Admin'::text)
+            ('demo.user@trabawho.test'::text, 'Demo User'::text, 'client'::text, 'Demo'::text, null::text, 'User'::text),
+            ('demo.admin@trabawho.test'::text, 'Demo Admin'::text, 'admin'::text, 'Demo'::text, null::text, 'Admin'::text)
         ) as desired(email, full_name, app_role, first_name, middle_name, last_name)
         join auth.users users
           on lower(users.email::text) = lower(desired.email)
@@ -262,8 +262,8 @@ begin
           desired.last_name
         from (
           values
-            ('demo.user@giglink.test'::text, 'Demo User'::text, 'client'::text, 'Demo'::text, null::text, 'User'::text),
-            ('demo.admin@giglink.test'::text, 'Demo Admin'::text, 'admin'::text, 'Demo'::text, null::text, 'Admin'::text)
+            ('demo.user@trabawho.test'::text, 'Demo User'::text, 'client'::text, 'Demo'::text, null::text, 'User'::text),
+            ('demo.admin@trabawho.test'::text, 'Demo Admin'::text, 'admin'::text, 'Demo'::text, null::text, 'Admin'::text)
         ) as desired(email, full_name, app_role, first_name, middle_name, last_name)
         join auth.users users
           on lower(users.email::text) = lower(desired.email)

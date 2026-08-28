@@ -31,7 +31,7 @@ async function expectNoHorizontalOverflow(page) {
 }
 
 async function mockChatbot(page, handler) {
-  await page.route('**/functions/v1/giglink-chatbot', async (route) => {
+  await page.route('**/functions/v1/trabawho-chatbot', async (route) => {
     const request = route.request();
 
     if (request.method() === 'OPTIONS') {
@@ -61,7 +61,7 @@ async function loginAsClient(page) {
   await expect(page.getByTestId('client-home-dashboard')).toBeVisible({ timeout: 20_000 });
 }
 
-test.describe('floating GigLink chatbot', () => {
+test.describe('floating TrabaWho chatbot', () => {
   const viewports = [
     { name: 'desktop', width: 1366, height: 900 },
     { name: 'mobile', width: 390, height: 844 },
@@ -71,7 +71,7 @@ test.describe('floating GigLink chatbot', () => {
     await page.setViewportSize({ width: 1366, height: 900 });
     await page.goto('/');
 
-    await expect(page.getByRole('button', { name: /open giglink assistant/i })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: /open trabawho assistant/i })).toHaveCount(0);
     await expect(page.getByTestId('floating-chatbot')).toHaveCount(0);
     await expectNoHorizontalOverflow(page);
   });
@@ -97,15 +97,15 @@ test.describe('floating GigLink chatbot', () => {
       await page.setViewportSize({ width: viewport.width, height: viewport.height });
       await loginAsClient(page);
 
-      const toggle = page.getByRole('button', { name: /open giglink assistant/i });
+      const toggle = page.getByRole('button', { name: /open trabawho assistant/i });
       await expect(toggle).toBeVisible();
       await toggle.click();
 
-      await expect(page.getByRole('dialog', { name: /giglink assistant/i })).toBeVisible();
+      await expect(page.getByRole('dialog', { name: /trabawho assistant/i })).toBeVisible();
       await expect(page.getByText(/marketplace and booking help/i)).toBeVisible();
       await expect(page.getByRole('button', { name: /book a provider/i })).toBeVisible();
 
-      await page.getByLabel(/message giglink assistant/i).fill('How do I book a service?');
+      await page.getByLabel(/message trabawho assistant/i).fill('How do I book a service?');
       await page.getByRole('button', { name: /^send message$/i }).click();
 
       await expect(page.getByTestId('chatbot-loading')).toBeVisible();
@@ -123,8 +123,8 @@ test.describe('floating GigLink chatbot', () => {
 
       await expectNoHorizontalOverflow(page);
 
-      await page.getByRole('button', { name: /close giglink assistant/i }).first().click();
-      await expect(page.getByRole('dialog', { name: /giglink assistant/i })).toHaveCount(0);
+      await page.getByRole('button', { name: /close trabawho assistant/i }).first().click();
+      await expect(page.getByRole('dialog', { name: /trabawho assistant/i })).toHaveCount(0);
 
       expect(consoleFailures).toEqual([]);
     });
@@ -147,8 +147,8 @@ test.describe('floating GigLink chatbot', () => {
 
     await page.setViewportSize({ width: 390, height: 844 });
     await loginAsClient(page);
-    await page.getByRole('button', { name: /open giglink assistant/i }).click();
-    await page.getByLabel(/message giglink assistant/i).fill('ww');
+    await page.getByRole('button', { name: /open trabawho assistant/i }).click();
+    await page.getByLabel(/message trabawho assistant/i).fill('ww');
     await page.getByRole('button', { name: /^send message$/i }).click();
 
     await expect(page.getByTestId('chatbot-message-user').filter({ hasText: 'ww' })).toBeVisible();
@@ -169,8 +169,8 @@ test.describe('floating GigLink chatbot', () => {
 
     await page.setViewportSize({ width: 1366, height: 900 });
     await loginAsClient(page);
-    await page.getByRole('button', { name: /open giglink assistant/i }).click();
-    await page.getByLabel(/message giglink assistant/i).fill('Will this fail safely?');
+    await page.getByRole('button', { name: /open trabawho assistant/i }).click();
+    await page.getByLabel(/message trabawho assistant/i).fill('Will this fail safely?');
     await page.getByRole('button', { name: /^send message$/i }).click();
 
     await expect(page.getByRole('alert')).toContainText(/assistant is unavailable/i);

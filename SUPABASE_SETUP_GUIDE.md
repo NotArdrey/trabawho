@@ -1,8 +1,8 @@
-# GigLink Supabase Setup Guide
+# TrabaWho Supabase Setup Guide
 
 ## Step 1: Create `.env.local` File
 
-Create a file named `.env.local` in the root of your project (`c:\Users\Joshua\giglink\.env.local`) with these variables:
+Create a file named `.env.local` in the root of your project (`c:\Users\Joshua\trabawho\.env.local`) with these variables:
 
 ```bash
 # Supabase Configuration

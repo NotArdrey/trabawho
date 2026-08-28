@@ -1,4 +1,4 @@
-# GigLink — UI/UX Plan & Checklist
+# TrabaWho — UI/UX Plan & Checklist
 
 A page-by-page audit of UI/UX state. Focus: visual design, interaction patterns, responsiveness, accessibility, and polish.
 

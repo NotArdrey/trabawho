@@ -137,7 +137,7 @@ const createDefaultDiditWorkflow = async (apiKey: string) => {
       "x-api-key": apiKey,
     },
     body: JSON.stringify({
-      workflow_label: "GigLink Standard KYC",
+      workflow_label: "TrabaWho Standard KYC",
       features: [
         {
           feature: "OCR",
@@ -259,8 +259,8 @@ serve(async (req: Request) => {
 
     const diditApiKey = Deno.env.get("DIDIT_API_KEY") || "";
     const workflowId = Deno.env.get("DIDIT_WORKFLOW_ID") || "";
-    const supabaseUrl = Deno.env.get("GIGLINK_SUPABASE_URL") || Deno.env.get("SUPABASE_URL") || "";
-    const anonKey = Deno.env.get("GIGLINK_SUPABASE_ANON_KEY") || Deno.env.get("SUPABASE_ANON_KEY") || "";
+    const supabaseUrl = Deno.env.get("TRABAWHO_SUPABASE_URL") || Deno.env.get("SUPABASE_URL") || "";
+    const anonKey = Deno.env.get("TRABAWHO_SUPABASE_ANON_KEY") || Deno.env.get("SUPABASE_ANON_KEY") || "";
 
     if (!diditApiKey || !workflowId || !supabaseUrl || !anonKey) {
       return jsonResponse({

@@ -39,7 +39,7 @@ describe('sendChatbotMessage', () => {
       attachments: [attachment],
     });
 
-    expect(supabase.functions.invoke).toHaveBeenCalledWith('giglink-chatbot', {
+    expect(supabase.functions.invoke).toHaveBeenCalledWith('trabawho-chatbot', {
       body: expect.objectContaining({
         attachments: [attachment],
         messages: [

@@ -13,7 +13,7 @@ function HeroSlider({ onGetStarted, onBrowseServices }) {
       url: 'https://images.unsplash.com/photo-1581092918056-0c4c3acd3789?w=1800&h=1100&fit=crop',
       alt: 'Technician preparing tools for a home service job',
       title: 'Find the right pro for the work in front of you.',
-      description: 'From tutoring to repairs, GigLink keeps service details, pricing, ratings, and availability easy to scan.',
+      description: 'From tutoring to repairs, TrabaWho keeps service details, pricing, ratings, and availability easy to scan.',
     },
     {
       url: 'https://images.unsplash.com/photo-1552664730-d307ca884978?w=1800&h=1100&fit=crop',
@@ -259,7 +259,7 @@ function HeroSlider({ onGetStarted, onBrowseServices }) {
                   style={styles.sliderCtaButton('secondary')}
                   onClick={onGetStarted}
                 >
-                  Join GigLink
+                  Join TrabaWho
                   <ArrowRight size={17} aria-hidden="true" />
                 </button>
               </div>

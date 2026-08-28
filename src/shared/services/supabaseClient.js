@@ -89,7 +89,7 @@ export const supabase = isSupabaseConfigured ? createClient(supabaseUrl, supabas
   },
   global: {
     headers: {
-      'X-Client-Info': 'giglink-app',
+      'X-Client-Info': 'trabawho-app',
     },
   },
 }) : createMissingSupabaseClient();

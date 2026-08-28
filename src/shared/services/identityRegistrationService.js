@@ -5,7 +5,7 @@ import {
   sanitizeRegistrationLogValue,
 } from './registrationLogger';
 
-const STORAGE_KEY = 'giglink.identitySignup.v1';
+const STORAGE_KEY = 'trabawho.identitySignup.v1';
 
 export const DIDIT_DOCUMENT_TYPES = [
   { key: 'id_card', label: 'National ID / ID card', mode: 'didit' },

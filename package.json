@@ -1,7 +1,12 @@
 {
-  "name": "giglink",
+  "name": "trabawho",
   "version": "0.1.0",
+  "description": "TrabaWho service marketplace for trusted local work.",
   "private": true,
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/NotArdrey/trabawho.git"
+  },
   "dependencies": {
     "@supabase/supabase-js": "^2.104.1",
     "@testing-library/dom": "^10.4.1",

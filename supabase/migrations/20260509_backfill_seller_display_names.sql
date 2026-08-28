@@ -12,7 +12,7 @@ with resolved_names as (
       nullif(btrim(p.full_name), ''),
       nullif(btrim(concat_ws(' ', p.first_name, p.middle_name, p.last_name)), ''),
       nullif(split_part(coalesce(p.email, ''), '@', 1), ''),
-      'GigLink User'
+      'TrabaWho User'
     ) as resolved_display_name,
     coalesce(s.search_meta, '{}'::jsonb) as current_search_meta
   from public.sellers s

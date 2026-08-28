@@ -46,8 +46,8 @@ describe('FloatingChatbot worker matches', () => {
       />
     );
 
-    await userEvent.click(screen.getByRole('button', { name: /open giglink assistant/i }));
-    await userEvent.type(screen.getByLabelText(/message giglink assistant/i), 'Need help with a leak');
+    await userEvent.click(screen.getByRole('button', { name: /open trabawho assistant/i }));
+    await userEvent.type(screen.getByLabelText(/message trabawho assistant/i), 'Need help with a leak');
     await userEvent.click(screen.getByRole('button', { name: /^send message$/i }));
 
     await expect(screen.findByText('Alex Reyes')).resolves.toBeInTheDocument();
@@ -57,7 +57,7 @@ describe('FloatingChatbot worker matches', () => {
       expect(startServiceConversationByServiceId).toHaveBeenCalledWith({
         serviceId: 'service-123',
         assistantContext: expect.objectContaining({
-          source: 'giglink-chatbot',
+          source: 'trabawho-chatbot',
           selected_match: workerMatch,
         }),
       });
@@ -74,17 +74,17 @@ describe('FloatingChatbot worker matches', () => {
 
     render(<FloatingChatbot currentView="client-dashboard" isLoggedIn />);
 
-    await userEvent.click(screen.getByRole('button', { name: /open giglink assistant/i }));
-    await userEvent.type(screen.getByLabelText(/message giglink assistant/i), 'Find a worker');
+    await userEvent.click(screen.getByRole('button', { name: /open trabawho assistant/i }));
+    await userEvent.type(screen.getByLabelText(/message trabawho assistant/i), 'Find a worker');
     await userEvent.click(screen.getByRole('button', { name: /^send message$/i }));
 
     await expect(screen.findByText('You can compare workers from Browse.')).resolves.toBeInTheDocument();
-    await userEvent.type(screen.getByLabelText(/message giglink assistant/i), 'draft');
-    await userEvent.click(screen.getByRole('button', { name: /reset giglink assistant chat/i }));
+    await userEvent.type(screen.getByLabelText(/message trabawho assistant/i), 'draft');
+    await userEvent.click(screen.getByRole('button', { name: /reset trabawho assistant chat/i }));
 
     expect(screen.queryByText('Find a worker')).not.toBeInTheDocument();
     expect(screen.queryByText('You can compare workers from Browse.')).not.toBeInTheDocument();
     expect(screen.getByText(/Hi! I can help you browse services/i)).toBeInTheDocument();
-    expect(screen.getByLabelText(/message giglink assistant/i)).toHaveValue('');
+    expect(screen.getByLabelText(/message trabawho assistant/i)).toHaveValue('');
   });
 });

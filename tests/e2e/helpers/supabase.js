@@ -1,9 +1,9 @@
 const { createClient } = require('@supabase/supabase-js');
 const { requireEnv } = require('./env');
 
-const DEMO_CLIENT_EMAIL = 'demo.user@giglink.test';
-const DEMO_ADMIN_EMAIL = 'demo.admin@giglink.test';
-const DEMO_WORKER_EMAIL = 'demo.worker@giglink.test';
+const DEMO_CLIENT_EMAIL = 'demo.user@trabawho.test';
+const DEMO_ADMIN_EMAIL = 'demo.admin@trabawho.test';
+const DEMO_WORKER_EMAIL = 'demo.worker@trabawho.test';
 const DEMO_PASSWORD = 'pass123';
 
 function createTestSupabaseClient() {

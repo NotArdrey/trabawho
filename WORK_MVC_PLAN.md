@@ -261,7 +261,7 @@ Methods:
 ## Data Persistence Strategy
 
 ### Schedule Data (Local First)
-**localStorage Key:** `giglink_worker_schedule`
+**localStorage Key:** `trabawho_worker_schedule`
 ```json
 {
   "week": 0,
@@ -281,13 +281,13 @@ Methods:
 - Display "unsaved" indicator if local changes not synced
 
 ### Payment Confirmations (Cross-Tab Sync)
-**localStorage Key:** `giglink_cash_confirmation_requests`
+**localStorage Key:** `trabawho_cash_confirmation_requests`
 - 2.5s polling in controller
 - Storage event listener for cross-tab updates
 - Same pattern as bookings module
 
 ### Refund Requests (Cross-Tab Sync)
-**localStorage Key:** `giglink_refund_requests`
+**localStorage Key:** `trabawho_refund_requests`
 - Same as payment confirmations
 - Worker-side approval → visible in MyWork.jsx
 

@@ -1,4 +1,4 @@
--- Identity-first registration support for the dcz GigLink project.
+-- Identity-first registration support for the dcz TrabaWho project.
 -- Existing marketplace auth/data flows remain compatible with the current profiles.user_id shape.
 
 create extension if not exists pgcrypto;

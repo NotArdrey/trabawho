@@ -1,4 +1,4 @@
-# GigLink — Feature Plan & Checklist
+# TrabaWho — Feature Plan & Checklist
 
 A page-by-page audit of what's **done**, what's **missing (necessary)**, and **suggested** enhancements.
 

@@ -52,14 +52,14 @@ select
     nullif(u.raw_user_meta_data ->> 'full_name', ''),
     nullif(u.raw_user_meta_data ->> 'name', ''),
     split_part(u.email, '@', 1),
-    'GigLink User'
+    'TrabaWho User'
   ) as full_name,
   split_part(
     coalesce(
       nullif(u.raw_user_meta_data ->> 'full_name', ''),
       nullif(u.raw_user_meta_data ->> 'name', ''),
       split_part(u.email, '@', 1),
-      'GigLink User'
+      'TrabaWho User'
     ),
     ' ',
     1
@@ -93,4 +93,4 @@ set
 where nullif(btrim(coalesce(p.profile_photo, '')), '') is null;
 
 comment on function public.default_profile_image_url(uuid) is
-  'Returns a deterministic default profile image URL for GigLink profiles without uploaded photos.';
+  'Returns a deterministic default profile image URL for TrabaWho profiles without uploaded photos.';

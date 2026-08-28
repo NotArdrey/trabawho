@@ -13,7 +13,7 @@ function AdminOverview({ stats, accounts, logs, themeTokens, styles }) {
       <section className="gl-admin-header-panel" style={styles.header}>
         <div style={styles.headerCopy}>
           <span style={styles.eyebrow}>Admin Portal UI</span>
-          <h1 style={styles.title}>GigLink Admin Dashboard</h1>
+          <h1 style={styles.title}>TrabaWho Admin Dashboard</h1>
           <p style={styles.subtitle}>
             Main landing view for admin summaries, trends, and quick status checks. Detailed management pages are available from the top navigation.
           </p>

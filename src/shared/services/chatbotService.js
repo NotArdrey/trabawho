@@ -1,6 +1,6 @@
 import { supabase } from './supabaseClient';
 
-const CHATBOT_FUNCTION_NAME = 'giglink-chatbot';
+const CHATBOT_FUNCTION_NAME = 'trabawho-chatbot';
 const SUPPORTED_IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
 
 const normalizeAttachment = (attachment) => {
@@ -58,7 +58,7 @@ export const sendChatbotMessage = async ({ messages, context, attachments = [] }
   });
 
   if (error) {
-    console.error('giglink-chatbot failed', {
+    console.error('trabawho-chatbot failed', {
       message: error.message,
       status: error.status,
       code: error.code,
