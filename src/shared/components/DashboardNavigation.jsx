@@ -109,7 +109,6 @@ function DashboardNavigation({
     { key: 'chat', label: 'Chats', icon: MessageCircle, onClick: onOpenChatPage || onOpenMyBookings },
     { key: 'bookings', label: 'Bookings', icon: CalendarCheck, onClick: onOpenMyBookings },
     { key: 'profile', label: 'Profile', icon: UserRound, onClick: onOpenProfile },
-    { key: 'settings', label: 'Settings', icon: Settings, onClick: onOpenSettings },
   ];
   const workerNavItems = [
     { key: 'home', label: 'Home', icon: Home, onClick: onOpenDashboard },
@@ -117,7 +116,6 @@ function DashboardNavigation({
     { key: 'chat', label: 'Chats', icon: MessageCircle, onClick: onOpenChatPage || onOpenMyBookings },
     { key: 'bookings', label: 'Bookings', icon: CalendarCheck, onClick: onOpenMyBookings },
     { key: 'profile', label: 'Profile', icon: UserRound, onClick: onOpenProfile },
-    { key: 'settings', label: 'Settings', icon: Settings, onClick: onOpenSettings },
   ];
   const navItems = isWorkerAccount && !isAdminAccount ? workerNavItems : clientNavItems;
   const mobileNavLabels = {
@@ -127,7 +125,6 @@ function DashboardNavigation({
     bookings: 'Mobile bookings tab',
     work: 'Mobile work tab',
     profile: 'Mobile profile tab',
-    settings: 'Mobile settings tab',
   };
 
   const markAllNotificationsRead = () => {
@@ -265,6 +262,9 @@ function DashboardNavigation({
                 </button>
                 <button type="button" className="gl-app-menu-button" onClick={() => { setIsProfileMenuOpen(false); (onOpenAccountSettings || onOpenProfile)?.(); }}>
                   <Shield size={16} aria-hidden="true" /> Account & Privacy
+                </button>
+                <button type="button" className="gl-app-menu-button" onClick={() => { setIsProfileMenuOpen(false); onOpenSettings?.(); }}>
+                  <Settings size={16} aria-hidden="true" /> Settings
                 </button>
                 {sellerProfile?.role === 'admin' && (
                   <button type="button" className="gl-app-menu-button" onClick={() => { setIsProfileMenuOpen(false); onToggleAdminView?.(); }}>

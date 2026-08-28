@@ -127,11 +127,11 @@ test.describe('AI redesign smoke verification', () => {
     await expect(page.getByTestId('profile-page')).toBeVisible({ timeout: 20_000 });
     await expectNoHorizontalOverflow(page);
 
+    await page.getByLabel('Profile menu').click();
     await page.getByRole('button', { name: /^Settings$/ }).click();
     await expect(page.getByTestId('settings-page')).toBeVisible({ timeout: 20_000 });
     await expectNoHorizontalOverflow(page);
 
-    await page.getByRole('button', { name: /^Profile$/ }).click();
     await page.getByLabel('Profile menu').click();
     await page.getByRole('button', { name: /^Account & Privacy$/ }).click();
     await expect(page.getByTestId('account-settings-page')).toBeVisible({ timeout: 20_000 });
