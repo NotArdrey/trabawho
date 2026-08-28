@@ -108,14 +108,12 @@ function DashboardNavigation({
     { key: 'browse', label: 'Browse', icon: Store, onClick: onOpenBrowseServices || onOpenDashboard },
     { key: 'chat', label: 'Chats', icon: MessageCircle, onClick: onOpenChatPage || onOpenMyBookings },
     { key: 'bookings', label: 'Bookings', icon: CalendarCheck, onClick: onOpenMyBookings },
-    { key: 'profile', label: 'Profile', icon: UserRound, onClick: onOpenProfile },
   ];
   const workerNavItems = [
     { key: 'home', label: 'Home', icon: Home, onClick: onOpenDashboard },
     { key: 'work', label: 'My Work', icon: BriefcaseBusiness, onClick: onOpenMyWork || onOpenSellerSetup },
     { key: 'chat', label: 'Chats', icon: MessageCircle, onClick: onOpenChatPage || onOpenMyBookings },
     { key: 'bookings', label: 'Bookings', icon: CalendarCheck, onClick: onOpenMyBookings },
-    { key: 'profile', label: 'Profile', icon: UserRound, onClick: onOpenProfile },
   ];
   const navItems = isWorkerAccount && !isAdminAccount ? workerNavItems : clientNavItems;
   const mobileNavLabels = {
@@ -124,7 +122,6 @@ function DashboardNavigation({
     chat: 'Mobile chats tab',
     bookings: 'Mobile bookings tab',
     work: 'Mobile work tab',
-    profile: 'Mobile profile tab',
   };
 
   const markAllNotificationsRead = () => {
