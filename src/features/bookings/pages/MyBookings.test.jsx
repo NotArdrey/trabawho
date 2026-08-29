@@ -169,4 +169,18 @@ describe('MyBookings Redesign Component', () => {
 
     expect(screen.getByTestId('mock-payment-modal')).toBeInTheDocument();
   });
+
+  test('shows the provider confirmation action before client completion', () => {
+    mockCurrentBookings = [{
+      ...mockBookings[0],
+      status: 'Payment Confirmed',
+      paymentStatus: 'paid',
+      deliveryStatus: 'not_delivered',
+    }];
+
+    render(<MyBookings currentView="my-bookings" sellerProfile={{ role: 'worker', userId: 'worker-1' }} />);
+
+    expect(screen.getByRole('button', { name: /Mark Delivered/i })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Confirm Completion/i })).not.toBeInTheDocument();
+  });
 });

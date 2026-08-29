@@ -34,6 +34,7 @@ import {
   acknowledgeCashPayment,
   archiveConversationThread,
   confirmBookingCompletion,
+  markBookingDelivered,
 } from '../services/bookingService';
 
 const WORKER_ROLE_VALUES = new Set(['worker', 'workers', 'seller', 'sellers']);
@@ -341,6 +342,19 @@ const MyBookings = ({
       pushHeaderNotification('Booking Completed', 'The completed service was recorded and can now be rated.');
     } catch (error) {
       pushHeaderNotification('Completion Failed', error?.message || 'Unable to confirm service completion.');
+    }
+  }, [bookingListCtrl, pushHeaderNotification]);
+
+  const handleMarkDelivered = useCallback(async (bookingId) => {
+    try {
+      const updated = await markBookingDelivered(bookingId);
+      bookingListCtrl.replaceBooking(updated);
+      pushHeaderNotification(
+        'Delivery Confirmed by Provider',
+        'The client can now confirm completion from their booking.'
+      );
+    } catch (error) {
+      pushHeaderNotification('Delivery Confirmation Failed', error?.message || 'Unable to mark the service delivered.');
     }
   }, [bookingListCtrl, pushHeaderNotification]);
 
@@ -661,6 +675,20 @@ const MyBookings = ({
               >
                 <CheckCircle2 size={16} aria-hidden="true" />
                 Confirm Completion
+              </button>
+            )}
+
+            {shouldLoadSellerBookings
+              && booking.deliveryStatus === 'not_delivered'
+              && booking.paymentStatus === 'paid'
+              && ['Payment Confirmed', 'Service Scheduled', 'Active Service'].includes(booking.status) && (
+              <button
+                type="button"
+                className="gl-button primary"
+                onClick={() => handleMarkDelivered(booking.id)}
+              >
+                <CheckCircle2 size={16} aria-hidden="true" />
+                Mark Delivered
               </button>
             )}
 
@@ -1188,6 +1216,14 @@ const MyBookings = ({
               <div><span>Payment</span><strong>{detailBooking.paymentMethod === 'gcash-advance' ? 'GCash Advance' : 'Pending Selection'}</strong></div>
               <div><span>Service price</span><strong>{formatPhp(detailBooking.quoteAmount || 0)}</strong></div>
               <div><span>Total charged</span><strong>{formatPhp(detailBooking.totalChargedAmount || detailBooking.quoteAmount || 0)}</strong></div>
+              <div>
+                <span>Provider confirmation</span>
+                <strong>{['seller_claimed', 'buyer_confirmed'].includes(detailBooking.deliveryStatus) ? 'Delivered ✓' : 'Awaiting provider'}</strong>
+              </div>
+              <div>
+                <span>Client confirmation</span>
+                <strong>{detailBooking.deliveryStatus === 'buyer_confirmed' ? 'Completed ✓' : detailBooking.deliveryStatus === 'seller_claimed' ? 'Awaiting client' : 'Waiting for delivery'}</strong>
+              </div>
               {detailBooking.paymentReference && <div><span>Reference</span><strong>{detailBooking.paymentReference}</strong></div>}
               {detailBooking.completedAt && <div><span>Completed</span><strong>{new Date(detailBooking.completedAt).toLocaleDateString('en-PH')}</strong></div>}
             </div>
