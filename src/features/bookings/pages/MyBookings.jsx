@@ -23,6 +23,7 @@ import ChatWindow from '../components/ChatWindow';
 import SlotSelectionModal from '../components/SlotSelectionModal';
 import PaymentModal from '../components/PaymentModal';
 import BookingTermsModal from '../components/BookingTermsModal';
+import RatingModal from '../components/RatingModal';
 
 import {
   useBookingListController,
@@ -224,6 +225,7 @@ const MyBookings = ({
       await ratingCtrl.handleLeaveRating(payload);
     } catch (error) {
       pushHeaderNotification('Rating Failed', error?.message || 'Unable to save rating right now.');
+      throw error;
     }
   }, [pushHeaderNotification, ratingCtrl]);
 
@@ -408,6 +410,7 @@ const MyBookings = ({
 
   const currentBooking = bookingListCtrl.bookings.find((b) => isBookingNavigationMatch(b, selectedBookingId));
   const detailBooking = bookingListCtrl.bookings.find((b) => String(b.id) === String(detailBookingId));
+  const ratingBooking = bookingListCtrl.bookings.find((b) => String(b.id) === String(ratingCtrl.ratingTargetId));
   const currentBookingFee = Number(currentBooking?.transactionFeeAmount || 0);
   const currentBookingTotal = Number(currentBooking?.totalChargedAmount || currentBooking?.quoteAmount || 0);
 
@@ -711,7 +714,7 @@ const MyBookings = ({
                 type="button"
                 className="gl-button secondary"
                 style={{ borderColor: 'var(--gl-amber)', color: 'var(--gl-amber)' }}
-                onClick={() => handleOpenChat(booking.id)}
+                onClick={() => ratingCtrl.handleOpenRating(booking.id)}
               >
                 <Star size={16} aria-hidden="true" />
                 Rate Service
@@ -1244,6 +1247,13 @@ const MyBookings = ({
             </div>
 
             {detailBooking.description && <p className="booking-detail-modal-description">{detailBooking.description}</p>}
+            {(detailBooking.rating || detailBooking.review) && (
+              <div className="booking-detail-review">
+                <strong>{detailBooking.rating} / 5 stars</strong>
+                {detailBooking.review && <p>{detailBooking.review}</p>}
+                {detailBooking.reviewImageUrl && <img src={detailBooking.reviewImageUrl} alt="Customer review" />}
+              </div>
+            )}
 
             <footer className="booking-detail-modal-actions">
               <button type="button" className="gl-button secondary" onClick={() => setDetailBookingId(null)}>Close</button>
@@ -1269,6 +1279,19 @@ const MyBookings = ({
           onSelectPayment={(method, mockPayment) => handleSelectPaymentMethod(currentBooking.id, method, mockPayment)}
           onCancel={handleBackToList}
           confirmLabel={currentBooking.paymentStatus === 'partially_paid' ? 'Pay Remaining Balance' : 'Submit Payment'}
+        />
+      )}
+
+      {ratingBooking && (
+        <RatingModal
+          booking={ratingBooking}
+          onClose={() => ratingCtrl.setRatingTargetId(null)}
+          onSubmit={({ rating, comment, imageFile }) => handleLeaveRating({
+            bookingId: ratingBooking.id,
+            rating,
+            comment,
+            imageFile,
+          })}
         />
       )}
 

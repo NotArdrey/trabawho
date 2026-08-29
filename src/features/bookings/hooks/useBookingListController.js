@@ -77,7 +77,7 @@ export function useBookingListController(initialBookings = [], options = {}) {
     try {
       setActionError('');
       const updated = updates.rating !== undefined
-        ? await submitBookingReview(current, updates.rating, updates.review || '')
+        ? await submitBookingReview(current, updates.rating, updates.review || '', updates.reviewImage || null)
         : await updateBookingWorkflow(current, updates);
       replaceBooking(updated);
       return updated;

@@ -354,6 +354,7 @@ export const mapBookingRowToUiBooking = (booking = {}, context = {}) => {
     canRate: booking.status === 'completed' && !review,
     rating: review?.rating || metadata.rating || null,
     review: review?.body || metadata.review || '',
+    reviewImageUrl: review?.image_url || metadata.review_image_url || '',
     billingCycle: metadata.billing_cycle || metadata.billingCycle || null,
     serviceActive: metadata.service_active ?? metadata.serviceActive ?? booking.status === 'in_progress',
     stopRequested: Boolean(metadata.stop_requested || metadata.stopRequested),
@@ -1275,7 +1276,30 @@ export const createClientBookingRequestByServiceId = async ({
   return createClientBookingRequest({ provider, assistantContext });
 };
 
-export const submitBookingReview = async (bookingOrId, ratingValue, ratingComment = '') => {
+const uploadReviewImage = async ({ file, userId, bookingId }) => {
+  if (!file) return '';
+
+  const allowedTypes = new Set(['image/jpeg', 'image/png', 'image/webp']);
+  if (!allowedTypes.has(file.type)) {
+    throw new Error('Review photo must be a JPG, PNG, or WebP image.');
+  }
+  if (file.size > 5 * 1024 * 1024) {
+    throw new Error('Review photo must be 5 MB or smaller.');
+  }
+
+  const extension = file.type === 'image/png' ? 'png' : file.type === 'image/webp' ? 'webp' : 'jpg';
+  const objectPath = `${userId}/${bookingId}/${Date.now()}-review.${extension}`;
+  const { error } = await supabase.storage
+    .from('review-images')
+    .upload(objectPath, file, { cacheControl: '3600', contentType: file.type, upsert: false });
+
+  if (error) throw mapDatabaseError(error);
+
+  const { data } = supabase.storage.from('review-images').getPublicUrl(objectPath);
+  return data?.publicUrl || '';
+};
+
+export const submitBookingReview = async (bookingOrId, ratingValue, ratingComment = '', ratingImageFile = null) => {
   const current = typeof bookingOrId === 'object' ? bookingOrId : await fetchBookingById(bookingOrId);
   if (!current?.id) throw new Error('Missing booking to review.');
 
@@ -1288,12 +1312,16 @@ export const submitBookingReview = async (bookingOrId, ratingValue, ratingCommen
   }
 
   const existingReview = current.raw?.review || null;
+  const imageUrl = ratingImageFile
+    ? await uploadReviewImage({ file: ratingImageFile, userId: user.id, bookingId: current.id })
+    : existingReview?.image_url || '';
   const payload = {
     seller_id: current.workerId,
     reviewer_id: user.id,
     booking_id: current.id,
     rating,
     body: getNullableString(ratingComment),
+    image_url: getNullableString(imageUrl),
     published: true,
     updated_at: nowIso(),
   };
@@ -1314,7 +1342,7 @@ export const submitBookingReview = async (bookingOrId, ratingValue, ratingCommen
   }
 
   const refreshed = await fetchBookingById(current.id);
-  return { ...refreshed, rating, review: ratingComment, canRate: false };
+  return { ...refreshed, rating, review: ratingComment, reviewImageUrl: imageUrl, canRate: false };
 };
 
 const buildWorkflowIdempotencyKey = (action, bookingId) => (

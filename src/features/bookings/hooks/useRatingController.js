@@ -76,6 +76,7 @@ export function useRatingController(updateBooking, pushNotification) {
     await updateBooking(payload.bookingId, {
       rating: payload.rating,
       review: payload.comment || '',
+      reviewImage: payload.imageFile || null,
       canRate: false,
     });
 

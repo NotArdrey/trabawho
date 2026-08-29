@@ -45,6 +45,7 @@ const mockBookings = [
 
 let mockCurrentBookings = [];
 let mockIsLoading = false;
+const mockHandleOpenRating = jest.fn();
 
 jest.mock('../hooks', () => ({
   useBookingListController: () => ({
@@ -73,6 +74,9 @@ jest.mock('../hooks', () => ({
     handleConfirmRefundReceived: jest.fn(),
   }),
   useRatingController: () => ({
+    ratingTargetId: null,
+    setRatingTargetId: jest.fn(),
+    handleOpenRating: mockHandleOpenRating,
     handleLeaveRating: jest.fn(),
   }),
 }));
@@ -81,6 +85,7 @@ describe('MyBookings Redesign Component', () => {
   beforeEach(() => {
     mockCurrentBookings = [];
     mockIsLoading = false;
+    mockHandleOpenRating.mockClear();
   });
 
   test('renders empty state with rich CTA when there are no bookings', () => {
@@ -182,5 +187,14 @@ describe('MyBookings Redesign Component', () => {
 
     expect(screen.getByRole('button', { name: /Mark Delivered/i })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Confirm Completion/i })).not.toBeInTheDocument();
+  });
+
+  test('opens the rating workflow instead of routing to hidden chat controls', () => {
+    mockCurrentBookings = [mockBookings[1]];
+
+    render(<MyBookings currentView="my-bookings" />);
+    fireEvent.click(screen.getByRole('button', { name: /Rate Service/i }));
+
+    expect(mockHandleOpenRating).toHaveBeenCalledWith('b2');
   });
 });

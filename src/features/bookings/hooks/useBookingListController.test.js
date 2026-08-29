@@ -1,5 +1,6 @@
 import { act, renderHook } from '@testing-library/react';
 import { useBookingListController } from './useBookingListController';
+import { submitBookingReview } from '../services/bookingService';
 
 jest.mock('../services/bookingService', () => ({
   fetchClientBookings: jest.fn(),
@@ -41,5 +42,21 @@ describe('useBookingListController filters', () => {
 
     act(() => result.current.setActiveFilter('active'));
     expect(result.current.filteredBookings.map((booking) => booking.id)).toEqual(['pending', 'partial', 'paid']);
+  });
+
+  test('forwards an optional review image to review persistence', async () => {
+    const image = new File(['image'], 'work.png', { type: 'image/png' });
+    submitBookingReview.mockResolvedValue({ ...bookings[3], rating: 5, canRate: false });
+    const { result } = setup();
+
+    await act(async () => {
+      await result.current.updateBooking('completed', {
+        rating: 5,
+        review: 'Excellent work',
+        reviewImage: image,
+      });
+    });
+
+    expect(submitBookingReview).toHaveBeenCalledWith(bookings[3], 5, 'Excellent work', image);
   });
 });
