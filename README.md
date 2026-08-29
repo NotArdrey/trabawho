@@ -2,6 +2,8 @@
 
 TrabaWho is a React marketplace for connecting customers with local service providers. It combines booking and seller workflows with an AI assistant that can use marketplace and booking context to help users find services, estimate requirements, and understand their options.
 
+Production: https://trabawho-kappa.vercel.app
+
 ## Implemented features
 
 - Customer dashboard, service discovery, profiles, bookings, work tracking, settings, and seller onboarding
