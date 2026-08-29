@@ -11,7 +11,9 @@ jest.mock('../../../shared/components/DashboardNavigation', () => () => (
 jest.mock('../components/ChatWindow', () => () => <div data-testid="mock-chat-window">Chat</div>);
 jest.mock('../components/SlotSelectionModal', () => () => <div data-testid="mock-slot-modal">Slots</div>);
 jest.mock('../components/PaymentModal', () => () => <div data-testid="mock-payment-modal">Payment</div>);
-jest.mock('../components/BookingTermsModal', () => () => <div data-testid="mock-terms-modal">Terms</div>);
+jest.mock('../components/BookingTermsModal', () => ({ isOpen, onConfirm }) => (
+  isOpen ? <button data-testid="mock-terms-modal" onClick={onConfirm}>Continue to payment</button> : null
+));
 
 // Mock the hooks
 const mockBookings = [
@@ -139,5 +141,32 @@ describe('MyBookings Redesign Component', () => {
     fireEvent.change(searchInput, { target: { value: 'Juan' } });
     expect(screen.getByText('Juan Dela Cruz')).toBeInTheDocument();
     expect(screen.queryByText('Maria Santos')).not.toBeInTheDocument();
+  });
+
+  test('opens booking details from a card', () => {
+    mockCurrentBookings = mockBookings;
+
+    render(<MyBookings currentView="my-bookings" />);
+
+    fireEvent.click(screen.getAllByRole('button', { name: /View Details/i })[0]);
+
+    const detailsDialog = screen.getByRole('dialog', { name: /Tutor/i });
+    expect(detailsDialog).toBeInTheDocument();
+    expect(detailsDialog).toHaveTextContent('GCASH-998811');
+  });
+
+  test('lets a buyer open payment directly from a pending booking card', () => {
+    mockCurrentBookings = [{
+      ...mockBookings[0],
+      status: 'Payment Pending',
+      paymentStatus: 'pending_provider',
+    }];
+
+    render(<MyBookings currentView="my-bookings" />);
+
+    fireEvent.click(screen.getByRole('button', { name: /Pay Now/i }));
+    fireEvent.click(screen.getByTestId('mock-terms-modal'));
+
+    expect(screen.getByTestId('mock-payment-modal')).toBeInTheDocument();
   });
 });

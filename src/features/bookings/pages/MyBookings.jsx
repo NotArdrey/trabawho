@@ -7,6 +7,7 @@ import {
   CheckCircle2,
   Clock,
   CreditCard,
+  Eye,
   Filter,
   Home,
   MessageCircle,
@@ -175,6 +176,7 @@ const MyBookings = ({
   const [selectedBookingId, setSelectedBookingId] = useState(selectedChatBookingId || null);
   const [uiState, setUiState] = useState(() => (isChatRoute ? 'chat' : 'list'));
   const [isTermsModalOpen, setIsTermsModalOpen] = useState(false);
+  const [detailBookingId, setDetailBookingId] = useState(null);
   const [localSearchTerm, setLocalSearchTerm] = useState('');
 
   const [isMobile, setIsMobile] = useState(() =>
@@ -225,6 +227,11 @@ const MyBookings = ({
   }, [pushHeaderNotification, ratingCtrl]);
 
   const handleOpenPaymentSelection = useCallback(() => {
+    setIsTermsModalOpen(true);
+  }, []);
+
+  const handlePayBooking = useCallback((bookingId) => {
+    setSelectedBookingId(bookingId);
     setIsTermsModalOpen(true);
   }, []);
 
@@ -386,6 +393,7 @@ const MyBookings = ({
   }, [bookingListCtrl.bookings, isChatRoute, selectedBookingId, selectedChatBookingId]);
 
   const currentBooking = bookingListCtrl.bookings.find((b) => isBookingNavigationMatch(b, selectedBookingId));
+  const detailBooking = bookingListCtrl.bookings.find((b) => String(b.id) === String(detailBookingId));
   const currentBookingFee = Number(currentBooking?.transactionFeeAmount || 0);
   const currentBookingTotal = Number(currentBooking?.totalChargedAmount || currentBooking?.quoteAmount || 0);
 
@@ -493,6 +501,10 @@ const MyBookings = ({
   const renderBookingCard = (booking) => {
     const statusMeta = getStatusMeta(booking.status);
     const StatusIcon = statusMeta.icon;
+    const canPayNow = !shouldLoadSellerBookings && (
+      ['Payment Pending', 'Slot Selected - Payment Pending'].includes(booking.status)
+      || booking.paymentStatus === 'partially_paid'
+    );
 
     return (
       <article
@@ -599,6 +611,26 @@ const MyBookings = ({
           </div>
 
           <div className="booking-card-actions">
+            <button
+              type="button"
+              className="gl-button secondary"
+              onClick={() => setDetailBookingId(booking.id)}
+            >
+              <Eye size={16} aria-hidden="true" />
+              View Details
+            </button>
+
+            {canPayNow && (
+              <button
+                type="button"
+                className="gl-button primary"
+                onClick={() => handlePayBooking(booking.id)}
+              >
+                <CreditCard size={16} aria-hidden="true" />
+                {booking.paymentStatus === 'partially_paid' ? 'Pay Balance' : 'Pay Now'}
+              </button>
+            )}
+
             <button
               type="button"
               className="gl-button primary"
@@ -973,9 +1005,9 @@ const MyBookings = ({
         </main>
       )}
 
-      {isChatRoute && currentBooking && (
+      {currentBooking && (
         <>
-          {uiState === 'chat' && (
+          {isChatRoute && uiState === 'chat' && (
             <ChatWindow
               appTheme={appTheme}
               booking={currentBooking}
@@ -996,18 +1028,10 @@ const MyBookings = ({
             />
           )}
 
-          {uiState === 'slots' && (
+          {isChatRoute && uiState === 'slots' && (
             <SlotSelectionModal
               booking={currentBooking}
               onConfirmSlot={(slotInfo) => handleConfirmSlot(currentBooking.id, slotInfo)}
-              onCancel={handleBackToList}
-            />
-          )}
-
-          {uiState === 'payment' && (
-            <PaymentModal
-              booking={currentBooking}
-              onSelectPayment={(method, mockPayment) => handleSelectPaymentMethod(currentBooking.id, method, mockPayment)}
               onCancel={handleBackToList}
             />
           )}
@@ -1125,6 +1149,76 @@ const MyBookings = ({
             </div>
           )}
         </>
+      )}
+
+      {detailBooking && (
+        <div
+          className="booking-detail-modal-backdrop"
+          role="presentation"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) setDetailBookingId(null);
+          }}
+        >
+          <section
+            className="booking-detail-modal gl-card"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="booking-detail-title"
+          >
+            <header className="booking-detail-modal-header">
+              <div>
+                <span className="gl-eyebrow">Booking details</span>
+                <h2 id="booking-detail-title">{detailBooking.serviceType}</h2>
+                <p>{detailBooking.workerName}</p>
+              </div>
+              <button
+                type="button"
+                className="booking-detail-modal-close"
+                aria-label="Close booking details"
+                onClick={() => setDetailBookingId(null)}
+              >
+                <X size={20} aria-hidden="true" />
+              </button>
+            </header>
+
+            <div className="booking-detail-modal-grid">
+              <div><span>Status</span><strong>{getStatusMeta(detailBooking.status).label}</strong></div>
+              <div><span>Date</span><strong>{detailBooking.selectedSlot?.date || detailBooking.requestDate || 'Coordinated in chat'}</strong></div>
+              <div><span>Time</span><strong>{detailBooking.selectedSlot?.timeBlock ? `${detailBooking.selectedSlot.timeBlock.startTime} - ${detailBooking.selectedSlot.timeBlock.endTime}` : 'Coordinated in chat'}</strong></div>
+              <div><span>Payment</span><strong>{detailBooking.paymentMethod === 'gcash-advance' ? 'GCash Advance' : 'Pending Selection'}</strong></div>
+              <div><span>Service price</span><strong>{formatPhp(detailBooking.quoteAmount || 0)}</strong></div>
+              <div><span>Total charged</span><strong>{formatPhp(detailBooking.totalChargedAmount || detailBooking.quoteAmount || 0)}</strong></div>
+              {detailBooking.paymentReference && <div><span>Reference</span><strong>{detailBooking.paymentReference}</strong></div>}
+              {detailBooking.completedAt && <div><span>Completed</span><strong>{new Date(detailBooking.completedAt).toLocaleDateString('en-PH')}</strong></div>}
+            </div>
+
+            {detailBooking.description && <p className="booking-detail-modal-description">{detailBooking.description}</p>}
+
+            <footer className="booking-detail-modal-actions">
+              <button type="button" className="gl-button secondary" onClick={() => setDetailBookingId(null)}>Close</button>
+              <button
+                type="button"
+                className="gl-button primary"
+                onClick={() => {
+                  setDetailBookingId(null);
+                  handleOpenChat(detailBooking.id);
+                }}
+              >
+                <MessageCircle size={16} aria-hidden="true" />
+                Open Chat
+              </button>
+            </footer>
+          </section>
+        </div>
+      )}
+
+      {currentBooking && uiState === 'payment' && (
+        <PaymentModal
+          booking={currentBooking}
+          onSelectPayment={(method, mockPayment) => handleSelectPaymentMethod(currentBooking.id, method, mockPayment)}
+          onCancel={handleBackToList}
+          confirmLabel={currentBooking.paymentStatus === 'partially_paid' ? 'Pay Remaining Balance' : 'Submit Payment'}
+        />
       )}
 
       <BookingTermsModal
