@@ -4836,6 +4836,26 @@ textarea {
   }
 }
 
+.bookings-sub-pill-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 19px;
+  height: 19px;
+  margin-left: 5px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: var(--gl-surface-3);
+  color: var(--gl-text-2);
+  font-size: 10px;
+  font-weight: 850;
+}
+
+.bookings-sub-pill.active .bookings-sub-pill-count {
+  background: color-mix(in srgb, var(--gl-blue) 14%, var(--gl-surface));
+  color: var(--gl-blue);
+}
+
 .booking-detail-modal-backdrop {
   position: fixed;
   inset: 0;

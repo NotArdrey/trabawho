@@ -475,11 +475,25 @@ const MyBookings = ({
     { key: 'completed', label: 'Completed', count: completedBookingsCount },
   ];
 
+  const paymentPendingCount = allBookings.filter((booking) => (
+    ['Payment Pending', 'Slot Selected - Payment Pending', 'Downpayment Paid'].includes(booking.status)
+    || ['pending_provider', 'partially_paid'].includes(booking.paymentStatus)
+  )).length;
+  const paidCount = allBookings.filter((booking) => booking.paymentStatus === 'paid').length;
+  const cashCount = allBookings.filter((booking) => booking.paymentMethod === 'after-service-cash').length;
+  const refundCount = allBookings.filter((booking) => (
+    Boolean(booking.refundStatus) || ['Refund Processing', 'Refunded'].includes(booking.status)
+  )).length;
+  const cancelledCount = allBookings.filter((booking) => ['Cancelled', 'Cancelled (Cash)'].includes(booking.status)).length;
+
   const displayFilters = [
-    { key: 'all', label: 'All types' },
-    { key: 'cash-approvals', label: 'Cash' },
-    { key: 'refunds', label: 'Refunds' },
-    { key: 'cancelled', label: 'Cancelled' },
+    { key: 'all', label: 'All', count: allBookings.length },
+    { key: 'payment-pending', label: 'Payment Pending', count: paymentPendingCount },
+    { key: 'paid', label: 'Paid', count: paidCount },
+    { key: 'completed', label: 'Completed', count: completedBookingsCount },
+    { key: 'cash-approvals', label: 'Cash', count: cashCount },
+    { key: 'refunds', label: 'Refunds', count: refundCount },
+    { key: 'cancelled', label: 'Cancelled', count: cancelledCount },
   ];
 
   // Search filter applied on top of list controller
@@ -824,6 +838,7 @@ const MyBookings = ({
                 onClick={() => bookingListCtrl.setDisplayFilter(filter.key)}
               >
                 {filter.label}
+                <span className="bookings-sub-pill-count">{filter.count}</span>
               </button>
             ))}
           </div>

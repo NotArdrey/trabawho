@@ -6,7 +6,9 @@ import {
   updateBookingWorkflow,
 } from '../services/bookingService';
 
-const TERMINAL_STATUSES = ['Completed Service', 'Service Stopped', 'Cancelled (Cash)', 'Refunded'];
+const COMPLETED_STATUSES = ['Completed Service', 'Service Stopped'];
+const TERMINAL_STATUSES = [...COMPLETED_STATUSES, 'Cancelled', 'Cancelled (Cash)', 'Refunded'];
+const PAYMENT_PENDING_STATUSES = ['Payment Pending', 'Slot Selected - Payment Pending', 'Downpayment Paid'];
 
 export function useBookingListController(initialBookings = [], options = {}) {
   const { autoLoad = true, includeStandaloneChats = false, listRole = 'buyer', sellerId = null } = options;
@@ -125,7 +127,7 @@ export function useBookingListController(initialBookings = [], options = {}) {
   const statusFilteredBookings = useMemo(() => (
     bookings.filter((booking) => {
       if (activeFilter === 'completed') {
-        return TERMINAL_STATUSES.includes(booking.status) || booking.status === 'Refund Processing';
+        return COMPLETED_STATUSES.includes(booking.status);
       }
       if (activeFilter === 'active') {
         return !TERMINAL_STATUSES.includes(booking.status);
@@ -139,11 +141,21 @@ export function useBookingListController(initialBookings = [], options = {}) {
       if (displayFilter === 'cash-approvals') {
         return booking.paymentMethod === 'after-service-cash';
       }
+      if (displayFilter === 'payment-pending') {
+        return PAYMENT_PENDING_STATUSES.includes(booking.status)
+          || ['pending_provider', 'partially_paid'].includes(booking.paymentStatus);
+      }
+      if (displayFilter === 'paid') {
+        return booking.paymentStatus === 'paid';
+      }
+      if (displayFilter === 'completed') {
+        return COMPLETED_STATUSES.includes(booking.status);
+      }
       if (displayFilter === 'refunds') {
-        return Boolean(booking.refundStatus) || booking.status === 'Refund Processing';
+        return Boolean(booking.refundStatus) || ['Refund Processing', 'Refunded'].includes(booking.status);
       }
       if (displayFilter === 'cancelled') {
-        return booking.status === 'Cancelled (Cash)' && booking.paymentMethod === 'after-service-cash';
+        return ['Cancelled', 'Cancelled (Cash)'].includes(booking.status);
       }
       return true;
     })
