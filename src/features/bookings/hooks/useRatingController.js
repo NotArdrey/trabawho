@@ -51,7 +51,6 @@ export function useRatingController(updateBooking, pushNotification) {
       rating: ratingValue,
       review: ratingComment.trim(),
       canRate: false,
-      status: 'Completed Service',
     });
 
     // Push notification

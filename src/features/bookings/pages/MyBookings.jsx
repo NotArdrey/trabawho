@@ -29,7 +29,11 @@ import {
   useRefundController,
   useRatingController,
 } from '../hooks';
-import { archiveConversationThread } from '../services/bookingService';
+import {
+  acknowledgeCashPayment,
+  archiveConversationThread,
+  confirmBookingCompletion,
+} from '../services/bookingService';
 
 const WORKER_ROLE_VALUES = new Set(['worker', 'workers', 'seller', 'sellers']);
 const CLIENT_ROLE_VALUES = new Set(['client', 'clients', 'buyer', 'buyers', 'customer', 'customers']);
@@ -148,7 +152,8 @@ const MyBookings = ({
   const paymentCtrl = usePaymentController(
     undefined, // onPaymentProofSubmit
     undefined, // onPaymentMethodSelect
-    bookingListCtrl.updateBooking
+    bookingListCtrl.updateBooking,
+    bookingListCtrl.replaceBooking
   );
 
   // Refund controller
@@ -312,6 +317,26 @@ const MyBookings = ({
     }
   }, [bookingListCtrl, pushHeaderNotification]);
 
+  const handleAcknowledgeCashPayment = useCallback(async (bookingId) => {
+    try {
+      const updated = await acknowledgeCashPayment(bookingId);
+      bookingListCtrl.replaceBooking(updated);
+      pushHeaderNotification('Cash Payment Confirmed', 'Your cash-payment acknowledgement was recorded.');
+    } catch (error) {
+      pushHeaderNotification('Cash Confirmation Failed', error?.message || 'Unable to acknowledge cash payment.');
+    }
+  }, [bookingListCtrl, pushHeaderNotification]);
+
+  const handleConfirmCompletion = useCallback(async (bookingId) => {
+    try {
+      const updated = await confirmBookingCompletion(bookingId);
+      bookingListCtrl.replaceBooking(updated);
+      pushHeaderNotification('Booking Completed', 'The completed service was recorded and can now be rated.');
+    } catch (error) {
+      pushHeaderNotification('Completion Failed', error?.message || 'Unable to confirm service completion.');
+    }
+  }, [bookingListCtrl, pushHeaderNotification]);
+
   const hideCurrentChat = useCallback(async (targetBooking, mode) => {
     if (!targetBooking) return;
 
@@ -387,6 +412,7 @@ const MyBookings = ({
         'Negotiating',
         'Awaiting Slot Selection',
         'Payment Pending',
+        'Downpayment Paid',
         'Slot Selected - Payment Pending',
         'Cash Verification Pending',
         'Refund Processing',
@@ -565,6 +591,11 @@ const MyBookings = ({
                 (+{formatPhp(booking.transactionFeeAmount)} fee)
               </span>
             )}
+            {booking.paymentPlan === 'downpayment' && (
+              <span style={{ fontSize: '12px', color: 'var(--gl-text-3)', fontWeight: 600 }}>
+                Paid: {formatPhp(booking.amountPaid)} · Balance: {formatPhp(booking.balanceDueAmount)}
+              </span>
+            )}
           </div>
 
           <div className="booking-card-actions">
@@ -576,6 +607,30 @@ const MyBookings = ({
               <MessageCircle size={16} aria-hidden="true" />
               Open Chat
             </button>
+
+            {!shouldLoadSellerBookings && booking.cashCollectionStatus === 'seller_claimed' && (
+              <button
+                type="button"
+                className="gl-button secondary"
+                onClick={() => handleAcknowledgeCashPayment(booking.id)}
+              >
+                <ShieldCheck size={16} aria-hidden="true" />
+                Acknowledge Cash
+              </button>
+            )}
+
+            {!shouldLoadSellerBookings && booking.deliveryStatus === 'seller_claimed' && (
+              <button
+                type="button"
+                className="gl-button primary"
+                disabled={booking.paymentStatus !== 'paid'}
+                title={booking.paymentStatus === 'paid' ? 'Confirm that the service was delivered' : 'Payment confirmation is required first'}
+                onClick={() => handleConfirmCompletion(booking.id)}
+              >
+                <CheckCircle2 size={16} aria-hidden="true" />
+                Confirm Completion
+              </button>
+            )}
 
             {booking.canRate && (
               <button

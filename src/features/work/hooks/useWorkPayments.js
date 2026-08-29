@@ -9,13 +9,7 @@ const mapBookingToTransaction = (booking) => {
   const paymentMethod = booking.paymentMethod || '';
   const isCash = paymentMethod === 'after-service-cash';
   const isAfterService = paymentMethod === 'after-service-cash' || paymentMethod === 'after-service-gcash';
-  const isPaid = Boolean(
-    booking.paymentReference
-    || booking.transactionId
-    || booking.cashConfirmationStatus === 'approved'
-    || booking.status === 'Completed Service'
-    || booking.status === 'Refunded'
-  );
+  const isPaid = booking.paymentStatus === 'paid' || booking.paymentStatus === 'refunded';
 
   return {
     id: booking.id,
@@ -26,11 +20,12 @@ const mapBookingToTransaction = (booking) => {
     paymentMode: isAfterService ? 'After Service' : 'Advance',
     paymentChannel: isCash ? 'cash' : 'gcash',
     isPaid,
-    isDone: booking.status === 'Completed Service' || booking.status === 'Refunded',
+    isDone: booking.deliveryStatus === 'seller_claimed' || booking.deliveryStatus === 'buyer_confirmed' || booking.status === 'Refunded',
     weekOffset: 0,
     expectedCashAmount: booking.expectedCashAmount || booking.quoteAmount || 0,
     submittedCashAmount: booking.submittedCashAmount || 0,
     cashConfirmationStatus: booking.cashConfirmationStatus,
+    cashCollectionStatus: booking.cashCollectionStatus,
     cashConfirmationQrId: booking.cashVerifierQrId,
     transactionId: booking.transactionId || booking.paymentReference || '',
     refundStatus: booking.refundStatus,
@@ -79,8 +74,17 @@ export const useWorkPayments = ({ sellerId = null, weekOffset = 0 } = {}) => {
   const allCashTransactions = weekTransactions.filter((transaction) => transaction.paymentChannel === 'cash');
   const cashConfirmationNotifications =
     cashPaymentView === 'pending'
-      ? allCashTransactions.filter((transaction) => transaction.cashConfirmationStatus === 'pending-worker-review')
-      : allCashTransactions.filter((transaction) => transaction.cashConfirmationStatus === 'approved' || transaction.cashConfirmationStatus === 'denied');
+      ? allCashTransactions.filter((transaction) => (
+        transaction.cashConfirmationStatus === 'pending-worker-review'
+        && transaction.cashCollectionStatus !== 'seller_claimed'
+        && transaction.cashCollectionStatus !== 'buyer_acknowledged'
+      ))
+      : allCashTransactions.filter((transaction) => (
+        transaction.cashConfirmationStatus === 'approved'
+        || transaction.cashConfirmationStatus === 'denied'
+        || transaction.cashCollectionStatus === 'seller_claimed'
+        || transaction.cashCollectionStatus === 'buyer_acknowledged'
+      ));
 
   const refundTransactions = weekTransactions.filter((transaction) => Boolean(transaction.refundStatus));
   const cancelledCashTransactions = weekTransactions.filter(

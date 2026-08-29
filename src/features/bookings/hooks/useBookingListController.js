@@ -112,9 +112,9 @@ export function useBookingListController(initialBookings = [], options = {}) {
       serviceActive: false,
       stopRequested: true,
       workerStopApproved: true,
-      canRate: true,
+      canRate: false,
       nextChargeDate: null,
-      dbStatus: 'completed',
+      dbStatus: 'cancelled',
     })
   ), [persistBookingUpdate]);
 

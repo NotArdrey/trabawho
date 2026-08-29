@@ -12,8 +12,9 @@
 // ============================================================================
 
 import { useState, useCallback } from 'react';
+import { selectBookingPaymentPlan } from '../services/bookingService';
 
-export function usePaymentController(onPaymentProofSubmit, onPaymentMethodSelect, updateBooking) {
+export function usePaymentController(onPaymentProofSubmit, onPaymentMethodSelect, updateBooking, replaceBooking) {
   // ========================================================================
   // STATE MANAGEMENT
   // ========================================================================
@@ -108,15 +109,27 @@ export function usePaymentController(onPaymentProofSubmit, onPaymentMethodSelect
    * For cash payments, sets up cash confirmation QR
    */
   const handleSelectPaymentMethod = useCallback(async (booking, paymentMethod, mockPayment = {}) => {
+    if (paymentMethod === 'gcash-advance') {
+      if (booking?.paymentStatus === 'partially_paid') {
+        onPaymentMethodSelect?.(booking.id, paymentMethod, mockPayment);
+        return booking;
+      }
+      const updated = await selectBookingPaymentPlan(
+        booking,
+        mockPayment?.paymentPlan === 'downpayment' ? 'downpayment' : 'full'
+      );
+      replaceBooking?.(updated);
+      onPaymentMethodSelect?.(booking.id, paymentMethod, mockPayment);
+      return updated;
+    }
+
     const updates = {
       paymentMethod,
-      status: paymentMethod === 'gcash-advance' ? 'Payment Confirmed' : 'Service Scheduled',
+      status: 'Payment Pending',
     };
 
     if (mockPayment?.mockPaymentReference && paymentMethod !== 'after-service-cash') {
       updates.paymentProofSubmitted = true;
-      updates.paymentReference = mockPayment.mockPaymentReference;
-      updates.transactionId = mockPayment.mockPaymentReference;
     }
 
     if (mockPayment?.mockPaymentReference) {
@@ -135,7 +148,7 @@ export function usePaymentController(onPaymentProofSubmit, onPaymentMethodSelect
 
     // Notify parent
     onPaymentMethodSelect?.(booking.id, paymentMethod, mockPayment);
-  }, [updateBooking, onPaymentMethodSelect]);
+  }, [updateBooking, replaceBooking, onPaymentMethodSelect]);
 
   // ========================================================================
   // RETURN OBJECT - Exposed state and handlers

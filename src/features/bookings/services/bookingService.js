@@ -1,5 +1,6 @@
 import { supabase } from '../../../shared/services/supabaseClient';
 import { getProfilePhotoUrl } from '../../../shared/utils/profilePhoto';
+import { calculateBookingPricing } from '../utils/bookingPricing';
 
 const getCleanString = (value) => (typeof value === 'string' ? value.trim() : '');
 const getNullableString = (value) => {
@@ -195,6 +196,18 @@ const buildSelectedSlot = (booking = {}, metadata = {}) => {
 };
 
 const uiStatusFromDb = (booking = {}, metadata = {}) => {
+  if (booking.dispute_status === 'open') return 'Dispute Open';
+  if (booking.status === 'completed') return 'Completed Service';
+  if (booking.status === 'refunded') return 'Refunded';
+  if (booking.status === 'cancelled') {
+    return metadata.payment_method === 'after-service-cash' ? 'Cancelled (Cash)' : 'Cancelled';
+  }
+  if (booking.delivery_status === 'seller_claimed') return 'Service Delivered';
+  if (metadata.payment_method === 'gcash-advance') {
+    if (booking.payment_status === 'paid') return 'Payment Confirmed';
+    if (booking.payment_status === 'partially_paid') return 'Downpayment Paid';
+    return 'Payment Pending';
+  }
   if (metadata.ui_status) return metadata.ui_status;
   if (metadata.uiStatus) return metadata.uiStatus;
 
@@ -269,8 +282,16 @@ export const mapBookingRowToUiBooking = (booking = {}, context = {}) => {
   const mockPayment = metadata.mock_payment || metadata.mockPayment || null;
   const uiStatus = uiStatusFromDb(booking, metadata);
   const totalAmount = getRateAmount(service, { ...metadata, quote_amount: booking.total_amount ?? metadata.quote_amount });
-  const transactionFeeAmount = getNumberOrNull(mockPayment?.transactionFeeAmount);
-  const totalChargedAmount = getNumberOrNull(mockPayment?.totalChargedAmount);
+  const fallbackPricing = calculateBookingPricing(totalAmount);
+  const transactionFeeRate = getNumberOrNull(booking.transaction_fee_rate)
+    ?? getNumberOrNull(mockPayment?.transactionFeeRate)
+    ?? fallbackPricing.transactionFeeRate;
+  const transactionFeeAmount = getNumberOrNull(booking.transaction_fee_amount)
+    ?? getNumberOrNull(mockPayment?.transactionFeeAmount)
+    ?? fallbackPricing.transactionFeeAmount;
+  const totalChargedAmount = getNumberOrNull(booking.total_charged_amount)
+    ?? getNumberOrNull(mockPayment?.totalChargedAmount)
+    ?? fallbackPricing.totalChargedAmount;
   const bookingMode = getServiceBookingMode(service, seller, metadata);
 
   return {
@@ -295,28 +316,42 @@ export const mapBookingRowToUiBooking = (booking = {}, context = {}) => {
     selectedSlot,
     paymentMethod,
     allowGcashAdvance: metadata.allow_gcash_advance !== false,
-    allowAfterService: metadata.allow_after_service !== false,
-    afterServicePaymentType: metadata.after_service_payment_type || 'both',
+    allowAfterService: false,
+    afterServicePaymentType: 'gcash-only',
     gcashNumber: metadata.gcash_number || '',
     qrImageUrl: metadata.qr_image_url || '',
     paymentProofSubmitted: Boolean(metadata.payment_proof_submitted || metadata.paymentProofSubmitted),
     paymentReference: booking.payment_reference || metadata.payment_reference || '',
     transactionId: metadata.transaction_id || booking.payment_reference || '',
     mockPayment,
-    transactionFeeRate: getNumberOrNull(mockPayment?.transactionFeeRate) ?? 0,
-    transactionFeePercent: mockPayment?.transactionFeePercent || '',
-    transactionFeeAmount: transactionFeeAmount ?? 0,
-    totalChargedAmount: totalChargedAmount ?? totalAmount,
+    transactionFeeRate,
+    transactionFeePercent: `${Number((transactionFeeRate * 100).toFixed(2))}%`,
+    transactionFeeAmount,
+    totalChargedAmount,
+    deliveryStatus: booking.delivery_status || (booking.status === 'completed' ? 'buyer_confirmed' : 'not_delivered'),
+    paymentStatus: booking.payment_status || (booking.payment_reference ? 'paid' : 'unpaid'),
+    paymentPlan: booking.payment_plan || 'full',
+    serviceDownpaymentAmount: getNumberOrNull(booking.service_downpayment_amount) ?? 0,
+    upfrontRequiredAmount: getNumberOrNull(booking.upfront_required_amount) ?? totalChargedAmount,
+    amountPaid: getNumberOrNull(booking.amount_paid) ?? (booking.payment_status === 'paid' ? totalChargedAmount : 0),
+    balanceDueAmount: getNumberOrNull(booking.balance_due_amount) ?? 0,
+    cashCollectionStatus: booking.cash_collection_status || 'not_applicable',
+    disputeStatus: booking.dispute_status || 'none',
+    scheduleVersion: booking.schedule_version || 1,
+    deliveredAt: booking.delivered_at || null,
+    completionDueAt: booking.completion_due_at || null,
+    completedAt: booking.completed_at || null,
+    disputeDeadlineAt: booking.dispute_deadline_at || null,
     cashConfirmationStatus: cashStatus,
     cashVerifierQrId: metadata.cash_verifier_qr_id || metadata.cashVerifierQrId || (booking.id ? `CASHQR-${booking.id}` : ''),
     submittedCashAmount: metadata.submitted_cash_amount ?? metadata.submittedCashAmount ?? null,
-    expectedCashAmount: metadata.expected_cash_amount ?? metadata.expectedCashAmount ?? totalChargedAmount ?? totalAmount,
+    expectedCashAmount: totalChargedAmount,
     refundEligible: metadata.refund_eligible ?? (paymentMethod === 'gcash-advance' && booking.status === 'completed'),
     refundStatus,
     refundAmount: metadata.refund_amount ?? metadata.refundAmount ?? null,
     refundReason: metadata.refund_reason || metadata.refundReason || '',
     refundReference: metadata.refund_reference || metadata.refundReference || '',
-    canRate: metadata.can_rate !== undefined ? Boolean(metadata.can_rate) : booking.status === 'completed' && !review,
+    canRate: booking.status === 'completed' && !review,
     rating: review?.rating || metadata.rating || null,
     review: review?.body || metadata.review || '',
     billingCycle: metadata.billing_cycle || metadata.billingCycle || null,
@@ -1070,7 +1105,7 @@ export const createClientBooking = async ({ provider, pendingBooking, paymentMet
   const slotId = rawSlot?.id || selectedSlot?.slotId || null;
   const totalAmount = getNumberOrNull(pendingBooking?.quoteAmount) ?? getRateAmount(rawService);
   const totalChargedAmount = getNumberOrNull(mockPayment?.totalChargedAmount) ?? totalAmount;
-  const uiStatus = paymentMethod === 'gcash-advance' ? 'Payment Confirmed' : 'Service Scheduled';
+  const uiStatus = paymentMethod === 'gcash-advance' ? 'Payment Pending' : 'Service Scheduled';
   const cashStatus = paymentMethod === 'after-service-cash' ? 'awaiting-client-scan' : null;
   const bookingMode = provider?.bookingMode === 'calendar-only' || pendingBooking?.bookingMode === 'calendar-only'
     ? 'calendar-only'
@@ -1090,13 +1125,14 @@ export const createClientBooking = async ({ provider, pendingBooking, paymentMet
     cash_confirmation_status: cashStatus,
     cash_verifier_qr_id: cashStatus ? `CASHQR-${slotId || serviceId}-${Date.now()}` : null,
     allow_gcash_advance: pendingBooking?.allowGcashAdvance !== false,
-    allow_after_service: pendingBooking?.allowAfterService !== false,
-    after_service_payment_type: pendingBooking?.afterServicePaymentType || 'both',
+    allow_after_service: false,
+    after_service_payment_type: 'gcash-only',
     expected_cash_amount: totalChargedAmount,
     refund_eligible: paymentMethod === 'gcash-advance',
     can_rate: false,
     created_via: 'marketplace',
     mock_payment: mockPayment,
+    payment_plan: mockPayment?.paymentPlan || 'full',
   };
 
   const { data, error } = await supabase.rpc('create_service_booking', {
@@ -1277,21 +1313,67 @@ export const submitBookingReview = async (bookingOrId, ratingValue, ratingCommen
     if (error) throw mapDatabaseError(error);
   }
 
-  return updateBookingWorkflow(current, {
-    rating,
-    review: ratingComment,
-    canRate: false,
-    status: 'Completed Service',
-    dbStatus: 'completed',
+  const refreshed = await fetchBookingById(current.id);
+  return { ...refreshed, rating, review: ratingComment, canRate: false };
+};
+
+const buildWorkflowIdempotencyKey = (action, bookingId) => (
+  `${action}-${String(bookingId).slice(0, 8)}-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
+);
+
+const runBookingWorkflowRpc = async (functionName, bookingId, params = {}) => {
+  const { data, error } = await supabase.rpc(functionName, {
+    p_booking_id: bookingId,
+    p_idempotency_key: params.idempotencyKey || buildWorkflowIdempotencyKey(functionName, bookingId),
+    ...params.rpcParams,
+  });
+  if (error) throw mapDatabaseError(error);
+  const [mapped] = await hydrateBookingRows([data]);
+  return mapped;
+};
+
+export const markBookingDelivered = (bookingOrId, options = {}) => {
+  const bookingId = typeof bookingOrId === 'object' ? bookingOrId?.id : bookingOrId;
+  return runBookingWorkflowRpc('mark_booking_delivered', bookingId, options);
+};
+
+export const confirmBookingCompletion = (bookingOrId, options = {}) => {
+  const bookingId = typeof bookingOrId === 'object' ? bookingOrId?.id : bookingOrId;
+  return runBookingWorkflowRpc('confirm_booking_completion', bookingId, options);
+};
+
+export const acknowledgeCashPayment = (bookingOrId, options = {}) => {
+  const bookingId = typeof bookingOrId === 'object' ? bookingOrId?.id : bookingOrId;
+  return runBookingWorkflowRpc('acknowledge_cash_payment', bookingId, options);
+};
+
+export const openBookingDispute = (bookingOrId, reason, options = {}) => {
+  const bookingId = typeof bookingOrId === 'object' ? bookingOrId?.id : bookingOrId;
+  return runBookingWorkflowRpc('open_booking_dispute', bookingId, {
+    ...options,
+    rpcParams: { p_reason: reason },
+  });
+};
+
+export const selectBookingPaymentPlan = (bookingOrId, paymentPlan, options = {}) => {
+  const bookingId = typeof bookingOrId === 'object' ? bookingOrId?.id : bookingOrId;
+  return runBookingWorkflowRpc('select_booking_payment_plan', bookingId, {
+    ...options,
+    rpcParams: { p_payment_plan: paymentPlan },
   });
 };
 
 export const submitCashConfirmation = async (bookingOrId, amount) => {
   const current = typeof bookingOrId === 'object' ? bookingOrId : await fetchBookingById(bookingOrId);
   const parsedAmount = Number(amount);
+  const expectedAmount = Number(current?.totalChargedAmount || current?.expectedCashAmount || 0);
 
   if (!Number.isFinite(parsedAmount) || parsedAmount <= 0) {
     throw new Error('Enter a valid cash amount before sending for worker review.');
+  }
+
+  if (expectedAmount > 0 && Math.abs(parsedAmount - expectedAmount) > 0.009) {
+    throw new Error(`Cash amount must match the booking total of PHP ${expectedAmount.toFixed(2)}.`);
   }
 
   return updateBookingWorkflow(current, {
@@ -1310,15 +1392,10 @@ export const reviewCashConfirmation = async (bookingOrId, decision) => {
   if (!current?.id) throw new Error('Missing booking for cash review.');
 
   if (decision === 'approve') {
-    const transactionId = current.transactionId || buildTransactionId(current.id, 'cash');
-    return updateBookingWorkflow(current, {
-      cashConfirmationStatus: 'approved',
-      paymentProofSubmitted: true,
-      paymentReference: transactionId,
-      transactionId,
-      canRate: true,
-      status: 'Completed Service',
-      dbStatus: 'completed',
+    return runBookingWorkflowRpc('claim_cash_payment_collected', current.id, {
+      rpcParams: {
+        p_amount: Number(current.submittedCashAmount || current.totalChargedAmount || 0),
+      },
     });
   }
 
@@ -1420,6 +1497,7 @@ export const bookingService = {
   buildTransactionId,
   buildRefundReference,
   confirmBookingRefundReceived,
+  confirmBookingCompletion,
   createClientBooking,
   createClientBookingRequest,
   createClientBookingRequestByServiceId,
@@ -1439,6 +1517,10 @@ export const bookingService = {
   mapBookingRowToUiBooking,
   mapConversationRowToUiChat,
   mapMessageRowToUiMessage,
+  markBookingDelivered,
+  acknowledgeCashPayment,
+  openBookingDispute,
+  selectBookingPaymentPlan,
   parseDateOnly,
   requestBookingRefund,
   reviewCashConfirmation,

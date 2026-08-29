@@ -1,5 +1,4 @@
 import React, { useEffect, useState } from 'react';
-import { Moon, Sun } from 'lucide-react';
 import DashboardNavigation from '../../../shared/components/DashboardNavigation';
 import { getThemeTokens } from '../../../shared/styles/themeTokens';
 
@@ -27,7 +26,6 @@ const Settings = ({
   onLanguageChange,
 }) => {
   const isDarkMode = appTheme === 'dark';
-  const ThemeIcon = isDarkMode ? Moon : Sun;
   const language = appLanguage === 'fil' ? 'fil' : 'en';
 
   const [emailNotifications, setEmailNotifications] = useState(true);
@@ -67,11 +65,8 @@ const Settings = ({
       theme: 'Theme',
       themeDesc: 'Choose between light and dark mode',
       followSystem: 'Use Device Appearance',
-      lightMode: 'Light mode',
-      darkMode: 'Dark mode',
-      deviceThemeActive: 'Device theme active',
-      clickForLight: 'Click for light',
-      clickForDark: 'Click for dark',
+      lightMode: 'Light Mode',
+      darkMode: 'Dark Mode',
       notifications: 'Notifications',
       notificationsDesc: 'Manage your notification preferences',
       emailNotifications: 'Email Notifications',
@@ -97,11 +92,8 @@ const Settings = ({
       theme: 'Tema',
       themeDesc: 'Pumili sa pagitan ng light at dark mode',
       followSystem: 'Gamitin ang Tema ng Device',
-      lightMode: 'Light mode',
-      darkMode: 'Dark mode',
-      deviceThemeActive: 'Aktibo ang tema ng device',
-      clickForLight: 'I-click para sa light',
-      clickForDark: 'I-click para sa dark',
+      lightMode: 'Light Mode',
+      darkMode: 'Dark Mode',
       notifications: 'Mga Notification',
       notificationsDesc: 'Pamahalaan ang iyong mga kagustuhan sa notification',
       emailNotifications: 'Email Notifications',
@@ -274,11 +266,67 @@ const Settings = ({
       flexShrink: 0,
       alignSelf: isMobile ? 'flex-start' : 'center',
     },
+    themeToggleContainer: {
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      flexWrap: isMobile ? 'wrap' : 'nowrap',
+      gap: '20px',
+      backgroundColor: themeTokens.inputBg,
+      padding: isMobile ? '14px' : '20px',
+      borderRadius: '10px',
+      border: `1px solid ${themeTokens.inputBorder}`,
+    },
+    themeOption: {
+      display: 'flex',
+      flexDirection: 'column',
+      alignItems: 'center',
+      gap: '8px',
+      fontSize: '13px',
+      color: themeTokens.textSecondary,
+      fontWeight: 500,
+    },
+    themeIcon: {
+      width: '26px',
+      height: '26px',
+      display: 'inline-flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      color: themeTokens.textSecondary,
+    },
+    themeSwitch: {
+      position: 'relative',
+      display: 'inline-block',
+      width: '54px',
+      height: '28px',
+    },
     hiddenInput: {
       opacity: 0,
       width: 0,
       height: 0,
       position: 'absolute',
+    },
+    slider: {
+      position: 'absolute',
+      cursor: 'pointer',
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      backgroundColor: isDarkMode ? themeTokens.accent : themeTokens.borderColor,
+      transition: '0.3s',
+      borderRadius: '34px',
+    },
+    sliderThumb: {
+      position: 'absolute',
+      content: "''",
+      height: '22px',
+      width: '22px',
+      left: isDarkMode ? '29px' : '3px',
+      bottom: '3px',
+      backgroundColor: 'white',
+      transition: '0.3s',
+      borderRadius: '50%',
     },
     systemThemeBtn: {
       marginTop: '12px',
@@ -464,22 +512,47 @@ const Settings = ({
                 <p style={styles.sectionDesc}>{t.themeDesc}</p>
               </div>
 
-              <button
-                type="button"
-                className="gl-app-theme-toggle"
-                onClick={handleThemeToggle}
-                aria-label={isDarkMode ? 'Switch to light mode' : 'Switch to dark mode'}
-                aria-pressed={isDarkMode}
-                title={isDarkMode ? 'Switch to light mode' : 'Switch to dark mode'}
-              >
-                <span className="gl-app-theme-icon">
-                  <ThemeIcon size={17} aria-hidden="true" />
-                </span>
-                <span>
-                  <strong>{isDarkMode ? t.darkMode : t.lightMode}</strong>
-                  <small>{themeMode === 'system' ? t.deviceThemeActive : (isDarkMode ? t.clickForLight : t.clickForDark)}</small>
-                </span>
-              </button>
+              <div style={styles.themeToggleContainer}>
+                <div style={styles.themeOption}>
+                  <span style={styles.themeIcon} aria-hidden="true">
+                    <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor">
+                      <circle cx="12" cy="12" r="5"></circle>
+                      <g stroke="currentColor" strokeWidth="2" fill="none">
+                        <path d="M12 1v4"></path>
+                        <path d="M12 19v4"></path>
+                        <path d="M4.22 4.22l2.83 2.83"></path>
+                        <path d="M16.95 16.95l2.83 2.83"></path>
+                        <path d="M1 12h4"></path>
+                        <path d="M19 12h4"></path>
+                        <path d="M4.22 19.78l2.83-2.83"></path>
+                        <path d="M16.95 7.05l2.83-2.83"></path>
+                      </g>
+                    </svg>
+                  </span>
+                  <span>{t.lightMode}</span>
+                </div>
+
+                <label style={styles.themeSwitch}>
+                  <input
+                    type="checkbox"
+                    checked={isDarkMode}
+                    onChange={handleThemeToggle}
+                    style={styles.hiddenInput}
+                  />
+                  <span style={styles.slider}>
+                    <span style={styles.sliderThumb}></span>
+                  </span>
+                </label>
+
+                <div style={styles.themeOption}>
+                  <span style={styles.themeIcon} aria-hidden="true">
+                    <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor">
+                      <path d="M21 12.79A9 9 0 1 1 11.21 3c0 .1 0 .21 0 .31A7 7 0 0 0 20.69 13c.1 0 .21 0 .31-.01z"></path>
+                    </svg>
+                  </span>
+                  <span>{t.darkMode}</span>
+                </div>
+              </div>
 
               <button
                 type="button"

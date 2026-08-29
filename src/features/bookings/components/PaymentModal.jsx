@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { calculateBookingPricing } from '../utils/bookingPricing';
 
 
 /**
@@ -31,12 +32,13 @@ const PaymentModal = ({
   scheduleLabel,
   scheduleValue,
   advancePaymentDescription,
-  transactionFeeRate = 0.05,
+  transactionFeeRate,
   testModeTitle = 'Mock payment test mode',
   testModeDescription = 'This flow records a sandbox payment reference only. No real GCash or cash transfer is processed.',
-  confirmLabel = 'Run Mock Payment & Confirm',
+  confirmLabel = 'Create Payment-Pending Booking',
 }) => {
   const [selectedMethod, setSelectedMethod] = useState(null);
+  const [paymentPlan, setPaymentPlan] = useState('full');
   const [afterServiceChannel, setAfterServiceChannel] = useState('cash');
   const [isProcessing, setIsProcessing] = useState(false);
   const [showProcessing, setShowProcessing] = useState(false);
@@ -47,16 +49,32 @@ const PaymentModal = ({
   );
 
   const allowsAdvanceGcash = booking?.allowGcashAdvance !== false;
-  const allowsAfterService = booking?.allowAfterService !== false;
+  const allowsAfterService = false;
   const afterServicePaymentType = booking?.afterServicePaymentType || 'both';
   const allowsAfterServiceCash = allowsAfterService && (afterServicePaymentType === 'both' || afterServicePaymentType === 'cash-only');
   const allowsAfterServiceGcash = allowsAfterService && (afterServicePaymentType === 'both' || afterServicePaymentType === 'gcash-only');
   const isRequestBooking = booking?.bookingMode === 'calendar-only' || booking?.isRequestBooking;
   const baseAmount = Number(booking?.quoteAmount || 0) || 0;
-  const feeRate = Math.max(0, Number(transactionFeeRate) || 0);
-  const transactionFeeAmount = Number((baseAmount * feeRate).toFixed(2));
-  const totalPaymentAmount = Number((baseAmount + transactionFeeAmount).toFixed(2));
-  const transactionFeePercent = `${Number((feeRate * 100).toFixed(2)).toString()}%`;
+  const {
+    transactionFeeRate: feeRate,
+    transactionFeeAmount,
+    totalChargedAmount: totalPaymentAmount,
+    transactionFeePercent,
+    serviceDownpaymentAmount,
+    downpaymentUpfrontAmount,
+    downpaymentBalanceAmount,
+  } = calculateBookingPricing(baseAmount, transactionFeeRate);
+  const isPayingRemainingBalance = booking?.paymentStatus === 'partially_paid';
+  const amountDueNow = isPayingRemainingBalance
+    ? Number(booking?.balanceDueAmount || downpaymentBalanceAmount)
+    : paymentPlan === 'downpayment'
+      ? downpaymentUpfrontAmount
+      : totalPaymentAmount;
+  const remainingBalance = isPayingRemainingBalance
+    ? 0
+    : paymentPlan === 'downpayment'
+      ? downpaymentBalanceAmount
+      : 0;
   const resolvedSubtitle = subtitle || `Choose how you'd like to pay for ${booking.workerName}'s service`;
   const resolvedScheduleLabel = scheduleLabel || (isRequestBooking ? 'Schedule:' : 'Scheduled:');
   const resolvedScheduleValue = scheduleValue || (
@@ -94,6 +112,10 @@ const PaymentModal = ({
       setAfterServiceChannel('cash');
     }
   }, [allowsAdvanceGcash, allowsAfterService, afterServicePaymentType, selectedMethod]);
+
+  useEffect(() => {
+    setPaymentPlan(booking?.paymentPlan === 'downpayment' ? 'downpayment' : 'full');
+  }, [booking?.id, booking?.paymentPlan]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return undefined;
@@ -145,6 +167,11 @@ const PaymentModal = ({
         transactionFeePercent,
         transactionFeeAmount,
         totalChargedAmount: totalPaymentAmount,
+        paymentPlan,
+        serviceDownpaymentAmount,
+        upfrontPaymentAmount: amountDueNow,
+        remainingBalanceAmount: remainingBalance,
+        paymentAttemptAmount: amountDueNow,
       }));
     } finally {
       setIsProcessing(false);
@@ -314,6 +341,16 @@ const PaymentModal = ({
             <span style={{ ...styles.value, ...styles.amount }}>{formatPhp(totalPaymentAmount)}</span>
           </div>
           <div style={styles.row}>
+            <span style={styles.label}>Amount due now:</span>
+            <span style={{ ...styles.value, ...styles.amount }}>{formatPhp(amountDueNow)}</span>
+          </div>
+          {remainingBalance > 0 && (
+            <div style={styles.row}>
+              <span style={styles.label}>Remaining before completion:</span>
+              <span style={styles.value}>{formatPhp(remainingBalance)}</span>
+            </div>
+          )}
+          <div style={styles.row}>
             <span style={styles.label}>{resolvedScheduleLabel}</span>
             <span style={styles.value}>{resolvedScheduleValue}</span>
           </div>
@@ -335,6 +372,32 @@ const PaymentModal = ({
         
         {/* Payment Method Selection */}
         {!showProcessing && (
+          <>
+          <div style={{ ...styles.methods, paddingBottom: 0 }}>
+            <div
+              style={{ ...styles.option, ...(paymentPlan === 'full' ? styles.optionSelected : {}) }}
+              onClick={() => { if (!isPayingRemainingBalance) setPaymentPlan('full'); }}
+            >
+              <div style={styles.optionHeader}>
+                <input type="radio" checked={paymentPlan === 'full'} disabled={isPayingRemainingBalance} onChange={() => setPaymentPlan('full')} />
+                <h3>Full Payment</h3>
+              </div>
+              <p style={styles.desc}>Pay the full service cost and 5% platform fee upfront.</p>
+              <strong>{formatPhp(totalPaymentAmount)} due now</strong>
+            </div>
+            <div
+              style={{ ...styles.option, ...(paymentPlan === 'downpayment' ? styles.optionSelected : {}) }}
+              onClick={() => { if (!isPayingRemainingBalance) setPaymentPlan('downpayment'); }}
+            >
+              <div style={styles.optionHeader}>
+                <input type="radio" checked={paymentPlan === 'downpayment'} disabled={isPayingRemainingBalance} onChange={() => setPaymentPlan('downpayment')} />
+                <h3>50% Downpayment</h3>
+              </div>
+              <p style={styles.desc}>Pay 50% of the service plus the full 5% platform fee now.</p>
+              <strong>{formatPhp(downpaymentUpfrontAmount)} due now</strong>
+              <p style={styles.desc}>{formatPhp(downpaymentBalanceAmount)} remaining before completion</p>
+            </div>
+          </div>
           <div style={styles.methods}>
             {allowsAdvanceGcash && (
               <div
@@ -366,9 +429,9 @@ const PaymentModal = ({
                 </p>
 
                 <ul style={styles.list}>
-                  <li>- Booking confirmed instantly</li>
+                  <li>- Booking confirms after provider verification</li>
                   <li>- Payment secured with GCash encryption</li>
-                  <li>- Receive booking receipt via SMS</li>
+                  <li>- Receive a payment reference and booking receipt</li>
                   <li>- Refund eligible if service not rendered</li>
                 </ul>
 
@@ -451,6 +514,7 @@ const PaymentModal = ({
               </div>
             )}
           </div>
+          </>
         )}
         
         {/* Confirmation Button */}

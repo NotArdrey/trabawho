@@ -370,8 +370,8 @@ function BrowseServicesPage({
         timeBlock: selectedBlock,
       },
       allowGcashAdvance: true,
-      allowAfterService: true,
-      afterServicePaymentType: 'both',
+      allowAfterService: false,
+      afterServicePaymentType: 'gcash-only',
     });
 
     setIsBookingCalendarOpen(false);
@@ -427,7 +427,11 @@ function BrowseServicesPage({
           ? 'cash after-service payment'
           : 'GCash after-service payment';
 
-    setBookingMessage(`Booking confirmed with ${paymentLabel}.`);
+    setBookingMessage(
+      selectedPaymentMethod === 'gcash-advance'
+        ? `${mockPayment?.paymentPlan === 'downpayment' ? '50% downpayment' : 'Full payment'} booking created. GCash payment is pending provider verification before confirmation.`
+        : `Booking scheduled with ${paymentLabel}. Payment is required before final completion.`
+    );
     setIsPaymentModalOpen(false);
     setPendingBooking(null);
     setSelectedWorker(null);

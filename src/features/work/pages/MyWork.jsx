@@ -8,7 +8,7 @@ import QrPreviewModal from '../components/modals/QrPreviewModal';
 import CreateServiceModal from '../components/CreateServiceModal';
 import SuccessNotification from '../../../shared/components/SuccessNotification';
 import ErrorNotification from '../../../shared/components/ErrorNotification';
-import { updateBookingWorkflow } from '../../bookings/services/bookingService';
+import { markBookingDelivered } from '../../bookings/services/bookingService';
 import { getThemeTokens } from '../../../shared/styles/themeTokens';
 import { getProfilePhotoUrl } from '../../../shared/utils/profilePhoto';
 import { useWorkPayments, useWorkProfileServices, useWorkSchedule } from '../hooks';
@@ -365,19 +365,9 @@ const MyWork = ({ appTheme = 'light', themeMode = 'system', onThemeChange, curre
   };
 
   const canTogglePaid = (txn) => {
-    if (!txn) return false;
-    if (!isMonthlyRecurringTxn(txn)) return true;
-    if (txn.paymentLocked) return false;
-
-    if (txn.paymentMode === 'Advance') {
-      return !txn.isPaid;
-    }
-
-    if (txn.paymentMode === 'After Service') {
-      return isLastCycleEntry(txn) && txn.isDone;
-    }
-
-    return true;
+    // Payment success is provider/server controlled. Cash collection uses the
+    // seller-claim + buyer-acknowledgement workflow instead of this toggle.
+    return false;
   };
 
   const canMarkDone = (txn) => {
@@ -409,78 +399,21 @@ const MyWork = ({ appTheme = 'light', themeMode = 'system', onThemeChange, curre
     setSelectedChatId(null);
   };
   
-  const handleTogglePaid = (transactionId) => {
-    const target = transactions.find((txn) => txn.id === transactionId);
-    if (!target) return;
-    const persistPaidState = (nextPaid) => {
-      if (!target.sourceBookingId) return;
-      updateBookingWorkflow(target.sourceBookingId, {
-        paymentProofSubmitted: nextPaid,
-        paymentReference: nextPaid ? (target.transactionId || `MANUAL-${String(target.id).slice(0, 8).toUpperCase()}`) : '',
-      }).catch((error) => {
-        setPaymentError(error?.message || 'Unable to update payment status.');
-      });
-    };
-
-    // Monthly recurring rules:
-    // 1) Advance: first paid marks whole cycle paid + locks paid toggle.
-    // 2) After Service: only last cycle entry can trigger paid state for all previous weeks.
-    if (isMonthlyRecurringTxn(target)) {
-      if (!canTogglePaid(target)) return;
-
-      if (target.paymentMode === 'Advance') {
-        setTransactions((prev) =>
-          prev.map((txn) =>
-            txn.subscriptionId === target.subscriptionId
-              ? { ...txn, isPaid: true, paymentLocked: true }
-              : txn
-          )
-        );
-        persistPaidState(true);
-        return;
-      }
-
-      if (target.paymentMode === 'After Service') {
-        setTransactions((prev) =>
-          prev.map((txn) =>
-            txn.subscriptionId === target.subscriptionId
-              ? { ...txn, isPaid: true, paymentLocked: true }
-              : txn
-          )
-        );
-        persistPaidState(true);
-        return;
-      }
-    }
-
-    const nextPaid = !target.isPaid;
-    setTransactions((prev) =>
-      prev.map((txn) => {
-        if (txn.id !== transactionId) return txn;
-        return { ...txn, isPaid: nextPaid };
-      })
-    );
-    persistPaidState(nextPaid);
-  };
-
   const handleOpenDoneModal = (transaction) => {
     setDoneConfirmTarget(transaction);
   };
 
-  const handleConfirmDone = () => {
+  const handleConfirmDone = async () => {
     if (!doneConfirmTarget) return;
-    const persistDoneState = () => {
-      if (!doneConfirmTarget.sourceBookingId) return;
-      updateBookingWorkflow(doneConfirmTarget.sourceBookingId, {
-        status: 'Completed Service',
-        canRate: true,
-        paymentProofSubmitted: doneConfirmTarget.isPaid || doneConfirmTarget.paymentMode === 'Advance',
-        paymentReference: doneConfirmTarget.transactionId || undefined,
-        dbStatus: 'completed',
-      }).catch((error) => {
-        setPaymentError(error?.message || 'Unable to update service completion.');
-      });
-    };
+    if (!doneConfirmTarget.sourceBookingId) return;
+
+    try {
+      setPaymentError('');
+      await markBookingDelivered(doneConfirmTarget.sourceBookingId);
+    } catch (error) {
+      setPaymentError(error?.message || 'Unable to record service delivery.');
+      return;
+    }
 
     // Monthly after-service rule: if final cycle entry is marked done,
     // mark whole cycle paid and lock the paid state.
@@ -506,7 +439,6 @@ const MyWork = ({ appTheme = 'light', themeMode = 'system', onThemeChange, curre
           return txn;
         })
       );
-      persistDoneState();
       setDoneConfirmTarget(null);
       return;
     }
@@ -522,7 +454,6 @@ const MyWork = ({ appTheme = 'light', themeMode = 'system', onThemeChange, curre
           : txn
       )
     );
-    persistDoneState();
     setDoneConfirmTarget(null);
   };
 
@@ -1662,10 +1593,10 @@ const MyWork = ({ appTheme = 'light', themeMode = 'system', onThemeChange, curre
                                         type="checkbox"
                                         checked={txn.isPaid}
                                         disabled={!canTogglePaid(txn)}
-                                        onChange={() => handleTogglePaid(txn.id)}
+                                        readOnly
                                         style={{ margin: 0, padding: 0 }}
                                       />
-                                      <span>{txn.isPaid ? 'Paid' : 'Mark paid'}</span>
+                                      <span>{txn.isPaid ? 'Paid (verified)' : 'Awaiting verification'}</span>
                                     </label>
                                     {isMonthlyRecurringTxn(txn) && !canTogglePaid(txn) && (
                                       <span style={sx('lock-hint')}>Locked for monthly cycle</span>
@@ -1784,10 +1715,10 @@ const MyWork = ({ appTheme = 'light', themeMode = 'system', onThemeChange, curre
                                                   type="checkbox"
                                                   checked={bookingTxn.isPaid}
                                                   disabled={!canTogglePaid(bookingTxn)}
-                                                  onChange={() => handleTogglePaid(bookingTxn.id)}
+                                                  readOnly
                                                   style={{ margin: 0, padding: 0 }}
                                                 />
-                                                <span>{bookingTxn.isPaid ? 'Paid' : 'Mark paid'}</span>
+                                                <span>{bookingTxn.isPaid ? 'Paid (verified)' : 'Awaiting verification'}</span>
                                               </label>
                                               {isMonthlyRecurringTxn(bookingTxn) && !canTogglePaid(bookingTxn) && (
                                                 <span style={sx('lock-hint')}>Locked for monthly cycle</span>
@@ -1893,11 +1824,11 @@ const MyWork = ({ appTheme = 'light', themeMode = 'system', onThemeChange, curre
         onConfirm={handleConfirmDone}
         onConfirmMouseEnter={() => setHoverKey('confirm-done')}
         onConfirmMouseLeave={() => setHoverKey('')}
-        confirmLabel="Confirm Done"
-        note="This confirms that the worker has completed the service for this transaction."
+        confirmLabel="Claim Service Delivered"
+        note="This records the seller's delivery claim. The buyer must confirm completion, or the system may auto-confirm after 72 hours if there is no dispute."
       >
         <p>
-          Mark <strong>{doneConfirmTarget?.clientName}</strong> as completed?
+          Claim that the service for <strong>{doneConfirmTarget?.clientName}</strong> was delivered?
         </p>
       </ConfirmActionModal>
 

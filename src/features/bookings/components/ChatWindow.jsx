@@ -122,7 +122,12 @@ const ChatWindow = ({ appTheme = 'light', booking, onApproveQuote, onRejectQuote
   };
   const shouldShowSlotPaymentAction = booking.selectedSlot && !isServiceStopped && !booking.transactionId && !booking.paymentMethod;
   const shouldShowRecurringGcashPaymentAction = booking.selectedSlot && !isServiceStopped && !booking.transactionId && isGcashFlow(booking.paymentMethod || '') && !booking.paymentProofSubmitted && isRecurringBilling(booking) && isRecurringChargeDue(booking);
-  const shouldShowGcashPaymentAction = booking.selectedSlot && !isServiceStopped && !booking.transactionId && isGcashFlow(booking.paymentMethod || '') && !booking.paymentProofSubmitted && !isRecurringBilling(booking);
+  const hasDownpaymentBalance = booking.paymentStatus === 'partially_paid' && Number(booking.balanceDueAmount || 0) > 0;
+  const shouldShowGcashPaymentAction = booking.selectedSlot
+    && !isServiceStopped
+    && isGcashFlow(booking.paymentMethod || '')
+    && !isRecurringBilling(booking)
+    && (hasDownpaymentBalance || (!booking.transactionId && !booking.paymentProofSubmitted));
   const shouldShowCashConfirmationAction = booking.paymentMethod === 'after-service-cash' && !isServiceStopped && !booking.transactionId && booking.cashConfirmationStatus !== 'approved';
   const shouldShowTransactionAction = Boolean(booking.transactionId || booking.paymentReference);
   const showServiceDetailsSidebar = false;
@@ -710,6 +715,12 @@ const ChatWindow = ({ appTheme = 'light', booking, onApproveQuote, onRejectQuote
                 <p style={styles.detailValue}>Service cost: {formatPhp(booking.quoteAmount)}</p>
                 <p style={styles.detailValue}>Transaction fee ({booking.transactionFeePercent || '5%'}): {formatPhp(transactionFeeAmount)}</p>
                 <p style={styles.detailValue}>Total payment: {formatPhp(totalChargedAmount)}</p>
+                {booking.paymentPlan === 'downpayment' && (
+                  <>
+                    <p style={styles.detailValue}>Amount paid: {formatPhp(booking.amountPaid)}</p>
+                    <p style={styles.detailValue}>Remaining balance: {formatPhp(booking.balanceDueAmount)}</p>
+                  </>
+                )}
               </div>
             )}
 
@@ -794,7 +805,7 @@ const ChatWindow = ({ appTheme = 'light', booking, onApproveQuote, onRejectQuote
                       style={{ ...styles.actionBtn, width: '100%' }}
                       onClick={onOpenPaymentSelection}
                     >
-                      Pay via GCash
+                      {hasDownpaymentBalance ? 'Pay Remaining Balance' : 'Pay via GCash'}
                     </button>
                   )}
 
