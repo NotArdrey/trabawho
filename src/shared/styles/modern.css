@@ -3546,18 +3546,40 @@ textarea {
 }
 
 @media (max-width: 1024px) {
+  .gl-admin-sidebar {
+    transform: translateX(-100%) !important;
+  }
+
+  .gl-admin-sidebar.open {
+    transform: translateX(0) !important;
+    box-shadow: var(--gl-shadow) !important;
+  }
+
+  .gl-admin-sidebar-overlay {
+    display: block !important;
+    position: fixed !important;
+    inset: 0 !important;
+    z-index: 145 !important;
+    background: rgba(15, 23, 42, 0.45) !important;
+    backdrop-filter: blur(2px) !important;
+  }
+
+  .gl-admin-mobile-close,
+  .gl-admin-mobile-toggle {
+    display: inline-flex !important;
+  }
+
+  .gl-admin-main-wrapper {
+    margin-left: 0 !important;
+    width: 100% !important;
+  }
+
+  .gl-admin-topbar {
+    padding: 0 16px !important;
+  }
+
   .gl-admin-shell {
     padding: 16px !important;
-  }
-
-  .gl-admin-nav-inner {
-    grid-template-columns: 1fr !important;
-    align-items: stretch !important;
-  }
-
-  .gl-admin-nav-tabs,
-  .gl-admin-nav-actions {
-    justify-content: flex-start !important;
   }
 
   .gl-admin-stats-grid,

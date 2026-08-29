@@ -1,136 +1,226 @@
 import React from 'react';
+import PropTypes from 'prop-types';
+import {
+  ArrowLeft,
+  ClipboardList,
+  LayoutDashboard,
+  LogOut,
+  MessageSquare,
+  Users,
+  X,
+} from 'lucide-react';
 import { getThemeTokens } from '../../../shared/styles/themeTokens';
 import BrandWordmark from '../../../shared/components/BrandWordmark';
 
-function AdminNavigation({ appTheme = 'light', activeSection = 'accounts', onSectionChange, onOpenDashboard, onOpenLogoutConfirm }) {
+function AdminNavigation({
+  appTheme = 'light',
+  activeSection = 'overview',
+  onSectionChange,
+  onOpenDashboard,
+  onOpenLogoutConfirm,
+  stats = {},
+  isMobileOpen = false,
+  onCloseMobile,
+}) {
   const themeTokens = getThemeTokens(appTheme);
 
   const sections = [
-    { key: 'overview', label: 'Overview', shortLabel: 'Overview' },
-    { key: 'accounts', label: 'Account Management', shortLabel: 'Accounts' },
-    { key: 'logs', label: 'Audit Logs', shortLabel: 'Logs' },
-    { key: 'comments', label: 'Summary / Comments', shortLabel: 'Comments' },
+    {
+      key: 'overview',
+      label: 'Overview',
+      icon: LayoutDashboard,
+    },
+    {
+      key: 'accounts',
+      label: 'Account Management',
+      icon: Users,
+      badge: stats.totalAccounts !== undefined && stats.totalAccounts !== null ? stats.totalAccounts : null,
+    },
+    {
+      key: 'logs',
+      label: 'Audit Logs',
+      icon: ClipboardList,
+      badge: stats.logsCount !== undefined && stats.logsCount !== null ? stats.logsCount : null,
+    },
+    {
+      key: 'comments',
+      label: 'Summary / Comments',
+      icon: MessageSquare,
+      badge: stats.flaggedComments > 0 ? stats.flaggedComments : null,
+      badgeType: stats.flaggedComments > 0 ? 'warning' : 'default',
+    },
   ];
 
-  const styles = {
-    nav: {
-      position: 'sticky',
-      top: 0,
-      zIndex: 130,
-      backgroundColor: themeTokens.navBg,
-      borderBottom: `1px solid ${themeTokens.navBorder}`,
-      boxShadow: themeTokens.shadowSoft,
-    },
-    inner: {
-      maxWidth: '1280px',
-      margin: '0 auto',
-      padding: '0.75rem 1rem',
-      display: 'grid',
-      gridTemplateColumns: 'minmax(170px, 1fr) minmax(320px, 1.2fr) minmax(180px, 1fr)',
-      alignItems: 'center',
-      gap: '0.75rem',
-    },
-    brandWrap: { display: 'flex', alignItems: 'center', gap: 'var(--gl-brand-gap)', minWidth: 0 },
-    brandLogo: { width: 'var(--gl-brand-logo-size)', height: 'var(--gl-brand-logo-size)', objectFit: 'contain', flex: '0 0 auto' },
-    brand: {
-      margin: 0,
-      fontFamily: "'Poppins', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
-      fontSize: 'var(--gl-brand-font-size)',
-      fontWeight: 850,
-      color: themeTokens.accent,
-      lineHeight: 1,
-      letterSpacing: 0,
-      whiteSpace: 'nowrap',
-    },
-    badge: {
-      display: 'inline-flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      borderRadius: '999px',
-      padding: '4px 10px',
-      fontSize: '12px',
-      fontWeight: 800,
-      backgroundColor: themeTokens.badgeBg,
-      color: themeTokens.badgeText,
-      whiteSpace: 'nowrap',
-    },
-    tabs: {
-      display: 'flex',
-      justifyContent: 'center',
-      gap: '0.5rem',
-      flexWrap: 'wrap',
-    },
-    tab: {
-      border: `1px solid ${themeTokens.border}`,
-      backgroundColor: themeTokens.surface,
-      color: themeTokens.textPrimary,
-      borderRadius: '999px',
-      padding: '0.62rem 1rem',
-      fontWeight: 700,
-      cursor: 'pointer',
-      transition: 'all 0.2s ease',
-    },
-    tabActive: {
-      backgroundColor: themeTokens.accent,
-      color: '#ffffff',
-      borderColor: themeTokens.accent,
-      boxShadow: themeTokens.accentShadow,
-    },
-    actions: {
-      display: 'flex',
-      justifyContent: 'flex-end',
-      gap: '0.5rem',
-      flexWrap: 'wrap',
-    },
-    actionButton: {
-      border: `1px solid ${themeTokens.border}`,
-      backgroundColor: themeTokens.surface,
-      color: themeTokens.textPrimary,
-      borderRadius: '999px',
-      padding: '0.6rem 0.95rem',
-      fontWeight: 700,
-      cursor: 'pointer',
-    },
-    actionPrimary: {
-      backgroundColor: themeTokens.accent,
-      color: '#ffffff',
-      borderColor: themeTokens.accent,
-    },
-  };
-
   return (
-    <nav className="gl-admin-nav" style={styles.nav}>
-      <div className="gl-admin-nav-inner" style={styles.inner}>
-        <div className="gl-admin-nav-brand" style={styles.brandWrap}>
-          <img src="/trabawho-logo.svg" alt="" aria-hidden="true" style={styles.brandLogo} />
-          <h1 style={styles.brand}><BrandWordmark /></h1>
-          <span style={styles.badge}>Admin</span>
-        </div>
+    <>
+      {/* Mobile Backdrop Overlay */}
+      {isMobileOpen && (
+        <div
+          className="gl-admin-sidebar-overlay"
+          onClick={onCloseMobile}
+          aria-label="Close navigation overlay"
+          role="button"
+          tabIndex={0}
+          onKeyDown={(e) => e.key === 'Escape' && onCloseMobile && onCloseMobile()}
+        />
+      )}
 
-        <div className="gl-admin-nav-tabs" style={styles.tabs}>
-          {sections.map((section) => (
+      <aside
+        className={`gl-admin-sidebar ${isMobileOpen ? 'open' : ''}`}
+        aria-label="Admin Navigation Sidebar"
+        style={{
+          backgroundColor: themeTokens.surface,
+          borderColor: themeTokens.border,
+        }}
+      >
+        {/* Sidebar Header / Brand */}
+        <div className="gl-admin-sidebar-header" style={{ borderColor: themeTokens.border }}>
+          <button
+            type="button"
+            className="gl-admin-sidebar-brand"
+            onClick={onOpenDashboard}
+            aria-label="Back to App Home"
+          >
+            <img
+              src="/trabawho-logo.svg"
+              alt=""
+              aria-hidden="true"
+              className="gl-admin-brand-logo"
+            />
+            <div className="gl-admin-brand-info">
+              <strong className="gl-admin-brand-title">
+                <BrandWordmark />
+              </strong>
+              <span
+                className="gl-admin-badge"
+                style={{
+                  backgroundColor: themeTokens.badgeBg,
+                  color: themeTokens.badgeText,
+                  borderColor: themeTokens.accent,
+                }}
+              >
+                Admin
+              </span>
+            </div>
+          </button>
+
+          {/* Close button on mobile */}
+          {onCloseMobile && (
             <button
-              key={section.key}
               type="button"
-              style={{ ...styles.tab, ...(activeSection === section.key ? styles.tabActive : {}) }}
-              onClick={() => onSectionChange && onSectionChange(section.key)}
+              className="gl-admin-mobile-close"
+              onClick={onCloseMobile}
+              aria-label="Close navigation"
             >
-              {section.label}
+              <X size={18} aria-hidden="true" />
             </button>
-          ))}
+          )}
         </div>
 
-        <div className="gl-admin-nav-actions" style={styles.actions}>
-          <button type="button" style={styles.actionButton} onClick={onOpenDashboard}>
-            Back to App
+        <div className="gl-admin-sidebar-section-title" style={{ color: themeTokens.textMuted }}>
+          <span>PORTAL MENU</span>
+        </div>
+
+        {/* Navigation List */}
+        <nav className="gl-admin-nav-list" aria-label="Admin Sections">
+          {sections.map(({ key, label, icon: Icon, badge, badgeType }) => {
+            const isActive = activeSection === key;
+            return (
+              <button
+                key={key}
+                type="button"
+                className={`gl-admin-nav-item ${isActive ? 'active' : ''}`}
+                style={
+                  isActive
+                    ? {
+                        backgroundColor: themeTokens.accentSoft,
+                        borderColor: themeTokens.accentBorder,
+                        color: themeTokens.accent,
+                      }
+                    : {
+                        color: themeTokens.textSecondary,
+                      }
+                }
+                onClick={() => {
+                  onSectionChange && onSectionChange(key);
+                  onCloseMobile && onCloseMobile();
+                }}
+              >
+                <Icon size={18} className="gl-admin-nav-icon" aria-hidden="true" />
+                <span className="gl-admin-nav-label">{label}</span>
+                {badge !== null && badge !== undefined && (
+                  <span
+                    className={`gl-admin-nav-badge ${badgeType === 'warning' ? 'badge-warning' : ''}`}
+                    style={
+                      badgeType === 'warning'
+                        ? {
+                            backgroundColor: themeTokens.dangerBg,
+                            color: themeTokens.danger,
+                            borderColor: themeTokens.dangerBorder,
+                          }
+                        : {
+                            backgroundColor: themeTokens.surfaceSoft,
+                            color: themeTokens.textSecondary,
+                          }
+                    }
+                  >
+                    {badge}
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </nav>
+
+        {/* Sidebar Footer */}
+        <div className="gl-admin-sidebar-footer" style={{ borderColor: themeTokens.border }}>
+          <button
+            type="button"
+            className="gl-admin-footer-btn gl-admin-back-btn"
+            style={{
+              backgroundColor: themeTokens.surfaceAlt,
+              borderColor: themeTokens.border,
+              color: themeTokens.textPrimary,
+            }}
+            onClick={onOpenDashboard}
+          >
+            <ArrowLeft size={16} aria-hidden="true" />
+            <span>Back to App</span>
           </button>
-          <button type="button" style={{ ...styles.actionButton, ...styles.actionPrimary }} onClick={onOpenLogoutConfirm}>
-            Logout
+
+          <button
+            type="button"
+            className="gl-admin-footer-btn gl-admin-logout-btn"
+            style={{
+              backgroundColor: themeTokens.surfaceAlt,
+              borderColor: themeTokens.border,
+              color: themeTokens.danger,
+            }}
+            onClick={onOpenLogoutConfirm}
+          >
+            <LogOut size={16} aria-hidden="true" />
+            <span>Logout</span>
           </button>
         </div>
-      </div>
-    </nav>
+      </aside>
+    </>
   );
 }
+
+AdminNavigation.propTypes = {
+  appTheme: PropTypes.string,
+  activeSection: PropTypes.string,
+  onSectionChange: PropTypes.func,
+  onOpenDashboard: PropTypes.func,
+  onOpenLogoutConfirm: PropTypes.func,
+  stats: PropTypes.shape({
+    totalAccounts: PropTypes.number,
+    disabledAccounts: PropTypes.number,
+    flaggedComments: PropTypes.number,
+    logsCount: PropTypes.number,
+  }),
+  isMobileOpen: PropTypes.bool,
+  onCloseMobile: PropTypes.func,
+};
 
 export default AdminNavigation;

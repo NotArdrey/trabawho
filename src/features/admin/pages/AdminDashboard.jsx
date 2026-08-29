@@ -1,4 +1,9 @@
 import { useEffect, useState } from 'react';
+import {
+  ArrowLeft,
+  LogOut,
+  Menu,
+} from 'lucide-react';
 import AdminNavigation from '../components/AdminNavigation';
 import AdminOverview from '../components/AdminOverview';
 import AdminAccountsTable from '../components/AdminAccountsTable';
@@ -12,6 +17,7 @@ import { useAdminAccounts } from '../hooks/useAdminAccounts';
 
 function AdminDashboard({ appTheme = 'light', onLogout, onOpenDashboard }) {
   const [activeSection, setActiveSection] = useState('overview');
+  const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
   const [isLogoutConfirmOpen, setIsLogoutConfirmOpen] = useState(false);
 
   // Controller hook - handles all business logic and state
@@ -38,6 +44,13 @@ function AdminDashboard({ appTheme = 'light', onLogout, onOpenDashboard }) {
     onLogout && onLogout();
   };
 
+  const sectionLabels = {
+    overview: 'Overview & Metrics',
+    accounts: 'Account Management',
+    logs: 'Audit Logs',
+    comments: 'Summary / Comments Moderation',
+  };
+
   // Styles object - all styling in one place
   const styles = {
     page: {
@@ -45,11 +58,118 @@ function AdminDashboard({ appTheme = 'light', onLogout, onOpenDashboard }) {
       backgroundColor: themeTokens.pageBg,
       color: themeTokens.textPrimary,
       fontFamily: "'Segoe UI', Tahoma, Geneva, Verdana, sans-serif",
+      display: 'flex',
+      width: '100%',
+      position: 'relative',
+    },
+    mainWrapper: {
+      flex: '1 1 auto',
+      marginLeft: '256px',
+      minHeight: '100vh',
+      display: 'flex',
+      flexDirection: 'column',
+      minWidth: 0,
+      width: 'calc(100% - 256px)',
+    },
+    topbar: {
+      position: 'sticky',
+      top: 0,
+      zIndex: 120,
+      minHeight: '62px',
+      backgroundColor: themeTokens.surface,
+      borderBottom: `1px solid ${themeTokens.border}`,
+      boxShadow: themeTokens.shadowSoft,
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      padding: '0 24px',
+      gap: '16px',
+    },
+    topbarLeft: {
+      display: 'flex',
+      alignItems: 'center',
+      gap: '12px',
+      minWidth: 0,
+    },
+    topbarMobileToggle: {
+      border: `1px solid ${themeTokens.border}`,
+      borderRadius: '8px',
+      backgroundColor: themeTokens.surfaceAlt,
+      color: themeTokens.textPrimary,
+      padding: '7px',
+      cursor: 'pointer',
+      display: 'none',
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    topbarBreadcrumb: {
+      display: 'flex',
+      alignItems: 'center',
+      gap: '8px',
+      fontSize: '14px',
+      fontWeight: 700,
+      whiteSpace: 'nowrap',
+      overflow: 'hidden',
+      textOverflow: 'ellipsis',
+    },
+    topbarParent: {
+      color: themeTokens.textMuted,
+    },
+    topbarSlash: {
+      color: themeTokens.border,
+    },
+    topbarCurrent: {
+      color: themeTokens.textPrimary,
+      fontWeight: 800,
+    },
+    topbarRight: {
+      display: 'flex',
+      alignItems: 'center',
+      gap: '10px',
+      flexShrink: 0,
+    },
+    topbarStatusBadge: {
+      display: 'inline-flex',
+      alignItems: 'center',
+      gap: '6px',
+      padding: '4px 10px',
+      borderRadius: '999px',
+      backgroundColor: themeTokens.successBg,
+      border: `1px solid ${themeTokens.successBorder}`,
+      fontSize: '12px',
+      fontWeight: 750,
+      color: themeTokens.successText,
+    },
+    topbarStatusDot: {
+      width: '7px',
+      height: '7px',
+      borderRadius: '999px',
+      backgroundColor: themeTokens.success,
+    },
+    topbarActionBtn: {
+      border: `1px solid ${themeTokens.border}`,
+      borderRadius: '8px',
+      backgroundColor: themeTokens.surfaceAlt,
+      color: themeTokens.textPrimary,
+      padding: '7px 12px',
+      fontSize: '13px',
+      fontWeight: 700,
+      cursor: 'pointer',
+      display: 'inline-flex',
+      alignItems: 'center',
+      gap: '6px',
+    },
+    topbarLogoutBtn: {
+      backgroundColor: themeTokens.dangerBg,
+      color: themeTokens.danger,
+      borderColor: themeTokens.dangerBorder,
     },
     shell: {
-      maxWidth: '1280px',
+      maxWidth: '1360px',
+      width: '100%',
       margin: '0 auto',
-      padding: '20px',
+      padding: '24px',
+      boxSizing: 'border-box',
     },
     header: {
       backgroundColor: themeTokens.surface,
@@ -299,69 +419,126 @@ function AdminDashboard({ appTheme = 'light', onLogout, onOpenDashboard }) {
   };
 
   return (
-    <div className="gl-admin-page" data-testid="admin-dashboard-page" style={styles.page}>
+    <div className="gl-admin-layout gl-admin-page" data-testid="admin-dashboard-page" style={styles.page}>
       <AdminNavigation
         appTheme={appTheme}
         activeSection={activeSection}
         onSectionChange={setActiveSection}
         onOpenDashboard={onOpenDashboard}
         onOpenLogoutConfirm={handleOpenLogoutConfirm}
+        stats={{
+          totalAccounts: adminState.accounts?.length || 0,
+          disabledAccounts: adminState.stats?.disabledAccounts || 0,
+          flaggedComments: adminState.stats?.flaggedComments || 0,
+          logsCount: adminState.logs?.length || 0,
+        }}
+        isMobileOpen={isMobileNavOpen}
+        onCloseMobile={() => setIsMobileNavOpen(false)}
       />
 
-      <div className="gl-admin-shell" style={styles.shell}>
-        {/* Overview Section */}
-        {activeSection === 'overview' && (
-          <AdminOverview
-            stats={adminState.stats}
-            accounts={adminState.accounts}
-            logs={adminState.logs}
-            themeTokens={themeTokens}
-            styles={styles}
-          />
-        )}
+      <div className="gl-admin-main-wrapper" style={styles.mainWrapper}>
+        {/* Top Header / Topbar */}
+        <header className="gl-admin-topbar" style={styles.topbar}>
+          <div style={styles.topbarLeft}>
+            <button
+              type="button"
+              className="gl-admin-mobile-toggle"
+              style={styles.topbarMobileToggle}
+              onClick={() => setIsMobileNavOpen(true)}
+              aria-label="Open navigation menu"
+            >
+              <Menu size={20} aria-hidden="true" />
+            </button>
+            <div style={styles.topbarBreadcrumb}>
+              <span style={styles.topbarParent}>Admin Portal</span>
+              <span style={styles.topbarSlash}>/</span>
+              <span style={styles.topbarCurrent}>{sectionLabels[activeSection] || 'Dashboard'}</span>
+            </div>
+          </div>
 
-        {/* Accounts Management Section */}
-        {activeSection === 'accounts' && (
-          <AdminAccountsTable
-            normalizedAccounts={adminState.normalizedAccounts}
-            isAccountsLoading={adminState.isAccountsLoading}
-            accountsError={adminState.accountsError}
-            searchQuery={adminState.searchQuery}
-            onSearchChange={adminState.setSearchQuery}
-            selectedRole={adminState.selectedRole}
-            onRoleFilterChange={adminState.setSelectedRole}
-            roleSavingId={adminState.roleSavingId}
-            onUpdateRole={adminState.handleUpdateRole}
-            onOpenAccessAction={adminState.openAccessAction}
-            onRestoreAccount={adminState.handleRestoreAccount}
-            themeTokens={themeTokens}
-            styles={styles}
-          />
-        )}
+          <div style={styles.topbarRight}>
+            <div style={styles.topbarStatusBadge}>
+              <span style={styles.topbarStatusDot} />
+              <span>Admin Live</span>
+            </div>
+            <button
+              type="button"
+              className="gl-admin-topbar-action-btn"
+              style={styles.topbarActionBtn}
+              onClick={onOpenDashboard}
+            >
+              <ArrowLeft size={15} aria-hidden="true" />
+              <span>Back to App</span>
+            </button>
+            <button
+              type="button"
+              className="gl-admin-topbar-action-btn gl-admin-topbar-logout-btn"
+              style={{ ...styles.topbarActionBtn, ...styles.topbarLogoutBtn }}
+              onClick={handleOpenLogoutConfirm}
+            >
+              <LogOut size={15} aria-hidden="true" />
+              <span>Logout</span>
+            </button>
+          </div>
+        </header>
 
-        {/* Audit Logs Section */}
-        {activeSection === 'logs' && (
-          <AdminLogsSection
-            logs={adminState.logs}
-            styles={styles}
-          />
-        )}
+        {/* Content Shell */}
+        <main className="gl-admin-shell" style={styles.shell}>
+          {/* Overview Section */}
+          {activeSection === 'overview' && (
+            <AdminOverview
+              stats={adminState.stats}
+              accounts={adminState.accounts}
+              logs={adminState.logs}
+              themeTokens={themeTokens}
+              styles={styles}
+              onSectionChange={setActiveSection}
+            />
+          )}
 
-        {/* Comments Moderation Section */}
-        {activeSection === 'comments' && (
-          <AdminCommentsSection
-            comments={adminState.comments}
-            commentsError={adminState.commentsError}
-            onOpenDeleteComment={adminState.setCommentDeleteTarget}
-            styles={styles}
-          />
-        )}
+          {/* Accounts Management Section */}
+          {activeSection === 'accounts' && (
+            <AdminAccountsTable
+              normalizedAccounts={adminState.normalizedAccounts}
+              isAccountsLoading={adminState.isAccountsLoading}
+              accountsError={adminState.accountsError}
+              searchQuery={adminState.searchQuery}
+              onSearchChange={adminState.setSearchQuery}
+              selectedRole={adminState.selectedRole}
+              onRoleFilterChange={adminState.setSelectedRole}
+              roleSavingId={adminState.roleSavingId}
+              onUpdateRole={adminState.handleUpdateRole}
+              onOpenAccessAction={adminState.openAccessAction}
+              onRestoreAccount={adminState.handleRestoreAccount}
+              themeTokens={themeTokens}
+              styles={styles}
+            />
+          )}
 
-        {activeSection !== 'overview' && (
-          <p style={styles.sectionNavHint}>
-            Use the top navigation to switch between admin sections.
-          </p>
-        )}
+          {/* Audit Logs Section */}
+          {activeSection === 'logs' && (
+            <AdminLogsSection
+              logs={adminState.logs}
+              styles={styles}
+            />
+          )}
+
+          {/* Comments Moderation Section */}
+          {activeSection === 'comments' && (
+            <AdminCommentsSection
+              comments={adminState.comments}
+              commentsError={adminState.commentsError}
+              onOpenDeleteComment={adminState.setCommentDeleteTarget}
+              styles={styles}
+            />
+          )}
+
+          {activeSection !== 'overview' && (
+            <p style={styles.sectionNavHint}>
+              Use the sidebar navigation to switch between admin sections.
+            </p>
+          )}
+        </main>
       </div>
 
       {/* Access Action Modal (Disable/Ban) */}
