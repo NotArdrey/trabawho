@@ -53,11 +53,11 @@ async function mockChatbot(page, handler) {
 
 async function loginAsClient(page) {
   await page.goto('/');
-  await page.getByRole('button', { name: /^Login$/ }).first().click();
-  await expect(page.getByRole('heading', { name: 'Login' })).toBeVisible();
+  await page.getByRole('button', { name: /^Sign in$/ }).first().click();
+  await expect(page.getByRole('heading', { name: 'Sign in' })).toBeVisible();
   await page.getByLabel('Email').fill(DEMO_CLIENT_EMAIL);
   await page.getByLabel('Password').fill(DEMO_PASSWORD);
-  await page.locator('form').getByRole('button', { name: /^Login$/ }).click();
+  await page.locator('form').getByRole('button', { name: /^Sign in$/ }).click();
   await expect(page.getByTestId('client-home-dashboard')).toBeVisible({ timeout: 20_000 });
 }
 

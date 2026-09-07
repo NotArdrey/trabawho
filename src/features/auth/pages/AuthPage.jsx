@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ArrowLeft,
+  CalendarCheck,
   CheckCircle2,
   ExternalLink,
   FileText,
@@ -9,13 +10,32 @@ import {
   LogIn,
   Mail,
   MapPin,
+  MessageSquareText,
   RefreshCw,
   ShieldCheck,
+  Search,
   Upload,
   User,
   UserPlus,
   XCircle,
 } from 'lucide-react';
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectLabel,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import {
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from '@/components/ui/pagination';
 import {
   clearIdentitySignupState,
   DIDIT_DOCUMENT_TYPES,
@@ -35,6 +55,12 @@ import {
 import BrandWordmark from '../../../shared/components/BrandWordmark';
 
 const PSGC_BASE_URL = 'https://psgc.gitlab.io/api';
+const REGISTRATION_STEPS = [
+  { number: 1, label: 'Account' },
+  { number: 2, label: 'Security' },
+  { number: 3, label: 'Location' },
+  { number: 4, label: 'Review' },
+];
 
 const EMPTY_AUTH_FORM = {
   email: '',
@@ -112,6 +138,7 @@ function AuthPage({
   const [isForgotSubmitting, setIsForgotSubmitting] = useState(false);
   const [isForgotSubmitted, setIsForgotSubmitted] = useState(false);
   const [identityStep, setIdentityStep] = useState('details');
+  const [registrationStep, setRegistrationStep] = useState(1);
   const [identitySession, setIdentitySession] = useState(null);
   const [identityStatusMessage, setIdentityStatusMessage] = useState('');
   const [identityOutcome, setIdentityOutcome] = useState(null);
@@ -142,7 +169,7 @@ function AuthPage({
     }
 
     return {
-      title: 'Login',
+      title: 'Sign in',
       subtitle: 'Access your dashboard, bookings, saved providers, and service workspace.',
     };
   }, [isForgotMode, isRegisterMode]);
@@ -299,6 +326,8 @@ function AuthPage({
       setIdentityOutcome(null);
     }
 
+    setRegistrationStep(1);
+
     if (mode === 'forgot') {
       setForgotEmail((currentEmail) => currentEmail || latestEmailRef.current);
     }
@@ -376,11 +405,17 @@ function AuthPage({
     setIdentityStatusMessage('');
   };
 
-  const handleProvinceChange = (event) => {
-    const provinceCode = event.target.value;
+  const handleSelectChange = (name, value) => {
+    setFormData((current) => ({ ...current, [name]: value }));
+    setIdentityStatusMessage('');
+  };
+
+  const handleProvinceChange = (provinceCode) => {
     const selectedProvince = provinces.find((province) => province.code === provinceCode);
 
     setSelectedProvinceCode(provinceCode);
+    setSelectedCityMunicipalityCode('');
+    setBarangays([]);
     setFormData((current) => ({
       ...current,
       province: selectedProvince ? selectedProvince.name : '',
@@ -390,8 +425,7 @@ function AuthPage({
     fetchCities(provinceCode);
   };
 
-  const handleCityChange = (event) => {
-    const cityCode = event.target.value;
+  const handleCityChange = (cityCode) => {
     const selectedCity = cities.find((city) => city.code === cityCode);
 
     setSelectedCityMunicipalityCode(cityCode);
@@ -403,8 +437,7 @@ function AuthPage({
     fetchBarangays(cityCode);
   };
 
-  const handleBarangayChange = (event) => {
-    const barangayCode = event.target.value;
+  const handleBarangayChange = (barangayCode) => {
     const selectedBarangay = barangays.find((barangay) => barangay.code === barangayCode);
 
     setFormData((current) => ({
@@ -413,40 +446,72 @@ function AuthPage({
     }));
   };
 
-  const validateAuthForm = () => {
-    if (!isRegisterMode) return '';
-
-    if (formData.password !== formData.confirmPassword) {
-      return 'Password and confirm password do not match.';
+  const validateRegistrationStep = (step) => {
+    if (step === 1) {
+      if (!formData.accountRole) return 'Choose how you plan to use TrabaWho.';
+      if (!formData.documentTypeKey) return 'Choose an identity document.';
     }
 
-    if (formData.password.length < 8) {
-      return 'Password must be at least 8 characters.';
+    if (step === 2) {
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email.trim())) {
+        return 'Enter a valid email address.';
+      }
+      if (formData.password.length < 8) return 'Password must be at least 8 characters.';
+      if (formData.password !== formData.confirmPassword) {
+        return 'Password and confirm password do not match.';
+      }
     }
 
-    if (!formData.province || !formData.city || !formData.barangay || !formData.address.trim()) {
+    if (step === 3 && (!formData.province || !formData.city || !formData.barangay || !formData.address.trim())) {
       return 'Please complete all service location fields.';
     }
 
-    if (!formData.acceptedIdentityTerms) {
-      return 'Confirm that you consent to identity verification before continuing.';
-    }
-
-    if (!formData.acceptedRaTerms) {
-      return 'Confirm that you agree to the RA 10173 Terms and Conditions before continuing.';
-    }
-
-    if (!usesDidit) {
-      if (!formData.manualFullName.trim()) return 'Enter the full name exactly as shown on the ID.';
-      if (!formData.identityDocumentNumber.trim()) return 'Enter the ID number.';
-      if (!formData.idDocumentExpiry) return 'Enter the ID expiry date.';
-      if (formData.idDocumentExpiry < getTodayInputValue()) return 'ID expiry date cannot be in the past.';
-      if (!formData.frontImage || !formData.backImage || !formData.selfieImage) {
-        return 'Upload the front ID image, back ID image, and selfie image.';
+    if (step === 4) {
+      if (!formData.acceptedIdentityTerms) {
+        return 'Confirm that you consent to identity verification before continuing.';
+      }
+      if (!formData.acceptedRaTerms) {
+        return 'Confirm that you agree to the RA 10173 Terms and Conditions before continuing.';
+      }
+      if (!usesDidit) {
+        if (!formData.manualFullName.trim()) return 'Enter the full name exactly as shown on the ID.';
+        if (!formData.identityDocumentNumber.trim()) return 'Enter the ID number.';
+        if (!formData.idDocumentExpiry) return 'Enter the ID expiry date.';
+        if (formData.idDocumentExpiry < getTodayInputValue()) return 'ID expiry date cannot be in the past.';
+        if (!formData.frontImage || !formData.backImage || !formData.selfieImage) {
+          return 'Upload the front ID image, back ID image, and selfie image.';
+        }
       }
     }
 
     return '';
+  };
+
+  const validateAuthForm = () => {
+    if (!isRegisterMode) return '';
+
+    for (const step of REGISTRATION_STEPS) {
+      const error = validateRegistrationStep(step.number);
+      if (error) return error;
+    }
+
+    return '';
+  };
+
+  const moveToRegistrationStep = (nextStep) => {
+    setRegistrationStep(Math.min(Math.max(nextStep, 1), REGISTRATION_STEPS.length));
+    setSubmitError('');
+    requestAnimationFrame(() => document.getElementById('registration-step-heading')?.focus());
+  };
+
+  const handleRegistrationNext = () => {
+    const validationError = validateRegistrationStep(registrationStep);
+    if (validationError) {
+      setSubmitError(validationError);
+      return;
+    }
+
+    moveToRegistrationStep(registrationStep + 1);
   };
 
   const handleIdentityRegistrationSubmit = async () => {
@@ -589,6 +654,11 @@ function AuthPage({
     event.preventDefault();
     setSubmitError('');
 
+    if (isRegisterMode && registrationStep < REGISTRATION_STEPS.length) {
+      handleRegistrationNext();
+      return;
+    }
+
     logRegistrationDebug('auth_page:submit_started', {
       mode,
       isRegisterMode,
@@ -702,8 +772,10 @@ function AuthPage({
         </button>
 
         <button type="button" className="auth-back-button" onClick={onBack} aria-label="Back to TrabaWho home">
-          <ArrowLeft size={18} aria-hidden="true" />
-          Back
+          <span className="auth-back-icon" aria-hidden="true">
+            <ArrowLeft size={17} />
+          </span>
+          <span className="auth-back-label">Back to home</span>
         </button>
       </header>
 
@@ -716,31 +788,30 @@ function AuthPage({
           />
           <div className="auth-visual-overlay" />
           <div className="auth-visual-content">
+            <span className="auth-visual-eyebrow">Built for local work</span>
             <h2>Find help, book work, and manage every job in one place.</h2>
             <p>
-              TrabaWho connects clients with service providers for real schedules,
-              transparent rates, and clean booking handoffs.
+              From the first search to the finished service, TrabaWho keeps the experience clear and connected.
             </p>
 
-            <div className="auth-proof-grid" aria-label="TrabaWho trust highlights">
-              <div>
-                <strong>80+</strong>
-                <span>Service categories</span>
-              </div>
-              <div>
-                <strong>15m</strong>
-                <span>Average response</span>
-              </div>
-              <div>
-                <strong>24/7</strong>
-                <span>Booking access</span>
-              </div>
+            <div className="auth-journey-panel">
+              <strong>Everything you need to get work moving</strong>
+              <ol aria-label="TrabaWho service journey">
+                <li><span><Search size={17} aria-hidden="true" /></span><b>Discover</b><small>Find local help</small></li>
+                <li><span><CalendarCheck size={17} aria-hidden="true" /></span><b>Schedule</b><small>Choose what works</small></li>
+                <li><span><MessageSquareText size={17} aria-hidden="true" /></span><b>Manage</b><small>Stay up to date</small></li>
+              </ol>
             </div>
           </div>
         </aside>
 
         <section className={`auth-panel ${isRegisterMode ? 'register' : isForgotMode ? 'forgot' : 'login'}`}>
           <div className="auth-panel-head">
+            <div className="auth-panel-brand" aria-hidden="true">
+              <img src="/trabawho-logo.svg" alt="" />
+              <span><BrandWordmark /><small>Local services marketplace</small></span>
+            </div>
+            <span className="auth-panel-accent" aria-hidden="true" />
             <h1>{pageCopy.title}</h1>
             <p>{pageCopy.subtitle}</p>
           </div>
@@ -755,7 +826,7 @@ function AuthPage({
                 aria-selected={isLoginMode}
               >
                 <LogIn size={16} aria-hidden="true" />
-                Login
+                Sign in
               </button>
               <button
                 type="button"
@@ -782,7 +853,7 @@ function AuthPage({
                   </p>
                   <button type="button" className="auth-submit secondary" onClick={() => handleModeChange('login')}>
                     <LogIn size={18} aria-hidden="true" />
-                    Back to Login
+                    Back to sign in
                   </button>
                 </div>
               ) : (
@@ -812,7 +883,7 @@ function AuthPage({
 
                   <button type="button" className="auth-link-button center" onClick={() => handleModeChange('login')}>
                     <ArrowLeft size={16} aria-hidden="true" />
-                    Back to Login
+                    Back to sign in
                   </button>
                 </>
               )}
@@ -827,7 +898,7 @@ function AuthPage({
               </p>
               <button type="button" className="auth-submit" onClick={resetRegisterSuccess}>
                 <LogIn size={18} aria-hidden="true" />
-                Continue to Login
+                Continue to sign in
               </button>
             </div>
           ) : isRegisterMode && identityStep === 'didit' ? (
@@ -867,29 +938,75 @@ function AuthPage({
               ) : (
                 <button type="button" className="auth-submit" onClick={() => handleModeChange('login')}>
                   <LogIn size={18} aria-hidden="true" />
-                  Continue to Login
+                  Continue to sign in
                 </button>
               )}
             </div>
           ) : (
             <form className="auth-form" onSubmit={handleAuthSubmit}>
               {isRegisterMode && (
+                <div className="auth-registration-progress">
+                  <div className="auth-progress-copy">
+                    <span>Step {registrationStep} of {REGISTRATION_STEPS.length}</span>
+                    <strong>{REGISTRATION_STEPS[registrationStep - 1].label}</strong>
+                  </div>
+                  <Pagination aria-label="Registration progress">
+                    <PaginationContent>
+                      {REGISTRATION_STEPS.map((step) => {
+                        const status = step.number === registrationStep
+                          ? 'current'
+                          : step.number < registrationStep ? 'complete' : 'upcoming';
+
+                        return (
+                          <PaginationItem key={step.number}>
+                            <PaginationLink
+                              href={`#registration-step-${step.number}`}
+                              isActive={step.number === registrationStep}
+                              aria-label={`Step ${step.number}: ${step.label}`}
+                              aria-disabled={step.number > registrationStep || undefined}
+                              tabIndex={step.number > registrationStep ? -1 : undefined}
+                              data-status={status}
+                              className="auth-progress-step"
+                              onClick={(event) => {
+                                event.preventDefault();
+                                if (step.number < registrationStep) moveToRegistrationStep(step.number);
+                              }}
+                            >
+                              {step.number}
+                            </PaginationLink>
+                          </PaginationItem>
+                        );
+                      })}
+                    </PaginationContent>
+                  </Pagination>
+                </div>
+              )}
+
+              {isRegisterMode && registrationStep === 1 && (
                 <>
+                  <div className="auth-form-section-title" id="registration-step-heading" tabIndex="-1">
+                    <span>1</span>
+                    <div><strong>Choose your account</strong><small>Select how you plan to use TrabaWho.</small></div>
+                  </div>
                   <div className="auth-register-grid">
                     <label className="auth-field" htmlFor="accountRole">
                       <span>Account Type</span>
                       <div className="auth-input-wrap">
                         <UserPlus size={18} aria-hidden="true" />
-                        <select
-                          id="accountRole"
+                        <Select
                           name="accountRole"
                           value={formData.accountRole}
-                          onChange={handleInputChange}
+                          onValueChange={(value) => handleSelectChange('accountRole', value)}
                           required
                         >
-                          <option value="client">Client</option>
-                          <option value="worker">Worker</option>
-                        </select>
+                          <SelectTrigger id="accountRole" className="auth-select-trigger">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="client">Client</SelectItem>
+                            <SelectItem value="worker">Worker</SelectItem>
+                          </SelectContent>
+                        </Select>
                       </div>
                     </label>
 
@@ -897,132 +1014,56 @@ function AuthPage({
                       <span>Identity document</span>
                       <div className="auth-input-wrap">
                         <FileText size={18} aria-hidden="true" />
-                        <select
-                          id="documentTypeKey"
+                        <Select
                           name="documentTypeKey"
                           value={formData.documentTypeKey}
-                          onChange={handleInputChange}
+                          onValueChange={(value) => handleSelectChange('documentTypeKey', value)}
                           required
                         >
-                          <optgroup label="Automatic Didit verification">
-                            {DIDIT_DOCUMENT_TYPES.map((document) => (
-                              <option key={document.key} value={document.key}>{document.label}</option>
-                            ))}
-                          </optgroup>
-                          <optgroup label="Manual review">
-                            {MANUAL_DOCUMENT_TYPES.map((document) => (
-                              <option key={document.key} value={document.key}>{document.label}</option>
-                            ))}
-                          </optgroup>
-                        </select>
+                          <SelectTrigger id="documentTypeKey" className="auth-select-trigger">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectGroup>
+                              <SelectLabel>Automatic Didit verification</SelectLabel>
+                              {DIDIT_DOCUMENT_TYPES.map((document) => (
+                                <SelectItem key={document.key} value={document.key}>{document.label}</SelectItem>
+                              ))}
+                            </SelectGroup>
+                            <SelectGroup>
+                              <SelectLabel>Manual review</SelectLabel>
+                              {MANUAL_DOCUMENT_TYPES.map((document) => (
+                                <SelectItem key={document.key} value={document.key}>{document.label}</SelectItem>
+                              ))}
+                            </SelectGroup>
+                          </SelectContent>
+                        </Select>
                       </div>
                     </label>
                   </div>
 
                   {usesDidit ? (
-                    <div className="auth-alert warning">
+                    <div className="auth-alert info">
                       <ShieldCheck size={16} aria-hidden="true" />
                       {selectedDocument.label} uses Didit for ID scan, liveness, and face match before account creation.
                     </div>
                   ) : (
-                    <div className="auth-form" data-testid="manual-review-fields">
-                      <div className="auth-alert warning">
-                        <Upload size={16} aria-hidden="true" />
-                        {selectedDocument.label} requires manual review. Upload clear ID images and a selfie.
-                      </div>
-
-                      <label className="auth-field" htmlFor="manualFullName">
-                        <span>Name on ID</span>
-                        <div className="auth-input-wrap">
-                          <User size={18} aria-hidden="true" />
-                          <input
-                            id="manualFullName"
-                            name="manualFullName"
-                            type="text"
-                            value={formData.manualFullName}
-                            onChange={handleInputChange}
-                            placeholder="Juan Santos Dela Cruz"
-                          />
-                        </div>
-                      </label>
-
-                      <label className="auth-field" htmlFor="identityDocumentNumber">
-                        <span>ID number</span>
-                        <div className="auth-input-wrap">
-                          <FileText size={18} aria-hidden="true" />
-                          <input
-                            id="identityDocumentNumber"
-                            name="identityDocumentNumber"
-                            type="text"
-                            value={formData.identityDocumentNumber}
-                            onChange={handleInputChange}
-                            placeholder="ID number"
-                          />
-                        </div>
-                      </label>
-
-                      <label className="auth-field" htmlFor="idDocumentExpiry">
-                        <span>ID expiry date</span>
-                        <div className="auth-input-wrap">
-                          <FileText size={18} aria-hidden="true" />
-                          <input
-                            id="idDocumentExpiry"
-                            name="idDocumentExpiry"
-                            type="date"
-                            min={getTodayInputValue()}
-                            value={formData.idDocumentExpiry}
-                            onChange={handleInputChange}
-                          />
-                        </div>
-                      </label>
-
-                      <div className="auth-register-grid">
-                        <label className="auth-field" htmlFor="manual-front-image">
-                          <span>Front image</span>
-                          <div className="auth-input-wrap">
-                            <Upload size={18} aria-hidden="true" />
-                            <input
-                              id="manual-front-image"
-                              name="frontImage"
-                              type="file"
-                              accept="image/*"
-                              onChange={handleInputChange}
-                            />
-                          </div>
-                        </label>
-
-                        <label className="auth-field" htmlFor="manual-back-image">
-                          <span>Back image</span>
-                          <div className="auth-input-wrap">
-                            <Upload size={18} aria-hidden="true" />
-                            <input
-                              id="manual-back-image"
-                              name="backImage"
-                              type="file"
-                              accept="image/*"
-                              onChange={handleInputChange}
-                            />
-                          </div>
-                        </label>
-                      </div>
-
-                      <label className="auth-field" htmlFor="manual-selfie-image">
-                        <span>Selfie image</span>
-                        <div className="auth-input-wrap">
-                          <Upload size={18} aria-hidden="true" />
-                          <input
-                            id="manual-selfie-image"
-                            name="selfieImage"
-                            type="file"
-                            accept="image/*"
-                            onChange={handleInputChange}
-                          />
-                        </div>
-                      </label>
+                    <div className="auth-alert info">
+                      <Upload size={16} aria-hidden="true" />
+                      {selectedDocument.label} uses manual review. You will add the document details on the final step.
                     </div>
                   )}
                 </>
               )}
+
+              {(!isRegisterMode || registrationStep === 2) && (
+                <>
+                  {isRegisterMode && (
+                    <div className="auth-form-section-title" id="registration-step-heading" tabIndex="-1">
+                      <span>2</span>
+                      <div><strong>Secure your account</strong><small>Use an email you can access for verification.</small></div>
+                    </div>
+                  )}
 
               <label className="auth-field" htmlFor="email">
                 <span>Email</span>
@@ -1058,8 +1099,8 @@ function AuthPage({
                 </div>
               </label>
 
-              {isRegisterMode && (
-                <>
+                  {isRegisterMode && (
+                    <>
                   <label className="auth-field" htmlFor="confirmPassword">
                     <span>Confirm Password</span>
                     <div className="auth-input-wrap">
@@ -1075,34 +1116,39 @@ function AuthPage({
                         required
                       />
                     </div>
-                  </label>
+                    </label>
+                    </>
+                  )}
+                </>
+              )}
 
-                  <div className="auth-location-block">
-                    <div>
-                      <span className="auth-location-kicker">
-                        <MapPin size={15} aria-hidden="true" />
-                        Service Location
-                      </span>
-                      <p>Used to match you with nearby providers in the Philippines.</p>
-                    </div>
+              {isRegisterMode && registrationStep === 3 && (
+                <>
+                  <div className="auth-form-section-title" id="registration-step-heading" tabIndex="-1">
+                    <span>3</span>
+                    <div><strong>Add your service location</strong><small>Used to match you with nearby providers in the Philippines.</small></div>
                   </div>
 
                   <label className="auth-field" htmlFor="province">
                     <span>Province {isLoadingProvinces && <small>(Loading...)</small>}</span>
                     <div className="auth-input-wrap">
                       <MapPin size={18} aria-hidden="true" />
-                      <select
-                        id="province"
+                      <Select
+                        name="province"
                         value={selectedProvinceCode}
-                        onChange={handleProvinceChange}
+                        onValueChange={handleProvinceChange}
                         required
                         disabled={isLoadingProvinces}
                       >
-                        <option value="">Select a Province</option>
-                        {provinces.map((province) => (
-                          <option key={province.code} value={province.code}>{province.name}</option>
-                        ))}
-                      </select>
+                        <SelectTrigger id="province" className="auth-select-trigger">
+                          <SelectValue placeholder="Select a province" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {provinces.map((province) => (
+                            <SelectItem key={province.code} value={province.code}>{province.name}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                     </div>
                   </label>
 
@@ -1110,18 +1156,22 @@ function AuthPage({
                     <span>City/Municipality {isLoadingCities && <small>(Loading...)</small>}</span>
                     <div className="auth-input-wrap">
                       <MapPin size={18} aria-hidden="true" />
-                      <select
-                        id="city"
+                      <Select
+                        name="city"
                         value={selectedCityMunicipalityCode}
-                        onChange={handleCityChange}
+                        onValueChange={handleCityChange}
                         required
                         disabled={!selectedProvinceCode || isLoadingCities}
                       >
-                        <option value="">{!selectedProvinceCode ? 'Select Province First' : 'Select City/Municipality'}</option>
-                        {cities.map((city) => (
-                          <option key={city.code} value={city.code}>{city.name}</option>
-                        ))}
-                      </select>
+                        <SelectTrigger id="city" className="auth-select-trigger">
+                          <SelectValue placeholder={!selectedProvinceCode ? 'Select province first' : 'Select city/municipality'} />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {cities.map((city) => (
+                            <SelectItem key={city.code} value={city.code}>{city.name}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                     </div>
                   </label>
 
@@ -1129,18 +1179,22 @@ function AuthPage({
                     <span>Barangay {isLoadingBarangays && <small>(Loading...)</small>}</span>
                     <div className="auth-input-wrap">
                       <MapPin size={18} aria-hidden="true" />
-                      <select
-                        id="barangay"
+                      <Select
+                        name="barangay"
                         value={formData.barangay ? (barangays.find((barangay) => barangay.name === formData.barangay)?.code || '') : ''}
-                        onChange={handleBarangayChange}
+                        onValueChange={handleBarangayChange}
                         required
                         disabled={!selectedCityMunicipalityCode || isLoadingBarangays}
                       >
-                        <option value="">{!selectedCityMunicipalityCode ? 'Select City First' : 'Select Barangay'}</option>
-                        {barangays.map((barangay) => (
-                          <option key={barangay.code} value={barangay.code}>{barangay.name}</option>
-                        ))}
-                      </select>
+                        <SelectTrigger id="barangay" className="auth-select-trigger">
+                          <SelectValue placeholder={!selectedCityMunicipalityCode ? 'Select city first' : 'Select barangay'} />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {barangays.map((barangay) => (
+                            <SelectItem key={barangay.code} value={barangay.code}>{barangay.name}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                     </div>
                   </label>
 
@@ -1162,6 +1216,80 @@ function AuthPage({
                   </label>
 
                   {apiError && <div className="auth-alert warning">{apiError}</div>}
+                </>
+              )}
+
+              {isRegisterMode && registrationStep === 4 && (
+                <>
+                  <div className="auth-form-section-title" id="registration-step-heading" tabIndex="-1">
+                    <span>4</span>
+                    <div><strong>Review and consent</strong><small>Confirm how identity and account information will be handled.</small></div>
+                  </div>
+
+                  {!usesDidit && (
+                    <div className="auth-form" data-testid="manual-review-fields">
+                      <div className="auth-alert info">
+                        <Upload size={16} aria-hidden="true" />
+                        Upload clear images for manual review. Your account remains pending until approval.
+                      </div>
+
+                      <label className="auth-field" htmlFor="manualFullName">
+                        <span>Name on ID</span>
+                        <div className="auth-input-wrap">
+                          <User size={18} aria-hidden="true" />
+                          <input id="manualFullName" name="manualFullName" type="text" value={formData.manualFullName} onChange={handleInputChange} placeholder="Juan Santos Dela Cruz" />
+                        </div>
+                      </label>
+
+                      <div className="auth-register-grid">
+                        <label className="auth-field" htmlFor="identityDocumentNumber">
+                          <span>ID number</span>
+                          <div className="auth-input-wrap">
+                            <FileText size={18} aria-hidden="true" />
+                            <input id="identityDocumentNumber" name="identityDocumentNumber" type="text" value={formData.identityDocumentNumber} onChange={handleInputChange} placeholder="ID number" />
+                          </div>
+                        </label>
+                        <label className="auth-field" htmlFor="idDocumentExpiry">
+                          <span>ID expiry date</span>
+                          <div className="auth-input-wrap">
+                            <FileText size={18} aria-hidden="true" />
+                            <input id="idDocumentExpiry" name="idDocumentExpiry" type="date" min={getTodayInputValue()} value={formData.idDocumentExpiry} onChange={handleInputChange} />
+                          </div>
+                        </label>
+                      </div>
+
+                      <div className="auth-register-grid">
+                        <label className="auth-field" htmlFor="manual-front-image">
+                          <span>Front image</span>
+                          <div className="auth-input-wrap">
+                            <Upload size={18} aria-hidden="true" />
+                            <input id="manual-front-image" name="frontImage" type="file" accept="image/*" onChange={handleInputChange} />
+                          </div>
+                        </label>
+                        <label className="auth-field" htmlFor="manual-back-image">
+                          <span>Back image</span>
+                          <div className="auth-input-wrap">
+                            <Upload size={18} aria-hidden="true" />
+                            <input id="manual-back-image" name="backImage" type="file" accept="image/*" onChange={handleInputChange} />
+                          </div>
+                        </label>
+                      </div>
+
+                      <label className="auth-field" htmlFor="manual-selfie-image">
+                        <span>Selfie image</span>
+                        <div className="auth-input-wrap">
+                          <Upload size={18} aria-hidden="true" />
+                          <input id="manual-selfie-image" name="selfieImage" type="file" accept="image/*" onChange={handleInputChange} />
+                        </div>
+                      </label>
+                    </div>
+                  )}
+
+                  <div className="auth-review-summary" aria-label="Registration summary">
+                    <div><span>Account</span><strong>{formData.accountRole === 'worker' ? 'Worker' : 'Client'}</strong></div>
+                    <div><span>Document</span><strong>{selectedDocument.label}</strong></div>
+                    <div><span>Location</span><strong>{[formData.city, formData.province].filter(Boolean).join(', ')}</strong></div>
+                  </div>
 
                   <label className="auth-field" htmlFor="acceptedIdentityTerms">
                     <span>Identity consent</span>
@@ -1202,7 +1330,7 @@ function AuthPage({
 
               <button type="submit" className="auth-submit" disabled={isSubmitting}>
                 {isSubmitting ? <RefreshCw className="gl-spin" size={18} aria-hidden="true" /> : isRegisterMode ? (usesDidit ? <ShieldCheck size={18} aria-hidden="true" /> : <Upload size={18} aria-hidden="true" />) : <LogIn size={18} aria-hidden="true" />}
-                {isSubmitting ? (isRegisterMode ? 'Submitting...' : 'Logging in...') : (isRegisterMode ? (usesDidit ? 'Start Didit Verification' : 'Submit Manual Review') : 'Login')}
+                {isSubmitting ? (isRegisterMode ? 'Submitting...' : 'Signing in...') : (isRegisterMode ? (usesDidit ? 'Start Didit Verification' : 'Submit Manual Review') : 'Sign in')}
               </button>
 
               {isLoginMode && (

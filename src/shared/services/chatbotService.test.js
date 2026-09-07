@@ -1,17 +1,17 @@
 import { sendChatbotMessage } from './chatbotService';
 import { supabase } from './supabaseClient';
 
-jest.mock('./supabaseClient', () => ({
+vi.mock('./supabaseClient', () => ({
   supabase: {
     functions: {
-      invoke: jest.fn(),
+      invoke: vi.fn(),
     },
   },
 }));
 
 describe('sendChatbotMessage', () => {
   beforeEach(() => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
   });
 
   it('keeps uploaded image attachments in the function payload and latest message', async () => {

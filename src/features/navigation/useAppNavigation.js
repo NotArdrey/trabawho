@@ -1,5 +1,13 @@
 import { useState, useEffect } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { supabase } from '../../shared/services/supabaseClient';
+import {
+  getMessageBookingId,
+  isSafeReturnPath,
+  pathForView,
+  paths,
+  viewFromPathname,
+} from '../../app/router/routes';
 import {
   signInWithEmail,
   signUpWithEmail,
@@ -100,11 +108,13 @@ const buildAuthOnlyProfile = (user, source = {}) => {
 };
 
 export const useAppNavigation = () => {
+  const location = useLocation();
+  const navigate = useNavigate();
   // State management
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [isLoadingTransition, setIsLoadingTransition] = useState(true);
   const [authUser, setAuthUser] = useState(null);
-  const [currentView, setCurrentView] = useState('client-dashboard');
+  const [legacyView, setLegacyView] = useState('client-dashboard');
   const [previousView, setPreviousView] = useState('client-dashboard');
   const [selectedChatBookingId, setSelectedChatBookingId] = useState(null);
   const [sellerProfile, setSellerProfile] = useState(null);
@@ -123,6 +133,21 @@ export const useAppNavigation = () => {
   const [resetEmail, setResetEmail] = useState(null);
   const [successNotification, setSuccessNotification] = useState({ isVisible: false, message: '' });
   const [errorNotification, setErrorNotification] = useState({ isVisible: false, message: '' });
+
+  const currentView = viewFromPathname(location.pathname) || legacyView;
+  const setCurrentView = (nextView) => {
+    setLegacyView(nextView);
+    navigate(pathForView(nextView));
+  };
+
+  useEffect(() => {
+    const routeView = viewFromPathname(location.pathname);
+    if (routeView) setLegacyView(routeView);
+
+    const bookingId = getMessageBookingId(location.pathname);
+    if (bookingId) setSelectedChatBookingId(bookingId);
+    setIsSellerOnboardingOpen(location.pathname === paths.sellerOnboarding);
+  }, [location.pathname]);
 
   useEffect(() => {
     if (!authUser?.id) return undefined;
@@ -401,7 +426,9 @@ export const useAppNavigation = () => {
           setSellerProfile(profile);
           setUserLocation(profile?.location || null);
           setIsLoggedIn(true);
-          setCurrentView(resolveHomeView(profile));
+          if (location.pathname !== paths.resetPassword) {
+            setCurrentView(resolveHomeView(profile));
+          }
           if (!isMounted) return;
         }
       } catch (error) {
@@ -445,6 +472,7 @@ export const useAppNavigation = () => {
   };
 
   const handleLogin = async (formData, isLoginMode = true) => {
+    const requestedPath = new URLSearchParams(location.search).get('returnTo');
     try {
       if (isLoginMode) {
         const user = await signInWithEmail({
@@ -454,6 +482,7 @@ export const useAppNavigation = () => {
         // Only show the loading screen AFTER we know auth succeeded
         setIsLoadingTransition(true);
         const result = await hydrateAuthenticatedUser(user);
+        if (isSafeReturnPath(requestedPath)) navigate(requestedPath, { replace: true });
         showSuccessNotification('Welcome back! You have successfully logged in.');
         setIsLoadingTransition(false);
         return result;
@@ -483,6 +512,7 @@ export const useAppNavigation = () => {
         },
         isWorker: false,
       });
+      if (isSafeReturnPath(requestedPath)) navigate(requestedPath, { replace: true });
       showSuccessNotification('Account created successfully! Welcome to TrabaWho.');
       setIsLoadingTransition(false);
       return result.user;
@@ -508,13 +538,15 @@ export const useAppNavigation = () => {
       setUserLocation(null);
       setIsSellerOnboardingOpen(false);
       setSelectedChatBookingId(null);
-      setCurrentView('client-dashboard');
+      setLegacyView('client-dashboard');
+      navigate(paths.home, { replace: true });
       setIsLoadingTransition(false);
     }
   };
 
   const handleOpenSellerOnboarding = () => {
     setIsSellerOnboardingOpen(true);
+    navigate(paths.sellerOnboarding, { state: { backgroundPath: location.pathname } });
   };
 
   const handleOnboardingComplete = async (profileData, destination = 'my-work') => {
@@ -615,6 +647,8 @@ export const useAppNavigation = () => {
 
   const handleCloseSellerOnboarding = () => {
     setIsSellerOnboardingOpen(false);
+    const backgroundPath = location.state?.backgroundPath;
+    navigate(typeof backgroundPath === 'string' ? backgroundPath : paths.dashboard, { replace: true });
   };
 
   const handleProfileUpdate = async (updatedProfileFields) => {
@@ -672,7 +706,8 @@ export const useAppNavigation = () => {
   const handleOpenChatPage = (bookingId = null) => {
     const nextBookingId = bookingId && typeof bookingId === 'object' ? null : bookingId;
     setSelectedChatBookingId(nextBookingId || null);
-    setCurrentView('chat');
+    setLegacyView('chat');
+    navigate(nextBookingId ? `${paths.messages}/${encodeURIComponent(nextBookingId)}` : paths.messages);
   };
 
   const handleOpenBrowseServices = () => {
@@ -724,7 +759,7 @@ export const useAppNavigation = () => {
   };
 
   const handleOpenForgotPassword = () => {
-    setCurrentView('forgot-password');
+    navigate(paths.forgotPassword);
   };
 
   const handleResendVerification = async (email) => {
@@ -740,11 +775,12 @@ export const useAppNavigation = () => {
   const handleOpenResetPassword = (token, email) => {
     setResetToken(token);
     setResetEmail(email);
-    setCurrentView('reset-password');
+    navigate(paths.resetPassword, { state: { token, email } });
   };
 
   const handleBackToLogin = () => {
-    setCurrentView('client-dashboard');
+    setLegacyView('client-dashboard');
+    navigate(paths.signIn);
     setResetToken(null);
     setResetEmail(null);
   };

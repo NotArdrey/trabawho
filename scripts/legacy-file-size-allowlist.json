@@ -1,0 +1,15 @@
+[
+  "src/shared/styles/modern.css",
+  "src/features/work/pages/MyWork.jsx",
+  "src/features/bookings/services/bookingService.js",
+  "src/shared/services/authService.js",
+  "src/features/bookings/pages/MyBookings.jsx",
+  "src/features/auth/pages/AuthPage.jsx",
+  "src/features/bookings/components/ChatWindow.jsx",
+  "src/features/auth/pages/IdentityRegistrationPage.jsx",
+  "src/features/navigation/useAppNavigation.js",
+  "src/features/profile/pages/Profile.jsx",
+  "src/shared/components/FloatingChatbot.jsx",
+  "src/features/marketplace/pages/BrowseServicesPage.jsx",
+  "src/features/profile/pages/Settings.jsx"
+]

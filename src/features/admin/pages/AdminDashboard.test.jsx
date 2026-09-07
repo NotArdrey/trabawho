@@ -23,7 +23,7 @@ const mockLogs = [
   { id: 'l1', action: 'Account Enabled', actor: 'Admin', target: 'Bob Client', timestamp: '2026-08-28 10:00:00', severity: 'low' },
 ];
 
-jest.mock('../hooks/useAdminAccounts', () => ({
+vi.mock('../hooks/useAdminAccounts', () => ({
   useAdminAccounts: () => ({
     accounts: mockAccounts,
     normalizedAccounts: mockAccounts,
@@ -33,38 +33,38 @@ jest.mock('../hooks/useAdminAccounts', () => ({
     commentsError: '',
     stats: mockStats,
     searchQuery: '',
-    setSearchQuery: jest.fn(),
+    setSearchQuery: vi.fn(),
     selectedRole: 'all',
-    setSelectedRole: jest.fn(),
-    handleUpdateRole: jest.fn(),
+    setSelectedRole: vi.fn(),
+    handleUpdateRole: vi.fn(),
     roleSavingId: null,
-    openAccessAction: jest.fn(),
-    closeAccessAction: jest.fn(),
-    handleConfirmAccessAction: jest.fn(),
-    handleRestoreAccount: jest.fn(),
+    openAccessAction: vi.fn(),
+    closeAccessAction: vi.fn(),
+    handleConfirmAccessAction: vi.fn(),
+    handleRestoreAccount: vi.fn(),
     accessActionTarget: null,
     accessActionMode: 'disable',
     accessReason: '',
-    setAccessReason: jest.fn(),
+    setAccessReason: vi.fn(),
     accessDurationValue: '2',
-    setAccessDurationValue: jest.fn(),
+    setAccessDurationValue: vi.fn(),
     accessDurationUnit: 'minutes',
-    setAccessDurationUnit: jest.fn(),
+    setAccessDurationUnit: vi.fn(),
     comments: mockComments,
-    setComments: jest.fn(),
-    handleDeleteComment: jest.fn(),
+    setComments: vi.fn(),
+    handleDeleteComment: vi.fn(),
     commentDeleteTarget: null,
-    setCommentDeleteTarget: jest.fn(),
+    setCommentDeleteTarget: vi.fn(),
     logs: mockLogs,
   }),
 }));
 
 describe('AdminDashboard with Sidebar UI', () => {
-  const mockOnLogout = jest.fn();
-  const mockOnOpenDashboard = jest.fn();
+  const mockOnLogout = vi.fn();
+  const mockOnOpenDashboard = vi.fn();
 
   beforeEach(() => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
   });
 
   test('renders sidebar navigation with brand and all sections', () => {

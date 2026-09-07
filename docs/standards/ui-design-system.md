@@ -1,0 +1,67 @@
+# TrabaWho UI Design System
+
+## Direction
+
+The interface is professional, modern, approachable, and trustworthy. Preserve the TrabaWho blue/orange identity while using neutral surfaces and semantic shadcn/ui tokens. Clarity and task completion take precedence over decoration, but restraint must not result in generic, colorless, or visually forgettable screens.
+
+Visual interest must reinforce hierarchy or explain the product. Use brand color, relevant photography, simple line artwork, numbered steps, and structured information panels intentionally. Avoid empty decoration and dense promotional clutter.
+
+## Foundation
+
+- Use shadcn/ui source components in `src/components/ui`; do not introduce a competing component library.
+- Use Tailwind utilities and semantic tokens. Do not add component-specific rules to a global stylesheet.
+- Use Lucide React for interface icons. Do not use emoji, text glyphs, or one-off SVGs for ordinary controls.
+- Use Inter/system sans-serif for interface text and monospace only for technical values.
+- Use the spacing scale `4, 8, 12, 16, 24, 32, 48, 64` and a default 8px radius.
+
+## Brand and semantic color
+
+- Primary brand: `#1557c0`; stronger interactive state: `#0f4396`.
+- Brand accent: `#ff7a00`, reserved for brand emphasis rather than general warning state.
+- Light mode is white-led: use white and subtle cool-neutral surfaces, TrabaWho blue for primary actions and navigation, and orange for compact highlights.
+- Dark mode is blue-led: use deep navy and dark blue surfaces rather than flat black or neutral gray, with accessible lighter blue interactions and selective orange highlights.
+- Blue remains the dominant interactive color. Orange may mark section numbers, short standalone accent rules, selected-step details, or small icon treatments; it must not compete with the primary action.
+- Do not place a contrasting color on only one edge of a card, panel, field, or alert. Borders remain uniform on all sides; place brand emphasis inside the component instead.
+- A page should contain enough blue/orange brand expression to be recognizably TrabaWho without coloring every surface.
+- Components consume `background`, `foreground`, `card`, `primary`, `secondary`, `muted`, `accent`, `destructive`, `border`, `input`, and `ring` tokens.
+- Dark mode changes semantic tokens, not component markup.
+- Never communicate status with color alone.
+
+## Layout and imagery
+
+- Use image-forward editorial layouts for public acquisition, authentication, and onboarding when photography helps establish the service context.
+- On wide authentication-style screens, prefer an approximately 55–60% visual column and 40–45% task column. The form remains readable and independently scrollable when its content is long.
+- Use one strong, relevant image rather than multiple competing photographs. Apply a restrained overlay only to maintain text contrast.
+- Text placed over photography needs a deliberate content block or clearly controlled contrast. Supporting benefits must be visually noticeable, concise, and structured rather than presented as faint miscellaneous text.
+- Decorative visuals must never block interaction, reduce legibility, or create horizontal overflow. Hide or substantially simplify nonessential photography on small screens so the user reaches the task immediately.
+- Do not present invented marketplace statistics, ratings, verification, availability, or trust claims. When real data is unavailable, use truthful capability statements or omit the claim.
+
+## Components
+
+- Buttons use `primary`, `secondary`, `outline`, `ghost`, or `destructive`; one task state has one dominant primary action.
+- Do not use neon borders, colored or luminous shadows, animated shine, glow-on-hover, or glow-based focus treatments. Establish hierarchy with spacing, typography, surface contrast, borders, and restrained neutral shadows.
+- Hover states may change color or border contrast but must not lift, scale, or add decorative radiance. Keyboard focus remains a clear solid ring with adequate contrast.
+- Icon-only buttons have a minimum 44×44px hit area, a programmatic name, and a tooltip when the action is not universally obvious.
+- Forms use persistent labels, optional format/example copy, nearby corrective errors, and `aria-describedby` associations.
+- Use the shared shadcn-based `SelectField` for standard dropdown fields. Extend the shared API for recurring needs instead of creating page-specific select styling; use lower-level Select primitives only for deliberately custom composition.
+- Notification centers use the shared shadcn-based popover and notification-list components. Keep persistent inbox items distinct from transient Sonner feedback, show honest unread state, and include loading, empty, and recoverable error handling when data is remote.
+- Long forms are divided into short, named or numbered sections with brief supporting copy. Standalone authentication and onboarding panels may include the TrabaWho lockup and compact brand accents so they do not feel generic or unfinished.
+- Use blue for the active form mode and primary submit action. Use orange only as a supporting accent for progress, identity, location, or other important contextual information.
+- Information panels use flat semantic surfaces and clear borders. They must not use luminous gradients or shadow effects to attract attention.
+- Dialogs trap focus and restore it. Destructive decisions use Alert Dialog and name the affected record.
+- Use inline feedback for form/section outcomes, transient notifications for routine success, and banners only for ongoing conditions.
+- Data regions explicitly handle initial loading, empty, partial, success, recoverable error, permission-denied, and offline states.
+
+## Responsive composition
+
+Design and verify at 390, 768, 1024, 1280, and 1440 pixels. Recompose rather than shrink desktop layouts. Flexible children use `min-width: 0`; essential identifiers and calculated values wrap instead of truncating. Scrolling regions keep visible scrollbars.
+
+## Accessibility
+
+Target WCAG 2.2 AA. Require semantic landmarks and headings, complete keyboard operation, logical focus order, visible focus, accessible names, associated errors, polite status announcements, reduced-motion support, adequate contrast, zoom/large-text support, and keyboard alternatives for drag operations.
+
+Decorative Lucide icons use `aria-hidden="true"`. Meaningful graphics require an accessible name or adjacent text. Tooltips supplement rather than replace accessible names.
+
+## Content
+
+Use concise language familiar to clients and workers. Actions begin with verbs. Error messages explain what must be corrected. Use the same term for the same concept throughout the product and maintain English and Filipino strings together when a screen is localized.

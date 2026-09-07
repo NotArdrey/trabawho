@@ -2,11 +2,11 @@ import { act, renderHook } from '@testing-library/react';
 import { useBookingListController } from './useBookingListController';
 import { submitBookingReview } from '../services/bookingService';
 
-jest.mock('../services/bookingService', () => ({
-  fetchClientBookings: jest.fn(),
-  fetchSellerBookings: jest.fn(),
-  submitBookingReview: jest.fn(),
-  updateBookingWorkflow: jest.fn(),
+vi.mock('../services/bookingService', () => ({
+  fetchClientBookings: vi.fn(),
+  fetchSellerBookings: vi.fn(),
+  submitBookingReview: vi.fn(),
+  updateBookingWorkflow: vi.fn(),
 }));
 
 const bookings = [

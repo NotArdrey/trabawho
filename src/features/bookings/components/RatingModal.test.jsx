@@ -4,13 +4,13 @@ import RatingModal from './RatingModal';
 
 describe('RatingModal', () => {
   beforeEach(() => {
-    URL.createObjectURL = jest.fn(() => 'blob:review-preview');
-    URL.revokeObjectURL = jest.fn();
+    URL.createObjectURL = vi.fn(() => 'blob:review-preview');
+    URL.revokeObjectURL = vi.fn();
   });
 
   test('submits a star rating, comment, and optional image', async () => {
-    const onSubmit = jest.fn().mockResolvedValue(undefined);
-    const onClose = jest.fn();
+    const onSubmit = vi.fn().mockResolvedValue(undefined);
+    const onClose = vi.fn();
     const image = new File(['review image'], 'finished-work.png', { type: 'image/png' });
 
     render(
@@ -37,7 +37,7 @@ describe('RatingModal', () => {
   });
 
   test('rejects unsupported image types', () => {
-    render(<RatingModal booking={{ workerName: 'Paolo' }} onSubmit={jest.fn()} onClose={jest.fn()} />);
+    render(<RatingModal booking={{ workerName: 'Paolo' }} onSubmit={vi.fn()} onClose={vi.fn()} />);
     const invalidFile = new File(['not an image'], 'review.txt', { type: 'text/plain' });
 
     fireEvent.change(screen.getByLabelText('Add review photo'), { target: { files: [invalidFile] } });

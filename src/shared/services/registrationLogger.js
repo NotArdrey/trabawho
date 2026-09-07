@@ -118,7 +118,7 @@ export const logRegistrationDebug = (eventName, details = {}, level = 'log') => 
   console[consoleMethod](`${REGISTRATION_LOG_PREFIX} ${eventName}`, payload);
 
   if (
-    process.env.NODE_ENV === 'development'
+    import.meta.env.DEV
     && typeof fetch === 'function'
     && typeof window !== 'undefined'
   ) {

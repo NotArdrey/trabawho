@@ -27,16 +27,16 @@ test('temporary login probe', async ({ page }) => {
   });
 
   await page.goto('/');
-  await page.getByRole('button', { name: /^Login$/ }).first().click();
+  await page.getByRole('button', { name: /^Sign in$/ }).first().click();
   await page.getByLabel('Email').fill('demo.user@trabawho.test');
   await page.getByLabel('Password').fill('pass123');
-  await page.locator('form').getByRole('button', { name: /^Login$/ }).click();
+  await page.locator('form').getByRole('button', { name: /^Sign in$/ }).click();
   await page.waitForTimeout(12000);
 
   const body = await page.locator('body').innerText();
   console.log(JSON.stringify({
     url: page.url(),
-    headingLoginCount: await page.getByRole('heading', { name: 'Login' }).count(),
+    headingLoginCount: await page.getByRole('heading', { name: 'Sign in' }).count(),
     bodyExcerpt: body.slice(0, 1000),
     events,
   }, null, 2));

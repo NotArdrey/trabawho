@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import {
   ArrowUpDown,
   BriefcaseBusiness,
@@ -26,6 +27,7 @@ import {
   getProviderQuoteAmount,
   normalizeServiceRecord,
 } from '../utils/serviceNormalizer';
+import { createServiceSearchParams, parseServiceSearchParams } from '../../../lib/service-search';
 
 const DEFAULT_CATEGORIES = ['All', 'Tutor', 'Technician', 'Cleaner', 'More Services'];
 
@@ -73,7 +75,10 @@ function BrowseServicesPage({
   onOpenAdminDashboard,
 }) {
   const isPublic = mode === 'public';
-  const [localSearchQuery, setLocalSearchQuery] = useState('');
+  const [urlSearchParams, setUrlSearchParams] = useSearchParams();
+  const initialPublicSearch = parseServiceSearchParams(urlSearchParams);
+  const [localSearchQuery, setLocalSearchQuery] = useState(initialPublicSearch.query || '');
+  const [localLocationQuery, setLocalLocationQuery] = useState(initialPublicSearch.location || '');
   const [activeCategory, setActiveCategory] = useState('All');
   const [selectedDistrict, setSelectedDistrict] = useState('All Districts');
   const [sortMode, setSortMode] = useState('recommended');
@@ -95,8 +100,16 @@ function BrowseServicesPage({
   const [schedulesByProvider, setSchedulesByProvider] = useState({});
 
   const searchQuery = isPublic ? localSearchQuery : externalSearchQuery;
+  const locationQuery = isPublic ? localLocationQuery : '';
   const reviewsSellerId = getProviderSellerId(reviewsTarget);
   const reviewsForTarget = reviewsSellerId ? (reviewsBySeller[reviewsSellerId] || []) : [];
+
+  useEffect(() => {
+    if (!isPublic) return;
+    const nextSearch = parseServiceSearchParams(urlSearchParams);
+    setLocalSearchQuery(nextSearch.query || '');
+    setLocalLocationQuery(nextSearch.location || '');
+  }, [isPublic, urlSearchParams]);
 
   useEffect(() => {
     let mounted = true;
@@ -225,6 +238,7 @@ function BrowseServicesPage({
 
   const filteredServices = useMemo(() => {
     const normalizedSearch = String(searchQuery || '').trim().toLowerCase();
+    const normalizedLocation = String(locationQuery || '').trim().toLowerCase();
     const core = ['Tutor', 'Technician', 'Cleaner'];
 
     const filtered = services.filter((provider) => {
@@ -238,10 +252,14 @@ function BrowseServicesPage({
       ].join(' ').toLowerCase();
 
       const matchesSearch = !normalizedSearch || haystack.includes(normalizedSearch);
+      const matchesLocation = !normalizedLocation
+        || String(provider.location || '').toLowerCase().includes(normalizedLocation);
       const isCore = core.includes(serviceLabel);
       const matchesCategory = activeCategory === 'All'
         || (activeCategory === 'More Services' ? !isCore : serviceLabel === activeCategory);
-      const matchesDistrict = selectedDistrict === 'All Districts' || provider.location === selectedDistrict;
+      const matchesDistrict = isPublic
+        ? matchesLocation
+        : selectedDistrict === 'All Districts' || provider.location === selectedDistrict;
 
       return matchesSearch && matchesCategory && matchesDistrict;
     });
@@ -254,14 +272,26 @@ function BrowseServicesPage({
       if (sortMode === 'newest') return new Date(b.rawService?.created_at || 0) - new Date(a.rawService?.created_at || 0);
       return (b.reviews || 0) - (a.reviews || 0);
     });
-  }, [activeCategory, searchQuery, selectedDistrict, services, sortMode]);
+  }, [activeCategory, isPublic, locationQuery, searchQuery, selectedDistrict, services, sortMode]);
+
+  const updatePublicSearch = (nextSearch, replace = true) => {
+    setUrlSearchParams(createServiceSearchParams(nextSearch), { replace });
+  };
 
   const handleSearchChange = (event) => {
     if (isPublic) {
-      setLocalSearchQuery(event.target.value);
+      const nextQuery = event.target.value;
+      setLocalSearchQuery(nextQuery);
+      updatePublicSearch({ query: nextQuery, location: localLocationQuery });
       return;
     }
     onSearchChange?.(event);
+  };
+
+  const handleLocationChange = (event) => {
+    const nextLocation = event.target.value;
+    setLocalLocationQuery(nextLocation);
+    updatePublicSearch({ query: localSearchQuery, location: nextLocation });
   };
 
   const handleViewProfile = (provider) => {
@@ -522,14 +552,29 @@ function BrowseServicesPage({
               </div>
             </div>
 
-            <label className="browse-filter-group">
-              <span>District</span>
-              <select className="gl-select" value={selectedDistrict} onChange={(event) => setSelectedDistrict(event.target.value)}>
-                {districts.map((district) => (
-                  <option key={district} value={district}>{district}</option>
-                ))}
-              </select>
-            </label>
+            {isPublic ? (
+              <label className="browse-filter-group">
+                <span>Location</span>
+                <div className="browse-search">
+                  <MapPin size={17} aria-hidden="true" />
+                  <input
+                    className="gl-input"
+                    value={localLocationQuery}
+                    onChange={handleLocationChange}
+                    placeholder="City or province"
+                  />
+                </div>
+              </label>
+            ) : (
+              <label className="browse-filter-group">
+                <span>District</span>
+                <select className="gl-select" value={selectedDistrict} onChange={(event) => setSelectedDistrict(event.target.value)}>
+                  {districts.map((district) => (
+                    <option key={district} value={district}>{district}</option>
+                  ))}
+                </select>
+              </label>
+            )}
 
             <button
               type="button"
@@ -538,8 +583,11 @@ function BrowseServicesPage({
                 setActiveCategory('All');
                 setSelectedDistrict('All Districts');
                 setSortMode('recommended');
-                if (isPublic) setLocalSearchQuery('');
-                else onSearchChange?.({ target: { value: '' } });
+                if (isPublic) {
+                  setLocalSearchQuery('');
+                  setLocalLocationQuery('');
+                  updatePublicSearch({});
+                } else onSearchChange?.({ target: { value: '' } });
               }}
             >
               Clear filters
@@ -555,6 +603,7 @@ function BrowseServicesPage({
                   value={searchQuery}
                   onChange={handleSearchChange}
                   placeholder="Search services, providers, or locations"
+                  aria-label="Search services and providers"
                 />
               </div>
 
@@ -573,7 +622,7 @@ function BrowseServicesPage({
               <p>{isLoading ? 'Loading services...' : `${filteredServices.length} matching services`}</p>
               <div>
                 <span><BriefcaseBusiness size={15} aria-hidden="true" /> {activeCategory}</span>
-                <span><MapPin size={15} aria-hidden="true" /> {selectedDistrict}</span>
+                <span><MapPin size={15} aria-hidden="true" /> {isPublic ? (locationQuery || 'All locations') : selectedDistrict}</span>
                 <span><CalendarCheck size={15} aria-hidden="true" /> {sortMode}</span>
               </div>
             </div>

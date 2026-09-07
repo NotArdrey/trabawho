@@ -16,11 +16,17 @@ Production: https://trabawho-kappa.vercel.app
 
 ## Technology
 
-- React 19 and Create React App
+- React 19, Vite, and TypeScript (incremental migration)
+- Tailwind CSS and shadcn/ui with Lucide React icons
+- React Router
 - Supabase JavaScript client and Edge Functions
 - Groq-compatible AI models
-- Playwright and React Testing Library
+- Vitest, Playwright, and React Testing Library
 - jsPDF and Lucide React
+
+## Engineering standards
+
+The canonical application, architecture, UI, accessibility, and testing requirements are indexed in [`docs/README.md`](docs/README.md). The active TypeScript and shadcn migration is tracked in [`docs/migrations/react-typescript-shadcn.md`](docs/migrations/react-typescript-shadcn.md).
 
 ## Local development
 
@@ -29,12 +35,14 @@ npm install
 npm run dev
 ```
 
-Create the required local environment file from the available example or project configuration and provide only the public Supabase URL and publishable/anonymous key to the browser. Keep model-provider keys, Supabase service-role keys, and other privileged credentials in Supabase Edge Function secrets.
+Create `.env.local` from `.env.example` and provide only `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` to the browser. Keep model-provider keys, Supabase service-role keys, and other privileged credentials in Supabase Edge Function secrets.
 
 ## Verification
 
 ```bash
 npm test
+npm run typecheck
+npm run lint
 npm run test:e2e
 npm run build
 ```

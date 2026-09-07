@@ -4,22 +4,22 @@ import FloatingChatbot from './FloatingChatbot';
 import { sendChatbotMessage } from '../services/chatbotService';
 import { startServiceConversationByServiceId } from '../../features/bookings/services/bookingService';
 
-jest.mock('../services/chatbotService', () => ({
-  sendChatbotMessage: jest.fn(),
+vi.mock('../services/chatbotService', () => ({
+  sendChatbotMessage: vi.fn(),
 }));
 
-jest.mock('../../features/bookings/services/bookingService', () => ({
-  startServiceConversationByServiceId: jest.fn(),
+vi.mock('../../features/bookings/services/bookingService', () => ({
+  startServiceConversationByServiceId: vi.fn(),
 }));
 
 describe('FloatingChatbot worker matches', () => {
   beforeEach(() => {
-    Element.prototype.scrollIntoView = jest.fn();
-    jest.clearAllMocks();
+    Element.prototype.scrollIntoView = vi.fn();
+    vi.clearAllMocks();
   });
 
   it('starts a conversation and redirects to the selected worker chat', async () => {
-    const onOpenChatPage = jest.fn();
+    const onOpenChatPage = vi.fn();
     const workerMatch = {
       id: 'service-123',
       providerName: 'Alex Reyes',

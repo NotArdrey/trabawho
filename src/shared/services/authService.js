@@ -1,4 +1,4 @@
-import { supabase } from './supabaseClient';
+import { isSupabaseConfigured, supabase } from './supabaseClient';
 import {
   getRegistrationFormLogSnapshot,
   logRegistrationDebug,
@@ -115,12 +115,13 @@ const getServicePricingModel = (serviceData = {}) => {
 const toReadableDatabaseSetupError = (error) => {
   const message = String(error?.message || '');
   
-  console.error('🔴 REAL SUPABASE ERROR:', message, error); // ADD THIS LINE
+  const logMethod = isSupabaseConfigured ? 'error' : 'warn';
+  console[logMethod]('Supabase request failed:', message, error);
   // Network/connectivity issues
   if (/Failed to fetch|network|unable to reach|refused to connect/i.test(message)) {
     return new Error(
       'Network error: Unable to connect to Supabase. Verify your internet connection and that the Supabase project is online. '
-      + 'Check environment variables: REACT_APP_SUPABASE_URL and REACT_APP_SUPABASE_ANON_KEY must be set in .env.local'
+      + 'Check environment variables: VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY must be set in .env.local'
     );
   }
   
@@ -938,7 +939,7 @@ export const sendPasswordResetEmail = async (email) => {
   }
 
   const { error } = await supabase.auth.resetPasswordForEmail(normalizedEmail, {
-    redirectTo: typeof window !== 'undefined' ? window.location.origin : undefined,
+    redirectTo: typeof window !== 'undefined' ? `${window.location.origin}/reset-password` : undefined,
   });
 
   if (error) throw error;

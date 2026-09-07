@@ -3,17 +3,25 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import MyBookings from './MyBookings';
 
 // Mock the navigation component to simplify testing
-jest.mock('../../../shared/components/DashboardNavigation', () => () => (
-  <nav data-testid="mock-dashboard-nav">Navigation</nav>
-));
+vi.mock('../../../shared/components/DashboardNavigation', () => ({
+  default: () => <nav data-testid="mock-dashboard-nav">Navigation</nav>,
+}));
 
 // Mock child modals
-jest.mock('../components/ChatWindow', () => () => <div data-testid="mock-chat-window">Chat</div>);
-jest.mock('../components/SlotSelectionModal', () => () => <div data-testid="mock-slot-modal">Slots</div>);
-jest.mock('../components/PaymentModal', () => () => <div data-testid="mock-payment-modal">Payment</div>);
-jest.mock('../components/BookingTermsModal', () => ({ isOpen, onConfirm }) => (
-  isOpen ? <button data-testid="mock-terms-modal" onClick={onConfirm}>Continue to payment</button> : null
-));
+vi.mock('../components/ChatWindow', () => ({
+  default: () => <div data-testid="mock-chat-window">Chat</div>,
+}));
+vi.mock('../components/SlotSelectionModal', () => ({
+  default: () => <div data-testid="mock-slot-modal">Slots</div>,
+}));
+vi.mock('../components/PaymentModal', () => ({
+  default: () => <div data-testid="mock-payment-modal">Payment</div>,
+}));
+vi.mock('../components/BookingTermsModal', () => ({
+  default: ({ isOpen, onConfirm }) => (
+    isOpen ? <button data-testid="mock-terms-modal" onClick={onConfirm}>Continue to payment</button> : null
+  ),
+}));
 
 // Mock the hooks
 const mockBookings = [
@@ -45,9 +53,9 @@ const mockBookings = [
 
 let mockCurrentBookings = [];
 let mockIsLoading = false;
-const mockHandleOpenRating = jest.fn();
+const mockHandleOpenRating = vi.fn();
 
-jest.mock('../hooks', () => ({
+vi.mock('../hooks', () => ({
   useBookingListController: () => ({
     bookings: mockCurrentBookings,
     filteredBookings: mockCurrentBookings,
@@ -56,28 +64,28 @@ jest.mock('../hooks', () => ({
     isLoading: mockIsLoading,
     loadError: '',
     actionError: '',
-    setActiveFilter: jest.fn(),
-    setDisplayFilter: jest.fn(),
-    updateBooking: jest.fn(),
-    replaceBooking: jest.fn(),
-    refreshBookings: jest.fn(),
-    handleApproveQuote: jest.fn(),
-    handleRejectQuote: jest.fn(),
-    handleStopServiceAccepted: jest.fn(),
+    setActiveFilter: vi.fn(),
+    setDisplayFilter: vi.fn(),
+    updateBooking: vi.fn(),
+    replaceBooking: vi.fn(),
+    refreshBookings: vi.fn(),
+    handleApproveQuote: vi.fn(),
+    handleRejectQuote: vi.fn(),
+    handleStopServiceAccepted: vi.fn(),
     getBooking: (id) => mockCurrentBookings.find((b) => String(b.id) === String(id)),
   }),
   usePaymentController: () => ({
-    handleSelectPaymentMethod: jest.fn(),
+    handleSelectPaymentMethod: vi.fn(),
   }),
   useRefundController: () => ({
-    handleRequestRefund: jest.fn(),
-    handleConfirmRefundReceived: jest.fn(),
+    handleRequestRefund: vi.fn(),
+    handleConfirmRefundReceived: vi.fn(),
   }),
   useRatingController: () => ({
     ratingTargetId: null,
-    setRatingTargetId: jest.fn(),
+    setRatingTargetId: vi.fn(),
     handleOpenRating: mockHandleOpenRating,
-    handleLeaveRating: jest.fn(),
+    handleLeaveRating: vi.fn(),
   }),
 }));
 
@@ -90,7 +98,7 @@ describe('MyBookings Redesign Component', () => {
 
   test('renders empty state with rich CTA when there are no bookings', () => {
     mockCurrentBookings = [];
-    const handleBrowse = jest.fn();
+    const handleBrowse = vi.fn();
 
     render(
       <MyBookings
