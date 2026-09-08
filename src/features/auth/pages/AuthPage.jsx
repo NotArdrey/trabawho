@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ArrowLeft,
   CalendarCheck,
+  Check,
   CheckCircle2,
   ExternalLink,
   FileText,
@@ -505,12 +506,6 @@ function AuthPage({
   };
 
   const handleRegistrationNext = () => {
-    const validationError = validateRegistrationStep(registrationStep);
-    if (validationError) {
-      setSubmitError(validationError);
-      return;
-    }
-
     moveToRegistrationStep(registrationStep + 1);
   };
 
@@ -668,6 +663,10 @@ function AuthPage({
 
     const validationError = validateAuthForm();
     if (validationError) {
+      const invalidStep = REGISTRATION_STEPS.find(
+        (step) => validateRegistrationStep(step.number) === validationError
+      );
+      if (invalidStep) moveToRegistrationStep(invalidStep.number);
       logRegistrationDebug('auth_page:validation_failed', {
         mode,
         validationError,
@@ -946,39 +945,34 @@ function AuthPage({
             <form className="auth-form" onSubmit={handleAuthSubmit}>
               {isRegisterMode && (
                 <div className="auth-registration-progress">
-                  <div className="auth-progress-copy">
-                    <span>Step {registrationStep} of {REGISTRATION_STEPS.length}</span>
-                    <strong>{REGISTRATION_STEPS[registrationStep - 1].label}</strong>
-                  </div>
-                  <Pagination aria-label="Registration progress">
-                    <PaginationContent>
-                      {REGISTRATION_STEPS.map((step) => {
-                        const status = step.number === registrationStep
-                          ? 'current'
-                          : step.number < registrationStep ? 'complete' : 'upcoming';
+                  <nav aria-label="Registration progress">
+                  <ol className="auth-progress-track">
+                    {REGISTRATION_STEPS.map((step) => {
+                      const isComplete = step.number !== registrationStep
+                        && validateRegistrationStep(step.number) === '';
+                      const status = step.number === registrationStep
+                        ? 'current'
+                        : isComplete ? 'complete' : 'upcoming';
 
-                        return (
-                          <PaginationItem key={step.number}>
-                            <PaginationLink
-                              href={`#registration-step-${step.number}`}
-                              isActive={step.number === registrationStep}
-                              aria-label={`Step ${step.number}: ${step.label}`}
-                              aria-disabled={step.number > registrationStep || undefined}
-                              tabIndex={step.number > registrationStep ? -1 : undefined}
-                              data-status={status}
-                              className="auth-progress-step"
-                              onClick={(event) => {
-                                event.preventDefault();
-                                if (step.number < registrationStep) moveToRegistrationStep(step.number);
-                              }}
-                            >
-                              {step.number}
-                            </PaginationLink>
-                          </PaginationItem>
-                        );
-                      })}
-                    </PaginationContent>
-                  </Pagination>
+                      return (
+                        <li key={step.number} data-status={status}>
+                          <button
+                            type="button"
+                            aria-current={step.number === registrationStep ? 'step' : undefined}
+                            aria-label={`${step.label}${isComplete ? ', complete' : ''}`}
+                            disabled={step.number >= registrationStep}
+                            onClick={() => moveToRegistrationStep(step.number)}
+                          >
+                            <span className="auth-progress-marker" aria-hidden="true">
+                              {isComplete ? <Check size={16} /> : <i />}
+                            </span>
+                            <small>{step.label}</small>
+                          </button>
+                        </li>
+                      );
+                    })}
+                  </ol>
+                  </nav>
                 </div>
               )}
 
@@ -1328,10 +1322,48 @@ function AuthPage({
               {submitError && <div className="auth-alert error">{submitError}</div>}
               {isLoginMode && loginStatusMessage && <div className="auth-alert warning">{loginStatusMessage}</div>}
 
-              <button type="submit" className="auth-submit" disabled={isSubmitting}>
-                {isSubmitting ? <RefreshCw className="gl-spin" size={18} aria-hidden="true" /> : isRegisterMode ? (usesDidit ? <ShieldCheck size={18} aria-hidden="true" /> : <Upload size={18} aria-hidden="true" />) : <LogIn size={18} aria-hidden="true" />}
-                {isSubmitting ? (isRegisterMode ? 'Submitting...' : 'Signing in...') : (isRegisterMode ? (usesDidit ? 'Start Didit Verification' : 'Submit Manual Review') : 'Sign in')}
-              </button>
+              {isRegisterMode ? (
+                <Pagination aria-label="Registration step controls" className="auth-step-controls">
+                  <PaginationContent>
+                    {registrationStep > 1 && (
+                      <PaginationItem>
+                        <PaginationPrevious
+                          className="auth-step-previous"
+                          href={`#registration-step-${registrationStep - 1}`}
+                          onClick={(event) => {
+                            event.preventDefault();
+                            moveToRegistrationStep(registrationStep - 1);
+                          }}
+                        />
+                      </PaginationItem>
+                    )}
+                    {registrationStep < REGISTRATION_STEPS.length ? (
+                      <PaginationItem>
+                        <PaginationNext
+                          className="auth-step-next"
+                          href={`#registration-step-${registrationStep + 1}`}
+                          onClick={(event) => {
+                            event.preventDefault();
+                            handleRegistrationNext();
+                          }}
+                        />
+                      </PaginationItem>
+                    ) : (
+                      <PaginationItem className="auth-final-action">
+                        <button type="submit" className="auth-submit" disabled={isSubmitting}>
+                          {isSubmitting ? <RefreshCw className="gl-spin" size={18} aria-hidden="true" /> : usesDidit ? <ShieldCheck size={18} aria-hidden="true" /> : <Upload size={18} aria-hidden="true" />}
+                          {isSubmitting ? 'Submitting...' : usesDidit ? 'Start Didit Verification' : 'Submit Manual Review'}
+                        </button>
+                      </PaginationItem>
+                    )}
+                  </PaginationContent>
+                </Pagination>
+              ) : (
+                <button type="submit" className="auth-submit" disabled={isSubmitting}>
+                  {isSubmitting ? <RefreshCw className="gl-spin" size={18} aria-hidden="true" /> : <LogIn size={18} aria-hidden="true" />}
+                  {isSubmitting ? 'Signing in...' : 'Sign in'}
+                </button>
+              )}
 
               {isLoginMode && (
                 <div className="auth-form-footer">

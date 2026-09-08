@@ -46,6 +46,7 @@ Visual interest must reinforce hierarchy or explain the product. Use brand color
 - Use the shared shadcn-based `SelectField` for standard dropdown fields. Extend the shared API for recurring needs instead of creating page-specific select styling; use lower-level Select primitives only for deliberately custom composition.
 - Notification centers use the shared shadcn-based popover and notification-list components. Keep persistent inbox items distinct from transient Sonner feedback, show honest unread state, and include loading, empty, and recoverable error handling when data is remote.
 - Long forms are divided into short, named or numbered sections with brief supporting copy. Standalone authentication and onboarding panels may include the TrabaWho lockup and compact brand accents so they do not feel generic or unfinished.
+- Registration uses a short step flow with visible progress, per-step validation, and Previous/Next navigation. Every step uses the same section-heading treatment; do not introduce a one-off card for an individual step.
 - Use blue for the active form mode and primary submit action. Use orange only as a supporting accent for progress, identity, location, or other important contextual information.
 - Information panels use flat semantic surfaces and clear borders. They must not use luminous gradients or shadow effects to attract attention.
 - Dialogs trap focus and restore it. Destructive decisions use Alert Dialog and name the affected record.

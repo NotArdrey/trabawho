@@ -5,6 +5,7 @@ import {
   submitBookingReview,
   updateBookingWorkflow,
 } from '../services/bookingService';
+import { isSupabaseConfigured, supabase } from '../../../shared/services/supabaseClient';
 
 const COMPLETED_STATUSES = ['Completed Service', 'Service Stopped'];
 const TERMINAL_STATUSES = [...COMPLETED_STATUSES, 'Cancelled', 'Cancelled (Cash)', 'Refunded'];
@@ -12,7 +13,9 @@ const PAYMENT_PENDING_STATUSES = ['Payment Pending', 'Slot Selected - Payment Pe
 
 export function useBookingListController(initialBookings = [], options = {}) {
   const { autoLoad = true, includeStandaloneChats = false, listRole = 'buyer', sellerId = null } = options;
+  const sourceKey = `${listRole}:${sellerId || 'current'}:${includeStandaloneChats ? 'chats' : 'bookings'}`;
   const [bookings, setBookings] = useState(Array.isArray(initialBookings) ? initialBookings : []);
+  const [loadedSourceKey, setLoadedSourceKey] = useState(autoLoad ? '' : sourceKey);
   const [activeFilter, setActiveFilter] = useState('all');
   const [displayFilter, setDisplayFilter] = useState('all');
   const [isLoading, setIsLoading] = useState(Boolean(autoLoad));
@@ -33,6 +36,7 @@ export function useBookingListController(initialBookings = [], options = {}) {
         : await fetchClientBookings({ includeStandaloneChats });
       if (isLatestRequest()) {
         setBookings(rows);
+        setLoadedSourceKey(sourceKey);
       }
       return rows;
     } catch (error) {
@@ -45,7 +49,7 @@ export function useBookingListController(initialBookings = [], options = {}) {
         setIsLoading(false);
       }
     }
-  }, [includeStandaloneChats, listRole, sellerId]);
+  }, [includeStandaloneChats, listRole, sellerId, sourceKey]);
 
   useEffect(() => {
     if (!autoLoad) return undefined;
@@ -54,6 +58,29 @@ export function useBookingListController(initialBookings = [], options = {}) {
       activeRequestRef.current += 1;
     };
   }, [autoLoad, refreshBookings]);
+
+  useEffect(() => {
+    if (!autoLoad || !isSupabaseConfigured) return undefined;
+
+    let refreshTimer = null;
+    const queueRefresh = () => {
+      window.clearTimeout(refreshTimer);
+      refreshTimer = window.setTimeout(() => void refreshBookings(), 250);
+    };
+    const channel = supabase
+      .channel(`booking-hub-${listRole}-${sellerId || 'current'}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'bookings' }, queueRefresh)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'conversations' }, queueRefresh)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'messages' }, queueRefresh)
+      .subscribe();
+
+    return () => {
+      window.clearTimeout(refreshTimer);
+      void supabase.removeChannel(channel);
+    };
+  }, [autoLoad, listRole, refreshBookings, sellerId]);
+
+  const visibleBookings = loadedSourceKey === sourceKey ? bookings : [];
 
   const replaceBooking = useCallback((updatedBooking) => {
     if (!updatedBooking?.id) return;
@@ -67,8 +94,8 @@ export function useBookingListController(initialBookings = [], options = {}) {
   }, []);
 
   const getBooking = useCallback((bookingId) => (
-    bookings.find((booking) => String(booking.id) === String(bookingId)) || null
-  ), [bookings]);
+    visibleBookings.find((booking) => String(booking.id) === String(bookingId)) || null
+  ), [visibleBookings]);
 
   const persistBookingUpdate = useCallback(async (bookingId, updates) => {
     const current = getBooking(bookingId);
@@ -125,7 +152,7 @@ export function useBookingListController(initialBookings = [], options = {}) {
   ), [persistBookingUpdate]);
 
   const statusFilteredBookings = useMemo(() => (
-    bookings.filter((booking) => {
+    visibleBookings.filter((booking) => {
       if (activeFilter === 'completed') {
         return COMPLETED_STATUSES.includes(booking.status);
       }
@@ -134,7 +161,7 @@ export function useBookingListController(initialBookings = [], options = {}) {
       }
       return true;
     })
-  ), [bookings, activeFilter]);
+  ), [activeFilter, visibleBookings]);
 
   const filteredBookings = useMemo(() => (
     statusFilteredBookings.filter((booking) => {
@@ -164,14 +191,14 @@ export function useBookingListController(initialBookings = [], options = {}) {
   return {
     actionError,
     activeFilter,
-    bookings,
+    bookings: visibleBookings,
     displayFilter,
     filteredBookings,
     getBooking,
     handleApproveQuote,
     handleRejectQuote,
     handleStopServiceAccepted,
-    isLoading,
+    isLoading: isLoading || loadedSourceKey !== sourceKey,
     loadError,
     refreshBookings,
     replaceBooking,

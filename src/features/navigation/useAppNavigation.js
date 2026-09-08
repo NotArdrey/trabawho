@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { supabase } from '../../shared/services/supabaseClient';
 import {
+  canAccessPath,
   getMessageBookingId,
   isSafeReturnPath,
   pathForView,
@@ -60,7 +61,8 @@ const normalizeRole = (value) => {
 const resolveHomeView = (profile) => {
   const normalizedRole = normalizeRole(profile?.role);
   const isAdmin = Boolean(profile?.isAdmin) || normalizedRole === 'admin';
-  return isAdmin ? 'admin-dashboard' : 'client-dashboard';
+  if (isAdmin) return 'admin-dashboard';
+  return normalizedRole === 'worker' ? 'worker-dashboard' : 'client-dashboard';
 };
 
 const buildAuthOnlyProfile = (user, source = {}) => {
@@ -427,7 +429,13 @@ export const useAppNavigation = () => {
           setUserLocation(profile?.location || null);
           setIsLoggedIn(true);
           if (location.pathname !== paths.resetPassword) {
-            setCurrentView(resolveHomeView(profile));
+            const restoredView = viewFromPathname(location.pathname);
+            const restoredRole = normalizeRole(profile?.role);
+            if (restoredView && canAccessPath(location.pathname, restoredRole)) {
+              setLegacyView(restoredView);
+            } else {
+              setCurrentView(resolveHomeView(profile));
+            }
           }
           if (!isMounted) return;
         }
@@ -698,16 +706,19 @@ export const useAppNavigation = () => {
     setCurrentView('admin-dashboard');
   };
 
-  const handleOpenMyBookings = () => {
+  const handleOpenMyBookings = (scope = 'purchases') => {
     setSelectedChatBookingId(null);
-    setCurrentView('my-bookings');
+    const isIncoming = scope === 'incoming';
+    setLegacyView(isIncoming ? 'worker-bookings' : 'my-bookings');
+    navigate(`${isIncoming ? paths.workerBookings : paths.bookings}?scope=${isIncoming ? 'incoming' : 'purchases'}`);
   };
 
-  const handleOpenChatPage = (bookingId = null) => {
+  const handleOpenChatPage = (bookingId = null, scope = null) => {
     const nextBookingId = bookingId && typeof bookingId === 'object' ? null : bookingId;
     setSelectedChatBookingId(nextBookingId || null);
     setLegacyView('chat');
-    navigate(nextBookingId ? `${paths.messages}/${encodeURIComponent(nextBookingId)}` : paths.messages);
+    const scopeQuery = scope === 'incoming' || scope === 'purchases' ? `?scope=${scope}` : '';
+    navigate(nextBookingId ? `${paths.messages}/${encodeURIComponent(nextBookingId)}${scopeQuery}` : `${paths.messages}${scopeQuery}`);
   };
 
   const handleOpenBrowseServices = () => {

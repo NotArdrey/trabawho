@@ -1,5 +1,6 @@
 import React, { useMemo, useState, useEffect, useRef } from 'react';
-import { Archive, MoreVertical, Trash2 } from 'lucide-react';
+import { Archive, ArrowLeft, MessageCircle, MoreVertical, Send, Trash2 } from 'lucide-react';
+import { SearchFilterBar } from '@/components/ui/search-filter-bar';
 import { getThemeTokens } from '../../../shared/styles/themeTokens';
 import { fetchBookingMessages, sendBookingMessage } from '../services/bookingService';
 
@@ -18,7 +19,7 @@ const getChatListKey = (booking = {}, viewerRole = 'buyer') => {
   ].map(normalizeChatKeyPart).join('|');
 };
 
-const ChatWindow = ({ appTheme = 'light', booking, onApproveQuote, onRejectQuote, onStopServiceAccepted, bookings, onSelectBooking, selectedBookingId, onOpenSlotSelection, onOpenPaymentSelection, onRequestRefund, onConfirmRefundReceived, onLeaveRating, onArchiveChat, onDeleteChat, viewerRole = 'buyer' }) => {
+const ChatWindow = ({ appTheme = 'light', booking, onApproveQuote, onRejectQuote, onStopServiceAccepted, bookings, onSelectBooking, selectedBookingId, onOpenSlotSelection, onOpenPaymentSelection, onRequestRefund, onConfirmRefundReceived, onLeaveRating, onArchiveChat, onDeleteChat, viewerRole = 'buyer', initialMobileListOpen = false }) => {
   const [messages, setMessages] = useState([]);
   const [clientMessage, setClientMessage] = useState('');
   const [isLoading, setIsLoading] = useState(true);
@@ -39,6 +40,9 @@ const ChatWindow = ({ appTheme = 'light', booking, onApproveQuote, onRejectQuote
   const [isChatActionSaving, setIsChatActionSaving] = useState(false);
   const [isConversationMenuOpen, setIsConversationMenuOpen] = useState(false);
   const [pendingChatAction, setPendingChatAction] = useState(null);
+  const [isMobileChatListOpen, setIsMobileChatListOpen] = useState(initialMobileListOpen);
+  const [chatSearch, setChatSearch] = useState('');
+  const [chatFilter, setChatFilter] = useState('all');
   const conversationMenuRef = useRef(null);
 
   const hasSellerQuote = messages.some((message) => message.type === 'quote');
@@ -93,7 +97,10 @@ const ChatWindow = ({ appTheme = 'light', booking, onApproveQuote, onRejectQuote
   const getChatAvatarLetter = (targetBooking = {}) => (
     getChatDisplayName(targetBooking).trim().charAt(0).toUpperCase() || '?'
   );
-  const chatBookings = useMemo(() => {
+  const getChatPhoto = (targetBooking = {}) => (
+    isSellerView ? targetBooking.clientPhoto : targetBooking.workerPhoto
+  );
+  const uniqueChatBookings = useMemo(() => {
     const rows = Array.isArray(bookings) ? bookings : [];
     const seen = new Set();
 
@@ -104,6 +111,35 @@ const ChatWindow = ({ appTheme = 'light', booking, onApproveQuote, onRejectQuote
       return true;
     });
   }, [bookings, viewerRole]);
+  const isClosedChat = (targetBooking = {}) => [
+    'Completed Service',
+    'Service Stopped',
+    'Cancelled',
+    'Cancelled (Cash)',
+    'Refunded',
+  ].includes(targetBooking.status);
+  const chatBookings = useMemo(() => {
+    const normalizedSearch = chatSearch.trim().toLowerCase();
+    return uniqueChatBookings.filter((item) => {
+      const closed = isClosedChat(item);
+      const matchesFilter = chatFilter === 'all'
+        || (chatFilter === 'closed' ? closed : !closed);
+      const matchesSearch = !normalizedSearch || [
+        getChatDisplayName(item),
+        item.serviceType,
+        item.status,
+      ].filter(Boolean).join(' ').toLowerCase().includes(normalizedSearch);
+      return matchesFilter && matchesSearch;
+    });
+  }, [chatFilter, chatSearch, uniqueChatBookings]);
+  const chatFilterOptions = useMemo(() => {
+    const closedCount = uniqueChatBookings.filter(isClosedChat).length;
+    return [
+      { value: 'all', label: 'All', count: uniqueChatBookings.length },
+      { value: 'active', label: 'Active', count: uniqueChatBookings.length - closedCount },
+      { value: 'closed', label: 'Closed', count: closedCount },
+    ];
+  }, [uniqueChatBookings]);
 
   const isGcashFlow = (paymentMethod) => paymentMethod === 'gcash-advance' || paymentMethod === 'after-service-gcash';
   const isRecurringBilling = (targetBooking) => targetBooking?.billingCycle === 'weekly' || targetBooking?.billingCycle === 'monthly';
@@ -261,7 +297,7 @@ const ChatWindow = ({ appTheme = 'light', booking, onApproveQuote, onRejectQuote
     chatListHeader: { padding: '16px', borderBottom: `1px solid ${chatTheme.border}`, background: chatTheme.bgSecondary, flexShrink: 0 },
     chatListTitle: { fontSize: '16px', fontWeight: 700, color: chatTheme.textPrimary, margin: 0 },
     chatListScroll: { flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 0 },
-    chatItem: { padding: '12px 16px', borderBottom: `1px solid ${chatTheme.border}`, background: chatTheme.bgSecondary, cursor: 'pointer', transition: 'all 0.2s ease', borderLeftWidth: '4px', borderLeftStyle: 'solid', borderLeftColor: 'transparent' },
+    chatItem: { width: '100%', padding: '12px 16px', border: 'none', borderBottom: `1px solid ${chatTheme.border}`, background: chatTheme.bgSecondary, color: chatTheme.textPrimary, cursor: 'pointer', transition: 'background 0.2s ease, border-color 0.2s ease', borderLeftWidth: '4px', borderLeftStyle: 'solid', borderLeftColor: 'transparent', textAlign: 'left', fontFamily: 'inherit' },
     chatItemHovered: { background: chatTheme.hoverBg, borderLeftColor: themeTokens.accent },
     chatItemActive: { background: chatTheme.activeBg, borderLeftColor: themeTokens.accent },
     chatItemWorkerName: { fontSize: '14px', fontWeight: 600, color: chatTheme.textPrimary, margin: '0 0 4px 0' },
@@ -421,19 +457,36 @@ const ChatWindow = ({ appTheme = 'light', booking, onApproveQuote, onRejectQuote
 
   const isDeleteChatAction = pendingChatAction === 'delete';
 
+  const handleSelectChat = (bookingId) => {
+    setIsMobileChatListOpen(false);
+    onSelectBooking(bookingId);
+  };
+
   return (
     <div className="booking-workspace" style={styles.pageContainer}>
       <div className="booking-workspace-grid" style={styles.mainContainer}>
         {/* LEFT COLUMN: Chat List */}
-        <div className="booking-chat-list" style={styles.chatList}>
+        <div className={`booking-chat-list ${isMobileChatListOpen ? 'mobile-open' : ''}`} style={styles.chatList}>
           <div style={styles.chatListHeader}>
-            <h3 style={styles.chatListTitle}>Your Chats</h3>
+            <h3 style={styles.chatListTitle}>Messages</h3>
           </div>
+          <SearchFilterBar
+            activeValue={chatFilter}
+            className="booking-chat-search"
+            onActiveValueChange={setChatFilter}
+            onSearchValueChange={setChatSearch}
+            options={chatFilterOptions}
+            searchLabel="Search conversations"
+            searchPlaceholder="Search people or services"
+            searchValue={chatSearch}
+          />
           <div style={styles.chatListScroll}>
             {chatBookings.length > 0 ? (
               chatBookings.map((b) => (
-                <div
+                <button
+                  type="button"
                   key={b.id}
+                  className="booking-chat-list-item"
                   style={{
                     ...styles.chatItem,
                     ...(hoveredChatId === b.id ? styles.chatItemHovered : {}),
@@ -441,15 +494,23 @@ const ChatWindow = ({ appTheme = 'light', booking, onApproveQuote, onRejectQuote
                   }}
                   onMouseEnter={() => setHoveredChatId(b.id)}
                   onMouseLeave={() => setHoveredChatId(null)}
-                  onClick={() => onSelectBooking(b.id)}
+                  onClick={() => handleSelectChat(b.id)}
                   >
-                  <p style={styles.chatItemWorkerName}>{getChatDisplayName(b)}</p>
-                  <p style={styles.chatItemService}>{b.serviceType}</p>
-                </div>
+                  <span className="booking-chat-list-avatar" aria-hidden="true">
+                    {getChatPhoto(b)
+                      ? <img src={getChatPhoto(b)} alt="" />
+                      : getChatAvatarLetter(b)}
+                  </span>
+                  <span className="booking-chat-list-copy">
+                    <strong style={styles.chatItemWorkerName}>{getChatDisplayName(b)}</strong>
+                    <span style={styles.chatItemService}>{b.serviceType}</span>
+                  </span>
+                  <MessageCircle className="booking-chat-list-action" aria-hidden="true" />
+                </button>
               ))
             ) : (
               <div style={{ padding: '20px', textAlign: 'center', color: chatTheme.textMuted }}>
-                <p>No active chats</p>
+                <p>{uniqueChatBookings.length ? 'No conversations match your search.' : 'No conversations yet.'}</p>
               </div>
             )}
           </div>
@@ -458,15 +519,27 @@ const ChatWindow = ({ appTheme = 'light', booking, onApproveQuote, onRejectQuote
         {/* CENTER COLUMN: Chat Messages */}
         <div className="booking-chat-thread" style={styles.chatContainer}>
           <div style={styles.header}>
+            <button
+              type="button"
+              className="booking-mobile-chat-back"
+              onClick={() => setIsMobileChatListOpen(true)}
+              aria-label="Back to conversations"
+            >
+              <ArrowLeft aria-hidden="true" />
+            </button>
             <div style={styles.workerInfo}>
-              <div style={styles.workerAvatar}>{getChatAvatarLetter(booking)}</div>
+              <div className="booking-chat-avatar" style={styles.workerAvatar}>
+                {getChatPhoto(booking)
+                  ? <img src={getChatPhoto(booking)} alt="" />
+                  : getChatAvatarLetter(booking)}
+              </div>
               <div>
-                <h3 style={styles.workerName}>{getChatDisplayName(booking)}</h3>
-                <p style={styles.workerService}>{booking.serviceType}</p>
-                <p style={styles.workerMode}>
+                <h3 className="booking-chat-name" style={styles.workerName}>{getChatDisplayName(booking)}</h3>
+                <p className="booking-chat-service" style={styles.workerService}>{booking.serviceType}</p>
+                <p className="booking-chat-mode" style={styles.workerMode}>
                   {isRequestBooking ? 'Request booking - coordinate through chat' : 'Time-slot booking'}
                 </p>
-                <p style={styles.workerStatus}>{'\u2022'} Online</p>
+                <p className="booking-chat-online" style={styles.workerStatus}>{'\u2022'} Online</p>
                 {isRecurringService && !isServiceStopped && (
                   <p style={styles.recurringBadge}>
                     {booking.billingCycle === 'monthly' ? 'Monthly' : 'Weekly'} Service
@@ -646,7 +719,8 @@ const ChatWindow = ({ appTheme = 'light', booking, onApproveQuote, onRejectQuote
                 onClick={handleSendMessage}
                 disabled={!clientMessage.trim()}
               >
-                Send
+                <Send className="booking-send-icon" size={18} aria-hidden="true" />
+                <span>Send</span>
               </button>
             </div>
           )}

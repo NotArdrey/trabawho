@@ -1,14 +1,31 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import {
-  ArrowUpDown,
   BriefcaseBusiness,
-  CalendarCheck,
   Filter,
+  Layers3,
   MapPin,
   Search,
+  X,
 } from 'lucide-react';
 import DashboardNavigation from '../../../shared/components/DashboardNavigation';
+import { SearchFilterBar } from '@/components/ui/search-filter-bar';
+import {
+  Pagination,
+  PaginationContent,
+  PaginationEllipsis,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from '@/components/ui/pagination';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import SuccessNotification from '../../../shared/components/SuccessNotification';
 import ErrorNotification from '../../../shared/components/ErrorNotification';
 import { createClientBooking, startServiceConversation } from '../../bookings/services/bookingService';
@@ -30,6 +47,14 @@ import {
 import { createServiceSearchParams, parseServiceSearchParams } from '../../../lib/service-search';
 
 const DEFAULT_CATEGORIES = ['All', 'Tutor', 'Technician', 'Cleaner', 'More Services'];
+const SERVICES_PER_PAGE = 6;
+
+const getPaginationPages = (currentPage, totalPages) => {
+  if (totalPages <= 5) return Array.from({ length: totalPages }, (_, index) => index + 1);
+  if (currentPage <= 3) return [1, 2, 3, 4, 'ellipsis-end', totalPages];
+  if (currentPage >= totalPages - 2) return [1, 'ellipsis-start', totalPages - 3, totalPages - 2, totalPages - 1, totalPages];
+  return [1, 'ellipsis-start', currentPage - 1, currentPage, currentPage + 1, 'ellipsis-end', totalPages];
+};
 
 const getProviderSellerId = (provider) => {
   if (!provider) return null;
@@ -82,6 +107,11 @@ function BrowseServicesPage({
   const [activeCategory, setActiveCategory] = useState('All');
   const [selectedDistrict, setSelectedDistrict] = useState('All Districts');
   const [sortMode, setSortMode] = useState('recommended');
+  const [currentPage, setCurrentPage] = useState(() => {
+    const requestedPage = Number(urlSearchParams.get('page'));
+    return Number.isInteger(requestedPage) && requestedPage > 0 ? requestedPage : 1;
+  });
+  const [showMobileFilters, setShowMobileFilters] = useState(false);
   const [services, setServices] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
@@ -110,6 +140,11 @@ function BrowseServicesPage({
     setLocalSearchQuery(nextSearch.query || '');
     setLocalLocationQuery(nextSearch.location || '');
   }, [isPublic, urlSearchParams]);
+
+  useEffect(() => {
+    const requestedPage = Number(urlSearchParams.get('page'));
+    setCurrentPage(Number.isInteger(requestedPage) && requestedPage > 0 ? requestedPage : 1);
+  }, [urlSearchParams]);
 
   useEffect(() => {
     let mounted = true;
@@ -274,11 +309,60 @@ function BrowseServicesPage({
     });
   }, [activeCategory, isPublic, locationQuery, searchQuery, selectedDistrict, services, sortMode]);
 
+  const totalPages = Math.max(1, Math.ceil(filteredServices.length / SERVICES_PER_PAGE));
+  const activePage = Math.min(currentPage, totalPages);
+  const paginatedServices = filteredServices.slice(
+    (activePage - 1) * SERVICES_PER_PAGE,
+    activePage * SERVICES_PER_PAGE
+  );
+  const paginationPages = getPaginationPages(activePage, totalPages);
+
+  const getPageHref = (page) => {
+    const next = new URLSearchParams(urlSearchParams);
+    if (page === 1) next.delete('page');
+    else next.set('page', String(page));
+    const query = next.toString();
+    return query ? `?${query}` : '?';
+  };
+
+  const updatePage = (page, replace = false) => {
+    const nextPage = Math.min(Math.max(1, page), totalPages);
+    setCurrentPage(nextPage);
+    setUrlSearchParams((previous) => {
+      const next = new URLSearchParams(previous);
+      if (nextPage === 1) next.delete('page');
+      else next.set('page', String(nextPage));
+      return next;
+    }, { replace });
+  };
+
+  const resetPage = () => updatePage(1, true);
+
+  const hasActiveFilters = activeCategory !== 'All'
+    || selectedDistrict !== 'All Districts'
+    || Boolean(locationQuery)
+    || sortMode !== 'recommended';
+
+  const handleClearFilters = () => {
+    resetPage();
+    setActiveCategory('All');
+    setSelectedDistrict('All Districts');
+    setSortMode('recommended');
+    if (isPublic) {
+      setLocalSearchQuery('');
+      setLocalLocationQuery('');
+      updatePublicSearch({});
+    } else {
+      onSearchChange?.({ target: { value: '' } });
+    }
+  };
+
   const updatePublicSearch = (nextSearch, replace = true) => {
     setUrlSearchParams(createServiceSearchParams(nextSearch), { replace });
   };
 
   const handleSearchChange = (event) => {
+    resetPage();
     if (isPublic) {
       const nextQuery = event.target.value;
       setLocalSearchQuery(nextQuery);
@@ -289,6 +373,7 @@ function BrowseServicesPage({
   };
 
   const handleLocationChange = (event) => {
+    resetPage();
     const nextLocation = event.target.value;
     setLocalLocationQuery(nextLocation);
     updatePublicSearch({ query: localSearchQuery, location: nextLocation });
@@ -507,16 +592,19 @@ function BrowseServicesPage({
             </p>
           </div>
 
-          <div className="browse-kpis gl-kpi-grid" aria-label="Marketplace summary">
-            <div className="gl-kpi gl-card">
+          <div className="browse-kpis marketplace-summary" aria-label="Marketplace summary">
+            <div className="marketplace-stat">
+              <BriefcaseBusiness aria-hidden="true" />
               <p className="gl-kpi-value">{services.length}</p>
               <p className="gl-kpi-label">Active services</p>
             </div>
-            <div className="gl-kpi gl-card">
-              <p className="gl-kpi-value">{categories.length}</p>
+            <div className="marketplace-stat">
+              <Layers3 aria-hidden="true" />
+              <p className="gl-kpi-value">{Math.max(0, categories.length - 1)}</p>
               <p className="gl-kpi-label">Categories</p>
             </div>
-            <div className="gl-kpi gl-card">
+            <div className="marketplace-stat">
+              <MapPin aria-hidden="true" />
               <p className="gl-kpi-value">{districts.length - 1}</p>
               <p className="gl-kpi-label">Locations</p>
             </div>
@@ -524,10 +612,22 @@ function BrowseServicesPage({
         </section>
 
         <section className="browse-marketplace" aria-label="Service marketplace">
-          <aside className="browse-filter-rail gl-card" aria-label="Browse filters">
+          <aside
+            id="browse-filter-options"
+            className={`browse-filter-rail gl-card ${showMobileFilters ? 'mobile-open' : ''}`}
+            aria-label="Browse filters"
+          >
             <div className="browse-filter-head">
               <Filter size={17} aria-hidden="true" />
               <strong>Filters</strong>
+              <button
+                type="button"
+                className="browse-filter-close"
+                onClick={() => setShowMobileFilters(false)}
+                aria-label="Close filters"
+              >
+                <X size={18} aria-hidden="true" />
+              </button>
             </div>
 
             <div className="browse-filter-group">
@@ -539,7 +639,10 @@ function BrowseServicesPage({
                     className={`browse-filter-option ${activeCategory === category ? 'active' : ''}`}
                     type="button"
                     aria-label={category}
-                    onClick={() => setActiveCategory(category)}
+                    onClick={() => {
+                      setActiveCategory(category);
+                      resetPage();
+                    }}
                   >
                     <span>{category}</span>
                     <small>{category === 'All' ? services.length : services.filter((item) => {
@@ -566,65 +669,81 @@ function BrowseServicesPage({
                 </div>
               </label>
             ) : (
-              <label className="browse-filter-group">
+              <div className="browse-filter-group">
                 <span>District</span>
-                <select className="gl-select" value={selectedDistrict} onChange={(event) => setSelectedDistrict(event.target.value)}>
-                  {districts.map((district) => (
-                    <option key={district} value={district}>{district}</option>
-                  ))}
-                </select>
-              </label>
+                <Select value={selectedDistrict} onValueChange={(value) => {
+                  setSelectedDistrict(value);
+                  resetPage();
+                }}>
+                  <SelectTrigger
+                    className="focus:border-foreground focus:ring-0 focus:ring-offset-0"
+                    aria-label="Filter by district"
+                  >
+                    <SelectValue placeholder="All districts" />
+                  </SelectTrigger>
+                  <SelectContent position="popper">
+                    {districts.map((district) => (
+                      <SelectItem key={district} value={district}>{district}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             )}
 
             <button
               type="button"
               className="gl-button secondary browse-clear-button"
-              onClick={() => {
-                setActiveCategory('All');
-                setSelectedDistrict('All Districts');
-                setSortMode('recommended');
-                if (isPublic) {
-                  setLocalSearchQuery('');
-                  setLocalLocationQuery('');
-                  updatePublicSearch({});
-                } else onSearchChange?.({ target: { value: '' } });
-              }}
+              onClick={handleClearFilters}
             >
               Clear filters
             </button>
           </aside>
 
           <section className="browse-results-panel">
-            <div className="browse-toolbar gl-card">
-              <div className="browse-search">
-                <Search size={18} aria-hidden="true" />
-                <input
-                  className="gl-input"
-                  value={searchQuery}
-                  onChange={handleSearchChange}
-                  placeholder="Search services, providers, or locations"
-                  aria-label="Search services and providers"
-                />
-              </div>
-
-              <label className="browse-select-label">
-                <ArrowUpDown size={16} aria-hidden="true" />
-                <select className="gl-select" value={sortMode} onChange={(event) => setSortMode(event.target.value)}>
-                  <option value="recommended">Recommended</option>
-                  <option value="rating">Highest rated</option>
-                  <option value="price-low">Lowest price</option>
-                  <option value="newest">Newest</option>
-                </select>
-              </label>
-            </div>
+            <SearchFilterBar
+              className="browse-search-filter"
+              searchLabel="Search services and providers"
+              searchPlaceholder="Search services, providers, or locations"
+              searchValue={searchQuery}
+              onSearchValueChange={(value) => handleSearchChange({ target: { value } })}
+              endControl={(
+                <div className="browse-search-controls">
+                <Select value={sortMode} onValueChange={(value) => {
+                  setSortMode(value);
+                  resetPage();
+                }}>
+                  <SelectTrigger
+                    className="browse-sort-trigger focus:border-foreground focus:ring-0 focus:ring-offset-0"
+                    aria-label="Sort services"
+                  >
+                    <SelectValue placeholder="Sort services" />
+                  </SelectTrigger>
+                  <SelectContent position="popper">
+                    <SelectItem value="recommended">Recommended</SelectItem>
+                    <SelectItem value="rating">Highest rated</SelectItem>
+                    <SelectItem value="price-low">Lowest price</SelectItem>
+                    <SelectItem value="newest">Newest</SelectItem>
+                  </SelectContent>
+                </Select>
+                  <button
+                    type="button"
+                    className="gl-button secondary browse-mobile-filter-button"
+                    onClick={() => setShowMobileFilters((open) => !open)}
+                    aria-expanded={showMobileFilters}
+                    aria-controls="browse-filter-options"
+                  >
+                    <Filter size={17} aria-hidden="true" />
+                    {showMobileFilters ? 'Hide filters' : 'Filters'}
+                  </button>
+                </div>
+              )}
+            />
 
             <div className="browse-results-head">
-              <p>{isLoading ? 'Loading services...' : `${filteredServices.length} matching services`}</p>
-              <div>
-                <span><BriefcaseBusiness size={15} aria-hidden="true" /> {activeCategory}</span>
-                <span><MapPin size={15} aria-hidden="true" /> {isPublic ? (locationQuery || 'All locations') : selectedDistrict}</span>
-                <span><CalendarCheck size={15} aria-hidden="true" /> {sortMode}</span>
-              </div>
+              <p>{isLoading
+                ? 'Loading services...'
+                : `Showing ${filteredServices.length ? ((activePage - 1) * SERVICES_PER_PAGE) + 1 : 0}-${Math.min(activePage * SERVICES_PER_PAGE, filteredServices.length)} of ${filteredServices.length} services`}</p>
+              {hasActiveFilters && <button type="button" onClick={handleClearFilters}>Clear active filters</button>}
             </div>
 
             {loadError && (
@@ -632,7 +751,7 @@ function BrowseServicesPage({
             )}
 
             {isLoading ? (
-              <section className="browse-results-list">
+              <section className="marketplace-service-grid">
                 {Array.from({ length: 6 }).map((_, index) => (
                   <div className="browse-skeleton gl-card" key={`service-skeleton-${index}`}>
                     <span />
@@ -644,8 +763,8 @@ function BrowseServicesPage({
                 ))}
               </section>
             ) : filteredServices.length > 0 ? (
-              <section className="browse-results-list">
-                {filteredServices.map((provider) => (
+              <section className="marketplace-service-grid">
+                {paginatedServices.map((provider) => (
                   <ServiceCard
                     key={provider.id}
                     provider={provider}
@@ -660,6 +779,56 @@ function BrowseServicesPage({
                 <strong>No services match these filters yet.</strong>
                 <p>Try a broader search, another district, or the All category.</p>
               </div>
+            )}
+
+            {!isLoading && filteredServices.length > 0 && totalPages > 1 && (
+              <Pagination className="browse-pagination">
+                <PaginationContent>
+                  <PaginationItem>
+                    <PaginationPrevious
+                      href={activePage > 1 ? getPageHref(activePage - 1) : undefined}
+                      aria-disabled={activePage === 1}
+                      className={activePage === 1 ? 'pointer-events-none opacity-50' : ''}
+                      onClick={(event) => {
+                        event.preventDefault();
+                        if (activePage > 1) updatePage(activePage - 1);
+                      }}
+                    />
+                  </PaginationItem>
+                  {paginationPages.map((page) => (
+                    typeof page === 'number' ? (
+                      <PaginationItem key={page}>
+                        <PaginationLink
+                          href={getPageHref(page)}
+                          isActive={page === activePage}
+                          aria-label={`Go to page ${page}`}
+                          onClick={(event) => {
+                            event.preventDefault();
+                            updatePage(page);
+                          }}
+                        >
+                          {page}
+                        </PaginationLink>
+                      </PaginationItem>
+                    ) : (
+                      <PaginationItem key={page}>
+                        <PaginationEllipsis />
+                      </PaginationItem>
+                    )
+                  ))}
+                  <PaginationItem>
+                    <PaginationNext
+                      href={activePage < totalPages ? getPageHref(activePage + 1) : undefined}
+                      aria-disabled={activePage === totalPages}
+                      className={activePage === totalPages ? 'pointer-events-none opacity-50' : ''}
+                      onClick={(event) => {
+                        event.preventDefault();
+                        if (activePage < totalPages) updatePage(activePage + 1);
+                      }}
+                    />
+                  </PaginationItem>
+                </PaginationContent>
+              </Pagination>
             )}
           </section>
         </section>

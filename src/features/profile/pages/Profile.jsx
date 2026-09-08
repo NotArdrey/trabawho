@@ -6,6 +6,11 @@ import BookingTermsModal from '../../bookings/components/BookingTermsModal';
 import { getThemeTokens } from '../../../shared/styles/themeTokens';
 import { getProfilePhotoUrl, hasUploadedProfilePhoto } from '../../../shared/utils/profilePhoto';
 import { fetchSellerServices, updateServiceAdBoost, uploadPortfolioDocument } from '../../../shared/services/authService';
+import { Attachment, AttachmentUpload } from '@/components/ui/attachment';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Camera, Download, FileText, MapPin, Pencil, Rocket, ShieldCheck, UserRoundCog } from 'lucide-react';
 
 function Profile({ appTheme = 'light', themeMode = 'system', onThemeChange, currentView, searchQuery, onSearchChange, onLogout, onOpenSellerSetup, onOpenMyBookings, onOpenChatPage, sellerProfile, onOpenMyWork, onOpenProfile, onOpenAccountSettings, onOpenSettings, onOpenDashboard, onOpenBrowseServices, userLocation, onManageAccount, onBackToDashboard, onUpdateProfile, onOpenAdminDashboard }) {
   const MAX_PROFILE_PHOTO_BYTES = 2 * 1024 * 1024;
@@ -485,11 +490,11 @@ function Profile({ appTheme = 'light', themeMode = 'system', onThemeChange, curr
         onToggleAdminView={() => { if (typeof onOpenAdminDashboard === 'function') onOpenAdminDashboard(); }}
       />
 
-      <main style={styles.main}>
-        <div style={styles.card}>
+      <main className="profile-main-modern" style={styles.main}>
+        <div className="profile-surface" style={styles.card}>
           {saveError && <p style={styles.saveError}>{saveError}</p>}
 
-          <div style={styles.hero}>
+          <div className="profile-identity" style={styles.hero}>
             {isProfileLoading ? (
               <div style={styles.profilePhotoButton}>
                 <div style={styles.profileAvatarSkeleton}>
@@ -498,9 +503,9 @@ function Profile({ appTheme = 'light', themeMode = 'system', onThemeChange, curr
                 <div style={{ ...styles.textPlaceholder, width: '120px' }} />
               </div>
             ) : (
-              <button style={styles.profilePhotoButton} onClick={() => setIsPhotoSourceOpen(true)}>
-                <img src={profilePhoto} alt={displayName} style={styles.profilePhoto} />
-                <span style={styles.profilePhotoEdit}>{isSavingPhoto ? 'Saving Photo...' : (hasCustomProfilePhoto ? 'Change Photo' : 'Add Photo')}</span>
+              <button className="profile-photo-control" style={styles.profilePhotoButton} onClick={() => setIsPhotoSourceOpen(true)} aria-label={`${hasCustomProfilePhoto ? 'Change' : 'Add'} profile photo`}>
+                <span className="profile-photo-frame"><img src={profilePhoto} alt="" style={styles.profilePhoto} /><span className="profile-photo-camera"><Camera size={16} aria-hidden="true" /></span></span>
+                <span style={styles.profilePhotoEdit}>{isSavingPhoto ? 'Saving photo…' : (hasCustomProfilePhoto ? 'Change photo' : 'Add photo')}</span>
               </button>
             )}
 
@@ -517,30 +522,31 @@ function Profile({ appTheme = 'light', themeMode = 'system', onThemeChange, curr
                 </button>
               </div>
             ) : (
-              <h1
+              <button
+                type="button"
+                className="profile-name-control"
                 style={styles.editableHeading}
                 onMouseEnter={() => setIsHeadingHovered(true)}
                 onMouseLeave={() => setIsHeadingHovered(false)}
                 onClick={() => setIsEditingName(true)}
+                aria-label="Edit profile name"
               >
-                {displayName}
-              </h1>
+                <span>{displayName}</span><Pencil size={15} aria-hidden="true" />
+              </button>
             )}
 
             {isProfileLoading ? (
               <div style={{ ...styles.textPlaceholder, width: '130px' }} />
             ) : (
-              isVerifiedWorker && <span style={styles.verifiedBadge}>Verified Worker</span>
+              isVerifiedWorker && <Badge variant="success"><ShieldCheck size={14} aria-hidden="true" />Verified provider</Badge>
             )}
           </div>
 
-          <section style={styles.profileSection}>
+          <section className="profile-flat-section" style={styles.profileSection}>
             <div style={styles.sectionHeadingRow}>
-              <h2 style={styles.h2}>Bio</h2>
+              <div className="profile-section-title"><UserRoundCog size={18} aria-hidden="true" /><h2 style={styles.h2}>About</h2></div>
               {!isEditingBio && (
-                <button style={styles.sectionEditBtn} onClick={() => setIsEditingBio(true)}>
-                  Edit
-                </button>
+                <Button type="button" variant="ghost" size="sm" onClick={() => setIsEditingBio(true)}><Pencil aria-hidden="true" />Edit</Button>
               )}
             </div>
 
@@ -572,8 +578,8 @@ function Profile({ appTheme = 'light', themeMode = 'system', onThemeChange, curr
             )}
           </section>
 
-          <section style={styles.profileSection}>
-            <h2 style={styles.h2}>Address</h2>
+          <section className="profile-flat-section" style={styles.profileSection}>
+            <div className="profile-section-title"><MapPin size={18} aria-hidden="true" /><h2 style={styles.h2}>Location</h2></div>
             {isProfileLoading ? <div style={{ ...styles.textPlaceholder, width: '70%' }} /> : (
               <>
                 {fullAddress && <p style={styles.paragraph}><strong>Street Address:</strong> {fullAddress}</p>}
@@ -583,27 +589,29 @@ function Profile({ appTheme = 'light', themeMode = 'system', onThemeChange, curr
           </section>
 
           {isWorkerRole && (
-            <section style={{ ...styles.profileSection, ...styles.portfolioSection }}>
-              <h2 style={styles.h2Portfolio}>Digital Professional Portfolio</h2>
-              <p style={styles.portfolioParagraph}>Generate and download your professional resume with QR code verification for clients.</p>
-              <button
-                style={styles.generatePortfolioBtn}
-                onMouseEnter={() => setIsPortfolioHovered(true)}
-                onMouseLeave={() => setIsPortfolioHovered(false)}
-                onClick={() => setIsPortfolioModalOpen(true)}
-              >
-                Generate & Download Portfolio
-              </button>
+            <section className="profile-flat-section profile-portfolio-section" style={{ ...styles.profileSection, ...styles.portfolioSection }}>
+              <div className="profile-portfolio-heading">
+                <div>
+                  <div className="profile-section-title"><FileText size={18} aria-hidden="true" /><h2 style={styles.h2Portfolio}>Professional portfolio</h2></div>
+                  <p style={styles.portfolioParagraph}>Create a shareable PDF with your profile details and verification QR code.</p>
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="profile-generate-button"
+                  onMouseEnter={() => setIsPortfolioHovered(true)}
+                  onMouseLeave={() => setIsPortfolioHovered(false)}
+                  onClick={() => setIsPortfolioModalOpen(true)}
+                >
+                  <Download aria-hidden="true" />Preview portfolio
+                </Button>
+              </div>
 
               <div style={styles.portfolioDocActions}>
-                <button
-                  type="button"
-                  style={{ ...styles.sectionEditBtn, padding: '10px 12px' }}
-                  onClick={() => portfolioDocInputRef.current && portfolioDocInputRef.current.click()}
-                  disabled={isUploadingPortfolioDoc}
-                >
-                  {isUploadingPortfolioDoc ? 'Uploading...' : 'Upload Portfolio Document'}
-                </button>
+                <AttachmentUpload
+                  onChoose={() => portfolioDocInputRef.current && portfolioDocInputRef.current.click()}
+                  isUploading={isUploadingPortfolioDoc}
+                />
                 <input
                   ref={portfolioDocInputRef}
                   type="file"
@@ -616,23 +624,13 @@ function Profile({ appTheme = 'light', themeMode = 'system', onThemeChange, curr
               {portfolioDocuments.length > 0 && (
                 <div style={styles.portfolioDocList}>
                   {portfolioDocuments.map((document) => (
-                    <div key={document.storagePath || document.publicUrl} style={styles.portfolioDocItem}>
-                      <div>
-                        <a href={document.publicUrl} target="_blank" rel="noreferrer" style={styles.portfolioDocName}>
-                          {document.name}
-                        </a>
-                        <p style={styles.portfolioDocMeta}>
-                          {document.uploadedAt ? String(document.uploadedAt).slice(0, 10) : 'Uploaded'} - {Math.ceil((document.size || 0) / 1024)} KB
-                        </p>
-                      </div>
-                      <button
-                        type="button"
-                        style={styles.inlineEditCancel}
-                        onClick={() => handleRemovePortfolioDocument(document.storagePath)}
-                      >
-                        Remove
-                      </button>
-                    </div>
+                    <Attachment
+                      key={document.storagePath || document.publicUrl}
+                      name={document.name}
+                      href={document.publicUrl}
+                      description={`${document.uploadedAt ? String(document.uploadedAt).slice(0, 10) : 'Uploaded'} · ${Math.ceil((document.size || 0) / 1024)} KB`}
+                      onRemove={() => handleRemovePortfolioDocument(document.storagePath)}
+                    />
                   ))}
                 </div>
               )}
@@ -640,29 +638,33 @@ function Profile({ appTheme = 'light', themeMode = 'system', onThemeChange, curr
           )}
 
           {isWorkerRole && (
-            <section style={styles.profileSection}>
-              <h2 style={styles.h2}>Ad Booster</h2>
+            <section className="profile-flat-section" style={styles.profileSection}>
+              <div className="profile-section-title"><Rocket size={18} aria-hidden="true" /><h2 style={styles.h2}>Ad booster</h2></div>
               <p style={styles.paragraph}>Boost one of your gigs in marketplace recommendation views.</p>
               <div style={styles.boosterGrid}>
-                <label style={styles.boosterLabel}>
-                  Gig
-                  <select
+                <div style={styles.boosterLabel}>
+                  <label htmlFor="boost-service">Gig</label>
+                  <Select
                     value={selectedBoostServiceId}
-                    onChange={(event) => setSelectedBoostServiceId(event.target.value)}
-                    style={styles.boosterInput}
+                    onValueChange={setSelectedBoostServiceId}
+                    disabled={workerServices.length === 0}
                   >
-                    {workerServices.length === 0 && <option value="">No gigs found</option>}
+                    <SelectTrigger id="boost-service" className="w-full bg-background shadow-none">
+                      <SelectValue placeholder={workerServices.length === 0 ? 'No gigs found' : 'Choose a gig'} />
+                    </SelectTrigger>
+                    <SelectContent>
                     {workerServices.map((service) => {
                       const boostStatus = getActiveBoostStatus(service);
                       return (
-                        <option key={service.id} value={service.id}>
+                        <SelectItem key={service.id} value={String(service.id)}>
                           {service.title || service.short_description || 'Untitled gig'}
                           {boostStatus.isBoosted ? ` (Boosted until ${formatBoostEndDate(boostStatus.boostEndsAt)})` : ''}
-                        </option>
+                        </SelectItem>
                       );
                     })}
-                  </select>
-                </label>
+                    </SelectContent>
+                  </Select>
+                </div>
                 <label style={styles.boosterLabel}>
                   Days
                   <input
@@ -700,14 +702,16 @@ function Profile({ appTheme = 'light', themeMode = 'system', onThemeChange, curr
             </section>
           )}
 
-          <button
-            style={styles.manageAccountBtn}
+          <Button
+            type="button"
+            variant="secondary"
+            className="profile-manage-account"
             onMouseEnter={() => setIsManageHovered(true)}
             onMouseLeave={() => setIsManageHovered(false)}
             onClick={onManageAccount}
           >
-            Manage Account & Privacy
-          </button>
+            <ShieldCheck aria-hidden="true" />Manage account & privacy
+          </Button>
 
           {isPhotoSourceOpen && (
             <div style={styles.photoSourceOverlay}>

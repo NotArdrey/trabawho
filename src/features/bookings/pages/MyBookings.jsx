@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import {
   AlertCircle,
   CalendarCheck,
@@ -9,14 +10,12 @@ import {
   CreditCard,
   Eye,
   Filter,
-  Home,
   MessageCircle,
   Receipt,
   RotateCcw,
   Search,
   ShieldCheck,
   Star,
-  X,
 } from 'lucide-react';
 import DashboardNavigation from '../../../shared/components/DashboardNavigation';
 import ChatWindow from '../components/ChatWindow';
@@ -24,6 +23,12 @@ import SlotSelectionModal from '../components/SlotSelectionModal';
 import PaymentModal from '../components/PaymentModal';
 import BookingTermsModal from '../components/BookingTermsModal';
 import RatingModal from '../components/RatingModal';
+import { BookingScopeSwitcher } from '../components/BookingScopeSwitcher';
+import { Button } from '@/components/ui/button';
+import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { MetricCard } from '@/components/ui/metric-card';
+import { SearchFilterBar } from '@/components/ui/search-filter-bar';
+import { paths } from '@/app/router/routes';
 
 import {
   useBookingListController,
@@ -35,6 +40,7 @@ import {
   acknowledgeCashPayment,
   archiveConversationThread,
   confirmBookingCompletion,
+  fetchBookingById,
   markBookingDelivered,
 } from '../services/bookingService';
 
@@ -62,6 +68,28 @@ const formatPhp = (value) => `\u20B1${Number(value || 0).toLocaleString('en-PH',
   minimumFractionDigits: Number(value || 0) % 1 === 0 ? 0 : 2,
   maximumFractionDigits: 2,
 })}`;
+
+const formatBookingTime = (value) => {
+  const rawTime = String(value || '').trim();
+  if (!rawTime || /\b(?:am|pm)\b/i.test(rawTime)) return rawTime;
+
+  const match = rawTime.match(/^(\d{1,2}):(\d{2})(?::\d{2})?$/);
+  if (!match) return rawTime;
+
+  const hours = Number(match[1]);
+  const minutes = Number(match[2]);
+  if (hours > 23 || minutes > 59) return rawTime;
+
+  const period = hours >= 12 ? 'PM' : 'AM';
+  const twelveHour = hours % 12 || 12;
+  return `${twelveHour}:${match[2]} ${period}`;
+};
+
+const formatBookingTimeRange = (timeBlock) => (
+  timeBlock
+    ? `${formatBookingTime(timeBlock.startTime)} – ${formatBookingTime(timeBlock.endTime)}`
+    : 'Coordinated in chat'
+);
 
 const getAvatarInitials = (name = '') => {
   const parts = String(name).trim().split(/\s+/);
@@ -97,6 +125,36 @@ const getStatusMeta = (status) => {
     return { className: 'booking-status-active', icon: MessageCircle, label: 'Negotiating' };
   }
   return { className: 'booking-status-active', icon: CalendarCheck, label: status || 'Active' };
+};
+
+const COMPLETED_BOOKING_STATUSES = ['Completed Service', 'Service Stopped'];
+const CANCELLED_BOOKING_STATUSES = ['Cancelled', 'Cancelled (Cash)'];
+const SCHEDULED_BOOKING_STATUSES = ['Payment Confirmed', 'Service Scheduled', 'Active Service'];
+const isBookingActionNeeded = (booking, scope) => {
+  if (scope === 'incoming') {
+    return ['Negotiating', 'Cash Verification Pending', 'Refund Processing'].includes(booking.status)
+      || booking.paymentStatus === 'pending_provider';
+  }
+  return ['Awaiting Slot Selection', 'Payment Pending', 'Downpayment Paid', 'Slot Selected - Payment Pending'].includes(booking.status)
+    || booking.deliveryStatus === 'seller_claimed';
+};
+
+const matchesBookingHubFilter = (booking, filter, scope) => {
+  if (filter === 'all') return true;
+  if (filter === 'completed') return COMPLETED_BOOKING_STATUSES.includes(booking.status);
+  if (filter === 'cancelled') return CANCELLED_BOOKING_STATUSES.includes(booking.status);
+  if (filter === 'refunds') return Boolean(booking.refundStatus) || ['Refund Processing', 'Refunded'].includes(booking.status);
+  if (filter === 'delivered') return booking.deliveryStatus === 'seller_claimed' || booking.status === 'Service Delivered';
+  if (filter === 'scheduled') return SCHEDULED_BOOKING_STATUSES.includes(booking.status);
+  if (filter === 'payment-due') {
+    return ['Payment Pending', 'Slot Selected - Payment Pending', 'Downpayment Paid'].includes(booking.status)
+      || ['pending_provider', 'partially_paid'].includes(booking.paymentStatus);
+  }
+  if (filter === 'action-needed') return isBookingActionNeeded(booking, scope);
+  if (filter === 'active') {
+    return ![...COMPLETED_BOOKING_STATUSES, ...CANCELLED_BOOKING_STATUSES, 'Refunded'].includes(booking.status);
+  }
+  return scope === 'incoming';
 };
 
 const MyBookings = ({
@@ -141,11 +199,46 @@ const MyBookings = ({
 
   const normalizedRole = String(sellerProfile?.role || '').trim().toLowerCase();
   const isAdminProfile = Boolean(sellerProfile?.isAdmin) || normalizedRole === 'admin';
-  const shouldLoadSellerBookings = isWorkerProfile(sellerProfile) && !isAdminProfile;
+  const isWorkerAccount = isWorkerProfile(sellerProfile) && !isAdminProfile;
+  const location = useLocation();
+  const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const requestedScope = searchParams.get('scope');
+  const explicitScope = ['incoming', 'purchases'].includes(requestedScope) ? requestedScope : null;
   const isChatRoute = currentView === 'chat';
+  const [resolvedChatScope, setResolvedChatScope] = useState(null);
+  const isProviderBookingsRoute = location.pathname === paths.workerBookings;
+  const defaultScope = isWorkerAccount && isProviderBookingsRoute ? 'incoming' : 'purchases';
+  const activeScope = isWorkerAccount && (explicitScope || resolvedChatScope)
+    ? (explicitScope || resolvedChatScope)
+    : defaultScope;
+  const shouldLoadSellerBookings = activeScope === 'incoming';
+  const isResolvingChatScope = Boolean(isWorkerAccount && isChatRoute && selectedChatBookingId && !explicitScope && !resolvedChatScope);
+
+  useEffect(() => {
+    if (!isResolvingChatScope) return undefined;
+    let isMounted = true;
+    void fetchBookingById(selectedChatBookingId).then((booking) => {
+      if (!isMounted || !booking) return;
+      const userId = String(sellerProfile?.userId || sellerProfile?.user_id || '');
+      setResolvedChatScope(String(booking.sellerId || booking.workerId || '') === userId ? 'incoming' : 'purchases');
+    }).catch(() => {
+      if (isMounted) setResolvedChatScope(defaultScope);
+    });
+    return () => { isMounted = false; };
+  }, [defaultScope, isResolvingChatScope, selectedChatBookingId, sellerProfile?.userId, sellerProfile?.user_id]);
+
+  useEffect(() => {
+    if (isChatRoute && !requestedScope) return;
+    if (requestedScope === activeScope) return;
+    const nextParams = new URLSearchParams(searchParams);
+    nextParams.set('scope', activeScope);
+    setSearchParams(nextParams, { replace: true });
+  }, [activeScope, isChatRoute, requestedScope, searchParams, setSearchParams]);
 
   // Main booking list controller
   const bookingListCtrl = useBookingListController([], {
+    autoLoad: !isResolvingChatScope,
     includeStandaloneChats: isChatRoute,
     listRole: shouldLoadSellerBookings ? 'seller' : 'buyer',
     sellerId: shouldLoadSellerBookings ? sellerProfile?.userId : null,
@@ -179,8 +272,6 @@ const MyBookings = ({
   const [uiState, setUiState] = useState(() => (isChatRoute ? 'chat' : 'list'));
   const [isTermsModalOpen, setIsTermsModalOpen] = useState(false);
   const [detailBookingId, setDetailBookingId] = useState(null);
-  const [localSearchTerm, setLocalSearchTerm] = useState('');
-
   const [isMobile, setIsMobile] = useState(() =>
     typeof window !== 'undefined' ? window.innerWidth <= 768 : false
   );
@@ -212,8 +303,8 @@ const MyBookings = ({
   const handleOpenChat = useCallback((bookingId) => {
     setSelectedBookingId(bookingId);
     setUiState('chat');
-    onOpenChatPage?.(bookingId);
-  }, [onOpenChatPage]);
+    onOpenChatPage?.(bookingId, activeScope);
+  }, [activeScope, onOpenChatPage]);
 
   // Slot selection
   const handleOpenSlotSelection = useCallback(() => {
@@ -432,78 +523,89 @@ const MyBookings = ({
   ), [allBookings]);
 
   const pendingActionCount = useMemo(() => (
-    allBookings.filter((b) =>
-      [
-        'Negotiating',
-        'Awaiting Slot Selection',
-        'Payment Pending',
-        'Downpayment Paid',
-        'Slot Selected - Payment Pending',
-        'Cash Verification Pending',
-        'Refund Processing',
-      ].includes(b.status)
-    ).length
-  ), [allBookings]);
+    allBookings.filter((booking) => isBookingActionNeeded(booking, activeScope)).length
+  ), [activeScope, allBookings]);
 
   const metrics = useMemo(() => [
     {
-      label: 'Total Bookings',
+      label: shouldLoadSellerBookings ? 'Client bookings' : 'Total bookings',
       value: bookingListCtrl.isLoading && allBookings.length === 0 ? '...' : String(allBookings.length),
       icon: CalendarCheck,
-      accent: 'blue',
+      tone: 'blue',
     },
     {
-      label: 'Active & Scheduled',
+      label: shouldLoadSellerBookings ? 'Active jobs' : 'Active & scheduled',
       value: bookingListCtrl.isLoading && allBookings.length === 0 ? '...' : String(activeBookingsCount),
       icon: Clock,
-      accent: 'emerald',
+      tone: 'green',
     },
     {
-      label: 'Completed',
+      label: shouldLoadSellerBookings ? 'Completed jobs' : 'Completed',
       value: bookingListCtrl.isLoading && allBookings.length === 0 ? '...' : String(completedBookingsCount),
       icon: CheckCircle2,
-      accent: 'slate',
+      tone: 'neutral',
     },
     {
       label: 'Action Needed',
       value: bookingListCtrl.isLoading && allBookings.length === 0 ? '...' : String(pendingActionCount),
       icon: AlertCircle,
-      accent: 'amber',
+      tone: 'orange',
     },
-  ], [bookingListCtrl.isLoading, allBookings.length, activeBookingsCount, completedBookingsCount, pendingActionCount]);
+  ], [bookingListCtrl.isLoading, allBookings.length, activeBookingsCount, completedBookingsCount, pendingActionCount, shouldLoadSellerBookings]);
 
-  const statusFilters = [
-    { key: 'all', label: 'All', count: allBookings.length },
-    { key: 'active', label: 'Active', count: activeBookingsCount },
-    { key: 'completed', label: 'Completed', count: completedBookingsCount },
-  ];
+  const filterDefinitions = shouldLoadSellerBookings
+    ? [
+        ['all', 'All'],
+        ['action-needed', 'Action needed'],
+        ['scheduled', 'Scheduled'],
+        ['delivered', 'Delivered'],
+        ['completed', 'Completed'],
+        ['refunds', 'Refunds'],
+        ['cancelled', 'Cancelled'],
+      ]
+    : [
+        ['all', 'All'],
+        ['active', 'Active'],
+        ['payment-due', 'Payment due'],
+        ['delivered', 'Delivered'],
+        ['completed', 'Completed'],
+        ['refunds', 'Refunds'],
+        ['cancelled', 'Cancelled'],
+      ];
+  const allowedFilters = filterDefinitions.map(([value]) => value);
+  const requestedFilter = searchParams.get('filter') || 'all';
+  const selectedDisplayFilter = allowedFilters.includes(requestedFilter) ? requestedFilter : 'all';
+  const displayFilters = filterDefinitions.map(([value, label]) => ({
+    value,
+    label,
+    count: allBookings.filter((booking) => matchesBookingHubFilter(booking, value, activeScope)).length,
+  }));
 
-  const paymentPendingCount = allBookings.filter((booking) => (
-    ['Payment Pending', 'Slot Selected - Payment Pending', 'Downpayment Paid'].includes(booking.status)
-    || ['pending_provider', 'partially_paid'].includes(booking.paymentStatus)
-  )).length;
-  const paidCount = allBookings.filter((booking) => booking.paymentStatus === 'paid').length;
-  const cashCount = allBookings.filter((booking) => booking.paymentMethod === 'after-service-cash').length;
-  const refundCount = allBookings.filter((booking) => (
-    Boolean(booking.refundStatus) || ['Refund Processing', 'Refunded'].includes(booking.status)
-  )).length;
-  const cancelledCount = allBookings.filter((booking) => ['Cancelled', 'Cancelled (Cash)'].includes(booking.status)).length;
+  const updateSearchParams = (updates, replace = false) => {
+    const nextParams = new URLSearchParams(searchParams);
+    Object.entries(updates).forEach(([key, value]) => {
+      if (value && value !== 'all') nextParams.set(key, value);
+      else nextParams.delete(key);
+    });
+    nextParams.set('scope', activeScope);
+    setSearchParams(nextParams, { replace });
+  };
 
-  const displayFilters = [
-    { key: 'all', label: 'All', count: allBookings.length },
-    { key: 'payment-pending', label: 'Payment Pending', count: paymentPendingCount },
-    { key: 'paid', label: 'Paid', count: paidCount },
-    { key: 'completed', label: 'Completed', count: completedBookingsCount },
-    { key: 'cash-approvals', label: 'Cash', count: cashCount },
-    { key: 'refunds', label: 'Refunds', count: refundCount },
-    { key: 'cancelled', label: 'Cancelled', count: cancelledCount },
-  ];
+  const handleScopeChange = (nextScope) => {
+    const nextParams = new URLSearchParams();
+    nextParams.set('scope', nextScope);
+    const destination = nextScope === 'incoming' || isProviderBookingsRoute
+      ? paths.workerBookings
+      : paths.bookings;
+    navigate(`${destination}?${nextParams.toString()}`);
+  };
 
   // Search filter applied on top of list controller
-  const activeSearch = (searchQuery || localSearchTerm).trim().toLowerCase();
+  const bookingSearch = searchParams.get('q') || '';
+  const activeSearch = bookingSearch.trim().toLowerCase();
 
   const displayedBookings = useMemo(() => {
-    let list = bookingListCtrl.filteredBookings;
+    let list = allBookings.filter((booking) => matchesBookingHubFilter(booking, selectedDisplayFilter, activeScope));
     if (activeSearch) {
       list = list.filter((b) => {
         const workerName = String(b.workerName || '').toLowerCase();
@@ -523,7 +625,7 @@ const MyBookings = ({
       });
     }
     return list;
-  }, [bookingListCtrl.filteredBookings, activeSearch]);
+  }, [activeScope, activeSearch, allBookings, selectedDisplayFilter]);
 
   // ========================================================================
   // RENDER BOOKINGS LIST
@@ -536,6 +638,12 @@ const MyBookings = ({
       ['Payment Pending', 'Slot Selected - Payment Pending'].includes(booking.status)
       || booking.paymentStatus === 'partially_paid'
     );
+    const hasPrimaryWorkflowAction = canPayNow
+      || (!shouldLoadSellerBookings && booking.cashCollectionStatus === 'seller_claimed')
+      || (!shouldLoadSellerBookings && booking.deliveryStatus === 'seller_claimed')
+      || (shouldLoadSellerBookings && booking.deliveryStatus === 'not_delivered' && booking.paymentStatus === 'paid');
+    const counterpartName = shouldLoadSellerBookings ? booking.clientName : booking.workerName;
+    const messageLabel = shouldLoadSellerBookings ? 'Message client' : 'Message provider';
 
     return (
       <article
@@ -546,14 +654,14 @@ const MyBookings = ({
         <div className="booking-card-header">
           <div className="booking-provider-info">
             <div className="booking-provider-avatar">
-              {getAvatarInitials(booking.workerName)}
+              {getAvatarInitials(counterpartName)}
             </div>
             <div className="booking-provider-details">
               <h3 className="booking-worker-title">
-                {booking.workerName}
+                {counterpartName}
                 <span className="booking-service-tag">{booking.serviceType}</span>
               </h3>
-              <span style={{ fontSize: '12px', color: 'var(--gl-text-3)', fontWeight: 600 }}>
+              <span className="booking-mode-label">
                 {booking.bookingModeLabel || (booking.bookingMode === 'calendar-only' ? 'Direct Schedule' : 'Chat Coordination')}
               </span>
             </div>
@@ -586,9 +694,7 @@ const MyBookings = ({
               <div>
                 <span>Time: </span>
                 <strong>
-                  {booking.selectedSlot?.timeBlock
-                    ? `${booking.selectedSlot.timeBlock.startTime} - ${booking.selectedSlot.timeBlock.endTime}`
-                    : 'Coordinated in chat'}
+                  {formatBookingTimeRange(booking.selectedSlot?.timeBlock)}
                 </strong>
               </div>
             </div>
@@ -614,7 +720,7 @@ const MyBookings = ({
                 <Receipt size={16} aria-hidden="true" />
                 <div>
                   <span>Ref: </span>
-                  <code style={{ fontSize: '12px', fontWeight: 700, color: 'var(--gl-blue)', background: 'var(--gl-accent-soft)', padding: '2px 6px', borderRadius: '4px' }}>
+                  <code className="booking-reference">
                     {booking.paymentReference}
                   </code>
                 </div>
@@ -625,100 +731,101 @@ const MyBookings = ({
 
         <div className="booking-card-footer">
           <div className="booking-price-box">
-            <span className="booking-price-label">Price:</span>
+            <span className="booking-price-label">{shouldLoadSellerBookings ? 'Booking amount:' : 'Service price:'}</span>
             <span className="booking-price-value">
               {formatPhp(booking.quoteAmount || booking.totalChargedAmount || 0)}
             </span>
-            {booking.transactionFeeAmount > 0 && (
-              <span style={{ fontSize: '12px', color: 'var(--gl-text-3)', fontWeight: 600 }}>
-                (+{formatPhp(booking.transactionFeeAmount)} fee)
+            {!shouldLoadSellerBookings && booking.transactionFeeAmount > 0 && (
+              <span className="booking-price-detail">
+                Fee: {formatPhp(booking.transactionFeeAmount)}
+              </span>
+            )}
+            {!shouldLoadSellerBookings && booking.totalChargedAmount > 0 && (
+              <span className="booking-price-total">
+                Total: {formatPhp(booking.totalChargedAmount)}
               </span>
             )}
             {booking.paymentPlan === 'downpayment' && (
-              <span style={{ fontSize: '12px', color: 'var(--gl-text-3)', fontWeight: 600 }}>
+              <span className="booking-price-detail">
                 Paid: {formatPhp(booking.amountPaid)} · Balance: {formatPhp(booking.balanceDueAmount)}
               </span>
             )}
           </div>
 
           <div className="booking-card-actions">
-            <button
+            <Button
               type="button"
-              className="gl-button secondary"
+              variant="outline"
               onClick={() => setDetailBookingId(booking.id)}
             >
               <Eye size={16} aria-hidden="true" />
               View Details
-            </button>
+            </Button>
 
             {canPayNow && (
-              <button
+              <Button
                 type="button"
-                className="gl-button primary"
                 onClick={() => handlePayBooking(booking.id)}
               >
                 <CreditCard size={16} aria-hidden="true" />
                 {booking.paymentStatus === 'partially_paid' ? 'Pay Balance' : 'Pay Now'}
-              </button>
+              </Button>
             )}
 
-            <button
+            <Button
               type="button"
-              className="gl-button primary"
+              variant={hasPrimaryWorkflowAction ? 'outline' : 'primary'}
               onClick={() => handleOpenChat(booking.id)}
             >
               <MessageCircle size={16} aria-hidden="true" />
-              Open Chat
-            </button>
+              {messageLabel}
+            </Button>
 
             {!shouldLoadSellerBookings && booking.cashCollectionStatus === 'seller_claimed' && (
-              <button
+              <Button
                 type="button"
-                className="gl-button secondary"
                 onClick={() => handleAcknowledgeCashPayment(booking.id)}
               >
                 <ShieldCheck size={16} aria-hidden="true" />
                 Acknowledge Cash
-              </button>
+              </Button>
             )}
 
             {!shouldLoadSellerBookings && booking.deliveryStatus === 'seller_claimed' && (
-              <button
+              <Button
                 type="button"
-                className="gl-button primary"
                 disabled={booking.paymentStatus !== 'paid'}
                 title={booking.paymentStatus === 'paid' ? 'Confirm that the service was delivered' : 'Payment confirmation is required first'}
                 onClick={() => handleConfirmCompletion(booking.id)}
               >
                 <CheckCircle2 size={16} aria-hidden="true" />
                 Confirm Completion
-              </button>
+              </Button>
             )}
 
             {shouldLoadSellerBookings
               && booking.deliveryStatus === 'not_delivered'
               && booking.paymentStatus === 'paid'
               && ['Payment Confirmed', 'Service Scheduled', 'Active Service'].includes(booking.status) && (
-              <button
+              <Button
                 type="button"
-                className="gl-button primary"
                 onClick={() => handleMarkDelivered(booking.id)}
               >
                 <CheckCircle2 size={16} aria-hidden="true" />
                 Mark Delivered
-              </button>
+              </Button>
             )}
 
             {booking.canRate && (
-              <button
+              <Button
                 type="button"
-                className="gl-button secondary"
-                style={{ borderColor: 'var(--gl-amber)', color: 'var(--gl-amber)' }}
+                variant="outline"
+                className="text-orange-700 hover:text-orange-800 dark:text-orange-300"
                 onClick={() => ratingCtrl.handleOpenRating(booking.id)}
               >
                 <Star size={16} aria-hidden="true" />
                 Rate Service
-              </button>
+              </Button>
             )}
           </div>
         </div>
@@ -735,122 +842,47 @@ const MyBookings = ({
             <CalendarCheck size={15} aria-hidden="true" />
             Booking Hub
           </span>
-          <h1 id="bookings-title" className="gl-title">My Bookings</h1>
+          <h1 id="bookings-title" className="gl-title">{isWorkerAccount ? 'Bookings' : 'My Bookings'}</h1>
           <p className="gl-subtitle">
-            Track your scheduled appointments, active service orders, payments, refunds, and provider conversations.
+            {shouldLoadSellerBookings
+              ? 'Review client bookings, scheduled jobs, payment states, and delivery progress.'
+              : 'Track services you booked, scheduled appointments, payments, refunds, and provider conversations.'}
           </p>
         </div>
 
         <div className="bookings-hero-actions">
-          <button
-            className="gl-button primary"
-            type="button"
-            onClick={onOpenBrowseServices}
-          >
-            <Search size={16} aria-hidden="true" />
-            Browse Services
-          </button>
-          {shouldLoadSellerBookings && (
-            <button
-              className="gl-button secondary"
+          {!shouldLoadSellerBookings && (
+            <Button
               type="button"
-              onClick={onOpenMyWork}
+              onClick={onOpenBrowseServices}
             >
-              My Work Desk
-            </button>
+              <Search size={16} aria-hidden="true" />
+              Browse Services
+            </Button>
           )}
         </div>
       </section>
 
+      {isWorkerAccount && <BookingScopeSwitcher value={activeScope} onValueChange={handleScopeChange} />}
+
       {/* KPI Overview Metrics Grid */}
-      <section className="bookings-metric-grid" aria-label="Bookings metrics snapshot">
-        {metrics.map((item) => {
-          const Icon = item.icon;
-          return (
-            <article className={`bookings-metric-card accent-${item.accent}`} key={item.label}>
-              <span className="bookings-metric-icon">
-                <Icon size={20} aria-hidden="true" />
-              </span>
-              <div>
-                <p className="bookings-metric-value">{item.value}</p>
-                <h3>{item.label}</h3>
-              </div>
-            </article>
-          );
-        })}
+      <section className="grid auto-cols-[minmax(15rem,1fr)] grid-flow-col gap-3 overflow-x-auto pb-2 md:grid-flow-row md:grid-cols-2 md:overflow-visible lg:grid-cols-4" aria-label="Bookings metrics snapshot">
+        {metrics.map((item) => <MetricCard key={item.label} icon={item.icon} label={item.label} tone={item.tone} value={item.value} />)}
       </section>
 
-      {/* Unified Search and Filter Toolbar */}
-      <section className="bookings-toolbar gl-card" aria-label="Bookings filters and search">
-        <div className="bookings-toolbar-top">
-          <div className="bookings-search-box">
-            <Search size={16} aria-hidden="true" />
-            <input
-              type="text"
-              className="bookings-search-input"
-              placeholder="Search by worker, service, or reference..."
-              value={activeSearch}
-              onChange={(e) => {
-                setLocalSearchTerm(e.target.value);
-                onSearchChange?.(e);
-              }}
-              aria-label="Search bookings"
-            />
-            {activeSearch && (
-              <button
-                type="button"
-                className="bookings-search-clear"
-                onClick={() => {
-                  setLocalSearchTerm('');
-                  onSearchChange?.({ target: { value: '' } });
-                }}
-                aria-label="Clear search"
-              >
-                <X size={15} />
-              </button>
-            )}
-          </div>
-
-          <div className="bookings-filter-tabs" role="tablist" aria-label="Booking status filters">
-            {statusFilters.map((filter) => (
-              <button
-                key={filter.key}
-                type="button"
-                role="tab"
-                aria-selected={bookingListCtrl.activeFilter === filter.key}
-                className={`bookings-tab-btn ${bookingListCtrl.activeFilter === filter.key ? 'active' : ''}`}
-                onClick={() => bookingListCtrl.setActiveFilter(filter.key)}
-              >
-                <span>{filter.label}</span>
-                <span className="bookings-tab-badge">{filter.count}</span>
-              </button>
-            ))}
-          </div>
-        </div>
-
-        <div className="bookings-toolbar-sub">
-          <div className="bookings-sub-pills" aria-label="Payment and dispute filters">
-            <span style={{ fontSize: '12px', fontWeight: 800, color: 'var(--gl-text-3)', textTransform: 'uppercase', marginRight: '4px' }}>
-              Filter by:
-            </span>
-            {displayFilters.map((filter) => (
-              <button
-                key={filter.key}
-                type="button"
-                className={`bookings-sub-pill ${bookingListCtrl.displayFilter === filter.key ? 'active' : ''}`}
-                onClick={() => bookingListCtrl.setDisplayFilter(filter.key)}
-              >
-                {filter.label}
-                <span className="bookings-sub-pill-count">{filter.count}</span>
-              </button>
-            ))}
-          </div>
-
-          <p className="bookings-count-label">
-            Showing <strong>{displayedBookings.length}</strong> of {allBookings.length} booking{allBookings.length === 1 ? '' : 's'}
-          </p>
-        </div>
-      </section>
+      <SearchFilterBar
+        activeValue={selectedDisplayFilter}
+        onActiveValueChange={(value) => updateSearchParams({ filter: value })}
+        onSearchValueChange={(value) => {
+          updateSearchParams({ q: value }, true);
+          onSearchChange?.({ target: { value } });
+        }}
+        options={displayFilters}
+        resultLabel={`Showing ${displayedBookings.length} of ${allBookings.length} booking${allBookings.length === 1 ? '' : 's'}`}
+        searchLabel="Search bookings"
+        searchPlaceholder="Search by worker, service, or reference..."
+        searchValue={bookingSearch}
+      />
 
       {/* Error Notices */}
       {(bookingListCtrl.loadError || bookingListCtrl.actionError) && (
@@ -908,25 +940,17 @@ const MyBookings = ({
           </div>
 
           <div className="bookings-empty-actions">
-            <button
-              type="button"
-              className="gl-button primary"
-              onClick={onOpenBrowseServices}
-            >
-              <Search size={16} aria-hidden="true" />
-              Browse Marketplace
-            </button>
-            <button
-              type="button"
-              className="gl-button secondary"
-              onClick={onOpenDashboard}
-            >
-              <Home size={16} aria-hidden="true" />
-              Back to Dashboard
-            </button>
+            {shouldLoadSellerBookings ? (
+              <Button type="button" onClick={onOpenMyWork}>Manage My Work</Button>
+            ) : (
+              <Button type="button" onClick={onOpenBrowseServices}>
+                <Search size={16} aria-hidden="true" />
+                Browse Marketplace
+              </Button>
+            )}
           </div>
 
-          <div className="bookings-quick-categories">
+          {!shouldLoadSellerBookings && <div className="bookings-quick-categories">
             <span style={{ fontSize: '12px', color: 'var(--gl-text-3)', fontWeight: 800, textTransform: 'uppercase' }}>
               Explore:
             </span>
@@ -940,7 +964,7 @@ const MyBookings = ({
                 {cat}
               </button>
             ))}
-          </div>
+          </div>}
         </div>
       )}
 
@@ -964,19 +988,19 @@ const MyBookings = ({
             </p>
           </div>
           <div className="bookings-empty-actions">
-            <button
+            <Button
               type="button"
-              className="gl-button secondary"
+              variant="outline"
               onClick={() => {
                 bookingListCtrl.setActiveFilter('all');
                 bookingListCtrl.setDisplayFilter('all');
-                setLocalSearchTerm('');
+                updateSearchParams({ filter: '', q: '' });
                 onSearchChange?.({ target: { value: '' } });
               }}
             >
               <RotateCcw size={16} aria-hidden="true" />
               Reset All Filters
-            </button>
+            </Button>
           </div>
         </div>
       )}
@@ -1038,14 +1062,14 @@ const MyBookings = ({
               </p>
             </div>
             <div className="bookings-empty-actions">
-              <button
-                type="button"
-                className="gl-button primary"
-                onClick={onOpenBrowseServices}
-              >
-                <Search size={16} aria-hidden="true" />
-                Browse Services
-              </button>
+              {shouldLoadSellerBookings ? (
+                <Button type="button" onClick={onOpenMyWork}>Manage My Work</Button>
+              ) : (
+                <Button type="button" onClick={onOpenBrowseServices}>
+                  <Search size={16} aria-hidden="true" />
+                  Browse Services
+                </Button>
+              )}
             </div>
           </div>
         </main>
@@ -1059,6 +1083,7 @@ const MyBookings = ({
               booking={currentBooking}
               bookings={bookingListCtrl.bookings}
               selectedBookingId={selectedBookingId}
+              initialMobileListOpen={isMobile && !selectedChatBookingId}
               viewerRole={shouldLoadSellerBookings ? 'seller' : 'buyer'}
               onSelectBooking={handleOpenChat}
               onApproveQuote={() => handleApproveQuote(currentBooking.id)}
@@ -1197,43 +1222,22 @@ const MyBookings = ({
         </>
       )}
 
-      {detailBooking && (
-        <div
-          className="booking-detail-modal-backdrop"
-          role="presentation"
-          onMouseDown={(event) => {
-            if (event.target === event.currentTarget) setDetailBookingId(null);
-          }}
-        >
-          <section
-            className="booking-detail-modal gl-card"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="booking-detail-title"
-          >
-            <header className="booking-detail-modal-header">
-              <div>
-                <span className="gl-eyebrow">Booking details</span>
-                <h2 id="booking-detail-title">{detailBooking.serviceType}</h2>
-                <p>{detailBooking.workerName}</p>
-              </div>
-              <button
-                type="button"
-                className="booking-detail-modal-close"
-                aria-label="Close booking details"
-                onClick={() => setDetailBookingId(null)}
-              >
-                <X size={20} aria-hidden="true" />
-              </button>
-            </header>
+      <Dialog open={Boolean(detailBooking)} onOpenChange={(open) => { if (!open) setDetailBookingId(null); }}>
+        {detailBooking && (
+          <DialogContent className="max-w-2xl">
+            <DialogHeader>
+              <span className="gl-eyebrow w-fit">Booking details</span>
+              <DialogTitle>{detailBooking.serviceType}</DialogTitle>
+              <DialogDescription>{shouldLoadSellerBookings ? detailBooking.clientName : detailBooking.workerName}</DialogDescription>
+            </DialogHeader>
 
             <div className="booking-detail-modal-grid">
               <div><span>Status</span><strong>{getStatusMeta(detailBooking.status).label}</strong></div>
               <div><span>Date</span><strong>{detailBooking.selectedSlot?.date || detailBooking.requestDate || 'Coordinated in chat'}</strong></div>
-              <div><span>Time</span><strong>{detailBooking.selectedSlot?.timeBlock ? `${detailBooking.selectedSlot.timeBlock.startTime} - ${detailBooking.selectedSlot.timeBlock.endTime}` : 'Coordinated in chat'}</strong></div>
+              <div><span>Time</span><strong>{formatBookingTimeRange(detailBooking.selectedSlot?.timeBlock)}</strong></div>
               <div><span>Payment</span><strong>{detailBooking.paymentMethod === 'gcash-advance' ? 'GCash Advance' : 'Pending Selection'}</strong></div>
-              <div><span>Service price</span><strong>{formatPhp(detailBooking.quoteAmount || 0)}</strong></div>
-              <div><span>Total charged</span><strong>{formatPhp(detailBooking.totalChargedAmount || detailBooking.quoteAmount || 0)}</strong></div>
+              <div><span>{shouldLoadSellerBookings ? 'Booking amount' : 'Service price'}</span><strong>{formatPhp(detailBooking.quoteAmount || 0)}</strong></div>
+              {!shouldLoadSellerBookings && <div><span>Total charged</span><strong>{formatPhp(detailBooking.totalChargedAmount || detailBooking.quoteAmount || 0)}</strong></div>}
               <div>
                 <span>Provider confirmation</span>
                 <strong>{['seller_claimed', 'buyer_confirmed'].includes(detailBooking.deliveryStatus) ? 'Delivered ✓' : 'Awaiting provider'}</strong>
@@ -1255,23 +1259,22 @@ const MyBookings = ({
               </div>
             )}
 
-            <footer className="booking-detail-modal-actions">
-              <button type="button" className="gl-button secondary" onClick={() => setDetailBookingId(null)}>Close</button>
-              <button
+            <DialogFooter>
+              <DialogClose asChild><Button type="button" variant="outline">Close</Button></DialogClose>
+              <Button
                 type="button"
-                className="gl-button primary"
                 onClick={() => {
                   setDetailBookingId(null);
                   handleOpenChat(detailBooking.id);
                 }}
               >
                 <MessageCircle size={16} aria-hidden="true" />
-                Open Chat
-              </button>
-            </footer>
-          </section>
-        </div>
-      )}
+                {shouldLoadSellerBookings ? 'Message client' : 'Message provider'}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        )}
+      </Dialog>
 
       {currentBooking && uiState === 'payment' && (
         <PaymentModal

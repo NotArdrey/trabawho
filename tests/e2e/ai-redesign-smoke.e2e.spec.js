@@ -169,6 +169,9 @@ test.describe('AI redesign smoke verification', () => {
       await identityDocument.click();
       await page.getByRole('option', { name: 'Passport' }).click();
       await expect(identityDocument).toContainText('Passport');
+      await expect(page.getByRole('navigation', { name: 'Registration progress' })).toBeVisible();
+      await expect(page.getByRole('link', { name: 'Go to next page' })).toBeVisible();
+      await expect(page.getByLabel('Email')).toHaveCount(0);
       await expect(page.getByText('80+')).toHaveCount(0);
       if (viewport.visualVisible) {
         await expect(page.locator('.auth-visual')).toBeVisible();
@@ -188,6 +191,21 @@ test.describe('AI redesign smoke verification', () => {
     await page.getByRole('tab', { name: 'Register' }).click();
     await expect(page).toHaveURL(/\/register$/);
     await expect(page.getByRole('heading', { name: 'Create Account' })).toBeVisible();
+  });
+
+  test('registration steps move forward and backward without losing account choices', async ({ page }) => {
+    await page.goto('/register');
+    const accountType = page.getByLabel('Account Type');
+    await accountType.click();
+    await page.getByRole('option', { name: 'Worker' }).click();
+
+    await page.getByRole('link', { name: 'Go to next page' }).click();
+    await expect(page.getByText('Step 2 of 4')).toBeVisible();
+    await expect(page.getByLabel('Email')).toBeVisible();
+
+    await page.getByRole('link', { name: 'Go to previous page' }).click();
+    await expect(page.getByText('Step 1 of 4')).toBeVisible();
+    await expect(accountType).toContainText('Worker');
   });
 
   test('password recovery route is direct, accessible, and validates safely', async ({ page }) => {

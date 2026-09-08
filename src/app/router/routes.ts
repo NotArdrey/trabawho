@@ -5,6 +5,7 @@ export type LegacyView =
   | "client-dashboard"
   | "browse-services"
   | "my-bookings"
+  | "worker-bookings"
   | "chat"
   | "my-work"
   | "worker-dashboard"
@@ -22,6 +23,7 @@ export const paths = {
   authCallback: "/auth/callback",
   dashboard: "/dashboard",
   bookings: "/bookings",
+  workerBookings: "/worker/bookings",
   messages: "/messages",
   work: "/work",
   workerDashboard: "/worker/dashboard",
@@ -52,6 +54,7 @@ const exactViewPaths: Partial<Record<string, LegacyView>> = {
   [paths.services]: "browse-services",
   [paths.dashboard]: "client-dashboard",
   [paths.bookings]: "my-bookings",
+  [paths.workerBookings]: "worker-bookings",
   [paths.work]: "my-work",
   [paths.workerDashboard]: "worker-dashboard",
   [paths.profile]: "profile",
@@ -65,6 +68,7 @@ const viewPaths: Record<LegacyView, string> = {
   "client-dashboard": paths.dashboard,
   "browse-services": paths.services,
   "my-bookings": paths.bookings,
+  "worker-bookings": paths.workerBookings,
   chat: paths.messages,
   "my-work": paths.work,
   "worker-dashboard": paths.workerDashboard,
@@ -98,12 +102,14 @@ export function isKnownPath(pathname: string): boolean {
 
 export function canAccessPath(pathname: string, role: UserRole): boolean {
   if (pathname === paths.admin) return role === "admin";
-  if (pathname === paths.workerDashboard) return role === "worker" || role === "admin";
+  if (pathname === paths.workerDashboard || pathname === paths.workerBookings) return role === "worker" || role === "admin";
   return true;
 }
 
 export function homePathForRole(role: UserRole): string {
-  return role === "admin" ? paths.admin : paths.dashboard;
+  if (role === "admin") return paths.admin;
+  if (role === "worker") return paths.workerDashboard;
+  return paths.dashboard;
 }
 
 export function getMessageBookingId(pathname: string): string | null {

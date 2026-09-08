@@ -36,10 +36,11 @@ export default function Navigation({
           <Button type="button" variant="ghost" onClick={onProviderClick}>
             Become a provider
           </Button>
+          <span className="mx-1 h-6 w-px shrink-0 bg-border" aria-hidden="true" />
           <Button type="button" variant="ghost" onClick={onLoginClick}>
             Sign in
           </Button>
-          <Button type="button" onClick={onJoinClick}>
+          <Button type="button" className="font-bold text-white" onClick={onJoinClick}>
             Join TrabaWho
           </Button>
         </div>

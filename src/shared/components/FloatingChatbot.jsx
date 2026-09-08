@@ -103,7 +103,7 @@ const getLocalAssistantReply = (input, context) => {
 
 const getQuickPrompts = (currentView, role) => {
   const viewPrompts = QUICK_PROMPTS_BY_VIEW[currentView] || DEFAULT_QUICK_PROMPTS;
-  const prompts = role === 'worker' && currentView !== 'my-work' && currentView !== 'worker-dashboard'
+  const prompts = role === 'worker' && !['my-work', 'worker-dashboard', 'worker-bookings'].includes(currentView)
     ? [...viewPrompts.slice(0, 2), 'Manage my work']
     : viewPrompts;
 
@@ -206,7 +206,7 @@ function FloatingChatbot({
   onOpenChatPage,
   onSearchChange,
 }) {
-  const isWorkView = currentView === 'my-work' || currentView === 'worker-dashboard';
+  const isWorkView = ['my-work', 'worker-dashboard', 'worker-bookings'].includes(currentView);
   const [isOpen, setIsOpen] = useState(false);
   const [inputValue, setInputValue] = useState('');
   const [messages, setMessages] = useState(() => [createWelcomeMessage()]);

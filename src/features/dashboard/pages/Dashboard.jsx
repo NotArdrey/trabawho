@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
   ArrowRight,
-  BriefcaseBusiness,
   CalendarCheck,
   CheckCircle2,
   Clock3,
@@ -9,42 +8,11 @@ import {
   MessageCircle,
   ReceiptText,
   Search,
-  ShieldCheck,
-  UserRound,
 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { MetricCard } from '@/components/ui/metric-card';
 import DashboardNavigation from '../../../shared/components/DashboardNavigation';
 import { fetchClientDashboardSnapshot } from '../../bookings/services/bookingService';
-
-const quickActions = [
-  {
-    id: 'browse',
-    title: 'Browse Services',
-    description: 'Search active listings, compare providers, and book from the refreshed marketplace.',
-    icon: Search,
-    accent: 'blue',
-  },
-  {
-    id: 'bookings',
-    title: 'My Bookings',
-    description: 'Review quote requests, schedule changes, payment status, refunds, chats, and ratings.',
-    icon: CalendarCheck,
-    accent: 'emerald',
-  },
-  {
-    id: 'work',
-    title: 'My Work',
-    description: 'Manage service listings, inquiries, availability, and payouts from the seller desk.',
-    icon: BriefcaseBusiness,
-    accent: 'amber',
-  },
-  {
-    id: 'profile',
-    title: 'Profile',
-    description: 'Keep your public details, location, and account preferences current.',
-    icon: UserRound,
-    accent: 'slate',
-  },
-];
 
 const terminalStatuses = new Set(['Completed Service', 'Service Stopped', 'Cancelled', 'Cancelled (Cash)', 'Refunded']);
 const scheduledStatuses = new Set([
@@ -55,16 +23,11 @@ const scheduledStatuses = new Set([
   'Cash Verification Denied',
   'Active Service',
 ]);
-const paymentStatuses = new Set([
+const clientActionStatuses = new Set([
+  'Awaiting Slot Selection',
   'Payment Pending',
   'Slot Selected - Payment Pending',
-  'Service Scheduled',
-  'Payment Confirmed',
-  'Payment Submitted',
-  'Cash Verification Pending',
   'Cash Verification Denied',
-  'Refund Processing',
-  'Refunded',
 ]);
 
 const emptyDashboardData = {
@@ -148,19 +111,6 @@ const formatTimeAgo = (value) => {
   return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 };
 
-const hasPaymentActivity = (booking = {}) => (
-  paymentStatuses.has(booking.status)
-  || Boolean(
-    booking.paymentMethod
-      || booking.paymentReference
-      || booking.transactionId
-      || booking.paymentProofSubmitted
-      || booking.refundStatus
-      || booking.refundReference
-      || booking.cashConfirmationStatus
-  )
-);
-
 const getMessagePreview = (message = {}) => {
   if (message.attachments?.type === 'quote' || message.message_type === 'quote') return 'Quote sent in chat';
   const body = String(message.body ?? message.content ?? '').trim();
@@ -201,38 +151,49 @@ const buildDashboardModel = (data, isLoading) => {
       schedule: formatSchedule(booking),
       status: booking.status || 'Pending',
     }));
-  const paymentCount = bookings.filter(hasPaymentActivity).length;
+  const actionNeededCount = bookings.filter((booking) => (
+    clientActionStatuses.has(booking.status)
+    || Boolean(booking.canRate)
+  )).length;
   const nextBookingDetail = upcomingBookings[0]
     ? `Next service ${upcomingBookings[0].schedule.toLowerCase()}`
     : 'No scheduled services';
   const metrics = [
     {
-      label: 'Active requests',
+      id: 'active',
+      label: 'Active bookings',
       value: isLoading && bookings.length === 0 ? '...' : String(activeBookings.length),
       detail: isLoading && bookings.length === 0 ? 'Loading bookings' : `${awaitingReplyCount} awaiting provider reply`,
       icon: Clock3,
-      accent: 'blue',
+      tone: 'blue',
     },
     {
+      id: 'upcoming',
       label: 'Upcoming bookings',
       value: isLoading && bookings.length === 0 ? '...' : String(upcomingBookings.length),
       detail: isLoading && bookings.length === 0 ? 'Loading schedule' : nextBookingDetail,
       icon: CalendarCheck,
-      accent: 'emerald',
+      tone: 'green',
     },
     {
+      id: 'messages',
       label: 'Unread messages',
       value: isLoading && messages.length === 0 ? '...' : String(data.unreadMessageCount || 0),
-      detail: isLoading && messages.length === 0 ? 'Loading chats' : 'Across active chats',
+      detail: isLoading && messages.length === 0
+        ? 'Loading chats'
+        : (data.unreadMessageCount ? 'Across active chats' : 'No unread messages'),
       icon: MessageCircle,
-      accent: 'amber',
+      tone: 'sky',
     },
     {
-      label: 'Payments tracked',
-      value: isLoading && bookings.length === 0 ? '...' : String(paymentCount),
-      detail: isLoading && bookings.length === 0 ? 'Loading payments' : 'Receipts and refunds',
+      id: 'actions',
+      label: 'Action needed',
+      value: isLoading && bookings.length === 0 ? '...' : String(actionNeededCount),
+      detail: isLoading && bookings.length === 0
+        ? 'Checking bookings'
+        : (actionNeededCount ? 'Review booking updates' : "You're all caught up"),
       icon: ReceiptText,
-      accent: 'slate',
+      tone: 'orange',
     },
   ];
   const messageUpdates = messages.map((message) => {
@@ -296,29 +257,22 @@ function Dashboard({
   const [dashboardData, setDashboardData] = useState(emptyDashboardData);
   const [isDashboardLoading, setIsDashboardLoading] = useState(true);
   const [dashboardError, setDashboardError] = useState('');
-  const normalizedRole = String(sellerProfile?.role || '').trim().toLowerCase();
-  const hasSellerProfile = normalizedRole === 'worker'
-    || (!normalizedRole && Boolean(
-      sellerProfile?.isWorker
-        || sellerProfile?.sellerId
-        || sellerProfile?.workerProfileId
-    ));
 
   const displayName = sellerProfile?.firstName
     || sellerProfile?.fullName
     || sellerProfile?.full_name
     || 'there';
 
-  const actionHandlers = {
-    browse: onOpenBrowseServices,
-    bookings: onOpenMyBookings,
-    work: onOpenMyWork,
-    profile: onOpenProfile,
-  };
   const dashboardModel = useMemo(
     () => buildDashboardModel(dashboardData, isDashboardLoading),
     [dashboardData, isDashboardLoading]
   );
+  const metricHandlers = {
+    active: () => onOpenMyBookings?.(),
+    upcoming: () => onOpenMyBookings?.(),
+    messages: () => onOpenChatPage?.(),
+    actions: () => onOpenMyBookings?.(),
+  };
 
   useEffect(() => {
     let isMounted = true;
@@ -377,7 +331,7 @@ function Dashboard({
 
       <main className="gl-shell gl-page-pad dashboard-launchpad">
         <section className="dashboard-overview" aria-labelledby="dashboard-title">
-          <div className="dashboard-overview-head">
+          <div className="dashboard-overview-head dashboard-client-header">
             <div>
               <span className="gl-eyebrow">
                 <LayoutDashboard size={15} aria-hidden="true" />
@@ -394,35 +348,26 @@ function Dashboard({
               )}
             </div>
             <div className="dashboard-hero-actions">
-              <button className="gl-button primary" type="button" onClick={onOpenBrowseServices}>
+              <Button type="button" onClick={onOpenBrowseServices}>
                 <Search size={17} aria-hidden="true" />
-                Browse Services
-              </button>
-              {hasSellerProfile && (
-                <button className="gl-button secondary" type="button" onClick={onOpenMyWork}>
-                  <BriefcaseBusiness size={17} aria-hidden="true" />
-                  Open My Work
-                </button>
-              )}
+                Browse services
+              </Button>
             </div>
           </div>
 
           <div className="dashboard-metric-grid">
-            {dashboardModel.metrics.map((item) => {
-              const Icon = item.icon;
-              return (
-                <article className={`dashboard-metric-card accent-${item.accent}`} key={item.label}>
-                  <span className="dashboard-metric-icon">
-                    <Icon size={18} aria-hidden="true" />
-                  </span>
-                  <div>
-                    <p className="dashboard-metric-value">{item.value}</p>
-                    <h2>{item.label}</h2>
-                    <span>{item.detail}</span>
-                  </div>
-                </article>
-              );
-            })}
+            {dashboardModel.metrics.map((item) => (
+              <MetricCard
+                key={item.label}
+                detail={item.detail}
+                icon={item.icon}
+                label={item.label}
+                actionLabel={item.id === 'messages' ? 'Open messages' : `Open bookings for ${item.label.toLowerCase()}`}
+                onClick={metricHandlers[item.id]}
+                tone={item.tone}
+                value={item.value}
+              />
+            ))}
           </div>
         </section>
 
@@ -430,8 +375,8 @@ function Dashboard({
           <article className="dashboard-main-panel gl-card">
             <div className="dashboard-panel-head">
               <div>
-                <h2>Upcoming bookings</h2>
-                <p>Keep the next appointments easy to scan.</p>
+                <h2>Your next services</h2>
+                <p>Upcoming appointments and active requests.</p>
               </div>
               <button className="gl-icon-button" type="button" onClick={onOpenMyBookings} aria-label="Open bookings" title="Open bookings">
                 <ArrowRight size={18} aria-hidden="true" />
@@ -450,14 +395,17 @@ function Dashboard({
                   <span className="dashboard-status-pill">{booking.status}</span>
                 </div>
               )) : (
-                <div className="dashboard-booking-row">
+                <div className="dashboard-booking-row dashboard-client-empty">
                   <span className="dashboard-booking-icon">
                     <CalendarCheck size={18} aria-hidden="true" />
                   </span>
                   <div>
                     <strong>{isDashboardLoading ? 'Loading bookings...' : 'No upcoming bookings'}</strong>
-                    <p>{isDashboardLoading ? 'Checking your latest schedule.' : 'Confirmed appointments will appear here.'}</p>
+                    <p>{isDashboardLoading ? 'Checking your latest schedule.' : 'Find a trusted provider whenever you are ready.'}</p>
                   </div>
+                  {!isDashboardLoading && (
+                    <Button type="button" variant="outline" onClick={onOpenBrowseServices}>Browse services</Button>
+                  )}
                 </div>
               )}
             </div>
@@ -467,7 +415,7 @@ function Dashboard({
             <div className="dashboard-panel-head">
               <div>
                 <h2>Recent updates</h2>
-                <p>Latest account activity.</p>
+                <p>Booking and message activity.</p>
               </div>
             </div>
             <div className="dashboard-update-list">
@@ -494,44 +442,6 @@ function Dashboard({
           </aside>
         </section>
 
-        <section className="dashboard-action-grid" aria-label="Primary dashboard actions">
-          {quickActions.filter((action) => action.id !== 'work' || hasSellerProfile).map((action) => {
-            const Icon = action.icon;
-            const handler = actionHandlers[action.id];
-
-            return (
-              <article className={`dashboard-action-card gl-card accent-${action.accent}`} key={action.id}>
-                <div className="dashboard-action-icon">
-                  <Icon size={20} aria-hidden="true" />
-                </div>
-                <div>
-                  <h2>{action.title}</h2>
-                  <p>{action.description}</p>
-                </div>
-                <button className="gl-icon-button" type="button" onClick={handler} aria-label="Open launchpad action" title={action.title}>
-                  <ArrowRight size={18} aria-hidden="true" />
-                </button>
-              </article>
-            );
-          })}
-        </section>
-
-        <section className="dashboard-wide-panel gl-card">
-          <div>
-            <span className="dashboard-inline-icon">
-              <ShieldCheck size={18} aria-hidden="true" />
-              Account health
-            </span>
-            <h2>Profile and booking details are ready</h2>
-            <p>Keep your contact information, saved locations, and notification preferences up to date.</p>
-          </div>
-          <div className="dashboard-panel-actions">
-            <button className="gl-button secondary" type="button" onClick={onOpenProfile}>
-              <UserRound size={17} aria-hidden="true" />
-              Review Profile
-            </button>
-          </div>
-        </section>
       </main>
     </div>
   );

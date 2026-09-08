@@ -1,5 +1,6 @@
 import React from 'react';
 import { render, screen, fireEvent } from '@testing-library/react';
+import { MemoryRouter, useLocation } from 'react-router-dom';
 import MyBookings from './MyBookings';
 
 // Mock the navigation component to simplify testing
@@ -9,7 +10,7 @@ vi.mock('../../../shared/components/DashboardNavigation', () => ({
 
 // Mock child modals
 vi.mock('../components/ChatWindow', () => ({
-  default: () => <div data-testid="mock-chat-window">Chat</div>,
+  default: ({ viewerRole }) => <div data-testid="mock-chat-window" data-viewer-role={viewerRole}>Chat</div>,
 }));
 vi.mock('../components/SlotSelectionModal', () => ({
   default: () => <div data-testid="mock-slot-modal">Slots</div>,
@@ -28,11 +29,15 @@ const mockBookings = [
   {
     id: 'b1',
     workerName: 'Juan Dela Cruz',
+    clientName: 'Ana Client',
     serviceType: 'Tutor',
     description: 'Math tutorial sessions for grade 10',
     status: 'Service Scheduled',
     quoteAmount: 1500,
     requestDate: '2026-08-20',
+    selectedSlot: {
+      timeBlock: { startTime: '08:08', endTime: '10:08' },
+    },
     bookingMode: 'calendar-only',
     bookingModeLabel: 'Direct Schedule',
     paymentMethod: 'gcash-advance',
@@ -53,10 +58,13 @@ const mockBookings = [
 
 let mockCurrentBookings = [];
 let mockIsLoading = false;
+let mockListRole = '';
 const mockHandleOpenRating = vi.fn();
 
 vi.mock('../hooks', () => ({
-  useBookingListController: () => ({
+  useBookingListController: (_initialBookings, options) => {
+    mockListRole = options.listRole;
+    return ({
     bookings: mockCurrentBookings,
     filteredBookings: mockCurrentBookings,
     activeFilter: 'all',
@@ -73,7 +81,8 @@ vi.mock('../hooks', () => ({
     handleRejectQuote: vi.fn(),
     handleStopServiceAccepted: vi.fn(),
     getBooking: (id) => mockCurrentBookings.find((b) => String(b.id) === String(id)),
-  }),
+    });
+  },
   usePaymentController: () => ({
     handleSelectPaymentMethod: vi.fn(),
   }),
@@ -90,6 +99,14 @@ vi.mock('../hooks', () => ({
 }));
 
 describe('MyBookings Redesign Component', () => {
+  const LocationProbe = () => {
+    const location = useLocation();
+    return <output data-testid="location-probe">{`${location.pathname}${location.search}`}</output>;
+  };
+  const renderBookings = (component, initialEntry = '/bookings?scope=purchases') => render(
+    <MemoryRouter initialEntries={[initialEntry]}>{component}<LocationProbe /></MemoryRouter>
+  );
+
   beforeEach(() => {
     mockCurrentBookings = [];
     mockIsLoading = false;
@@ -100,7 +117,7 @@ describe('MyBookings Redesign Component', () => {
     mockCurrentBookings = [];
     const handleBrowse = vi.fn();
 
-    render(
+    renderBookings(
       <MyBookings
         currentView="my-bookings"
         onOpenBrowseServices={handleBrowse}
@@ -119,15 +136,15 @@ describe('MyBookings Redesign Component', () => {
   test('renders KPI snapshot cards and booking cards when bookings exist', () => {
     mockCurrentBookings = mockBookings;
 
-    render(
+    renderBookings(
       <MyBookings
         currentView="my-bookings"
       />
     );
 
     // KPI Metrics
-    expect(screen.getByText('Total Bookings')).toBeInTheDocument();
-    expect(screen.getByText('Active & Scheduled')).toBeInTheDocument();
+    expect(screen.getByText('Total bookings')).toBeInTheDocument();
+    expect(screen.getByText('Active & scheduled')).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Completed' })).toBeInTheDocument();
 
     // Booking Cards
@@ -142,7 +159,7 @@ describe('MyBookings Redesign Component', () => {
   test('allows searching bookings by provider or service name', () => {
     mockCurrentBookings = mockBookings;
 
-    render(
+    renderBookings(
       <MyBookings
         currentView="my-bookings"
       />
@@ -159,13 +176,14 @@ describe('MyBookings Redesign Component', () => {
   test('opens booking details from a card', () => {
     mockCurrentBookings = mockBookings;
 
-    render(<MyBookings currentView="my-bookings" />);
+    renderBookings(<MyBookings currentView="my-bookings" />);
 
     fireEvent.click(screen.getAllByRole('button', { name: /View Details/i })[0]);
 
     const detailsDialog = screen.getByRole('dialog', { name: /Tutor/i });
     expect(detailsDialog).toBeInTheDocument();
     expect(detailsDialog).toHaveTextContent('GCASH-998811');
+    expect(detailsDialog).toHaveTextContent('8:08 AM – 10:08 AM');
   });
 
   test('lets a buyer open payment directly from a pending booking card', () => {
@@ -175,7 +193,7 @@ describe('MyBookings Redesign Component', () => {
       paymentStatus: 'pending_provider',
     }];
 
-    render(<MyBookings currentView="my-bookings" />);
+    renderBookings(<MyBookings currentView="my-bookings" />);
 
     fireEvent.click(screen.getByRole('button', { name: /Pay Now/i }));
     fireEvent.click(screen.getByTestId('mock-terms-modal'));
@@ -191,7 +209,10 @@ describe('MyBookings Redesign Component', () => {
       deliveryStatus: 'not_delivered',
     }];
 
-    render(<MyBookings currentView="my-bookings" sellerProfile={{ role: 'worker', userId: 'worker-1' }} />);
+    renderBookings(
+      <MyBookings currentView="worker-bookings" sellerProfile={{ role: 'worker', userId: 'worker-1' }} />,
+      '/worker/bookings?scope=incoming',
+    );
 
     expect(screen.getByRole('button', { name: /Mark Delivered/i })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Confirm Completion/i })).not.toBeInTheDocument();
@@ -200,9 +221,56 @@ describe('MyBookings Redesign Component', () => {
   test('opens the rating workflow instead of routing to hidden chat controls', () => {
     mockCurrentBookings = [mockBookings[1]];
 
-    render(<MyBookings currentView="my-bookings" />);
+    renderBookings(<MyBookings currentView="my-bookings" />);
     fireEvent.click(screen.getByRole('button', { name: /Rate Service/i }));
 
     expect(mockHandleOpenRating).toHaveBeenCalledWith('b2');
+  });
+
+  test('shows client bookings by default in the provider booking workspace', () => {
+    mockCurrentBookings = mockBookings;
+
+    renderBookings(
+      <MyBookings currentView="worker-bookings" sellerProfile={{ role: 'worker', userId: 'worker-1' }} />,
+      '/worker/bookings?scope=incoming',
+    );
+
+    expect(screen.getByRole('heading', { name: 'Bookings' })).toBeInTheDocument();
+    expect(screen.getByText('Ana Client')).toBeInTheDocument();
+    expect(screen.getAllByRole('button', { name: 'Message client' })).toHaveLength(2);
+    expect(mockListRole).toBe('seller');
+  });
+
+  test('forces client-only accounts onto purchased services', () => {
+    mockCurrentBookings = mockBookings;
+
+    renderBookings(<MyBookings currentView="my-bookings" sellerProfile={{ role: 'client' }} />, '/bookings?scope=incoming');
+
+    expect(screen.getByRole('heading', { name: 'My Bookings' })).toBeInTheDocument();
+    expect(screen.getByText('Juan Dela Cruz')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Incoming bookings' })).not.toBeInTheDocument();
+    expect(mockListRole).toBe('buyer');
+  });
+
+  test('keeps a worker in the provider route while switching booking scopes', () => {
+    mockCurrentBookings = mockBookings;
+    renderBookings(
+      <MyBookings currentView="worker-bookings" sellerProfile={{ role: 'worker', userId: 'worker-1' }} />,
+      '/worker/bookings?scope=incoming',
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Services I booked' }));
+    expect(screen.getByTestId('location-probe')).toHaveTextContent('/worker/bookings?scope=purchases');
+    expect(mockListRole).toBe('buyer');
+  });
+
+  test('uses the booking scope to set the chat participant role', () => {
+    mockCurrentBookings = mockBookings;
+    renderBookings(
+      <MyBookings currentView="chat" selectedChatBookingId="b1" sellerProfile={{ role: 'worker', userId: 'worker-1' }} />,
+      '/messages/b1?scope=purchases',
+    );
+
+    expect(screen.getByTestId('mock-chat-window')).toHaveAttribute('data-viewer-role', 'buyer');
   });
 });

@@ -1,19 +1,31 @@
+import { useState } from 'react';
+import { CheckCircle2, CreditCard, Download, FileText, MapPin, QrCode, ShieldCheck, Star } from 'lucide-react';
 
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { Separator } from '@/components/ui/separator';
 
-import { useEffect, useState } from 'react';
+const qrImageToDataUrl = async (url) => {
+  const response = await fetch(url);
+  if (!response.ok) throw new Error('Unable to load verification QR code.');
+  const blob = await response.blob();
 
-/**
- * DigitalPortfolioModal Component
- * 
- * Generates and downloads a professional PDF resume with QR code for the worker.
- * Uses jsPDF to create the PDF document client-side.
- * 
- * Features:
- * - Worker profile info (name, service, bio, location)
- * - QR code linking to profile verification
- * - Professional formatting
- * - One-click download
- */
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = () => reject(new Error('Unable to read verification QR code.'));
+    reader.readAsDataURL(blob);
+  });
+};
+
 const DigitalPortfolioModal = ({
   isOpen,
   workerName = 'Service Provider',
@@ -26,315 +38,179 @@ const DigitalPortfolioModal = ({
   onClose,
 }) => {
   const [generationError, setGenerationError] = useState('');
-  const [isMobile, setIsMobile] = useState(() =>
-    typeof window !== 'undefined' ? window.innerWidth <= 720 : false
-  );
-
-  useEffect(() => {
-    if (typeof window === 'undefined') return undefined;
-
-    const handleResize = () => setIsMobile(window.innerWidth <= 720);
-    handleResize();
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, []);
-
-  if (!isOpen) return null;
-
-  const styles = {
-    overlay: {
-      position: 'fixed',
-      inset: 0,
-      backgroundColor: 'rgba(15, 23, 42, 0.58)',
-      display: 'flex',
-      alignItems: isMobile ? 'flex-start' : 'center',
-      justifyContent: 'center',
-      padding: isMobile ? '0.75rem' : '1rem',
-      zIndex: 280,
-      overflowY: 'auto',
-    },
-    card: {
-      width: 'min(100%, 980px)',
-      maxHeight: isMobile ? 'calc(100svh - 24px)' : '94vh',
-      overflowY: 'auto',
-      backgroundColor: '#ffffff',
-      borderRadius: '0.9rem',
-      border: '1px solid #e2e8f0',
-      boxShadow: '0 18px 42px rgba(15, 23, 42, 0.26)',
-    },
-    header: {
-      display: 'flex',
-      justifyContent: 'space-between',
-      alignItems: isMobile ? 'flex-start' : 'center',
-      gap: '0.75rem',
-      padding: isMobile ? '0.75rem' : '0.85rem 1rem',
-      borderBottom: '1px solid #e2e8f0',
-      backgroundColor: '#f8fafc',
-    },
-    close: { width: '32px', height: '32px', borderRadius: '999px', border: '1px solid #cbd5e1', backgroundColor: '#ffffff', cursor: 'pointer' },
-    body: {
-      display: 'grid',
-      gridTemplateColumns: isMobile ? 'minmax(0, 1fr)' : 'minmax(270px, 1.4fr) minmax(220px, 1fr)',
-      gap: '0.8rem',
-      padding: isMobile ? '0.75rem' : '1rem',
-      alignItems: 'start',
-    },
-    previewWrap: { width: '100%' },
-    previewCard: {
-      border: '1px solid #e2e8f0',
-      borderRadius: '0.7rem',
-      backgroundColor: '#ffffff',
-      padding: '0.9rem',
-      color: '#0f172a',
-      overflowWrap: 'break-word',
-    },
-    previewHeader: {
-      borderBottom: '1px solid #e2e8f0',
-      paddingBottom: '0.5rem',
-      marginBottom: '0.6rem',
-    },
-    previewService: { margin: 0, color: 'var(--gl-blue)', fontWeight: 700 },
-    previewRating: { margin: '0.25rem 0 0', color: '#334155' },
-    section: { marginBottom: '0.55rem' },
-    qrSection: { textAlign: 'center' },
-    qrImage: { width: '120px', height: '120px', objectFit: 'contain' },
-    previewFooter: { color: '#64748b', fontSize: '0.8rem', marginTop: '0.6rem' },
-    infoBox: {
-      border: '1px solid #e2e8f0',
-      borderRadius: '0.7rem',
-      backgroundColor: '#f8fafc',
-      padding: '0.8rem',
-      color: '#334155',
-      fontSize: '0.92rem',
-      lineHeight: 1.45,
-    },
-    errorNotice: {
-      marginTop: '0.75rem',
-      border: '1px solid #fecaca',
-      borderRadius: '0.55rem',
-      backgroundColor: '#fee2e2',
-      color: '#991b1b',
-      padding: '0.65rem 0.75rem',
-      fontSize: '0.92rem',
-      fontWeight: 700,
-    },
-    actions: {
-      display: 'flex',
-      justifyContent: 'flex-end',
-      gap: '0.5rem',
-      borderTop: '1px solid #e2e8f0',
-      padding: isMobile ? '0.75rem' : '0.75rem 1rem',
-      flexDirection: isMobile ? 'column' : 'row',
-    },
-    cancelButton: { border: '1px solid #cbd5e1', borderRadius: '0.45rem', backgroundColor: '#ffffff', padding: '0.5rem 0.75rem', cursor: 'pointer', fontWeight: 600, width: isMobile ? '100%' : 'auto' },
-    downloadButton: { border: 'none', borderRadius: '0.45rem', backgroundColor: 'var(--gl-blue)', color: '#ffffff', padding: '0.5rem 0.75rem', cursor: 'pointer', fontWeight: 700, width: isMobile ? '100%' : 'auto' },
-  };
+  const [isGenerating, setIsGenerating] = useState(false);
+  const ratingLabel = Number.isFinite(Number(rating)) ? Number(rating).toFixed(1) : 'Not rated';
+  const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=240x240&data=${encodeURIComponent(
+    `TrabaWho Profile: ${workerName} - ${serviceType}`
+  )}`;
 
   const generatePDF = async () => {
     try {
       setGenerationError('');
-      // Dynamically import jsPDF to avoid build-time dependency issues
+      setIsGenerating(true);
       const { jsPDF } = await import('jspdf');
-
       const doc = new jsPDF('p', 'mm', 'a4');
       const pageWidth = doc.internal.pageSize.getWidth();
       const pageHeight = doc.internal.pageSize.getHeight();
-      
-      // Background color (TrabaWho brand accent)
+      const margin = 20;
+      const contentWidth = pageWidth - (margin * 2);
+
       doc.setFillColor(21, 87, 192);
-      doc.rect(0, 0, pageWidth, 50, 'F');
-
-      // Title
+      doc.rect(0, 0, pageWidth, 46, 'F');
+      doc.setFillColor(255, 255, 255);
+      doc.roundedRect(margin, 13, 35, 8, 4, 4, 'F');
+      doc.setTextColor(21, 87, 192);
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(9);
+      doc.text('TRABAWHO', margin + 17.5, 18.4, { align: 'center' });
       doc.setTextColor(255, 255, 255);
-      doc.setFontSize(24);
+      doc.setFontSize(23);
+      doc.text('Professional Portfolio', margin, 32);
+
+      let y = 61;
+      doc.setTextColor(15, 23, 42);
       doc.setFont('helvetica', 'bold');
-      doc.text('Digital Professional Portfolio', pageWidth / 2, 20, { align: 'center' });
-      
-      doc.setFontSize(10);
-      doc.setFont('helvetica', 'normal');
-      doc.text('TrabaWho Verified Professional', pageWidth / 2, 30, { align: 'center' });
-
-      // Main content starts
-      doc.setTextColor(0, 0, 0);
-      let yPosition = 60;
-
-      // Worker Name
-      doc.setFontSize(18);
-      doc.setFont('helvetica', 'bold');
-      doc.text(workerName, 20, yPosition);
-      yPosition += 8;
-
-      // Service Type
+      doc.setFontSize(20);
+      doc.text(doc.splitTextToSize(workerName, contentWidth), margin, y);
+      y += 9;
+      doc.setTextColor(21, 87, 192);
       doc.setFontSize(12);
+      doc.text(doc.splitTextToSize(serviceType, contentWidth), margin, y);
+      y += 8;
+      doc.setTextColor(71, 85, 105);
       doc.setFont('helvetica', 'normal');
-      doc.setTextColor(100, 100, 100);
-      doc.text(`Service: ${serviceType}`, 20, yPosition);
-      yPosition += 8;
-
-      // Rating
-      doc.text(`Rating: ⭐ ${rating}/5 (TrabaWho Verified)`, 20, yPosition);
-      yPosition += 12;
-
-      // Divider line
-      doc.setDrawColor(200, 200, 200);
-      doc.line(20, yPosition, pageWidth - 20, yPosition);
-      yPosition += 8;
-
-      // Bio Section
-      doc.setFontSize(11);
-      doc.setFont('helvetica', 'bold');
-      doc.setTextColor(21, 87, 192);
-      doc.text('Professional Summary', 20, yPosition);
-      yPosition += 6;
-
       doc.setFontSize(10);
-      doc.setFont('helvetica', 'normal');
-      doc.setTextColor(0, 0, 0);
-      const bioLines = doc.splitTextToSize(bio, pageWidth - 40);
-      doc.text(bioLines, 20, yPosition);
-      yPosition += bioLines.length * 5 + 4;
+      doc.text(`Verified provider  |  Rating ${ratingLabel} / 5`, margin, y);
+      y += 11;
 
-      // Location Section
-      doc.setFontSize(11);
-      doc.setFont('helvetica', 'bold');
+      doc.setDrawColor(226, 232, 240);
+      doc.line(margin, y, pageWidth - margin, y);
+      y += 11;
+
+      const addSection = (label, value) => {
+        doc.setTextColor(21, 87, 192);
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(10);
+        doc.text(label.toUpperCase(), margin, y);
+        y += 6;
+        doc.setTextColor(30, 41, 59);
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(10.5);
+        const lines = doc.splitTextToSize(value, contentWidth);
+        doc.text(lines, margin, y);
+        y += (lines.length * 5.5) + 9;
+      };
+
+      addSection('Professional summary', bio);
+      addSection('Service location', location);
+      addSection('Payment contact', `GCash ${gcashNumber}`);
+
       doc.setTextColor(21, 87, 192);
-      doc.text('Service Location', 20, yPosition);
-      yPosition += 6;
-
+      doc.setFont('helvetica', 'bold');
       doc.setFontSize(10);
-      doc.setFont('helvetica', 'normal');
-      doc.setTextColor(0, 0, 0);
-      doc.text(`📍 ${location}`, 20, yPosition);
-      yPosition += 10;
-
-      // Payment Method Section
-      doc.setFontSize(11);
-      doc.setFont('helvetica', 'bold');
-      doc.setTextColor(21, 87, 192);
-      doc.text('Payment Method', 20, yPosition);
-      yPosition += 6;
-
-      doc.setFontSize(10);
-      doc.setFont('helvetica', 'normal');
-      doc.setTextColor(0, 0, 0);
-      doc.text(`💳 GCash: ${gcashNumber}`, 20, yPosition);
-      yPosition += 10;
-
-      // QR Code Section
-      if (yPosition > pageHeight - 50) {
-        doc.addPage();
-        yPosition = 20;
-      }
-
-      doc.setFontSize(11);
-      doc.setFont('helvetica', 'bold');
-      doc.setTextColor(21, 87, 192);
-      doc.text('Verification QR Code', 20, yPosition);
-      yPosition += 6;
-
-      // Generate QR code image (using QR server API)
-      const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(
-        `TrabaWho Profile: ${workerName} - ${serviceType}`
-      )}`;
+      doc.text('PROFILE VERIFICATION', margin, y);
+      y += 7;
 
       try {
-        doc.addImage(qrCodeUrl, 'PNG', 20, yPosition, 50, 50);
-      } catch (e) {
-        doc.setFontSize(9);
-        doc.text('QR Code: Visit trabawho.app to verify profile', 20, yPosition);
+        const qrDataUrl = await qrImageToDataUrl(qrCodeUrl);
+        doc.addImage(qrDataUrl, 'PNG', margin, y, 42, 42);
+      } catch {
+        doc.setDrawColor(203, 213, 225);
+        doc.roundedRect(margin, y, 42, 42, 2, 2, 'S');
+        doc.setTextColor(100, 116, 139);
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(8);
+        doc.text('QR unavailable', margin + 21, y + 22, { align: 'center' });
       }
 
-      // Footer
-      doc.setFontSize(8);
-      doc.setTextColor(150, 150, 150);
-      doc.text('Generated by TrabaWho • Trusted Service Marketplace', pageWidth / 2, pageHeight - 10, { align: 'center' });
-      doc.text(`Date: ${new Date().toLocaleDateString()}`, pageWidth / 2, pageHeight - 5, { align: 'center' });
+      doc.setTextColor(71, 85, 105);
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(9);
+      doc.text('Scan to verify this provider profile on TrabaWho.', margin + 50, y + 17);
+      doc.text('Profile details reflect the information available at export.', margin + 50, y + 24);
 
-      // Download PDF
-      const fileName = `${workerName}_TrabaWho_Portfolio_${new Date().getFullYear()}.pdf`;
-      doc.save(fileName);
+      doc.setDrawColor(226, 232, 240);
+      doc.line(margin, pageHeight - 18, pageWidth - margin, pageHeight - 18);
+      doc.setTextColor(100, 116, 139);
+      doc.setFontSize(8);
+      doc.text('Generated by TrabaWho | Trusted Service Marketplace', margin, pageHeight - 11);
+      doc.text(new Date().toLocaleDateString('en-PH'), pageWidth - margin, pageHeight - 11, { align: 'right' });
+
+      const safeName = workerName.replace(/[^a-z0-9]+/gi, '-').replace(/^-|-$/g, '') || 'provider';
+      doc.save(`${safeName}-TrabaWho-Portfolio.pdf`);
     } catch (error) {
-      setGenerationError('Could not generate PDF. Please try again.');
+      setGenerationError(error?.message || 'Could not generate the PDF. Please try again.');
+    } finally {
+      setIsGenerating(false);
     }
   };
 
   return (
-    <div style={styles.overlay} role="dialog" aria-modal="true" aria-labelledby="portfolio-modal-title">
-      <div style={styles.card}>
-        <div style={styles.header}>
-          <h3 id="portfolio-modal-title">Generate Digital Portfolio</h3>
-          <button style={styles.close} onClick={onClose}>✕</button>
-        </div>
+    <Dialog open={isOpen} onOpenChange={(open) => { if (!open) onClose(); }}>
+      <DialogContent className="max-w-4xl gap-0 overflow-hidden p-0">
+        <DialogHeader className="px-6 pb-5 pt-6">
+          <div className="mb-2 flex items-center gap-2 text-primary">
+            <FileText className="size-5" aria-hidden="true" />
+            <Badge variant="secondary">PDF portfolio</Badge>
+          </div>
+          <DialogTitle>Preview professional portfolio</DialogTitle>
+          <DialogDescription>Review the information below before downloading the shareable PDF.</DialogDescription>
+        </DialogHeader>
 
-        <div style={styles.body}>
-          <div style={styles.previewWrap}>
-            <div style={styles.previewCard}>
-              <div style={styles.previewHeader}>
-                <h2>{workerName}</h2>
-                <p style={styles.previewService}>{serviceType}</p>
-                <p style={styles.previewRating}>⭐ {rating}/5 - TrabaWho Verified</p>
+        <Separator />
+
+        <div className="grid min-h-0 gap-6 overflow-y-auto p-6 lg:grid-cols-[minmax(0,1.5fr)_minmax(15rem,0.75fr)]">
+          <article className="rounded-xl bg-muted/45 p-5" aria-label="Portfolio preview">
+            <header className="flex min-w-0 items-start gap-4">
+              {profilePhoto ? <img className="size-14 shrink-0 rounded-full object-cover ring-1 ring-border" src={profilePhoto} alt="" /> : null}
+              <div className="min-w-0 flex-1">
+                <h2 className="truncate text-xl font-bold">{workerName}</h2>
+                <p className="mt-1 font-semibold text-primary">{serviceType}</p>
+                <div className="mt-2 flex flex-wrap items-center gap-2">
+                  <Badge variant="success"><ShieldCheck aria-hidden="true" />Verified provider</Badge>
+                  <span className="inline-flex items-center gap-1 text-sm text-muted-foreground"><Star className="size-4 fill-orange-400 text-orange-400" aria-hidden="true" />{ratingLabel} / 5</span>
+                </div>
               </div>
+            </header>
 
-              <div style={styles.section}>
-                <h4>Professional Summary</h4>
-                <p>{bio}</p>
+            <Separator className="my-5" />
+
+            <div className="space-y-5">
+              <section>
+                <h3 className="text-sm font-semibold">Professional summary</h3>
+                <p className="mt-1 text-sm leading-6 text-muted-foreground">{bio}</p>
+              </section>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <section className="flex gap-3"><MapPin className="mt-0.5 size-4 shrink-0 text-primary" aria-hidden="true" /><div><h3 className="text-sm font-semibold">Service location</h3><p className="mt-1 text-sm text-muted-foreground">{location}</p></div></section>
+                <section className="flex gap-3"><CreditCard className="mt-0.5 size-4 shrink-0 text-primary" aria-hidden="true" /><div><h3 className="text-sm font-semibold">Payment contact</h3><p className="mt-1 text-sm text-muted-foreground">GCash {gcashNumber}</p></div></section>
               </div>
-
-              <div style={styles.section}>
-                <h4>Service Location</h4>
-                <p>📍 {location}</p>
-              </div>
-
-              <div style={styles.section}>
-                <h4>Payment Method</h4>
-                <p>💳 GCash: {gcashNumber}</p>
-              </div>
-
-              <div style={{ ...styles.section, ...styles.qrSection }}>
-                <h4>Verification QR Code</h4>
-                <img 
-                  src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(
-                    `TrabaWho Profile: ${workerName} - ${serviceType}`
-                  )}`}
-                  alt="Profile QR Code"
-                  style={styles.qrImage}
-                />
-              </div>
-
-              <p style={styles.previewFooter}>
-                Generated by TrabaWho • Trusted Service Marketplace
-              </p>
+              <section className="flex items-center gap-4 rounded-lg bg-background p-4">
+                <img src={qrCodeUrl} alt="Profile verification QR code" className="size-24 shrink-0" />
+                <div><QrCode className="mb-2 size-5 text-primary" aria-hidden="true" /><h3 className="text-sm font-semibold">Profile verification</h3><p className="mt-1 text-xs leading-5 text-muted-foreground">Clients can scan this code to verify the provider information.</p></div>
+              </section>
             </div>
-          </div>
+          </article>
 
-          <div style={styles.infoBox}>
-            <p>
-              <strong>📄 PDF Resume:</strong> This professional portfolio will be downloaded as a PDF file that you can share with clients, print, or display online.
-            </p>
-            <p>
-              <strong>🔐 QR Verification:</strong> The embedded QR code verifies your profile on TrabaWho, building trust with potential clients.
-            </p>
-            <p>
-              <strong>💼 Professional Use:</strong> Use this portfolio in emails, social media, or print ads to establish your professional identity.
-            </p>
-            {generationError && (
-              <div style={styles.errorNotice} role="alert">
-                {generationError}
-              </div>
-            )}
-          </div>
+          <aside>
+            <h3 className="font-semibold">Ready to share</h3>
+            <p className="mt-1 text-sm leading-6 text-muted-foreground">The exported PDF is formatted for email, messaging, and printing.</p>
+            <ul className="mt-5 space-y-4 text-sm">
+              <li className="flex gap-3"><CheckCircle2 className="mt-0.5 size-4 shrink-0 text-emerald-600" aria-hidden="true" /><span><strong className="block">Clean PDF layout</strong><span className="text-muted-foreground">Uses standard fonts and print-safe formatting.</span></span></li>
+              <li className="flex gap-3"><CheckCircle2 className="mt-0.5 size-4 shrink-0 text-emerald-600" aria-hidden="true" /><span><strong className="block">Verification included</strong><span className="text-muted-foreground">The QR code remains embedded in the document.</span></span></li>
+              <li className="flex gap-3"><CheckCircle2 className="mt-0.5 size-4 shrink-0 text-emerald-600" aria-hidden="true" /><span><strong className="block">Current profile data</strong><span className="text-muted-foreground">Name, service, location, and bio are taken from your profile.</span></span></li>
+            </ul>
+            {generationError ? <p className="mt-5 rounded-lg bg-destructive/10 p-3 text-sm font-medium text-destructive" role="alert">{generationError}</p> : null}
+          </aside>
         </div>
 
-        <div style={styles.actions}>
-          <button style={styles.cancelButton} onClick={onClose}>
-            Cancel
-          </button>
-          <button style={styles.downloadButton} onClick={generatePDF}>
-            📥 Download PDF Portfolio
-          </button>
-        </div>
-      </div>
-    </div>
+        <DialogFooter className="px-6 pb-5 pt-4">
+          <Button type="button" variant="outline" onClick={onClose}>Cancel</Button>
+          <Button type="button" onClick={() => void generatePDF()} isLoading={isGenerating}>
+            <Download aria-hidden="true" />{isGenerating ? 'Generating PDF…' : 'Download PDF'}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 };
 

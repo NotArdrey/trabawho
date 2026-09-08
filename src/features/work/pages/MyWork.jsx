@@ -13,18 +13,26 @@ import { getThemeTokens } from '../../../shared/styles/themeTokens';
 import { getProfilePhotoUrl } from '../../../shared/utils/profilePhoto';
 import { useWorkPayments, useWorkProfileServices, useWorkSchedule } from '../hooks';
 import {
+  Ban,
+  BriefcaseBusiness,
   CalendarDays,
-  ChevronDown,
+  CircleDollarSign,
+  Inbox,
   Loader2,
   Megaphone,
   MapPin,
   MessageSquareText,
   Pencil,
+  Plus,
+  RotateCcw,
   Star,
   Trash2,
   UserRound,
   WalletCards,
 } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 const formatDateLong = (date) =>
   date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
@@ -221,7 +229,6 @@ const MyWork = ({ appTheme = 'light', themeMode = 'system', onThemeChange, curre
   const [isCashQrPreviewOpen, setIsCashQrPreviewOpen] = useState(false);
   const [hoverKey, setHoverKey] = useState('');
   const [workSectionFilter, setWorkSectionFilter] = useState('all'); // all | inquiries | cash-approvals | refunds | cancelled
-  const [isWorkNavDropdownOpen, setIsWorkNavDropdownOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(() =>
     typeof window !== 'undefined' ? window.innerWidth <= 768 : false
   );
@@ -964,7 +971,29 @@ const MyWork = ({ appTheme = 'light', themeMode = 'system', onThemeChange, curre
         onToggleAdminView={() => { if (typeof onOpenAdminDashboard === 'function') onOpenAdminDashboard(); }}
       />
       
-      <main style={sx('my-work-main')} aria-hidden={editSlotModalOpen ? 'true' : undefined}>
+      <main className="my-work-main-modern" style={sx('my-work-main')} aria-hidden={editSlotModalOpen ? 'true' : undefined}>
+
+        <header className="my-work-page-heading">
+          <div className="my-work-page-heading-copy">
+            <Badge variant="secondary" className="my-work-page-eyebrow">
+              <BriefcaseBusiness size={14} aria-hidden="true" />
+              Provider workspace
+            </Badge>
+            <h1>Manage My Work</h1>
+            <p>Handle client requests, payments, refunds, and your published services from one place.</p>
+          </div>
+          <div className="my-work-page-heading-actions">
+            {!isLoadingSellerData && (
+              <Badge variant="outline">{(sellerDbServices || []).length} synced {(sellerDbServices || []).length === 1 ? 'service' : 'services'}</Badge>
+            )}
+            {canShowAddServiceButton && sellerData && (
+              <Button type="button" onClick={() => setIsCreateServiceOpen(true)}>
+                <Plus size={16} aria-hidden="true" />
+                Add service
+              </Button>
+            )}
+          </div>
+        </header>
 
         {/* Inline notifications */}
         {successMessage && (
@@ -991,12 +1020,6 @@ const MyWork = ({ appTheme = 'light', themeMode = 'system', onThemeChange, curre
             <Loader2 size={30} className="gl-spin" aria-hidden="true" style={{ marginBottom: '12px' }} />
             <p style={{ fontSize: '16px', fontWeight: 500 }}>Loading your seller profile…</p>
           </div>
-        )}
-
-        {!isLoadingSellerData && (
-          <p style={{ margin: '0 0 12px', fontSize: '12px', color: themeTokens.textMuted }}>
-            Synced services: {(sellerDbServices || []).length}
-          </p>
         )}
 
         {!isLoadingSellerData && hasSellerRecord && (workerServices || []).length > 1 && (
@@ -1073,7 +1096,7 @@ const MyWork = ({ appTheme = 'light', themeMode = 'system', onThemeChange, curre
         
         {!isLoadingSellerData && hasSellerRecord && (
           <>
-            <div style={sx('profile-summary-card')}>
+            <section className="my-work-profile-summary" style={sx('profile-summary-card')} aria-label="Current service summary">
               <div style={sx('profile-info')}>
                 <div style={sx('profile-avatar')}>
                   <img
@@ -1171,91 +1194,37 @@ const MyWork = ({ appTheme = 'light', themeMode = 'system', onThemeChange, curre
                   </div>
                 </div>
               </div>
-            </div>
+            </section>
 
-            <div style={{ ...sx('section-filter-row'), justifyContent: 'flex-start', position: 'relative' }}>
-              <div style={{ position: 'relative', minWidth: isMobile ? '100%' : '320px' }}>
-                <button
-                  type="button"
-                  style={{
-                    width: '100%',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    gap: '12px',
-                    padding: '12px 16px',
-                    borderRadius: '12px',
-                    border: `1px solid ${themeTokens.border}`,
-                    background: themeTokens.surface,
-                    color: themeTokens.textPrimary,
-                    fontSize: '14px',
-                    fontWeight: 700,
-                    cursor: 'pointer',
-                    boxShadow: isWorkNavDropdownOpen ? themeTokens.shadowSoft : 'none',
-                  }}
-                  onClick={() => setIsWorkNavDropdownOpen((prev) => !prev)}
-                >
-                  <span>Navigate Work Sections</span>
-                  <span style={{ color: themeTokens.accent, fontSize: '12px', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-                    {activeWorkSectionLabel}
-                    <ChevronDown size={14} aria-hidden="true" />
-                  </span>
-                </button>
-
-                {isWorkNavDropdownOpen && (
-                  <div style={{
-                    position: 'absolute',
-                    top: 'calc(100% + 8px)',
-                    right: 0,
-                    left: 0,
-                    background: themeTokens.surface,
-                    border: `1px solid ${themeTokens.border}`,
-                    borderRadius: '12px',
-                    boxShadow: themeTokens.shadow,
-                    zIndex: 20,
-                    overflow: 'hidden',
-                  }}>
-                    {workSectionOptions.map((option, index) => {
-                      const isSelected = workSectionFilter === option.value;
-                      return (
-                        <button
-                          key={option.value}
-                          type="button"
-                          style={{
-                            width: '100%',
-                            textAlign: 'left',
-                            padding: '12px 14px',
-                            border: 'none',
-                            background: isSelected ? themeTokens.accentSoft : themeTokens.surface,
-                            color: isSelected ? themeTokens.accent : themeTokens.textPrimary,
-                            cursor: 'pointer',
-                            borderBottom: index < workSectionOptions.length - 1 ? `1px solid ${themeTokens.border}` : 'none',
-                          }}
-                          onClick={() => {
-                            setWorkSectionFilter(option.value);
-                            setIsWorkNavDropdownOpen(false);
-                          }}
-                        >
-                          <div style={{ fontWeight: 700, fontSize: '14px' }}>{option.label}</div>
-                          <div style={{ fontSize: '12px', color: isSelected ? themeTokens.accent : themeTokens.textMuted, marginTop: '2px' }}>{option.description}</div>
-                        </button>
-                      );
-                    })}
-                  </div>
-                )}
+            <div className="my-work-section-picker" style={sx('section-filter-row')}>
+              <div>
+                <label htmlFor="work-section-select">Work section</label>
+                <p>Focus the page on one operational queue.</p>
               </div>
+              <Select value={workSectionFilter} onValueChange={setWorkSectionFilter}>
+                <SelectTrigger id="work-section-select" className="my-work-section-select" aria-label="Choose work section">
+                  <SelectValue>{activeWorkSectionLabel}</SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  {workSectionOptions.map((option) => (
+                    <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             
-            {showInquiriesSection && <section style={sx('inquiries-section')} data-testid="work-inquiries-section">
-              <div style={sx('section-header')}>
-                <h2 style={sectionTitleStyle}>Active Inquiries ({activeInquiries.length})</h2>
-                <p style={sx('section-subtitle')}>Clients waiting for your response</p>
+            {showInquiriesSection && <section className="my-work-queue-section" style={sx('inquiries-section')} data-testid="work-inquiries-section">
+              <div className="my-work-section-heading" style={sx('section-header')}>
+                <span className="my-work-section-icon tone-orange"><Inbox size={18} aria-hidden="true" /></span>
+                <div><h2 style={sectionTitleStyle}>Active inquiries</h2><p style={sx('section-subtitle')}>Clients waiting for your response.</p></div>
+                <Badge variant={activeInquiries.length ? 'warning' : 'secondary'}>{activeInquiries.length}</Badge>
               </div>
               
               <div style={sx('inquiries-grid')}>
                 {activeInquiries.map(inquiry => (
-                  <div
+                  <article
                     key={inquiry.id}
+                    className="my-work-inquiry-card"
                     style={{ ...sx('inquiry-card'), ...(isHovered(`inquiry-${inquiry.id}`) ? hoverStyles.inquiryCard : {}) }}
                     onMouseEnter={() => setHoverKey(`inquiry-${inquiry.id}`)}
                     onMouseLeave={() => setHoverKey('')}
@@ -1306,51 +1275,38 @@ const MyWork = ({ appTheme = 'light', themeMode = 'system', onThemeChange, curre
                         Respond {inquiry.messages > 0 && `(${inquiry.messages})`}
                       </button>
                     </div>
-                  </div>
+                  </article>
                 ))}
               </div>
             </section>}
 
-            {showCashApprovalSection && <section style={sx('payment-confirm-section')} data-testid="work-cash-section">
-              <div style={sx('section-header')}>
-                <h2 style={sectionTitleStyle}>Payment Confirmations (Cash)</h2>
-                <p style={sx('section-subtitle')}>Worker review queue for face-to-face cash confirmations scanned via Cash QR.</p>
-                <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.75rem' }}>
-                  <button
-                    style={{
-                      padding: '0.5rem 1rem',
-                      backgroundColor: cashPaymentView === 'pending' ? themeTokens.accent : themeTokens.surfaceAlt,
-                      color: cashPaymentView === 'pending' ? '#ffffff' : themeTokens.textPrimary,
-                      border: 'none',
-                      borderRadius: '0.375rem',
-                      fontWeight: 600,
-                      cursor: 'pointer',
-                      fontSize: '14px',
-                    }}
+            {showCashApprovalSection && <section className="my-work-queue-section" style={sx('payment-confirm-section')} data-testid="work-cash-section">
+              <div className="my-work-section-heading" style={sx('section-header')}>
+                <span className="my-work-section-icon tone-green"><CircleDollarSign size={18} aria-hidden="true" /></span>
+                <div><h2 style={sectionTitleStyle}>Cash confirmations</h2><p style={sx('section-subtitle')}>Review cash payments submitted through your confirmation QR.</p></div>
+              </div>
+              <div className="my-work-segmented-control" aria-label="Cash confirmation view">
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant={cashPaymentView === 'pending' ? 'default' : 'ghost'}
                     onClick={() => setCashPaymentView('pending')}
                   >
                     Pending Review
-                  </button>
-                  <button
-                    style={{
-                      padding: '0.5rem 1rem',
-                      backgroundColor: cashPaymentView === 'history' ? themeTokens.accent : themeTokens.surfaceAlt,
-                      color: cashPaymentView === 'history' ? '#ffffff' : themeTokens.textPrimary,
-                      border: 'none',
-                      borderRadius: '0.375rem',
-                      fontWeight: 600,
-                      cursor: 'pointer',
-                      fontSize: '14px',
-                    }}
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant={cashPaymentView === 'history' ? 'default' : 'ghost'}
                     onClick={() => setCashPaymentView('history')}
                   >
                     History
-                  </button>
-                </div>
+                  </Button>
               </div>
 
               {cashConfirmationNotifications.length === 0 ? (
-                <div style={sx('payment-confirm-card')}>
+                <div className="my-work-empty-state" style={sx('payment-confirm-card')}>
+                  <CircleDollarSign size={20} aria-hidden="true" />
                   <p style={cardMutedTextStyle}>{cashPaymentView === 'pending' ? 'No cash confirmation requests for this week.' : 'No completed cash transactions.'}</p>
                 </div>
               ) : (
@@ -1417,13 +1373,15 @@ const MyWork = ({ appTheme = 'light', themeMode = 'system', onThemeChange, curre
             </section>}
             
             {showRefundSection && (
-              <section style={sx('refund-section')} data-testid="work-refund-section">
-                <div style={sx('section-header')}>
-                  <h2 style={sectionTitleStyle}>Refund Queue (GCash)</h2>
-                  <p style={sx('section-subtitle')}>Cases for GCash Advance and GCash post-service payments that need refund tracking.</p>
+              <section className="my-work-queue-section" style={sx('refund-section')} data-testid="work-refund-section">
+                <div className="my-work-section-heading" style={sx('section-header')}>
+                  <span className="my-work-section-icon tone-blue"><RotateCcw size={18} aria-hidden="true" /></span>
+                  <div><h2 style={sectionTitleStyle}>GCash refund queue</h2><p style={sx('section-subtitle')}>Track refund cases that require provider or client confirmation.</p></div>
+                  <Badge variant={refundTransactions.length ? 'warning' : 'secondary'}>{refundTransactions.length}</Badge>
                 </div>
                 {refundTransactions.length === 0 ? (
-                  <div style={sx('payment-confirm-card')}>
+                  <div className="my-work-empty-state" style={sx('payment-confirm-card')}>
+                    <RotateCcw size={20} aria-hidden="true" />
                     <p style={cardMutedTextStyle}>No refund scenarios for this week.</p>
                   </div>
                 ) : (
@@ -1479,13 +1437,15 @@ const MyWork = ({ appTheme = 'light', themeMode = 'system', onThemeChange, curre
             )}
 
             {showCancelledSection && (
-              <section style={sx('cancelled-section')} data-testid="work-cancelled-section">
-                <div style={sx('section-header')}>
-                  <h2 style={sectionTitleStyle}>Cancelled Bookings (Cash Only)</h2>
-                  <p style={sx('section-subtitle')}>Cash-based bookings that were cancelled and should not enter GCash refund flow.</p>
+              <section className="my-work-queue-section" style={sx('cancelled-section')} data-testid="work-cancelled-section">
+                <div className="my-work-section-heading" style={sx('section-header')}>
+                  <span className="my-work-section-icon tone-red"><Ban size={18} aria-hidden="true" /></span>
+                  <div><h2 style={sectionTitleStyle}>Cancelled cash bookings</h2><p style={sx('section-subtitle')}>Review cancelled cash bookings that do not require a GCash refund.</p></div>
+                  <Badge variant="secondary">{cancelledCashTransactions.length}</Badge>
                 </div>
                 {cancelledCashTransactions.length === 0 ? (
-                  <div style={sx('payment-confirm-card')}>
+                  <div className="my-work-empty-state" style={sx('payment-confirm-card')}>
+                    <Ban size={20} aria-hidden="true" />
                     <p style={cardMutedTextStyle}>No cancelled cash bookings for this week.</p>
                   </div>
                 ) : (
@@ -1790,18 +1750,18 @@ const MyWork = ({ appTheme = 'light', themeMode = 'system', onThemeChange, curre
               )}
             </section>}
             
-            {workSectionFilter === 'all' && <section style={sx('stats-footer')}>
-              <div style={sx('stat-card')}>
+            {workSectionFilter === 'all' && <section className="my-work-stats-footer" style={sx('stats-footer')} aria-label="Work summary">
+              <div className="my-work-stat-card" style={sx('stat-card')}>
                 <h4 style={statTitleStyle}>Response Rate</h4>
                 <p style={sx('stat-value')}>92%</p>
                 <p style={sx('stat-desc')}>Avg response within 2 hours</p>
               </div>
-              <div style={sx('stat-card')}>
+              <div className="my-work-stat-card" style={sx('stat-card')}>
                 <h4 style={statTitleStyle}>This Week</h4>
                 <p style={sx('stat-value')}>{scheduledDurationLabel}</p>
                 <p style={sx('stat-desc')}>{supportsAvailabilitySchedule ? 'Total scheduled time' : 'Request-based service'}</p>
               </div>
-              <div style={sx('stat-card')}>
+              <div className="my-work-stat-card" style={sx('stat-card')}>
                 <h4 style={statTitleStyle}>Earnings</h4>
                 <p style={sx('stat-value')}>{pendingCompletionLabel}</p>
                 <p style={sx('stat-desc')}>Pending completion</p>
@@ -1958,11 +1918,6 @@ const MyWork = ({ appTheme = 'light', themeMode = 'system', onThemeChange, curre
         onSubmit={handleCreateServiceSubmit}
         appTheme={appTheme}
       />
-
-      {/* Floating Add Service button */}
-      {canShowAddServiceButton && sellerData && (
-        <button onClick={() => setIsCreateServiceOpen(true)} aria-label="Add service" style={{ position: 'fixed', right: isMobile ? 14 : 20, bottom: isMobile ? 112 : 28, zIndex: 2500, background: themeTokens.accent, color: '#fff', border: 'none', borderRadius: 999, width: 56, height: 56, fontSize: 20 }}>+</button>
-      )}
 
       {/* PROFILE EDIT MODAL */}
       <ProfileEditModal

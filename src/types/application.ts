@@ -16,6 +16,7 @@ export type AppRoute =
   | "/messages/:bookingId?"
   | "/work"
   | "/worker/dashboard"
+  | "/worker/bookings"
   | "/profile"
   | "/settings/account"
   | "/settings/preferences"

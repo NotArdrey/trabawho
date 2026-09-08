@@ -282,12 +282,15 @@ test.describe('identity-first registration', () => {
     await expect(page.getByLabel('First Name')).toHaveCount(0);
     await expect(page.getByLabel('Middle Name')).toHaveCount(0);
     await expect(page.getByLabel('Last Name')).toHaveCount(0);
-    await expect(page.getByLabel('Account Type')).toBeVisible();
+    const accountType = page.getByLabel('Account Type');
+    await expect(accountType).toBeVisible();
     await expect(page.getByLabel('Identity document')).toBeVisible();
-    await expect(page.getByLabel('Account Type')).toContainText(/Client/);
-    await expect(page.getByLabel('Account Type')).toContainText(/Worker/);
-    await expect(page.getByLabel('Account Type')).not.toContainText(/fan|musician/i);
-    await expect(page.getByRole('button', { name: /Start Didit Verification/i })).toBeVisible();
+    await accountType.click();
+    await expect(page.getByRole('option', { name: 'Client' })).toBeVisible();
+    await expect(page.getByRole('option', { name: 'Worker' })).toBeVisible();
+    await page.getByRole('option', { name: 'Client' }).click();
+    await expect(accountType).not.toContainText(/fan|musician/i);
+    await expect(page.getByRole('link', { name: 'Go to next page' })).toBeVisible();
     await expectNoHorizontalOverflow(page);
 
     expect(consoleFailures).toEqual([]);

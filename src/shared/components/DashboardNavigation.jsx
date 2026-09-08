@@ -1,8 +1,10 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
-  Bell,
+  ArrowLeftRight,
   BriefcaseBusiness,
   CalendarCheck,
+  ChevronRight,
   Home,
   LogOut,
   MessageCircle,
@@ -13,8 +15,17 @@ import {
   UserRound,
 } from 'lucide-react';
 import LogoutConfirmModal from '../../features/auth/components/LogoutConfirmModal';
+import { NotificationCenter, useRealtimeNotifications } from '../../components/notifications';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '../../components/ui/dropdown-menu';
 import { getProfilePhotoUrl } from '../utils/profilePhoto';
 import BrandWordmark from './BrandWordmark';
+import { paths } from '../../app/router/routes';
 
 const WORKER_ROLE_VALUES = new Set(['worker', 'workers', 'seller', 'sellers']);
 const CLIENT_ROLE_VALUES = new Set(['client', 'clients', 'buyer', 'buyers', 'customer', 'customers']);
@@ -44,35 +55,24 @@ function DashboardNavigation({
   onToggleAdminView,
   isAdminView = false,
 }) {
+  const navigate = useNavigate();
   const [isNotificationOpen, setIsNotificationOpen] = useState(false);
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
   const [isLogoutModalOpen, setIsLogoutModalOpen] = useState(false);
   const [showMobileSearch, setShowMobileSearch] = useState(false);
-  const [notifications, setNotifications] = useState([
-    { id: 'n1', title: 'Booking update', message: 'Your latest booking has a new message.', isRead: false },
-    { id: 'n2', title: 'Schedule reminder', message: 'You have an upcoming schedule today.', isRead: false },
-  ]);
-
-  const notificationRef = useRef(null);
-  const profileRef = useRef(null);
+  const [workerWorkspace, setWorkerWorkspace] = useState(() => localStorage.getItem('trabawho-worker-workspace') || 'provider');
+  const {
+    notifications,
+    isLoading: notificationsLoading,
+    error: notificationsError,
+    markRead: markNotificationRead,
+    markAllRead: markAllNotificationsRead,
+    retry: retryNotifications,
+  } = useRealtimeNotifications(sellerProfile?.userId || sellerProfile?.user_id);
 
   useEffect(() => {
     document.body.classList.add('gl-app-shell-active');
     return () => document.body.classList.remove('gl-app-shell-active');
-  }, []);
-
-  useEffect(() => {
-    const handleOutsideClick = (event) => {
-      if (notificationRef.current && !notificationRef.current.contains(event.target)) {
-        setIsNotificationOpen(false);
-      }
-      if (profileRef.current && !profileRef.current.contains(event.target)) {
-        setIsProfileMenuOpen(false);
-      }
-    };
-
-    document.addEventListener('mousedown', handleOutsideClick);
-    return () => document.removeEventListener('mousedown', handleOutsideClick);
   }, []);
 
   const activeKey = {
@@ -80,46 +80,79 @@ function DashboardNavigation({
     'browse-services': 'browse',
     chat: 'chat',
     'my-bookings': 'bookings',
+    'worker-bookings': 'bookings',
     'my-work': 'work',
-    'worker-dashboard': 'work',
+    'worker-dashboard': 'overview',
     profile: 'profile',
     'account-settings': 'profile',
     settings: 'settings',
   }[currentView] || 'home';
 
   const profilePhotoUrl = getProfilePhotoUrl(sellerProfile?.profilePhoto);
-  const unreadCount = notifications.filter((item) => !item.isRead).length;
   const normalizedRole = String(sellerProfile?.role || '').trim().toLowerCase();
   const isAdminAccount = Boolean(sellerProfile?.isAdmin) || normalizedRole === 'admin';
   const isWorkerAccount = isWorkerProfile(sellerProfile);
+  const isProviderWorkspace = isWorkerAccount && workerWorkspace === 'provider';
+  const showGlobalSearch = currentView !== 'browse-services';
+  const displayName = sellerProfile?.fullName
+    || [sellerProfile?.firstName, sellerProfile?.lastName].filter(Boolean).join(' ')
+    || 'TrabaWho member';
+  const workspaceLabel = isProviderWorkspace ? 'Provider workspace' : 'Client workspace';
+  const workspaceDescription = isProviderWorkspace ? 'Manage jobs and services' : 'Book trusted local help';
   const clientNavItems = [
     { key: 'home', label: 'Home', icon: Home, onClick: onOpenDashboard },
     { key: 'browse', label: 'Browse', icon: Store, onClick: onOpenBrowseServices || onOpenDashboard },
     { key: 'chat', label: 'Chats', icon: MessageCircle, onClick: onOpenChatPage || onOpenMyBookings },
-    { key: 'bookings', label: 'Bookings', icon: CalendarCheck, onClick: onOpenMyBookings },
+    { key: 'bookings', label: 'Bookings', icon: CalendarCheck, onClick: () => navigate(`${paths.bookings}?scope=purchases`) },
   ];
   const workerNavItems = [
-    { key: 'home', label: 'Home', icon: Home, onClick: onOpenDashboard },
+    { key: 'overview', label: 'Overview', icon: Home, onClick: () => navigate(paths.workerDashboard) },
     { key: 'work', label: 'My Work', icon: BriefcaseBusiness, onClick: onOpenMyWork || onOpenSellerSetup },
-    { key: 'chat', label: 'Chats', icon: MessageCircle, onClick: onOpenChatPage || onOpenMyBookings },
-    { key: 'bookings', label: 'Bookings', icon: CalendarCheck, onClick: onOpenMyBookings },
+    { key: 'chat', label: 'Messages', icon: MessageCircle, onClick: onOpenChatPage || onOpenMyBookings },
+    { key: 'bookings', label: 'Bookings', icon: CalendarCheck, onClick: () => navigate(`${paths.workerBookings}?scope=incoming`) },
   ];
-  const navItems = isWorkerAccount && !isAdminAccount ? workerNavItems : clientNavItems;
+  const navItems = isWorkerAccount && !isAdminAccount && isProviderWorkspace ? workerNavItems : clientNavItems;
   const mobileNavLabels = {
     home: 'Mobile home tab',
+    overview: 'Mobile overview tab',
     browse: 'Mobile browse tab',
     chat: 'Mobile chats tab',
     bookings: 'Mobile bookings tab',
     work: 'Mobile work tab',
   };
 
-  const markAllNotificationsRead = () => {
-    setNotifications((prev) => prev.map((item) => ({ ...item, isRead: true })));
+  useEffect(() => {
+    if (!isWorkerAccount) return;
+    const nextWorkspace = ['worker-dashboard', 'worker-bookings', 'my-work'].includes(currentView)
+      ? 'provider'
+      : ['client-dashboard', 'browse-services', 'my-bookings'].includes(currentView)
+        ? 'client'
+        : null;
+    if (!nextWorkspace) return;
+    setWorkerWorkspace(nextWorkspace);
+    localStorage.setItem('trabawho-worker-workspace', nextWorkspace);
+  }, [currentView, isWorkerAccount]);
+
+  const switchWorkerWorkspace = () => {
+    const nextWorkspace = isProviderWorkspace ? 'client' : 'provider';
+    setWorkerWorkspace(nextWorkspace);
+    localStorage.setItem('trabawho-worker-workspace', nextWorkspace);
+    navigate(nextWorkspace === 'provider' ? paths.workerDashboard : paths.dashboard);
+  };
+
+  const openWorkspaceHome = () => {
+    if (isProviderWorkspace) navigate(paths.workerDashboard);
+    else onOpenDashboard?.();
   };
 
   const handleNotificationClick = (id) => {
-    setNotifications((prev) => prev.map((item) => (item.id === id ? { ...item, isRead: true } : item)));
+    const notification = notifications.find((item) => item.id === id);
+    markNotificationRead(id);
     setIsNotificationOpen(false);
+    if (notification?.type === 'message') {
+      (onOpenChatPage || onOpenMyBookings)?.();
+      return;
+    }
     if (isWorkerAccount && !isAdminAccount) {
       onOpenMyWork?.();
       return;
@@ -148,113 +181,154 @@ function DashboardNavigation({
   return (
     <>
       <aside className="gl-app-sidebar">
-        <button type="button" className="gl-app-brand" onClick={() => onOpenDashboard?.()} aria-label="Open home">
+        <button type="button" className="gl-app-brand" onClick={openWorkspaceHome} aria-label="Open home">
           <img src="/trabawho-logo.svg" alt="" aria-hidden="true" />
-          <strong><BrandWordmark /></strong>
+          <span>
+            <strong><BrandWordmark /></strong>
+            <small>Local services marketplace</small>
+          </span>
         </button>
 
-        <div className="gl-app-sidebar-search">
-          <Search size={17} aria-hidden="true" />
-          <input
-            value={searchQuery || ''}
-            onChange={(event) => onSearchChange?.(event)}
-            placeholder="Search"
-          />
+        <button
+          type="button"
+          className="gl-app-workspace-card"
+          onClick={isWorkerAccount ? switchWorkerWorkspace : openWorkspaceHome}
+          aria-label={isWorkerAccount
+            ? `Switch to ${isProviderWorkspace ? 'client' : 'provider'} workspace`
+            : workspaceLabel}
+        >
+          <span className="gl-app-workspace-icon">
+            {isProviderWorkspace ? <BriefcaseBusiness aria-hidden="true" /> : <Home aria-hidden="true" />}
+          </span>
+          <span>
+            <strong>{workspaceLabel}</strong>
+            <small>{workspaceDescription}</small>
+          </span>
+          {isWorkerAccount
+            ? <ArrowLeftRight className="gl-app-workspace-action" aria-hidden="true" />
+            : <ChevronRight className="gl-app-workspace-action" aria-hidden="true" />}
+        </button>
+
+        <div className="gl-app-nav-section">
+          <p className="gl-app-nav-label">Workspace</p>
+          {renderNavButtons()}
         </div>
 
-        {renderNavButtons()}
-
+        <div className="gl-app-sidebar-footer">
+          <div className="gl-app-sidebar-utilities" aria-label="Account shortcuts">
+            <button type="button" onClick={() => onOpenProfile?.()} className={activeKey === 'profile' ? 'active' : ''}>
+              <UserRound aria-hidden="true" />
+              Profile
+            </button>
+            <button type="button" onClick={() => onOpenSettings?.()} className={activeKey === 'settings' ? 'active' : ''}>
+              <Settings aria-hidden="true" />
+              Settings
+            </button>
+          </div>
+          <button type="button" className="gl-app-sidebar-account" onClick={() => onOpenProfile?.()}>
+            <img src={profilePhotoUrl} alt="" />
+            <span>
+              <strong>{displayName}</strong>
+              <small>{workspaceLabel}</small>
+            </span>
+            <ChevronRight aria-hidden="true" />
+          </button>
+        </div>
       </aside>
 
-      <header className="gl-app-topbar">
-        <button type="button" className="gl-app-mobile-brand" onClick={() => onOpenDashboard?.()} aria-label="Open home">
+      <header className={`gl-app-topbar ${showGlobalSearch ? '' : 'no-search'}`}>
+        <button type="button" className="gl-app-mobile-brand" onClick={openWorkspaceHome} aria-label="Open home">
           <img src="/trabawho-logo.svg" alt="" aria-hidden="true" />
           <strong><BrandWordmark /></strong>
         </button>
 
-        <div className="gl-app-topbar-search">
-          <Search size={17} aria-hidden="true" />
-          <input
-            value={searchQuery || ''}
-            onChange={(event) => onSearchChange?.(event)}
-            placeholder="Search services, providers, locations"
-          />
-        </div>
+        {showGlobalSearch && (
+          <div className="gl-app-topbar-search">
+            <Search size={17} aria-hidden="true" />
+            <input
+              value={searchQuery || ''}
+              onChange={(event) => onSearchChange?.(event)}
+              placeholder="Search services, providers, locations"
+            />
+          </div>
+        )}
 
         <div className="gl-app-topbar-actions">
-          <button
-            type="button"
-            className="gl-app-icon-btn mobile-only"
-            aria-label="Open search"
-            aria-pressed={showMobileSearch}
-            onClick={() => setShowMobileSearch((value) => !value)}
-          >
-            <Search size={18} aria-hidden="true" />
-          </button>
-
-          <div ref={notificationRef} className="gl-app-menu-anchor">
-            <button type="button" className="gl-app-icon-btn" aria-label="Notifications" onClick={() => setIsNotificationOpen((value) => !value)}>
-              <Bell size={18} aria-hidden="true" />
-              {unreadCount > 0 && <span className="gl-app-dot" />}
+          {showGlobalSearch && (
+            <button
+              type="button"
+              className="gl-app-icon-btn mobile-only"
+              aria-label="Open search"
+              aria-pressed={showMobileSearch}
+              onClick={() => setShowMobileSearch((value) => !value)}
+            >
+              <Search size={18} aria-hidden="true" />
             </button>
+          )}
 
-            {isNotificationOpen && (
-              <div className="gl-app-dropdown">
-                <div className="gl-app-dropdown-head">
-                  <p>Notifications</p>
-                  <button type="button" onClick={markAllNotificationsRead}>Mark all read</button>
-                </div>
-                {notifications.map((item) => (
-                  <button
-                    key={item.id}
-                    type="button"
-                    className={`gl-app-notification ${item.isRead ? '' : 'unread'}`}
-                    onClick={() => handleNotificationClick(item.id)}
-                  >
-                    <strong>{item.title}</strong>
-                    <span>{item.message}</span>
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-
-          <div ref={profileRef} className="gl-app-menu-anchor">
-            <button type="button" className="gl-app-icon-btn avatar" aria-label="Profile menu" onClick={() => setIsProfileMenuOpen((value) => !value)}>
-              <img src={profilePhotoUrl} alt="Profile" />
-            </button>
-
-            {isProfileMenuOpen && (
-              <div className="gl-app-dropdown">
-                <button type="button" className="gl-app-menu-button" onClick={() => { setIsProfileMenuOpen(false); onOpenProfile?.(); }}>
-                  <UserRound size={16} aria-hidden="true" /> Profile
-                </button>
-                <button type="button" className="gl-app-menu-button" onClick={() => { setIsProfileMenuOpen(false); (onOpenAccountSettings || onOpenProfile)?.(); }}>
-                  <Shield size={16} aria-hidden="true" /> Account & Privacy
-                </button>
-                <button type="button" className="gl-app-menu-button" onClick={() => { setIsProfileMenuOpen(false); onOpenSettings?.(); }}>
-                  <Settings size={16} aria-hidden="true" /> Settings
-                </button>
-                {sellerProfile?.role === 'admin' && (
-                  <button type="button" className="gl-app-menu-button" onClick={() => { setIsProfileMenuOpen(false); onToggleAdminView?.(); }}>
-                    <Shield size={16} aria-hidden="true" /> {isAdminView ? 'Switch to Client View' : 'Switch to Admin View'}
-                  </button>
-                )}
-                <button type="button" className="gl-app-menu-button danger" onClick={() => { setIsProfileMenuOpen(false); setIsLogoutModalOpen(true); }}>
-                  <LogOut size={16} aria-hidden="true" /> Logout
-                </button>
-              </div>
-            )}
-          </div>
-        </div>
-
-        <div className={`gl-app-mobile-search ${showMobileSearch ? 'open' : ''}`}>
-          <input
-            value={searchQuery || ''}
-            onChange={(event) => onSearchChange?.(event)}
-            placeholder="Search services, providers, locations"
+          <NotificationCenter
+            notifications={notifications}
+            open={isNotificationOpen}
+            onOpenChange={(open) => {
+              if (open) setIsProfileMenuOpen(false);
+              setIsNotificationOpen(open);
+            }}
+            onMarkAllRead={markAllNotificationsRead}
+            onNotificationClick={handleNotificationClick}
+            isLoading={notificationsLoading}
+            error={notificationsError}
+            onRetry={retryNotifications}
           />
+
+          <DropdownMenu
+            open={isProfileMenuOpen}
+            onOpenChange={(open) => {
+              if (open) setIsNotificationOpen(false);
+              setIsProfileMenuOpen(open);
+            }}
+          >
+            <DropdownMenuTrigger asChild>
+              <button type="button" className="gl-app-icon-btn avatar" aria-label="Profile menu">
+                <img src={profilePhotoUrl} alt="Profile" />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-60">
+              <DropdownMenuItem onSelect={() => onOpenProfile?.()}>
+                <UserRound aria-hidden="true" /> Profile
+              </DropdownMenuItem>
+              <DropdownMenuItem onSelect={() => (onOpenAccountSettings || onOpenProfile)?.()}>
+                <Shield aria-hidden="true" /> Account &amp; Privacy
+              </DropdownMenuItem>
+              <DropdownMenuItem onSelect={() => onOpenSettings?.()}>
+                <Settings aria-hidden="true" /> Settings
+              </DropdownMenuItem>
+              {sellerProfile?.role === 'admin' && (
+                <DropdownMenuItem onSelect={() => onToggleAdminView?.()}>
+                  <Shield aria-hidden="true" /> {isAdminView ? 'Switch to Client View' : 'Switch to Admin View'}
+                </DropdownMenuItem>
+              )}
+              {isWorkerAccount && !isAdminAccount && (
+                <DropdownMenuItem onSelect={switchWorkerWorkspace}>
+                  <BriefcaseBusiness aria-hidden="true" /> {isProviderWorkspace ? 'Switch to client workspace' : 'Switch to provider workspace'}
+                </DropdownMenuItem>
+              )}
+              <DropdownMenuSeparator />
+              <DropdownMenuItem className="text-destructive focus:bg-destructive/10 focus:text-destructive" onSelect={() => setIsLogoutModalOpen(true)}>
+                <LogOut aria-hidden="true" /> Logout
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
+
+        {showGlobalSearch && (
+          <div className={`gl-app-mobile-search ${showMobileSearch ? 'open' : ''}`}>
+            <input
+              value={searchQuery || ''}
+              onChange={(event) => onSearchChange?.(event)}
+              placeholder="Search services, providers, locations"
+            />
+          </div>
+        )}
       </header>
 
       <div className="gl-app-mobile-nav">
