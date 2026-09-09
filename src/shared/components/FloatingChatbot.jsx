@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { BotMessageSquare, Loader2, Paperclip, RotateCcw, Send, X } from 'lucide-react';
 import { sendChatbotMessage } from '../services/chatbotService';
 import { startServiceConversationByServiceId } from '../../features/bookings/services/bookingService';
+import MobileChatbotLauncher from './MobileChatbotLauncher';
 
 const MAX_IMAGE_BYTES = 2_900_000;
 const PHOTO_HELP_PROMPT = 'Please identify the problem in this photo, estimate the likely budget, and find a qualified TrabaWho worker.';
@@ -706,15 +707,11 @@ function FloatingChatbot({
         </section>
       )}
 
-      <button
-        type="button"
-        className="gl-chatbot-toggle"
-        aria-label={isOpen ? 'Close TrabaWho assistant' : 'Open TrabaWho assistant'}
-        aria-expanded={isOpen}
-        onClick={() => setIsOpen((value) => !value)}
-      >
-        {isOpen ? <X size={24} aria-hidden="true" /> : <BotMessageSquare className="gl-chatbot-toggle-icon" size={29} aria-hidden="true" />}
-      </button>
+      <MobileChatbotLauncher
+        isOpen={isOpen}
+        onClose={() => setIsOpen(false)}
+        onToggle={() => setIsOpen((value) => !value)}
+      />
     </aside>
   );
 }

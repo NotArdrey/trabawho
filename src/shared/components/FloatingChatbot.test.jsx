@@ -87,4 +87,21 @@ describe('FloatingChatbot worker matches', () => {
     expect(screen.getByText(/Hi! I can help you browse services/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/message trabawho assistant/i)).toHaveValue('');
   });
+
+  it('uses an edge control to reveal and hide the launcher on mobile', async () => {
+    const originalWidth = window.innerWidth;
+    Object.defineProperty(window, 'innerWidth', { configurable: true, value: 390 });
+
+    const { unmount } = render(<FloatingChatbot currentView="client-dashboard" isLoggedIn />);
+    expect(screen.queryByRole('button', { name: /open trabawho assistant/i })).not.toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('button', { name: /show trabawho assistant button/i }));
+    expect(screen.getByRole('button', { name: /open trabawho assistant/i })).toBeVisible();
+
+    await userEvent.click(screen.getByRole('button', { name: /hide trabawho assistant button/i }));
+    expect(screen.queryByRole('button', { name: /open trabawho assistant/i })).not.toBeInTheDocument();
+
+    unmount();
+    Object.defineProperty(window, 'innerWidth', { configurable: true, value: originalWidth });
+  });
 });

@@ -13,18 +13,32 @@ import {
 } from '@/components/ui/dialog';
 import { Separator } from '@/components/ui/separator';
 
-const qrImageToDataUrl = async (url) => {
+const qrImageToDataUrl = async (url: string): Promise<string> => {
   const response = await fetch(url);
   if (!response.ok) throw new Error('Unable to load verification QR code.');
   const blob = await response.blob();
 
-  return new Promise((resolve, reject) => {
+  return new Promise<string>((resolve, reject) => {
     const reader = new FileReader();
-    reader.onload = () => resolve(reader.result);
+    reader.onload = () => typeof reader.result === 'string'
+      ? resolve(reader.result)
+      : reject(new Error('Unable to read verification QR code.'));
     reader.onerror = () => reject(new Error('Unable to read verification QR code.'));
     reader.readAsDataURL(blob);
   });
 };
+
+export interface DigitalPortfolioModalProps {
+  isOpen: boolean;
+  workerName?: string;
+  serviceType?: string;
+  bio?: string;
+  location?: string;
+  rating?: number | string;
+  profilePhoto?: string | null;
+  gcashNumber?: string;
+  onClose: () => void;
+}
 
 const DigitalPortfolioModal = ({
   isOpen,
@@ -36,7 +50,7 @@ const DigitalPortfolioModal = ({
   profilePhoto,
   gcashNumber = '09XXXXXXXXX',
   onClose,
-}) => {
+}: DigitalPortfolioModalProps) => {
   const [generationError, setGenerationError] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
   const ratingLabel = Number.isFinite(Number(rating)) ? Number(rating).toFixed(1) : 'Not rated';
@@ -54,6 +68,10 @@ const DigitalPortfolioModal = ({
       const pageHeight = doc.internal.pageSize.getHeight();
       const margin = 20;
       const contentWidth = pageWidth - (margin * 2);
+      const wrapText = (value: string): string | string[] => {
+        const wrapped = doc.splitTextToSize(value, contentWidth) as unknown;
+        return Array.isArray(wrapped) ? wrapped.map(String) : String(wrapped);
+      };
 
       doc.setFillColor(21, 87, 192);
       doc.rect(0, 0, pageWidth, 46, 'F');
@@ -71,11 +89,11 @@ const DigitalPortfolioModal = ({
       doc.setTextColor(15, 23, 42);
       doc.setFont('helvetica', 'bold');
       doc.setFontSize(20);
-      doc.text(doc.splitTextToSize(workerName, contentWidth), margin, y);
+      doc.text(wrapText(workerName), margin, y);
       y += 9;
       doc.setTextColor(21, 87, 192);
       doc.setFontSize(12);
-      doc.text(doc.splitTextToSize(serviceType, contentWidth), margin, y);
+      doc.text(wrapText(serviceType), margin, y);
       y += 8;
       doc.setTextColor(71, 85, 105);
       doc.setFont('helvetica', 'normal');
@@ -87,7 +105,7 @@ const DigitalPortfolioModal = ({
       doc.line(margin, y, pageWidth - margin, y);
       y += 11;
 
-      const addSection = (label, value) => {
+      const addSection = (label: string, value: string) => {
         doc.setTextColor(21, 87, 192);
         doc.setFont('helvetica', 'bold');
         doc.setFontSize(10);
@@ -96,9 +114,9 @@ const DigitalPortfolioModal = ({
         doc.setTextColor(30, 41, 59);
         doc.setFont('helvetica', 'normal');
         doc.setFontSize(10.5);
-        const lines = doc.splitTextToSize(value, contentWidth);
+        const lines = wrapText(value);
         doc.text(lines, margin, y);
-        y += (lines.length * 5.5) + 9;
+        y += ((Array.isArray(lines) ? lines.length : 1) * 5.5) + 9;
       };
 
       addSection('Professional summary', bio);
@@ -139,7 +157,7 @@ const DigitalPortfolioModal = ({
       const safeName = workerName.replace(/[^a-z0-9]+/gi, '-').replace(/^-|-$/g, '') || 'provider';
       doc.save(`${safeName}-TrabaWho-Portfolio.pdf`);
     } catch (error) {
-      setGenerationError(error?.message || 'Could not generate the PDF. Please try again.');
+      setGenerationError(error instanceof Error ? error.message : 'Could not generate the PDF. Please try again.');
     } finally {
       setIsGenerating(false);
     }
@@ -168,7 +186,7 @@ const DigitalPortfolioModal = ({
                 <p className="mt-1 font-semibold text-primary">{serviceType}</p>
                 <div className="mt-2 flex flex-wrap items-center gap-2">
                   <Badge variant="success"><ShieldCheck aria-hidden="true" />Verified provider</Badge>
-                  <span className="inline-flex items-center gap-1 text-sm text-muted-foreground"><Star className="size-4 fill-orange-400 text-orange-400" aria-hidden="true" />{ratingLabel} / 5</span>
+                  <span className="inline-flex items-center gap-1 text-sm text-muted-foreground"><Star className="size-4 fill-brand-highlight text-brand-highlight" aria-hidden="true" />{ratingLabel} / 5</span>
                 </div>
               </div>
             </header>

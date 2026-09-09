@@ -59,7 +59,7 @@ function SearchFilterBar({
               size="icon"
               className="absolute right-0 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
               onClick={() => onSearchValueChange("")}
-              aria-label={`Clear ${searchLabel.toLowerCase()}`}
+              aria-label={`Clear ${searchLabel.replace(/^search\s+/i, "")}`}
             >
               <X aria-hidden="true" />
             </Button>

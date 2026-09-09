@@ -3,6 +3,7 @@ import DashboardNavigation from '../../../shared/components/DashboardNavigation'
 import DigitalPortfolioModal from '../components/DigitalPortfolioModal';
 import PaymentModal from '../../bookings/components/PaymentModal';
 import BookingTermsModal from '../../bookings/components/BookingTermsModal';
+import AccountPrivacyPanel from '../components/AccountPrivacyPanel';
 import { getThemeTokens } from '../../../shared/styles/themeTokens';
 import { getProfilePhotoUrl, hasUploadedProfilePhoto } from '../../../shared/utils/profilePhoto';
 import { fetchSellerServices, updateServiceAdBoost, uploadPortfolioDocument } from '../../../shared/services/authService';
@@ -12,7 +13,7 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Camera, Download, FileText, MapPin, Pencil, Rocket, ShieldCheck, UserRoundCog } from 'lucide-react';
 
-function Profile({ appTheme = 'light', themeMode = 'system', onThemeChange, currentView, searchQuery, onSearchChange, onLogout, onOpenSellerSetup, onOpenMyBookings, onOpenChatPage, sellerProfile, onOpenMyWork, onOpenProfile, onOpenAccountSettings, onOpenSettings, onOpenDashboard, onOpenBrowseServices, userLocation, onManageAccount, onBackToDashboard, onUpdateProfile, onOpenAdminDashboard }) {
+function Profile({ appTheme = 'light', themeMode = 'system', onThemeChange, currentView, searchQuery, onSearchChange, onLogout, onOpenSellerSetup, onOpenMyBookings, onOpenChatPage, sellerProfile, onOpenMyWork, onOpenProfile, onOpenAccountSettings, onOpenSettings, onOpenDashboard, onOpenBrowseServices, userLocation, onUpdateProfile, onUpdatePassword, onOpenAdminDashboard }) {
   const MAX_PROFILE_PHOTO_BYTES = 2 * 1024 * 1024;
   const fallbackName = 'Juan Dela Cruz';
   const fallbackBio = 'Dedicated service provider focused on quality, punctuality, and client satisfaction.';
@@ -43,7 +44,6 @@ function Profile({ appTheme = 'light', themeMode = 'system', onThemeChange, curr
   const [isPortfolioModalOpen, setIsPortfolioModalOpen] = useState(false);
   const isBackHovered = false;
   const [isHeadingHovered, setIsHeadingHovered] = useState(false);
-  const [isManageHovered, setIsManageHovered] = useState(false);
   const [isPortfolioHovered, setIsPortfolioHovered] = useState(false);
   const [isSavingName, setIsSavingName] = useState(false);
   const [isSavingBio, setIsSavingBio] = useState(false);
@@ -440,7 +440,6 @@ function Profile({ appTheme = 'light', themeMode = 'system', onThemeChange, curr
     boosterLabel: { display: 'grid', gap: '6px', color: themeTokens.textPrimary, fontSize: '13px', fontWeight: 700 },
     boosterHint: { margin: '10px 0 0', color: themeTokens.textSecondary, fontSize: '13px', fontWeight: 700 },
     boosterSuccess: { margin: '10px 0 0', color: themeTokens.successText, background: themeTokens.successBg, border: `1px solid ${themeTokens.successBorder}`, borderRadius: '8px', padding: '9px 10px', fontWeight: 700, fontSize: '13px' },
-    manageAccountBtn: { width: '100%', border: 'none', borderRadius: '10px', padding: '14px', background: isManageHovered ? themeTokens.surfaceAlt : themeTokens.surfaceSoft, color: themeTokens.textPrimary, fontWeight: 700, fontSize: '15px', cursor: 'pointer' },
     photoSourceOverlay: { position: 'fixed', inset: 0, background: 'rgba(0, 0, 0, 0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 220 },
     photoSourceModal: { width: 'min(460px, 94vw)', background: themeTokens.surface, color: themeTokens.textPrimary, border: `1px solid ${themeTokens.border}`, borderRadius: '14px', padding: '20px', boxShadow: themeTokens.shadow },
     modalTitle: { margin: '0 0 8px', fontSize: '1.55rem', lineHeight: 1.2, color: themeTokens.textPrimary },
@@ -702,16 +701,14 @@ function Profile({ appTheme = 'light', themeMode = 'system', onThemeChange, curr
             </section>
           )}
 
-          <Button
-            type="button"
-            variant="secondary"
-            className="profile-manage-account"
-            onMouseEnter={() => setIsManageHovered(true)}
-            onMouseLeave={() => setIsManageHovered(false)}
-            onClick={onManageAccount}
-          >
-            <ShieldCheck aria-hidden="true" />Manage account & privacy
-          </Button>
+          <div className="mt-1 border-t pt-2">
+            <AccountPrivacyPanel
+              sellerProfile={sellerProfile}
+              userLocation={userLocation}
+              onUpdateProfile={onUpdateProfile}
+              onUpdatePassword={onUpdatePassword}
+            />
+          </div>
 
           {isPhotoSourceOpen && (
             <div style={styles.photoSourceOverlay}>

@@ -5,7 +5,13 @@ export { default as CalendarAvailabilityModal } from './components/CalendarAvail
 export { default as ProfileEditModal } from './components/ProfileEditModal';
 export { default as SellerScheduleModal } from './components/SellerScheduleModal';
 export { default as InquiryChatModal } from './components/InquiryChatModal';
+export { ActiveInquiriesSection } from './components/ActiveInquiriesSection';
+export { default as WorkProviderSummary } from './components/WorkProviderSummary';
+export type { WorkProviderSummaryProps } from './components/WorkProviderSummary';
+export { default as WorkSectionFilter } from './components/WorkSectionFilter';
+export type { WorkSectionFilterProps, WorkSectionOption, WorkSectionValue } from './components/WorkSectionFilter';
+export type { WorkInquiry } from './types/inquiry';
+export type { InquiryChatModalProps } from './components/InquiryChatModal';
 export { default as SlotEditModal } from './components/SlotEditModal';
-export { default as ConfirmActionModal } from './components/modals/ConfirmActionModal';
 export { default as QrPreviewModal } from './components/modals/QrPreviewModal';
 export * from './hooks';

@@ -7,3 +7,4 @@ export { default as SlotSelectionModal } from './components/SlotSelectionModal';
 export { default as BookingTermsModal } from './components/BookingTermsModal';
 export { BookingScopeSwitcher } from './components/BookingScopeSwitcher';
 export type { BookingHubFilter, BookingHubScope, BookingHubSummary, BookingCounterpartPresentation } from './types/booking-hub';
+export { fetchBookingMessages, sendBookingMessage, updateBookingWorkflow } from './services/bookingService';

@@ -1,4 +1,4 @@
-import { useEffect, type CSSProperties, type ReactNode } from 'react';
+import { useEffect, type ReactNode } from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { LandingPage, PasswordRecoveryPage, SellerOnboarding } from './features';
 import { LoadingScreen, SuccessNotification, ErrorNotification, FloatingChatbot } from './shared/components';
@@ -39,17 +39,6 @@ interface LegacyNavigationContext {
 
 function App() {
   const location = useLocation();
-  const styles: { sellerOnboardingOverlay: CSSProperties } = {
-    sellerOnboardingOverlay: {
-      position: 'fixed',
-      inset: 0,
-      backgroundColor: 'rgba(15, 23, 42, 0.5)',
-      zIndex: 150,
-      overflowY: 'auto',
-      padding: '1rem 0',
-    },
-  };
-
   // Use the navigation hook to get all state and handlers
   const navigationContext = useAppNavigation() as unknown as LegacyNavigationContext;
 
@@ -140,10 +129,7 @@ function App() {
   // Onboarding overlay
   const sellerOnboardingOverlay = navigationContext.isSellerOnboardingOpen ? (
     <div
-      style={{
-        ...styles.sellerOnboardingOverlay,
-        backgroundColor: navigationContext.appTheme === 'dark' ? 'rgba(15, 23, 42, 0.65)' : styles.sellerOnboardingOverlay.backgroundColor,
-      }}
+      className="fixed inset-0 z-[150] overflow-y-auto bg-slate-950/50 py-4 dark:bg-slate-950/65"
       role="dialog"
       aria-modal="true"
     >

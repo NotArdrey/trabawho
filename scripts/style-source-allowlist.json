@@ -1,0 +1,13 @@
+[
+  {
+    "path": "src/styles/globals.css",
+    "kind": "foundation",
+    "justification": "Tailwind imports, semantic design tokens, base reset, focus treatment, and reduced-motion defaults."
+  },
+  {
+    "path": "src/shared/styles/modern.css",
+    "kind": "legacy",
+    "baselineLines": 7003,
+    "justification": "Frozen compatibility stylesheet for UI slices that have not yet migrated to Tailwind."
+  }
+]

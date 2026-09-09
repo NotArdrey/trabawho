@@ -41,12 +41,15 @@
     "typecheck": "tsc -b --pretty false",
     "lint": "eslint . --max-warnings 0",
     "test": "vitest run",
+    "test:standards": "node --test scripts/standards-guards.test.mjs",
     "test:watch": "vitest",
     "test:e2e": "playwright test",
     "test:e2e:ai-redesign": "playwright test tests/e2e/ai-redesign-smoke.e2e.spec.js",
     "test:e2e:headed": "playwright test --headed",
     "check:file-sizes": "node scripts/check-file-sizes.mjs",
-    "check": "npm run typecheck && npm run lint && npm test && npm run check:file-sizes && npm run build"
+    "check:legacy": "node scripts/check-legacy-source.mjs",
+    "check:styles": "node scripts/check-styles.mjs",
+    "check": "npm run typecheck && npm run lint && npm test && npm run test:standards && npm run check:file-sizes && npm run check:legacy && npm run check:styles && npm run build"
   },
   "devDependencies": {
     "@playwright/test": "^1.59.1",

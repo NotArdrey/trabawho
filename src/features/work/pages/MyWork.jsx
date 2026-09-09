@@ -1,38 +1,33 @@
 import React, { useEffect, useState } from 'react';
 import DashboardNavigation from '../../../shared/components/DashboardNavigation';
 import InquiryChatModal from '../components/InquiryChatModal';
+import { ActiveInquiriesSection } from '../components/ActiveInquiriesSection';
+import WorkProviderSummary from '../components/WorkProviderSummary';
+import WorkSectionFilter from '../components/WorkSectionFilter';
 import SlotEditModal from '../components/SlotEditModal';
 import ProfileEditModal from '../components/ProfileEditModal';
-import ConfirmActionModal from '../components/modals/ConfirmActionModal';
+import { ConfirmActionModal } from '@/shared/components';
 import QrPreviewModal from '../components/modals/QrPreviewModal';
 import CreateServiceModal from '../components/CreateServiceModal';
 import SuccessNotification from '../../../shared/components/SuccessNotification';
 import ErrorNotification from '../../../shared/components/ErrorNotification';
 import { markBookingDelivered } from '../../bookings/services/bookingService';
 import { getThemeTokens } from '../../../shared/styles/themeTokens';
-import { getProfilePhotoUrl } from '../../../shared/utils/profilePhoto';
 import { useWorkPayments, useWorkProfileServices, useWorkSchedule } from '../hooks';
 import {
   Ban,
   BriefcaseBusiness,
   CalendarDays,
   CircleDollarSign,
-  Inbox,
   Loader2,
-  Megaphone,
-  MapPin,
-  MessageSquareText,
   Pencil,
   Plus,
   RotateCcw,
-  Star,
   Trash2,
   UserRound,
-  WalletCards,
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 const formatDateLong = (date) =>
   date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
@@ -55,28 +50,6 @@ const classStyles = {
   'header-spacer': { width: '148px' },
   'my-work-main': { width: '100%', maxWidth: '1120px', margin: '0 auto', padding: '40px 16px', boxSizing: 'border-box' },
   'empty-state-banner': { background: 'linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)', border: '1px solid #fcd34d', borderRadius: '12px', padding: '40px 24px', textAlign: 'center', marginBottom: '32px' },
-  'profile-summary-card': { background: 'white', borderRadius: '12px', padding: '28px', margin: '0 auto 32px', width: '100%', maxWidth: '1100px', boxSizing: 'border-box', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '32px', boxShadow: '0 2px 8px rgba(0, 0, 0, 0.08)', alignItems: 'start' },
-  'profile-info': { display: 'flex', gap: '20px', alignItems: 'flex-start' },
-  'profile-avatar': { width: '80px', height: '80px', background: 'linear-gradient(135deg, var(--gl-blue), var(--gl-blue-2))', color: 'white', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '32px', fontWeight: 700, flexShrink: 0 },
-  'profile-avatar-image': { width: '80px', height: '80px', borderRadius: '50%', objectFit: 'cover', display: 'block' },
-  'profile-name-link': { border: 'none', background: 'transparent', padding: 0, textAlign: 'left', cursor: 'pointer', fontSize: '24px', fontWeight: 700, color: '#2c3e50', margin: '0 0 4px 0' },
-  'service-type': { fontSize: '14px', color: 'var(--gl-blue)', fontWeight: 600, margin: '0 0 8px 0' },
-  location: { fontSize: '14px', color: '#7f8c8d', margin: 0, display: 'flex', alignItems: 'center', gap: '5px', flexWrap: 'wrap' },
-  'profile-chip-row': { marginTop: '8px', display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' },
-  'profile-action-row': { marginTop: '8px', display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' },
-  'service-mode-tag': { margin: 0, fontSize: '12px', fontWeight: 700, color: 'var(--gl-blue)', background: 'var(--gl-accent-soft)', display: 'inline-block', padding: '4px 8px', borderRadius: '999px' },
-  'service-boost-tag': { margin: 0, fontSize: '12px', fontWeight: 800, color: '#854d0e', background: '#fef3c7', border: '1px solid #fde68a', display: 'inline-flex', alignItems: 'center', gap: '5px', padding: '4px 8px', borderRadius: '999px', verticalAlign: 'middle' },
-  'profile-stats': { display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px' },
-  'service-description-panel': { gridColumn: '1 / -1', borderTop: '1px solid #eceff1', paddingTop: '18px' },
-  'service-description-title': { margin: '0 0 8px', fontSize: '13px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.5px', color: '#64748b' },
-  'service-description-text': { margin: 0, color: '#374151', lineHeight: 1.6, fontSize: '14px', whiteSpace: 'pre-wrap' },
-  'service-detail-grid': { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '10px', marginTop: '16px' },
-  'service-detail-item': { display: 'grid', gap: '3px' },
-  'service-detail-label': { fontSize: '11px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.5px', color: '#64748b' },
-  'service-detail-value': { fontSize: '13px', fontWeight: 700, color: '#1f2937' },
-  stat: { textAlign: 'center', padding: '16px', background: '#f9f9f9', borderRadius: '8px' },
-  'stat-number': { display: 'block', fontSize: '24px', fontWeight: 700, color: 'var(--gl-blue)', marginBottom: '4px' },
-  'stat-label': { display: 'block', fontSize: '12px', color: '#7f8c8d', textTransform: 'uppercase', letterSpacing: '0.5px' },
   'inquiries-section': { width: '100%', maxWidth: '1100px', margin: '0 auto 48px' },
   'section-header': { marginBottom: '24px' },
   'section-header-with-action': { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '16px', flexWrap: 'wrap', marginBottom: '18px' },
@@ -99,7 +72,6 @@ const classStyles = {
   'inquiry-description': { fontSize: '14px', color: '#555', margin: '0 0 12px 0', lineHeight: 1.5 },
   'inquiry-meta': { display: 'flex', gap: '16px', fontSize: '12px', color: '#7f8c8d' },
   'inquiry-actions': { display: 'flex', justifyContent: 'flex-end', gap: '8px' },
-  'btn-respond': { minWidth: '116px', minHeight: '38px', padding: '9px 14px', background: 'var(--gl-blue)', color: 'white', border: 'none', borderRadius: '8px', fontSize: '14px', fontWeight: 700, cursor: 'pointer', transition: 'transform 0.18s ease, background 0.18s ease, box-shadow 0.18s ease', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '7px', boxShadow: 'var(--gl-accent-shadow)' },
   'schedule-section': { width: '100%', maxWidth: '1100px', margin: '0 auto 48px' },
   'week-slider': { display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', background: '#ffffff', border: '1px solid #e5e7eb', borderRadius: '10px', padding: '10px 12px', marginBottom: '16px' },
   'week-nav-btn': { border: '1px solid #cbd5e1', background: '#f8fafc', color: '#1f2937', borderRadius: '8px', padding: '8px 10px', fontSize: '12px', fontWeight: 600, cursor: 'pointer' },
@@ -154,8 +126,6 @@ const classStyles = {
   'done-cancel-btn': { border: 'none', borderRadius: '8px', minHeight: '44px', padding: '10px 14px', fontWeight: 700, fontSize: '14px', cursor: 'pointer', background: '#e5e7eb', color: '#111827' },
   'done-confirm-btn': { border: 'none', borderRadius: '8px', minHeight: '44px', padding: '10px 14px', fontWeight: 700, fontSize: '14px', cursor: 'pointer', background: '#16a34a', color: '#fff' },
   'delete-confirm-btn': { border: 'none', borderRadius: '8px', minHeight: '44px', padding: '10px 14px', fontWeight: 700, fontSize: '14px', cursor: 'pointer', background: '#dc2626', color: '#fff' },
-  'gcash-qr-btn': { border: '1px solid var(--gl-accent-border)', background: 'var(--gl-accent-soft)', color: 'var(--gl-blue)', borderRadius: '6px', padding: '5px 8px', fontSize: '11px', fontWeight: 700, cursor: 'pointer', height: '24px', whiteSpace: 'nowrap', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' },
-  'profile-gcash-btn': { marginTop: 0 },
   'gcash-preview-modal': { width: 'min(520px, 92vw)' },
   'gcash-preview-body': { marginTop: '12px', display: 'flex', gap: '14px', alignItems: 'flex-start' },
   'gcash-preview-qr': { width: '170px', height: '170px', borderRadius: '8px', border: '1px solid #d1d5db' },
@@ -175,9 +145,6 @@ const classStyles = {
   'payment-qr-item': { border: '1px solid #e5e7eb', borderRadius: '8px', padding: '10px', background: '#f8fafc', textAlign: 'center' },
   'payment-qr-title': { margin: '0 0 6px', fontSize: '13px', fontWeight: 700, color: '#1f2937' },
   'payment-qr-caption': { margin: '6px 0 0', fontSize: '12px', color: '#6b7280' },
-  'section-filter-row': { display: 'flex', gap: '8px', flexWrap: 'wrap', margin: '0 auto 18px', width: '100%', maxWidth: '1100px' },
-  'section-filter-btn': { padding: '8px 12px', borderRadius: '999px', border: '1px solid #cbd5e1', background: '#ffffff', color: '#334155', fontSize: '12px', fontWeight: 700, cursor: 'pointer' },
-  'section-filter-btn-active': { background: 'var(--gl-blue)', color: '#ffffff', borderColor: 'var(--gl-blue)' },
   'refund-section': { width: '100%', maxWidth: '1100px', margin: '0 auto 40px' },
   'refund-grid': { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '16px' },
   'refund-card': { background: '#eef2ff', border: '1px solid #c7d2fe', borderRadius: '10px', padding: '14px', display: 'grid', gap: '8px' },
@@ -192,8 +159,6 @@ const hoverStyles = {
   backButton: { background: 'var(--gl-surface-2)', border: '1px solid var(--gl-blue)', color: 'var(--gl-blue)' },
   logoutButton: { background: '#fee', border: '1px solid #e74c3c' },
   profileName: { color: 'var(--gl-blue)', textDecoration: 'underline' },
-  inquiryCard: { boxShadow: 'var(--gl-shadow-soft)', border: '1px solid var(--gl-blue)', transform: 'translateY(-2px)' },
-  respondButton: { background: 'var(--gl-blue-2)', transform: 'translateY(-1px)' },
   weekNav: { background: '#eef2ff', border: '1px solid #818cf8' },
   gcashButton: { background: 'var(--gl-accent-soft)', border: '1px solid var(--gl-accent-border)' },
   markDone: { background: '#219653' },
@@ -282,7 +247,6 @@ const MyWork = ({ appTheme = 'light', themeMode = 'system', onThemeChange, curre
     weekDateByDay,
     weekOffset,
     weekRangeLabel,
-    weeklyScheduledMinutes,
     weeklySchedule,
   } = useWorkSchedule({ sellerId, currentProfile });
 
@@ -514,55 +478,6 @@ const MyWork = ({ appTheme = 'light', themeMode = 'system', onThemeChange, curre
       background: `linear-gradient(135deg, ${themeTokens.warningBg}, ${themeTokens.surfaceAlt})`,
       border: `1px solid ${themeTokens.warningBorder}`,
     },
-    'profile-summary-card': {
-      background: themeTokens.surface,
-      border: `1px solid ${themeTokens.border}`,
-      borderRadius: '8px',
-      boxShadow: themeTokens.shadowSoft,
-      color: themeTokens.textPrimary,
-    },
-    'profile-avatar': {
-      background: `linear-gradient(135deg, ${themeTokens.accent}, ${themeTokens.accentDeep || themeTokens.accent})`,
-    },
-    'profile-name-link': {
-      color: themeTokens.textPrimary,
-    },
-    'service-type': {
-      color: themeTokens.accent,
-    },
-    location: {
-      color: themeTokens.textSecondary,
-    },
-    'service-mode-tag': {
-      background: themeTokens.accentSoft,
-      color: themeTokens.accent,
-    },
-    'service-description-panel': {
-      borderTop: `1px solid ${themeTokens.border}`,
-    },
-    'service-description-title': {
-      color: themeTokens.textMuted,
-    },
-    'service-description-text': {
-      color: themeTokens.textSecondary,
-    },
-    'service-detail-label': {
-      color: themeTokens.textMuted,
-    },
-    'service-detail-value': {
-      color: themeTokens.textPrimary,
-    },
-    stat: {
-      background: themeTokens.surfaceAlt,
-      border: `1px solid ${themeTokens.border}`,
-      color: themeTokens.textPrimary,
-    },
-    'stat-label': {
-      color: themeTokens.textMuted,
-    },
-    'stat-number': {
-      color: themeTokens.accent,
-    },
     'inquiries-section': sectionCardStyle,
     'payment-confirm-section': sectionCardStyle,
     'refund-section': sectionCardStyle,
@@ -734,11 +649,6 @@ const MyWork = ({ appTheme = 'light', themeMode = 'system', onThemeChange, curre
     'payment-qr-caption': {
       color: themeTokens.textSecondary,
     },
-    'section-filter-btn': {
-      background: themeTokens.surface,
-      border: `1px solid ${themeTokens.border}`,
-      color: themeTokens.textPrimary,
-    },
     'refund-card': {
       background: isDarkMode ? 'rgba(79, 70, 229, 0.16)' : '#eef2ff',
       border: `1px solid ${isDarkMode ? 'rgba(129, 140, 248, 0.42)' : '#c7d2fe'}`,
@@ -759,13 +669,6 @@ const MyWork = ({ appTheme = 'light', themeMode = 'system', onThemeChange, curre
         'header-spacer': { display: 'none' },
         'my-work-main': { width: '100%', maxWidth: '640px', margin: '0 auto', padding: '18px 10px', boxSizing: 'border-box' },
         'empty-state-banner': { padding: '24px 14px' },
-        'profile-summary-card': { gridTemplateColumns: '1fr', gap: '16px', padding: '16px' },
-        'profile-info': { flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center' },
-        'profile-name-link': { fontSize: '20px' },
-        location: { justifyContent: 'center', textAlign: 'center' },
-        'profile-chip-row': { justifyContent: 'center' },
-        'profile-action-row': { justifyContent: 'center' },
-        'profile-stats': { gridTemplateColumns: '1fr' },
         'inquiries-section': { width: '100%', maxWidth: '600px', margin: '0 auto 32px' },
         'section-header': { textAlign: 'center' },
         'section-header-with-action': { alignItems: 'stretch', textAlign: 'left' },
@@ -786,7 +689,6 @@ const MyWork = ({ appTheme = 'light', themeMode = 'system', onThemeChange, curre
         'gcash-preview-qr': { width: '100%', maxWidth: '220px', height: 'auto' },
         'payment-confirm-grid': { gridTemplateColumns: '1fr' },
         'payment-qr-grid': { gridTemplateColumns: '1fr' },
-        'section-filter-row': { justifyContent: 'center' },
         'refund-grid': { gridTemplateColumns: '1fr' },
         'cancelled-grid': { gridTemplateColumns: '1fr' },
       }
@@ -816,7 +718,6 @@ const MyWork = ({ appTheme = 'light', themeMode = 'system', onThemeChange, curre
   const cancelledPrimaryTextStyle = { margin: 0, color: isDarkMode ? '#fecaca' : '#991b1b', fontWeight: 700, fontSize: '13px' };
   const cancelledMetaTextStyle = { margin: 0, color: isDarkMode ? '#fca5a5' : '#991b1b', fontSize: '12px' };
   const cancelledPolicyTextStyle = { margin: 0, color: isDarkMode ? '#fecaca' : '#7f1d1d', fontSize: '12px', fontWeight: 700 };
-  const statTitleStyle = { fontSize: '14px', color: themeTokens.textMuted, textTransform: 'uppercase', letterSpacing: '0.5px', margin: '0 0 8px 0' };
   const modalTextStyle = { margin: 0, color: themeTokens.textPrimary, lineHeight: 1.5 };
   const modalMetaTextStyle = { margin: '8px 0 0', color: themeTokens.textSecondary, fontSize: '13px' };
   const modalDangerTextStyle = { margin: '8px 0 0', color: isDarkMode ? '#fca5a5' : '#b91c1c', fontSize: '13px', fontWeight: 600 };
@@ -888,28 +789,16 @@ const MyWork = ({ appTheme = 'light', themeMode = 'system', onThemeChange, curre
     const entryDate = new Date(`${entry.date}T00:00:00`);
     return entryDate >= currentWeekMonday && entryDate <= currentWeekSunday;
   });
-  const scheduledDurationLabel = !supportsAvailabilitySchedule
-    ? 'Requests'
-    : scheduleMode === 'calendar-only'
-    ? `${visibleCalendarAvailability.length} ${visibleCalendarAvailability.length === 1 ? 'date' : 'dates'}`
-    : weeklyScheduledMinutes >= 60
-      ? `${Number((weeklyScheduledMinutes / 60).toFixed(weeklyScheduledMinutes % 60 === 0 ? 0 : 1))} hours`
-      : `${weeklyScheduledMinutes} min`;
-  const pendingCompletionAmount = weekTransactions
-    .filter((txn) => !txn.isDone && txn.bookingStatus !== 'Refunded' && txn.bookingStatus !== 'Cancelled (Cash)')
-    .reduce((total, txn) => total + Number(txn.expectedCashAmount || 0), 0);
-  const pendingCompletionLabel = `₱${pendingCompletionAmount.toLocaleString('en-PH')}`;
   const workSectionOptions = [
-    { label: 'Show All', value: 'all', description: 'Overview of every work section' },
-    { label: 'Active Inquiries', value: 'inquiries', description: 'Client requests waiting for a response' },
-    { label: 'Payment Confirmations', value: 'cash-approvals', description: 'Cash payment review queue' },
-    { label: 'Refund Cases', value: 'refunds', description: 'GCash refund tracking' },
-    { label: 'Cancelled Bookings', value: 'cancelled', description: 'Cancelled cash bookings' },
+    { label: 'Show All', shortLabel: 'All', value: 'all', description: 'Overview of every work section' },
+    { label: 'Active Inquiries', shortLabel: 'Inquiries', value: 'inquiries', description: 'Client requests waiting for a response' },
+    { label: 'Payment Confirmations', shortLabel: 'Cash', value: 'cash-approvals', description: 'Cash payment review queue' },
+    { label: 'Refund Cases', shortLabel: 'Refunds', value: 'refunds', description: 'GCash refund tracking' },
+    { label: 'Cancelled Bookings', shortLabel: 'Cancelled', value: 'cancelled', description: 'Cancelled cash bookings' },
     ...(supportsAvailabilitySchedule
-      ? [{ label: 'Service Availability', value: 'schedule', description: 'Time slots for the selected service' }]
+      ? [{ label: 'Service Availability', shortLabel: 'Availability', value: 'schedule', description: 'Time slots for the selected service' }]
       : []),
   ];
-  const activeWorkSectionLabel = workSectionOptions.find((option) => option.value === workSectionFilter)?.label || 'Show All';
   
   // ============ HELPER FUNCTIONS ============
   
@@ -927,19 +816,6 @@ const MyWork = ({ appTheme = 'light', themeMode = 'system', onThemeChange, curre
     if (slotsLeft === 0) return 'slot-full';
     if (slotsLeft <= capacity / 2) return 'slot-half';
     return 'slot-available';
-  };
-  
-  /**
-   * getStatusBadgeColor(status)
-   * Returns CSS class for inquiry status badge color
-   */
-  const getStatusBadgeColor = (status) => {
-    switch (status) {
-      case 'Pending Response': return 'status-pending';
-      case 'Waiting for Reply': return 'status-waiting';
-      case 'Negotiating Price': return 'status-negotiating';
-      default: return 'status-default';
-    }
   };
   
   // Currently selected inquiry for chat
@@ -973,7 +849,7 @@ const MyWork = ({ appTheme = 'light', themeMode = 'system', onThemeChange, curre
       
       <main className="my-work-main-modern" style={sx('my-work-main')} aria-hidden={editSlotModalOpen ? 'true' : undefined}>
 
-        <header className="my-work-page-heading">
+        <header className="my-work-page-heading max-[760px]:relative">
           <div className="my-work-page-heading-copy">
             <Badge variant="secondary" className="my-work-page-eyebrow">
               <BriefcaseBusiness size={14} aria-hidden="true" />
@@ -982,15 +858,14 @@ const MyWork = ({ appTheme = 'light', themeMode = 'system', onThemeChange, curre
             <h1>Manage My Work</h1>
             <p>Handle client requests, payments, refunds, and your published services from one place.</p>
           </div>
-          <div className="my-work-page-heading-actions">
-            {!isLoadingSellerData && (
-              <Badge variant="outline">{(sellerDbServices || []).length} synced {(sellerDbServices || []).length === 1 ? 'service' : 'services'}</Badge>
-            )}
+          <div className="my-work-page-heading-actions max-[760px]:absolute max-[760px]:right-0 max-[760px]:top-0">
             {canShowAddServiceButton && sellerData && (
-              <Button type="button" onClick={() => setIsCreateServiceOpen(true)}>
-                <Plus size={16} aria-hidden="true" />
-                Add service
-              </Button>
+              <span className="inline-flex">
+                <Button type="button" className="max-[760px]:h-10 max-[760px]:min-h-10 max-[760px]:px-3" onClick={() => setIsCreateServiceOpen(true)}>
+                  <Plus size={16} aria-hidden="true" />
+                  Add service
+                </Button>
+              </span>
             )}
           </div>
         </header>
@@ -1096,189 +971,29 @@ const MyWork = ({ appTheme = 'light', themeMode = 'system', onThemeChange, curre
         
         {!isLoadingSellerData && hasSellerRecord && (
           <>
-            <section className="my-work-profile-summary" style={sx('profile-summary-card')} aria-label="Current service summary">
-              <div style={sx('profile-info')}>
-                <div style={sx('profile-avatar')}>
-                  <img
-                    src={getProfilePhotoUrl(currentProfile?.profilePhoto)}
-                    alt={`${currentProfile?.fullName || 'Service provider'} profile`}
-                    style={sx('profile-avatar-image')}
-                  />
-                </div>
-                <div>
-                  <button
-                    style={{ ...sx('profile-name-link'), ...(isHovered('profile-name') ? hoverStyles.profileName : {}) }}
-                    onMouseEnter={() => setHoverKey('profile-name')}
-                    onMouseLeave={() => setHoverKey('')}
-                    onClick={handleOpenProfileEdit}
-                    title="Edit profile details"
-                  >
-                    {currentProfile?.fullName || 'Service Provider'}
-                  </button>
-                  <p style={sx('service-type')}>{currentProfile?.serviceType || 'Service Type'}</p>
-                  <p style={{ margin: '0 0 8px 0', fontSize: '13px', color: themeTokens.textSecondary, fontWeight: 600 }}>
-                    {currentPriceLabel}
-                  </p>
-                  <p style={sx('location')}>
-                    <MapPin size={14} aria-hidden="true" />
-                    {currentProfile?.location?.address || currentProfile?.location?.barangay || 'Sabang'}, {currentProfile?.location?.city || 'Baliwag'}, {currentProfile?.location?.province || 'Bulacan'}
-                  </p>
-                  <div style={sx('profile-chip-row')}>
-                    <p style={sx('service-mode-tag')}>
-                      Booking: {supportsAvailabilitySchedule ? 'Time-slot booking' : 'Request booking'}
-                    </p>
-                    {currentProfile?.isBoosted && (
-                      <span style={sx('service-boost-tag')}>
-                        <Megaphone size={13} aria-hidden="true" />
-                        Boosted
-                      </span>
-                    )}
-                  </div>
-                  <div style={sx('profile-action-row')}>
-                    <button
-                      style={{ ...sx('gcash-qr-btn', 'profile-gcash-btn'), ...(isHovered('profile-gcash-btn') ? hoverStyles.gcashButton : {}) }}
-                      onMouseEnter={() => setHoverKey('profile-gcash-btn')}
-                      onMouseLeave={() => setHoverKey('')}
-                      onClick={handleOpenGcashPreview}
-                    >
-                      GCash QR
-                    </button>
-                    <button
-                      style={{ ...sx('btn-gcash-preview', 'profile-gcash-btn'), ...(isHovered('profile-cash-btn') ? hoverStyles.gcashButton : {}) }}
-                      onMouseEnter={() => setHoverKey('profile-cash-btn')}
-                      onMouseLeave={() => setHoverKey('')}
-                      onClick={handleOpenCashQrPreview}
-                    >
-                      Cash Confirm QR
-                    </button>
-                  </div>
-                </div>
-              </div>
-              <div style={sx('profile-stats')}>
-                <div style={sx('stat')}>
-                  <span style={sx('stat-number')}>{activeInquiries.length}</span>
-                  <span style={sx('stat-label')}>Active Inquiries</span>
-                </div>
-                <div style={sx('stat')}>
-                  <span style={sx('stat-number')}>{avgRatingLabel}</span>
-                  <span style={sx('stat-label')}>Avg Rating</span>
-                </div>
-                <div style={sx('stat')}>
-                  <span style={sx('stat-number')}>0</span>
-                  <span style={sx('stat-label')}>Completed</span>
-                </div>
-              </div>
-              <div style={sx('service-description-panel')}>
-                <p style={sx('service-description-title')}>Work Description</p>
-                <p style={sx('service-description-text')}>{currentServiceDescription}</p>
-                <div style={sx('service-detail-grid')}>
-                  <div style={sx('service-detail-item')}>
-                    <span style={sx('service-detail-label')}>Service</span>
-                    <span style={sx('service-detail-value')}>{currentProfile?.serviceType || 'Service'}</span>
-                  </div>
-                  <div style={sx('service-detail-item')}>
-                    <span style={sx('service-detail-label')}>Rate</span>
-                    <span style={sx('service-detail-value')}>{currentPriceLabel}</span>
-                  </div>
-                  <div style={sx('service-detail-item')}>
-                    <span style={sx('service-detail-label')}>Duration</span>
-                    <span style={sx('service-detail-value')}>{currentDurationLabel}</span>
-                  </div>
-                  <div style={sx('service-detail-item')}>
-                    <span style={sx('service-detail-label')}>Payment</span>
-                    <span style={sx('service-detail-value')}>{currentPaymentLabel}</span>
-                  </div>
-                  <div style={sx('service-detail-item')}>
-                    <span style={sx('service-detail-label')}>Ad Booster</span>
-                    <span style={sx('service-detail-value')}>{currentBoostLabel}</span>
-                  </div>
-                </div>
-              </div>
-            </section>
+            <WorkProviderSummary
+              name={currentProfile?.fullName || 'Service Provider'}
+              profilePhoto={currentProfile?.profilePhoto}
+              service={currentProfile?.serviceType || 'Service'}
+              price={currentPriceLabel}
+              location={`${currentProfile?.location?.address || currentProfile?.location?.barangay || 'Sabang'}, ${currentProfile?.location?.city || 'Baliwag'}, ${currentProfile?.location?.province || 'Bulacan'}`}
+              bookingMode={supportsAvailabilitySchedule ? 'Time-slot booking' : 'Request booking'}
+              isBoosted={currentProfile?.isBoosted}
+              activeInquiries={activeInquiries.length}
+              averageRating={avgRatingLabel}
+              completed={0}
+              description={currentServiceDescription}
+              duration={currentDurationLabel}
+              payment={currentPaymentLabel}
+              booster={currentBoostLabel}
+              onEditProfile={handleOpenProfileEdit}
+              onOpenGcashQr={handleOpenGcashPreview}
+              onOpenCashQr={handleOpenCashQrPreview}
+            />
 
-            <div className="my-work-section-picker" style={sx('section-filter-row')}>
-              <div>
-                <label htmlFor="work-section-select">Work section</label>
-                <p>Focus the page on one operational queue.</p>
-              </div>
-              <Select value={workSectionFilter} onValueChange={setWorkSectionFilter}>
-                <SelectTrigger id="work-section-select" className="my-work-section-select" aria-label="Choose work section">
-                  <SelectValue>{activeWorkSectionLabel}</SelectValue>
-                </SelectTrigger>
-                <SelectContent>
-                  {workSectionOptions.map((option) => (
-                    <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+            <WorkSectionFilter value={workSectionFilter} options={workSectionOptions} onValueChange={setWorkSectionFilter} />
             
-            {showInquiriesSection && <section className="my-work-queue-section" style={sx('inquiries-section')} data-testid="work-inquiries-section">
-              <div className="my-work-section-heading" style={sx('section-header')}>
-                <span className="my-work-section-icon tone-orange"><Inbox size={18} aria-hidden="true" /></span>
-                <div><h2 style={sectionTitleStyle}>Active inquiries</h2><p style={sx('section-subtitle')}>Clients waiting for your response.</p></div>
-                <Badge variant={activeInquiries.length ? 'warning' : 'secondary'}>{activeInquiries.length}</Badge>
-              </div>
-              
-              <div style={sx('inquiries-grid')}>
-                {activeInquiries.map(inquiry => (
-                  <article
-                    key={inquiry.id}
-                    className="my-work-inquiry-card"
-                    style={{ ...sx('inquiry-card'), ...(isHovered(`inquiry-${inquiry.id}`) ? hoverStyles.inquiryCard : {}) }}
-                    onMouseEnter={() => setHoverKey(`inquiry-${inquiry.id}`)}
-                    onMouseLeave={() => setHoverKey('')}
-                  >
-                    <div style={sx('inquiry-header')}>
-                      <div style={sx('client-info')}>
-                        <img
-                          src={getProfilePhotoUrl(inquiry.clientPhoto)}
-                          alt={inquiry.clientName}
-                          style={sx('client-photo')}
-                        />
-                        <div style={{ minWidth: 0 }}>
-                          <h3 style={{ fontSize: '16px', fontWeight: 700, margin: 0, ...cardStrongTextStyle }}>{inquiry.clientName}</h3>
-                          {inquiry.clientRating ? (
-                            <p style={sx('client-rating')} className="gl-inline-icon-line">
-                              <Star size={13} fill="currentColor" aria-hidden="true" />
-                              {inquiry.clientRating} rating
-                            </p>
-                          ) : (
-                            <p style={{ ...sx('client-rating'), color: themeTokens.textMuted }}>New client</p>
-                          )}
-                        </div>
-                      </div>
-                      <span style={sx('status-badge', getStatusBadgeColor(inquiry.status))}>
-                        {inquiry.status}
-                      </span>
-                    </div>
-                    
-                    <div style={sx('inquiry-body')}>
-                      <p style={sx('inquiry-service')}>{inquiry.service}</p>
-                      <p style={sx('inquiry-description')}>{inquiry.description}</p>
-                      <div style={sx('inquiry-meta')}>
-                        <span className="gl-inline-icon-line"><WalletCards size={13} aria-hidden="true" /> {inquiry.proposedBudget}</span>
-                        <span className="gl-inline-icon-line"><CalendarDays size={13} aria-hidden="true" /> {inquiry.requestDate}</span>
-                      </div>
-                    </div>
-                    
-                    <div style={sx('inquiry-actions')}>
-                      <button
-                        type="button"
-                        style={{ ...sx('btn-respond'), ...(isHovered(`respond-${inquiry.id}`) ? hoverStyles.respondButton : {}) }}
-                        onMouseEnter={() => setHoverKey(`respond-${inquiry.id}`)}
-                        onMouseLeave={() => setHoverKey('')}
-                        onClick={() => handleRespondClick(inquiry.id)}
-                        aria-label={`Respond to ${inquiry.clientName}`}
-                      >
-                        <MessageSquareText size={16} aria-hidden="true" />
-                        Respond {inquiry.messages > 0 && `(${inquiry.messages})`}
-                      </button>
-                    </div>
-                  </article>
-                ))}
-              </div>
-            </section>}
+            {showInquiriesSection && <ActiveInquiriesSection inquiries={activeInquiries} onRespond={handleRespondClick} />}
 
             {showCashApprovalSection && <section className="my-work-queue-section" style={sx('payment-confirm-section')} data-testid="work-cash-section">
               <div className="my-work-section-heading" style={sx('section-header')}>
@@ -1750,67 +1465,33 @@ const MyWork = ({ appTheme = 'light', themeMode = 'system', onThemeChange, curre
               )}
             </section>}
             
-            {workSectionFilter === 'all' && <section className="my-work-stats-footer" style={sx('stats-footer')} aria-label="Work summary">
-              <div className="my-work-stat-card" style={sx('stat-card')}>
-                <h4 style={statTitleStyle}>Response Rate</h4>
-                <p style={sx('stat-value')}>92%</p>
-                <p style={sx('stat-desc')}>Avg response within 2 hours</p>
-              </div>
-              <div className="my-work-stat-card" style={sx('stat-card')}>
-                <h4 style={statTitleStyle}>This Week</h4>
-                <p style={sx('stat-value')}>{scheduledDurationLabel}</p>
-                <p style={sx('stat-desc')}>{supportsAvailabilitySchedule ? 'Total scheduled time' : 'Request-based service'}</p>
-              </div>
-              <div className="my-work-stat-card" style={sx('stat-card')}>
-                <h4 style={statTitleStyle}>Earnings</h4>
-                <p style={sx('stat-value')}>{pendingCompletionLabel}</p>
-                <p style={sx('stat-desc')}>Pending completion</p>
-              </div>
-            </section>}
           </>
         )}
       </main>
 
       <ConfirmActionModal
         isOpen={Boolean(doneConfirmTarget)}
-        title="Confirm Service Completion"
-        overlayStyle={sx('done-confirm-overlay')}
-        modalStyle={sx('done-confirm-modal')}
-        noteStyle={sx('done-confirm-note')}
-        actionsStyle={sx('done-confirm-actions')}
-        cancelButtonStyle={sx('done-cancel-btn')}
-        confirmButtonStyle={{ ...sx('done-confirm-btn'), ...(isHovered('confirm-done') ? hoverStyles.markDone : {}) }}
+        title="Confirm service delivery?"
+        description="The client must still confirm completion, or the system may auto-confirm after 72 hours when there is no dispute."
         onCancel={() => setDoneConfirmTarget(null)}
         onConfirm={handleConfirmDone}
-        onConfirmMouseEnter={() => setHoverKey('confirm-done')}
-        onConfirmMouseLeave={() => setHoverKey('')}
         confirmLabel="Claim Service Delivered"
-        note="This records the seller's delivery claim. The buyer must confirm completion, or the system may auto-confirm after 72 hours if there is no dispute."
       >
-        <p>
+        <p className="m-0">
           Claim that the service for <strong>{doneConfirmTarget?.clientName}</strong> was delivered?
         </p>
       </ConfirmActionModal>
 
       <ConfirmActionModal
         isOpen={Boolean(deleteConfirmTarget)}
-        title="Confirm Deletion"
-        overlayStyle={sx('done-confirm-overlay')}
-        modalStyle={sx('done-confirm-modal')}
-        noteStyle={sx('done-confirm-note')}
-        actionsStyle={sx('done-confirm-actions')}
-        cancelButtonStyle={sx('done-cancel-btn')}
-        confirmButtonStyle={{ ...sx('delete-confirm-btn'), ...(isHovered('confirm-delete') ? hoverStyles.deleteConfirm : {}) }}
+        title="Delete this time slot?"
+        description="This action cannot be undone. Existing booking records will not be deleted."
+        variant="destructive"
         onCancel={() => setDeleteConfirmTarget(null)}
         onConfirm={handleConfirmDelete}
-        onConfirmMouseEnter={() => setHoverKey('confirm-delete')}
-        onConfirmMouseLeave={() => setHoverKey('')}
         confirmLabel="Delete"
-        note="This action cannot be undone."
       >
-        <p>
-          Delete <strong>{deleteConfirmTarget?.label}</strong>?
-        </p>
+        <p className="m-0">You are about to remove <strong>{deleteConfirmTarget?.label}</strong>.</p>
       </ConfirmActionModal>
 
       <QrPreviewModal
@@ -1853,22 +1534,15 @@ const MyWork = ({ appTheme = 'light', themeMode = 'system', onThemeChange, curre
 
       <ConfirmActionModal
         isOpen={Boolean(cashDecisionTarget)}
-        title="Confirm Cash Decision"
-        overlayStyle={sx('done-confirm-overlay')}
-        modalStyle={sx('done-confirm-modal')}
-        noteStyle={sx('done-confirm-note')}
-        actionsStyle={sx('done-confirm-actions')}
-        cancelButtonStyle={sx('done-cancel-btn')}
-        confirmButtonStyle={cashDecisionTarget?.decision === 'approve' ? sx('done-confirm-btn') : sx('delete-confirm-btn')}
+        title={`${cashDecisionTarget?.decision === 'approve' ? 'Approve' : 'Deny'} cash confirmation?`}
+        description="Verify the submitted and expected amounts before continuing."
+        variant={cashDecisionTarget?.decision === 'deny' ? 'destructive' : 'default'}
         onCancel={handleCloseCashDecisionModal}
         onConfirm={handleConfirmCashDecision}
         cancelLabel="No"
         confirmLabel={`Yes, ${cashDecisionTarget?.decision === 'approve' ? 'Approve' : 'Deny'}`}
       >
-        <p style={modalTextStyle}>
-          Are you sure you want to <strong>{cashDecisionTarget?.decision === 'approve' ? 'approve' : 'deny'}</strong> this cash confirmation?
-        </p>
-        <p style={sx('done-confirm-note')}>
+        <p className="m-0">
           Client: <strong>{cashDecisionTarget?.clientName}</strong> | Service: <strong>{cashDecisionTarget?.service}</strong>
         </p>
         <p style={modalMetaTextStyle}>
@@ -1892,7 +1566,7 @@ const MyWork = ({ appTheme = 'light', themeMode = 'system', onThemeChange, curre
       )}
 
       {/* SLOT EDIT MODAL */}
-      <SlotEditModal
+      {editSlotModalOpen && <SlotEditModal
         isOpen={editSlotModalOpen}
         mode={scheduleMode}
         slotData={editSlotData}
@@ -1908,16 +1582,16 @@ const MyWork = ({ appTheme = 'light', themeMode = 'system', onThemeChange, curre
         onSave={handleSaveSlotEdit}
         onClose={closeSlotModal}
         appTheme={appTheme}
-      />
+      />}
 
-      <CreateServiceModal
+      {isCreateServiceOpen && <CreateServiceModal
         isOpen={isCreateServiceOpen}
         newService={newService}
         onChange={handleCreateServiceChange}
         onClose={closeCreateService}
         onSubmit={handleCreateServiceSubmit}
         appTheme={appTheme}
-      />
+      />}
 
       {/* PROFILE EDIT MODAL */}
       <ProfileEditModal

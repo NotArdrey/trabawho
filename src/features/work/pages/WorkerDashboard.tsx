@@ -161,7 +161,7 @@ function WorkerDashboard({
                         <div key={action.id}>
                           {index > 0 ? <Separator /> : null}
                           <button type="button" className="flex min-h-20 w-full items-center gap-3 rounded-lg px-2 py-3 text-left transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" onClick={() => openAction(action)}>
-                            <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-orange-100 text-orange-700 dark:bg-orange-950 dark:text-orange-200"><CircleAlert className="size-4" aria-hidden="true" /></span>
+                            <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-brand-highlight-soft text-brand-highlight-foreground"><CircleAlert className="size-4" aria-hidden="true" /></span>
                             <span className="min-w-0 flex-1"><strong className="block text-sm">{action.title}</strong><span className="mt-1 block text-sm leading-5 text-muted-foreground sm:truncate">{action.detail}</span><span className="mt-1 flex flex-wrap gap-x-3 text-xs text-muted-foreground">{action.schedule ? <span>{action.schedule}</span> : null}{action.amount ? <span>{action.amount}</span> : null}</span></span>
                             {action.status ? <Badge variant="outline" className="hidden sm:inline-flex">{action.status}</Badge> : null}<ArrowRight className="size-4 shrink-0" aria-hidden="true" />
                           </button>
@@ -184,7 +184,7 @@ function WorkerDashboard({
                   <CardContent className="grid grid-cols-2 gap-x-4 gap-y-5 px-5 pb-5 lg:grid-cols-4">
                     <div><p className="text-xs text-muted-foreground">Active listings</p><p className="mt-1 text-xl font-bold">{snapshot.serviceHealth.activeListings} <span className="text-sm font-medium text-muted-foreground">of {snapshot.serviceHealth.totalListings}</span></p></div>
                     <div><p className="text-xs text-muted-foreground">Available slots</p><p className="mt-1 text-xl font-bold">{snapshot.serviceHealth.availableSlots}</p></div>
-                    <div><p className="text-xs text-muted-foreground">Provider rating</p><p className="mt-1 flex items-center gap-1 text-xl font-bold"><Star className="size-4 text-orange-500" aria-hidden="true" />{snapshot.serviceHealth.rating ?? "—"}</p></div>
+                    <div><p className="text-xs text-muted-foreground">Provider rating</p><p className="mt-1 flex items-center gap-1 text-xl font-bold"><Star className="size-4 fill-brand-highlight text-brand-highlight" aria-hidden="true" />{snapshot.serviceHealth.rating ?? "—"}</p></div>
                     <div><p className="text-xs text-muted-foreground">Published reviews</p><p className="mt-1 text-xl font-bold">{snapshot.serviceHealth.reviewCount}</p></div>
                   </CardContent>
                 </Card>

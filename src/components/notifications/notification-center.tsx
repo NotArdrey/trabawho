@@ -35,7 +35,7 @@ function NotificationCenter({ notifications, open, onOpenChange, onMarkAllRead, 
       <PopoverTrigger asChild>
         <Button type="button" variant="ghost" size="icon" className="relative rounded-lg border-0 bg-transparent hover:bg-accent" aria-label={unreadCount ? `Notifications, ${unreadCount} unread` : "Notifications"}>
           <Bell aria-hidden="true" />
-          {unreadCount > 0 ? <span className="absolute right-1 top-1 flex min-w-4 items-center justify-center rounded-full bg-[var(--brand-orange)] px-1 text-[10px] font-bold leading-4 text-white">{unreadCount > 9 ? "9+" : unreadCount}</span> : null}
+          {unreadCount > 0 ? <span className="absolute right-1 top-1 flex min-w-4 items-center justify-center rounded-full bg-brand-highlight px-1 text-[10px] font-bold leading-4 text-slate-950">{unreadCount > 9 ? "9+" : unreadCount}</span> : null}
         </Button>
       </PopoverTrigger>
 
@@ -64,7 +64,7 @@ function NotificationCenter({ notifications, open, onOpenChange, onMarkAllRead, 
                 <button key={notification.id} type="button" className={cn("group flex min-h-20 w-full gap-3 rounded-lg border-0 px-3 py-3 text-left transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring", !notification.isRead && "bg-primary/8")} onClick={() => onNotificationClick(notification.id)}>
                   <span className={cn("mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-lg bg-secondary text-muted-foreground", !notification.isRead && "bg-primary text-primary-foreground")}><NotificationIcon aria-hidden="true" className="size-4" /></span>
                   <span className="min-w-0 flex-1"><span className="flex items-start justify-between gap-3"><span className="text-sm font-semibold text-foreground">{notification.title}</span>{notification.time ? <span className="shrink-0 text-xs text-muted-foreground">{notification.time}</span> : null}</span><span className="mt-1 block text-sm leading-5 text-muted-foreground">{notification.message}</span></span>
-                  {!notification.isRead ? <span className="mt-2 size-2 shrink-0 rounded-full bg-[var(--brand-orange)]" aria-label="Unread" /> : null}
+                  {!notification.isRead ? <span className="mt-2 size-2 shrink-0 rounded-full bg-brand-highlight" aria-label="Unread" /> : null}
                 </button>
               );
             })}

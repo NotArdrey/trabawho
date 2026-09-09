@@ -9,7 +9,8 @@ Visual interest must reinforce hierarchy or explain the product. Use brand color
 ## Foundation
 
 - Use shadcn/ui source components in `src/components/ui`; do not introduce a competing component library.
-- Use Tailwind utilities and semantic tokens. Do not add component-specific rules to a global stylesheet.
+- Use Tailwind utilities and semantic tokens. Static `style` props and component-specific rules in global stylesheets are prohibited. Use `cn` for conditional utilities and CVA for reusable component variants.
+- Keep global CSS limited to Tailwind setup, design tokens, resets, and universal accessibility behavior. Legacy global selectors may only be removed during migration, never extended.
 - Use Lucide React for interface icons. Do not use emoji, text glyphs, or one-off SVGs for ordinary controls.
 - Use Inter/system sans-serif for interface text and monospace only for technical values.
 - Use the spacing scale `4, 8, 12, 16, 24, 32, 48, 64` and a default 8px radius.
@@ -17,10 +18,11 @@ Visual interest must reinforce hierarchy or explain the product. Use brand color
 ## Brand and semantic color
 
 - Primary brand: `#1557c0`; stronger interactive state: `#0f4396`.
-- Brand accent: `#ff7a00`, reserved for brand emphasis rather than general warning state.
+- Brand highlight: `#ff7a00`; accessible highlight text: `#9a3412`; soft highlight surface: `#fff3e6`. Components consume the `brand-highlight`, `brand-highlight-foreground`, `brand-highlight-soft`, and `brand-highlight-border` semantic tokens instead of raw orange utilities.
 - Light mode is white-led: use white and subtle cool-neutral surfaces, TrabaWho blue for primary actions and navigation, and orange for compact highlights.
 - Dark mode is blue-led: use deep navy and dark blue surfaces rather than flat black or neutral gray, with accessible lighter blue interactions and selective orange highlights.
-- Blue remains the dominant interactive color. Orange may mark section numbers, short standalone accent rules, selected-step details, or small icon treatments; it must not compete with the primary action.
+- Blue remains the dominant interactive color for primary buttons, links, focus rings, navigation text, and confirmed selections. Orange is limited to rating stars, attention and unread counts, selected mobile-filter chips, small active-navigation indicators, required markers, and compact provider or marketplace icons.
+- Do not use orange-filled primary buttons. The bright logo orange does not provide sufficient contrast with white button text. Destructive, success, and warning treatments retain their own semantic colors; the `brand` badge variant is not a warning variant.
 - Do not place a contrasting color on only one edge of a card, panel, field, or alert. Borders remain uniform on all sides; place brand emphasis inside the component instead.
 - A page should contain enough blue/orange brand expression to be recognizably TrabaWho without coloring every surface.
 - Components consume `background`, `foreground`, `card`, `primary`, `secondary`, `muted`, `accent`, `destructive`, `border`, `input`, and `ring` tokens.
@@ -55,7 +57,7 @@ Visual interest must reinforce hierarchy or explain the product. Use brand color
 
 ## Responsive composition
 
-Design and verify at 390, 768, 1024, 1280, and 1440 pixels. Recompose rather than shrink desktop layouts. Flexible children use `min-width: 0`; essential identifiers and calculated values wrap instead of truncating. Scrolling regions keep visible scrollbars.
+Design and verify at 390, 768, 1024, 1280, and 1440 pixels. Recompose rather than shrink desktop layouts. Flexible children use `min-width: 0`; essential identifiers and calculated values wrap instead of truncating. Scrolling regions keep visible scrollbars, except compact horizontal chip rails may hide them when native touch scrolling, pointer dragging, keyboard access, and automatic selected-item visibility are all preserved.
 
 ## Accessibility
 

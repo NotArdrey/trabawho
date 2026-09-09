@@ -105,9 +105,10 @@ Create a component when a section has its own interaction behavior, is reused, h
 
 ### 3.3 File-size limits
 
-- Target: no more than 500 lines
-- Review required: 501–600 lines
-- Prohibited without exceptional justification: more than 600 lines
+- Required default: no more than 500 lines
+- Temporary exception only: 501–600 lines, with a recorded justification, owner, and removal milestone
+- Prohibited for new and migrated code: more than 600 lines
+- Frozen legacy files over the limit must have a measured baseline, may never grow, and must leave the exception list as they are split
 
 Large files should be split by responsibility, not by arbitrary line ranges.
 

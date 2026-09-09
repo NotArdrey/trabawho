@@ -32,9 +32,9 @@ const toneStyles: Record<MetricCardTone, { card: string; icon: string; watermark
     watermark: "text-emerald-700 dark:text-emerald-300",
   },
   orange: {
-    card: "bg-orange-50/70 dark:bg-orange-950/20",
-    icon: "bg-orange-100 text-orange-700 dark:bg-orange-900/60 dark:text-orange-200",
-    watermark: "text-orange-600 dark:text-orange-300",
+    card: "bg-brand-highlight-soft",
+    icon: "bg-brand-highlight-soft text-brand-highlight-foreground",
+    watermark: "text-brand-highlight",
   },
   neutral: {
     card: "bg-card",

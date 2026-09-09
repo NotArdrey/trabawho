@@ -835,7 +835,6 @@ const MyBookings = ({
 
   const renderBookingsList = () => (
     <main className="gl-shell gl-page-pad bookings-launchpad">
-      {/* Hero Overview Header */}
       <section className="bookings-hero" aria-labelledby="bookings-title">
         <div className="bookings-hero-copy">
           <span className="gl-eyebrow">
@@ -850,10 +849,11 @@ const MyBookings = ({
           </p>
         </div>
 
-        <div className="bookings-hero-actions">
+        <div className="bookings-hero-actions max-[880px]:w-full">
           {!shouldLoadSellerBookings && (
             <Button
               type="button"
+              className="max-[880px]:w-full"
               onClick={onOpenBrowseServices}
             >
               <Search size={16} aria-hidden="true" />

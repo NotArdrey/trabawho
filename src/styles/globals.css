@@ -26,7 +26,11 @@
   --ring: oklch(0.47 0.17 255.7);
   --brand-blue: #1557c0;
   --brand-blue-strong: #0f4396;
-  --brand-orange: #ff7a00;
+  --brand-highlight: #ff7a00;
+  --brand-highlight-foreground: #9a3412;
+  --brand-highlight-soft: #fff3e6;
+  --brand-highlight-border: #fed7aa;
+  --brand-orange: var(--brand-highlight);
   --radius: 0.5rem;
 }
 
@@ -49,6 +53,10 @@
   --border: oklch(1 0 0 / 12%);
   --input: oklch(1 0 0 / 16%);
   --ring: oklch(0.66 0.15 256.3);
+  --brand-highlight: #fb923c;
+  --brand-highlight-foreground: #fdba74;
+  --brand-highlight-soft: rgb(124 45 18 / 35%);
+  --brand-highlight-border: rgb(251 146 60 / 45%);
 }
 
 @theme inline {
@@ -70,6 +78,10 @@
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
+  --color-brand-highlight: var(--brand-highlight);
+  --color-brand-highlight-foreground: var(--brand-highlight-foreground);
+  --color-brand-highlight-soft: var(--brand-highlight-soft);
+  --color-brand-highlight-border: var(--brand-highlight-border);
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);

@@ -62,6 +62,17 @@ export default tseslint.config(
       "import/no-duplicates": "error",
       "@typescript-eslint/consistent-type-imports": "error",
       "@typescript-eslint/no-explicit-any": "error",
+      "react/forbid-dom-props": [
+        "error",
+        {
+          "forbid": [
+            {
+              "propName": "style",
+              "message": "Use Tailwind utilities. Runtime-only values require a documented one-line lint exception."
+            }
+          ]
+        }
+      ],
       "react/prop-types": "off"
     },
   },
