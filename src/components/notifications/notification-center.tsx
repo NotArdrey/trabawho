@@ -36,7 +36,7 @@ function NotificationCenter({ notifications, open, onOpenChange, onMarkAllRead, 
       <PopoverTrigger asChild>
         <Button type="button" variant="ghost" size="icon" className="relative rounded-lg border-0 bg-transparent hover:bg-accent" aria-label={unreadCount ? `Notifications, ${unreadCount} unread` : "Notifications"}>
           <Bell aria-hidden="true" />
-          {unreadCount > 0 ? <span className="absolute right-1 top-1 flex min-w-4 items-center justify-center rounded-full bg-brand-highlight px-1 text-[10px] font-bold leading-4 text-slate-950">{unreadCount > 9 ? "9+" : unreadCount}</span> : null}
+          {unreadCount > 0 ? <span className="absolute right-1 top-1 flex min-w-4 items-center justify-center rounded-full bg-brand-highlight-strong px-1 text-[10px] font-bold leading-4 text-white">{unreadCount > 9 ? "9+" : unreadCount}</span> : null}
         </Button>
       </PopoverTrigger>
 

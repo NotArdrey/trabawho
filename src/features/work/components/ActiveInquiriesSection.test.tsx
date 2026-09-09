@@ -10,7 +10,7 @@ const inquiry: WorkInquiry = {
   id: "inquiry-1",
   messages: 2,
   proposedBudget: "PHP 900",
-  requestDate: "Sep 9",
+  requestDate: "2026-08-29",
   service: "Appliance repair",
   status: "Waiting for response",
 };
@@ -21,6 +21,10 @@ describe("ActiveInquiriesSection", () => {
     render(<ActiveInquiriesSection inquiries={[inquiry]} onRespond={onRespond} />);
     expect(screen.getByRole("region", { name: "Active inquiries" })).toBeVisible();
     expect(screen.getByText("4.8 rating")).toBeVisible();
+    expect(screen.getByText("Budget")).toBeVisible();
+    expect(screen.getByText("PHP 900")).toBeVisible();
+    expect(screen.getByText("Requested date")).toBeVisible();
+    expect(screen.getByText("Aug 29, 2026")).toBeVisible();
     fireEvent.click(screen.getByRole("button", { name: "Respond to Joshua Santos" }));
     expect(onRespond).toHaveBeenCalledWith("inquiry-1");
   });

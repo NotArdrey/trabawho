@@ -4,6 +4,7 @@ import InquiryChatModal from '../components/InquiryChatModal';
 import { ActiveInquiriesSection } from '../components/ActiveInquiriesSection';
 import WorkProviderSummary from '../components/WorkProviderSummary';
 import WorkSectionFilter from '../components/WorkSectionFilter';
+import WorkPaymentQueues from '../components/WorkPaymentQueues';
 import SlotEditModal from '../components/SlotEditModal';
 import ProfileEditModal from '../components/ProfileEditModal';
 import { ConfirmActionModal } from '@/shared/components';
@@ -15,19 +16,14 @@ import { markBookingDelivered } from '../../bookings/services/bookingService';
 import { getThemeTokens } from '../../../shared/styles/themeTokens';
 import { useWorkPayments, useWorkProfileServices, useWorkSchedule } from '../hooks';
 import {
-  Ban,
   CalendarDays,
-  CircleDollarSign,
   Loader2,
   Pencil,
   Plus,
-  RotateCcw,
   Trash2,
   UserRound,
 } from 'lucide-react';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { WorkflowEmptyState, WorkflowPanel } from '@/components/ui/workflow-panel';
 
 const formatDateLong = (date) =>
   date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
@@ -119,40 +115,11 @@ const classStyles = {
   'stat-card': { background: 'white', borderRadius: '12px', padding: '24px', textAlign: 'center', boxShadow: '0 2px 8px rgba(0, 0, 0, 0.08)' },
   'stat-value': { fontSize: '32px', fontWeight: 700, color: 'var(--gl-blue)', margin: '0 0 4px 0' },
   'stat-desc': { fontSize: '12px', color: '#95a5a6', margin: 0 },
-  'done-confirm-overlay': { position: 'fixed', inset: 0, background: 'rgba(15, 23, 42, 0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2000, padding: '14px' },
-  'done-confirm-modal': { width: 'min(620px, 92vw)', background: '#ffffff', borderRadius: '12px', padding: '22px', boxShadow: '0 18px 50px rgba(15, 23, 42, 0.25)' },
-  'done-confirm-note': { marginTop: '10px', fontSize: '13px' },
-  'done-confirm-actions': { marginTop: '14px', display: 'flex', justifyContent: 'flex-end', gap: '8px' },
-  'done-cancel-btn': { border: 'none', borderRadius: '8px', minHeight: '44px', padding: '10px 14px', fontWeight: 700, fontSize: '14px', cursor: 'pointer', background: '#e5e7eb', color: '#111827' },
-  'done-confirm-btn': { border: 'none', borderRadius: '8px', minHeight: '44px', padding: '10px 14px', fontWeight: 700, fontSize: '14px', cursor: 'pointer', background: '#16a34a', color: '#fff' },
-  'delete-confirm-btn': { border: 'none', borderRadius: '8px', minHeight: '44px', padding: '10px 14px', fontWeight: 700, fontSize: '14px', cursor: 'pointer', background: '#dc2626', color: '#fff' },
-  'gcash-preview-modal': { width: 'min(520px, 92vw)' },
-  'gcash-preview-body': { marginTop: '12px', display: 'flex', gap: '14px', alignItems: 'flex-start' },
-  'gcash-preview-qr': { width: '170px', height: '170px', borderRadius: '8px', border: '1px solid #d1d5db' },
-  'payment-confirm-section': { width: '100%', maxWidth: '1100px', margin: '0 auto 40px' },
-  'payment-confirm-grid': { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '16px' },
-  'payment-confirm-card': { background: '#ffffff', border: '1px solid #e5e7eb', borderRadius: '10px', padding: '14px', boxShadow: '0 2px 8px rgba(0, 0, 0, 0.06)', display: 'grid', gap: '8px' },
-  'payment-confirm-meta': { display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px', flexWrap: 'wrap' },
-  'confirm-status-pill': { display: 'inline-flex', alignItems: 'center', borderRadius: '999px', padding: '4px 10px', fontSize: '11px', fontWeight: 700 },
-  'confirm-status-pending': { background: '#ffedd5', color: '#9a3412' },
-  'confirm-status-approved': { background: '#dcfce7', color: '#166534' },
-  'confirm-status-denied': { background: '#fee2e2', color: '#b91c1c' },
-  'payment-confirm-actions': { display: 'flex', gap: '8px', flexWrap: 'wrap' },
-  'btn-approve-cash': { border: 'none', background: '#16a34a', color: '#fff', borderRadius: '7px', padding: '8px 10px', fontSize: '12px', fontWeight: 700, cursor: 'pointer' },
-  'btn-deny-cash': { border: 'none', background: '#dc2626', color: '#fff', borderRadius: '7px', padding: '8px 10px', fontSize: '12px', fontWeight: 700, cursor: 'pointer' },
   'btn-gcash-preview': { border: '1px solid var(--gl-accent-border)', background: 'var(--gl-accent-soft)', color: 'var(--gl-blue)', borderRadius: '6px', padding: '5px 8px', fontSize: '11px', fontWeight: 700, cursor: 'pointer', height: '24px', whiteSpace: 'nowrap', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', marginLeft: 0 },
   'payment-qr-grid': { marginTop: '12px', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', gap: '14px' },
   'payment-qr-item': { border: '1px solid #e5e7eb', borderRadius: '8px', padding: '10px', background: '#f8fafc', textAlign: 'center' },
   'payment-qr-title': { margin: '0 0 6px', fontSize: '13px', fontWeight: 700, color: '#1f2937' },
   'payment-qr-caption': { margin: '6px 0 0', fontSize: '12px', color: '#6b7280' },
-  'refund-section': { width: '100%', maxWidth: '1100px', margin: '0 auto 40px' },
-  'refund-grid': { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '16px' },
-  'refund-card': { background: '#eef2ff', border: '1px solid #c7d2fe', borderRadius: '10px', padding: '14px', display: 'grid', gap: '8px' },
-  'refund-actions': { display: 'flex', gap: '8px', flexWrap: 'wrap' },
-  'btn-approve-refund': { border: 'none', background: '#4f46e5', color: '#fff', borderRadius: '7px', padding: '8px 10px', fontSize: '12px', fontWeight: 700, cursor: 'pointer' },
-  'cancelled-section': { width: '100%', maxWidth: '1100px', margin: '0 auto 40px' },
-  'cancelled-grid': { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '16px' },
-  'cancelled-card': { background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '10px', padding: '14px', display: 'grid', gap: '8px' },
 };
 
 const hoverStyles = {
@@ -166,9 +133,6 @@ const hoverStyles = {
   editAction: { background: 'var(--gl-accent-soft)', border: '1px solid var(--gl-blue)' },
   deleteAction: { background: '#fecaca', border: '1px solid #e74c3c' },
   deleteConfirm: { background: '#b91c1c' },
-  approveCash: { background: '#15803d' },
-  denyCash: { background: '#b91c1c' },
-  approveRefund: { background: '#4338ca' },
 };
 
 /**
@@ -479,9 +443,6 @@ const MyWork = ({ appTheme = 'light', themeMode = 'system', onThemeChange, curre
       border: `1px solid ${themeTokens.warningBorder}`,
     },
     'inquiries-section': sectionCardStyle,
-    'payment-confirm-section': sectionCardStyle,
-    'refund-section': sectionCardStyle,
-    'cancelled-section': sectionCardStyle,
     'schedule-section': sectionCardStyle,
     'section-header': {
       marginBottom: '18px',
@@ -603,22 +564,6 @@ const MyWork = ({ appTheme = 'light', themeMode = 'system', onThemeChange, curre
     'stat-value': {
       color: themeTokens.accent,
     },
-    'done-confirm-overlay': {
-      background: isDarkMode ? 'rgba(2, 6, 23, 0.78)' : 'rgba(15, 23, 42, 0.45)',
-    },
-    'done-confirm-modal': {
-      background: themeTokens.surface,
-      border: `1px solid ${themeTokens.border}`,
-      color: themeTokens.textPrimary,
-    },
-    'done-confirm-note': {
-      color: themeTokens.textSecondary,
-    },
-    'done-cancel-btn': {
-      background: themeTokens.surfaceAlt,
-      color: themeTokens.textPrimary,
-      border: `1px solid ${themeTokens.border}`,
-    },
     'gcash-qr-btn': {
       background: themeTokens.accentSoft,
       border: `1px solid ${themeTokens.accentBorder}`,
@@ -629,35 +574,12 @@ const MyWork = ({ appTheme = 'light', themeMode = 'system', onThemeChange, curre
       border: `1px solid ${themeTokens.accentBorder}`,
       color: themeTokens.accent,
     },
-    'payment-confirm-card': queueCardStyle,
-    'confirm-status-pending': {
-      background: themeTokens.warningBg,
-      color: themeTokens.warning,
-    },
-    'confirm-status-approved': {
-      background: isDarkMode ? 'rgba(22, 163, 74, 0.16)' : '#dcfce7',
-      color: isDarkMode ? '#bbf7d0' : '#166534',
-    },
-    'confirm-status-denied': {
-      background: themeTokens.dangerBg,
-      color: themeTokens.danger,
-    },
     'payment-qr-item': queueCardStyle,
     'payment-qr-title': {
       color: themeTokens.textPrimary,
     },
     'payment-qr-caption': {
       color: themeTokens.textSecondary,
-    },
-    'refund-card': {
-      background: isDarkMode ? 'rgba(79, 70, 229, 0.16)' : '#eef2ff',
-      border: `1px solid ${isDarkMode ? 'rgba(129, 140, 248, 0.42)' : '#c7d2fe'}`,
-      color: themeTokens.textPrimary,
-    },
-    'cancelled-card': {
-      background: themeTokens.dangerBg,
-      border: `1px solid ${themeTokens.dangerBorder}`,
-      color: themeTokens.textPrimary,
     },
   };
 
@@ -685,12 +607,7 @@ const MyWork = ({ appTheme = 'light', themeMode = 'system', onThemeChange, curre
         'booking-name': { minWidth: 0 },
         'booking-inline-actions': { width: '100%', flexWrap: 'wrap' },
         'stats-footer': { gridTemplateColumns: '1fr', margin: '24px auto 0' },
-        'gcash-preview-body': { flexDirection: 'column', alignItems: 'center' },
-        'gcash-preview-qr': { width: '100%', maxWidth: '220px', height: 'auto' },
-        'payment-confirm-grid': { gridTemplateColumns: '1fr' },
         'payment-qr-grid': { gridTemplateColumns: '1fr' },
-        'refund-grid': { gridTemplateColumns: '1fr' },
-        'cancelled-grid': { gridTemplateColumns: '1fr' },
       }
     : {};
 
@@ -707,16 +624,6 @@ const MyWork = ({ appTheme = 'light', themeMode = 'system', onThemeChange, curre
 
   const isHovered = (key) => hoverKey === key;
   const sectionTitleStyle = { fontSize: '22px', fontWeight: 800, color: themeTokens.textPrimary, margin: '0 0 4px 0', lineHeight: 1.2 };
-  const cardStrongTextStyle = { color: themeTokens.textPrimary };
-  const queueMetaTextStyle = { margin: 0, color: themeTokens.textSecondary, fontSize: '12px' };
-  const queueServiceTextStyle = { margin: 0, color: themeTokens.textPrimary, fontWeight: 700, fontSize: '13px' };
-  const monoSuccessTextStyle = { margin: 0, color: isDarkMode ? '#5eead4' : '#0f766e', fontSize: '12px', fontFamily: "'Courier New', monospace", fontWeight: 700 };
-  const refundPrimaryTextStyle = { margin: 0, color: isDarkMode ? '#c7d2fe' : '#3730a3', fontWeight: 700, fontSize: '13px' };
-  const refundMetaTextStyle = { margin: 0, color: isDarkMode ? '#a5b4fc' : '#4f46e5', fontSize: '12px' };
-  const refundMonoTextStyle = { margin: 0, color: isDarkMode ? '#c4b5fd' : '#4338ca', fontSize: '12px', fontFamily: "'Courier New', monospace", fontWeight: 700 };
-  const cancelledPrimaryTextStyle = { margin: 0, color: isDarkMode ? '#fecaca' : '#991b1b', fontWeight: 700, fontSize: '13px' };
-  const cancelledMetaTextStyle = { margin: 0, color: isDarkMode ? '#fca5a5' : '#991b1b', fontSize: '12px' };
-  const cancelledPolicyTextStyle = { margin: 0, color: isDarkMode ? '#fecaca' : '#7f1d1d', fontSize: '12px', fontWeight: 700 };
   const modalTextStyle = { margin: 0, color: themeTokens.textPrimary, lineHeight: 1.5 };
   const modalMetaTextStyle = { margin: '8px 0 0', color: themeTokens.textSecondary, fontSize: '13px' };
   const modalDangerTextStyle = { margin: '8px 0 0', color: isDarkMode ? '#fca5a5' : '#b91c1c', fontSize: '13px', fontWeight: 600 };
@@ -990,170 +897,19 @@ const MyWork = ({ appTheme = 'light', themeMode = 'system', onThemeChange, curre
             
             {showInquiriesSection && <ActiveInquiriesSection inquiries={activeInquiries} onRespond={handleRespondClick} />}
 
-            {showCashApprovalSection && <WorkflowPanel className="mb-4" contentClassName="p-5 max-md:p-4" data-testid="work-cash-section" icon={CircleDollarSign} title="Cash confirmations" description="Review cash payments submitted through your confirmation QR." tone="success" status={<Badge variant={cashConfirmationNotifications.length ? 'brand' : 'secondary'}>{cashConfirmationNotifications.length}</Badge>}>
-              <div className="my-work-segmented-control" aria-label="Cash confirmation view">
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant={cashPaymentView === 'pending' ? 'default' : 'ghost'}
-                    onClick={() => setCashPaymentView('pending')}
-                  >
-                    Pending Review
-                  </Button>
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant={cashPaymentView === 'history' ? 'default' : 'ghost'}
-                    onClick={() => setCashPaymentView('history')}
-                  >
-                    History
-                  </Button>
-              </div>
-
-              {cashConfirmationNotifications.length === 0 ? (
-                <WorkflowEmptyState className="min-h-32" icon={CircleDollarSign} title={cashPaymentView === 'pending' ? 'No requests to review' : 'No completed transactions'} description={cashPaymentView === 'pending' ? 'New cash confirmation requests for this week will appear here.' : 'Approved or denied cash confirmations will appear here.'} tone="success" />
-              ) : (
-                <div style={sx('payment-confirm-grid')}>
-                  {cashConfirmationNotifications.map((txn) => {
-                    const statusStyle =
-                      txn.cashConfirmationStatus === 'approved'
-                        ? sx('confirm-status-pill', 'confirm-status-approved')
-                        : txn.cashConfirmationStatus === 'denied'
-                          ? sx('confirm-status-pill', 'confirm-status-denied')
-                          : sx('confirm-status-pill', 'confirm-status-pending');
-
-                    return (
-                      <div key={`confirm-${txn.id}`} style={sx('payment-confirm-card')} data-testid={`cash-confirmation-${txn.id}`}>
-                        <div style={sx('payment-confirm-meta')}>
-                          <strong style={cardStrongTextStyle}>{txn.clientName}</strong>
-                          <span style={statusStyle}>
-                            {txn.cashConfirmationStatus === 'approved'
-                              ? 'Approved'
-                              : txn.cashConfirmationStatus === 'denied'
-                                ? 'Denied'
-                                : 'Pending Review'}
-                          </span>
-                        </div>
-                        <p style={queueServiceTextStyle}>{txn.service}</p>
-                        <p style={queueMetaTextStyle}>
-                          QR Ref: {txn.cashConfirmationQrId || 'N/A'}
-                        </p>
-                        <p style={queueMetaTextStyle}>
-                          Submitted: ₱{txn.submittedCashAmount || 0} | Expected: ₱{txn.expectedCashAmount || 0}
-                        </p>
-                        <p style={monoSuccessTextStyle}>
-                          {txn.transactionId ? `Transaction ID: ${txn.transactionId}` : 'Transaction ID: Pending approval'}
-                        </p>
-                        {cashPaymentView === 'pending' && (
-                          <div style={sx('payment-confirm-actions')}>
-                            <button
-                              data-testid={`cash-approve-${txn.id}`}
-                              style={{ ...sx('btn-approve-cash'), ...(isHovered(`approve-cash-${txn.id}`) ? hoverStyles.approveCash : {}) }}
-                              onMouseEnter={() => setHoverKey(`approve-cash-${txn.id}`)}
-                              onMouseLeave={() => setHoverKey('')}
-                              onClick={() => handleRequestCashConfirmationReview(txn, 'approve')}
-                              disabled={txn.cashConfirmationStatus === 'approved'}
-                            >
-                              Approve
-                            </button>
-                            <button
-                              data-testid={`cash-deny-${txn.id}`}
-                              style={{ ...sx('btn-deny-cash'), ...(isHovered(`deny-cash-${txn.id}`) ? hoverStyles.denyCash : {}) }}
-                              onMouseEnter={() => setHoverKey(`deny-cash-${txn.id}`)}
-                              onMouseLeave={() => setHoverKey('')}
-                              onClick={() => handleRequestCashConfirmationReview(txn, 'deny')}
-                              disabled={txn.cashConfirmationStatus === 'denied'}
-                            >
-                              Deny
-                            </button>
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </WorkflowPanel>}
+            <WorkPaymentQueues
+              cancelledTransactions={cancelledCashTransactions}
+              cashTransactions={cashConfirmationNotifications}
+              cashView={cashPaymentView}
+              onApproveRefund={handleApproveRefund}
+              onCashReview={handleRequestCashConfirmationReview}
+              onCashViewChange={setCashPaymentView}
+              refundTransactions={refundTransactions}
+              showCancelled={showCancelledSection}
+              showCash={showCashApprovalSection}
+              showRefunds={showRefundSection}
+            />
             
-            {showRefundSection && (
-              <WorkflowPanel className="mb-4" contentClassName="p-5 max-md:p-4" data-testid="work-refund-section" icon={RotateCcw} title="GCash refund queue" description="Track refund cases that require provider or client confirmation." tone="primary" status={<Badge variant={refundTransactions.length ? 'warning' : 'secondary'}>{refundTransactions.length}</Badge>}>
-                {refundTransactions.length === 0 ? (
-                  <WorkflowEmptyState className="min-h-32" icon={RotateCcw} title="No refunds to review" description="Refund cases for this week will appear here when action is required." tone="primary" />
-                ) : (
-                  <div style={sx('refund-grid')}>
-                    {refundTransactions.map((txn) => (
-                      <div key={`refund-${txn.id}`} style={sx('refund-card')} data-testid={`refund-request-${txn.id}`}>
-                        <div style={sx('payment-confirm-meta')}>
-                          <strong style={cardStrongTextStyle}>{txn.clientName}</strong>
-                          <span
-                            style={{
-                              ...sx('confirm-status-pill'),
-                              ...((txn.refundStatus === 'completed' || txn.refundStatus === 'approved')
-                                ? sx('confirm-status-approved')
-                                : txn.refundStatus === 'approved-awaiting-client-confirmation'
-                                  ? { background: themeTokens.accentSoft, color: themeTokens.accent }
-                                  : sx('confirm-status-pending')),
-                            }}
-                          >
-                            {txn.refundStatus === 'completed' || txn.refundStatus === 'approved'
-                              ? 'Refund Completed'
-                              : txn.refundStatus === 'approved-awaiting-client-confirmation'
-                                ? 'Awaiting Client Confirmation'
-                                : 'Refund Requested'}
-                          </span>
-                        </div>
-                        <p style={refundPrimaryTextStyle}>{txn.service}</p>
-                        <p style={refundMetaTextStyle}>Amount: ₱{txn.refundAmount || 0}</p>
-                        <p style={refundMetaTextStyle}>Reason: {txn.refundReason || 'Service cancellation/refund case'}</p>
-                        <p style={refundMonoTextStyle}>
-                          {txn.refundReference ? `Refund Ref: ${txn.refundReference}` : 'Refund Ref: Pending'}
-                        </p>
-                        <p style={monoSuccessTextStyle}>
-                          {txn.transactionId ? `Transaction ID: ${txn.transactionId}` : 'Transaction ID: N/A'}
-                        </p>
-                        {txn.refundStatus === 'requested' && (
-                          <div style={sx('refund-actions')}>
-                            <button
-                              data-testid={`refund-approve-${txn.id}`}
-                              style={{ ...sx('btn-approve-refund'), ...(isHovered(`approve-refund-${txn.id}`) ? hoverStyles.approveRefund : {}) }}
-                              onMouseEnter={() => setHoverKey(`approve-refund-${txn.id}`)}
-                              onMouseLeave={() => setHoverKey('')}
-                              onClick={() => handleApproveRefund(txn.id)}
-                            >
-                              Approve Refund
-                            </button>
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </WorkflowPanel>
-            )}
-
-            {showCancelledSection && (
-              <WorkflowPanel className="mb-4" contentClassName="p-5 max-md:p-4" data-testid="work-cancelled-section" icon={Ban} title="Cancelled cash bookings" description="Review cancelled cash bookings that do not require a GCash refund." status={<Badge variant="secondary">{cancelledCashTransactions.length}</Badge>}>
-                {cancelledCashTransactions.length === 0 ? (
-                  <WorkflowEmptyState className="min-h-32" icon={Ban} title="No cancelled bookings" description="Cancelled cash bookings for this week will appear here." />
-                ) : (
-                  <div style={sx('cancelled-grid')}>
-                    {cancelledCashTransactions.map((txn) => (
-                      <div key={`cancelled-${txn.id}`} style={sx('cancelled-card')}>
-                        <div style={sx('payment-confirm-meta')}>
-                          <strong style={cardStrongTextStyle}>{txn.clientName}</strong>
-                          <span style={sx('confirm-status-pill', 'confirm-status-denied')}>Cancelled</span>
-                        </div>
-                        <p style={cancelledPrimaryTextStyle}>{txn.service}</p>
-                        <p style={cancelledMetaTextStyle}>Payment Channel: Cash (No GCash refund needed)</p>
-                        <p style={cancelledMetaTextStyle}>Reason: {txn.cancelReason || 'Cancelled before service.'}</p>
-                        <p style={cancelledPolicyTextStyle}>{txn.cancelPolicy || 'Cash-only cancellation flow'}</p>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </WorkflowPanel>
-            )}
-
             {showScheduleSection && <section style={sx('schedule-section')} data-testid="work-schedule-section">
               <div style={sx('section-header', 'section-header-with-action')}>
                 <div style={sx('section-heading-copy')}>
@@ -1476,13 +1232,6 @@ const MyWork = ({ appTheme = 'light', themeMode = 'system', onThemeChange, curre
         primaryValue={gcashNumber}
         note="Ask your client to scan this QR or send payment to the number above."
         onClose={handleCloseGcashPreview}
-        overlayStyle={sx('done-confirm-overlay')}
-        modalStyle={sx('done-confirm-modal', 'gcash-preview-modal')}
-        bodyStyle={sx('gcash-preview-body')}
-        imageStyle={sx('gcash-preview-qr')}
-        noteStyle={sx('done-confirm-note')}
-        actionsStyle={sx('done-confirm-actions')}
-        closeButtonStyle={sx('done-cancel-btn')}
       />
 
       <QrPreviewModal
@@ -1495,13 +1244,6 @@ const MyWork = ({ appTheme = 'light', themeMode = 'system', onThemeChange, curre
         primaryValue={cashQrId}
         note="Client submits amount using this QR, then you approve or deny inside Payment Confirmations."
         onClose={handleCloseCashQrPreview}
-        overlayStyle={sx('done-confirm-overlay')}
-        modalStyle={sx('done-confirm-modal', 'gcash-preview-modal')}
-        bodyStyle={sx('gcash-preview-body')}
-        imageStyle={sx('gcash-preview-qr')}
-        noteStyle={sx('done-confirm-note')}
-        actionsStyle={sx('done-confirm-actions')}
-        closeButtonStyle={sx('done-cancel-btn')}
       />
 
       <ConfirmActionModal

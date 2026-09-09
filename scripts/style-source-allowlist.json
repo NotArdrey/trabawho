@@ -7,7 +7,7 @@
   {
     "path": "src/shared/styles/modern.css",
     "kind": "legacy",
-    "baselineLines": 6829,
+    "baselineLines": 6526,
     "justification": "Frozen compatibility stylesheet for UI slices that have not yet migrated to Tailwind."
   }
 ]

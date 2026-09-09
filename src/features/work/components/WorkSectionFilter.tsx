@@ -65,7 +65,7 @@ export default function WorkSectionFilter({ value, options, onValueChange }: Wor
   };
 
   return (
-    <section className="mb-4 border-b pb-4" aria-labelledby="work-section-filter-title">
+    <section className="mb-4 border-b pb-4 min-[761px]:rounded-xl min-[761px]:border min-[761px]:bg-card min-[761px]:p-4" aria-labelledby="work-section-filter-title">
       <div className="mb-3 flex items-center gap-2 min-[761px]:hidden">
         <ListFilter className="size-4 text-brand-highlight-foreground" aria-hidden="true" />
         <div>
@@ -105,12 +105,17 @@ export default function WorkSectionFilter({ value, options, onValueChange }: Wor
       </div>
 
       <div className="hidden items-center justify-between gap-6 min-[761px]:flex">
-        <div>
-          <h2 className="text-sm font-bold text-foreground">Work section</h2>
-          <p className="mt-0.5 text-xs text-muted-foreground">{activeOption?.description}</p>
+        <div className="flex min-w-0 items-center gap-3">
+          <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary" aria-hidden="true">
+            <ListFilter className="size-[18px]" />
+          </span>
+          <div className="min-w-0">
+            <h2 className="text-sm font-bold text-foreground">Work section</h2>
+            <p className="mt-0.5 truncate text-xs text-muted-foreground">{activeOption?.description}</p>
+          </div>
         </div>
         <Select value={value} onValueChange={(nextValue) => onValueChange(nextValue as WorkSectionValue)}>
-          <SelectTrigger className="w-[260px] shadow-none" aria-label="Choose work section"><SelectValue /></SelectTrigger>
+          <SelectTrigger className="w-[min(36vw,280px)] min-w-56 shrink-0 shadow-none" aria-label="Choose work section"><SelectValue /></SelectTrigger>
           <SelectContent>
             {options.map((option) => <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>)}
           </SelectContent>

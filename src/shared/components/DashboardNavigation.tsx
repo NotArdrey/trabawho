@@ -243,7 +243,15 @@ export default function DashboardNavigation({
               <DropdownMenuItem onSelect={onOpenAccountSettings || onOpenProfile}><Shield />Account &amp; Privacy</DropdownMenuItem>
               <DropdownMenuItem onSelect={onOpenSettings}><Settings />Settings</DropdownMenuItem>
               {sellerProfile?.role === "admin" && <DropdownMenuItem onSelect={onToggleAdminView}><Shield />{isAdminView ? "Switch to Client View" : "Switch to Admin View"}</DropdownMenuItem>}
-              {isWorkerAccount && !isAdminAccount && <DropdownMenuItem onSelect={switchWorkerWorkspace}><BriefcaseBusiness />{isProviderWorkspace ? "Switch to client workspace" : "Switch to provider workspace"}</DropdownMenuItem>}
+              {isWorkerAccount && !isAdminAccount && (
+                <DropdownMenuItem
+                  className="my-1 border border-primary/20 bg-primary/10 font-semibold text-primary focus:bg-primary/15 focus:text-primary [&>svg]:text-primary"
+                  onSelect={switchWorkerWorkspace}
+                >
+                  <BriefcaseBusiness />
+                  {isProviderWorkspace ? "Switch to client workspace" : "Switch to provider workspace"}
+                </DropdownMenuItem>
+              )}
               <DropdownMenuSeparator />
               <DropdownMenuItem className="text-destructive focus:bg-destructive/10 focus:text-destructive" onSelect={() => setIsLogoutModalOpen(true)}><LogOut />Logout</DropdownMenuItem>
             </DropdownMenuContent>

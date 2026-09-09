@@ -21,7 +21,7 @@ describe("brand highlight semantics", () => {
   it("meets WCAG AA for highlight text and count treatments", () => {
     expect(contrastRatio("9a3412", "fff3e6")).toBeGreaterThanOrEqual(4.5);
     expect(contrastRatio("fdba74", "7c2d12")).toBeGreaterThanOrEqual(4.5);
-    expect(contrastRatio("111827", "ff7a00")).toBeGreaterThanOrEqual(4.5);
+    expect(contrastRatio("ffffff", "b45309")).toBeGreaterThanOrEqual(4.5);
   });
 
   it("keeps brand highlighting distinct from warning and primary actions", () => {

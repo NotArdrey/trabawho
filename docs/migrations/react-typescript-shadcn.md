@@ -7,7 +7,7 @@ Status: active
 - Vite, strict TypeScript for migrated files, Tailwind CSS, shadcn/ui configuration, Vitest, linting, file-size enforcement, typed route policy, and Vercel SPA deployment are active.
 - The application shell, public navigation, landing experience, loading state, notifications, shared confirmation dialog, route contracts, Supabase integration contract, pricing utility, profile-photo utility, and feature entry points are typed.
 - The landing page and authentication presentation follow the white-led light theme, blue-led dark theme, image-forward composition, selective orange accent, and no-glow rules. Authentication behavior remains legacy JavaScript pending its full TypeScript conversion.
-- 101 frontend files are TypeScript and 68 JavaScript/JSX files remain at this checkpoint. Sixteen source files exceed 500 lines, including the 6,829-line frozen legacy stylesheet; the machine-readable baselines are authoritative as these totals shrink.
+- 113 frontend files are TypeScript and 65 JavaScript/JSX files remain at this checkpoint. Sixteen source files exceed 500 lines, including the 6,526-line frozen legacy stylesheet; the machine-readable baselines are authoritative as these totals shrink.
 - Static quality gate: Vitest and standards-guard coverage run in `npm run check`. Responsive Playwright coverage targets 390, 768, 1024, 1280, and 1440px, including 200% page scale, URL restoration, and light, dark, and system theme preferences.
 
 ## Checkpoints

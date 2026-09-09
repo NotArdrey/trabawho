@@ -247,7 +247,7 @@ function CreateServiceModal({ isOpen, newService, onChange, onClose, onSubmit }:
     <Dialog open={isOpen} onOpenChange={(open) => { if (!open && !isSubmitting) onClose(); }}>
       <DialogContent
         data-testid="create-service-modal"
-        className="grid w-[calc(100vw-2rem)] max-w-[840px] max-h-[calc(100svh-2rem)] grid-rows-[auto_auto_minmax(0,1fr)_auto] gap-0 overflow-hidden p-0 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden max-sm:w-[calc(100vw-1rem)] max-sm:max-h-[calc(100svh-1rem)] max-sm:rounded-xl"
+        className="grid !w-[min(840px,calc(100vw-2rem))] !max-w-[840px] max-h-[calc(100svh-2rem)] grid-rows-[auto_auto_minmax(0,1fr)_auto] gap-0 overflow-hidden p-0 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden max-sm:!w-[calc(100vw-1rem)] max-sm:max-h-[calc(100svh-1rem)] max-sm:rounded-xl"
       >
         <DialogHeader className="px-5 pb-4 pt-5 sm:px-6 sm:pt-6">
           <DialogTitle>Add a service</DialogTitle>

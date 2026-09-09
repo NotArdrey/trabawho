@@ -4,7 +4,6 @@ import {
   CalendarCheck,
   CheckCircle2,
   Clock3,
-  LayoutDashboard,
   MessageCircle,
   ReceiptText,
   Search,
@@ -333,11 +332,7 @@ function Dashboard({
         <section className="dashboard-overview" aria-labelledby="dashboard-title">
           <div className="dashboard-overview-head dashboard-client-header">
             <div>
-              <span className="gl-eyebrow">
-                <LayoutDashboard size={15} aria-hidden="true" />
-                Client dashboard
-              </span>
-              <h1 id="dashboard-title" className="gl-title">Good to see you, {displayName}.</h1>
+              <h1 id="dashboard-title" className="gl-title !mt-0">Good to see you, {displayName}.</h1>
               <p className="gl-subtitle">
                 Your booking activity, provider messages, and service requests are organized here.
               </p>
@@ -404,7 +399,10 @@ function Dashboard({
                     <p>{isDashboardLoading ? 'Checking your latest schedule.' : 'Find a trusted provider whenever you are ready.'}</p>
                   </div>
                   {!isDashboardLoading && (
-                    <Button type="button" variant="outline" onClick={onOpenBrowseServices}>Browse services</Button>
+                    <Button type="button" onClick={onOpenBrowseServices}>
+                      <Search aria-hidden="true" />
+                      Browse services
+                    </Button>
                   )}
                 </div>
               )}

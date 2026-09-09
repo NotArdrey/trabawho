@@ -414,9 +414,6 @@ function Profile({ appTheme = 'light', themeMode = 'system', onThemeChange, curr
     h2Portfolio: { margin: '0 0 8px', color: themeTokens.accent, fontSize: '18px' },
     sectionHeadingRow: { display: 'flex', alignItems: isMobile ? 'flex-start' : 'center', justifyContent: 'space-between', gap: isMobile ? '8px' : '0', flexWrap: isMobile ? 'wrap' : 'nowrap', marginBottom: '8px' },
     sectionEditBtn: { border: `1px solid ${themeTokens.border}`, borderRadius: '8px', background: themeTokens.surface, color: themeTokens.textPrimary, padding: '4px 10px', fontWeight: 700, cursor: 'pointer' },
-    bioEditWrap: { display: 'flex', flexDirection: 'column', gap: '10px' },
-    bioEditInput: { border: `1px solid ${themeTokens.inputBorder}`, borderRadius: '8px', padding: '10px', resize: 'vertical', minHeight: '90px', background: themeTokens.inputBg, color: themeTokens.inputText },
-    bioEditActions: { display: 'flex', gap: '8px' },
     paragraph: { margin: 0, color: themeTokens.textSecondary, lineHeight: 1.55 },
     saveError: {
       margin: '0 0 14px',
@@ -557,19 +554,17 @@ function Profile({ appTheme = 'light', themeMode = 'system', onThemeChange, curr
                 <div style={{ ...styles.textPlaceholder, width: '66%' }} />
               </div>
             ) : isEditingBio ? (
-              <div style={styles.bioEditWrap}>
+              <div className="space-y-3">
                 <textarea
-                  style={styles.bioEditInput}
+                  className="min-h-28 w-full resize-y rounded-md border border-input bg-background px-3 py-2 text-sm leading-6 text-foreground shadow-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                   rows={4}
                   value={draftBio}
                   onChange={(event) => setDraftBio(event.target.value)}
                   maxLength={280}
                 ></textarea>
-                <div style={styles.bioEditActions}>
-                  <button style={styles.inlineEditSave} onClick={saveBio} disabled={isSavingBio}>{isSavingBio ? 'Saving...' : 'Save'}</button>
-                  <button style={styles.inlineEditCancel} onClick={() => { setIsEditingBio(false); setDraftBio(displayBio); }}>
-                    Cancel
-                  </button>
+                <div className="flex justify-end gap-2">
+                  <Button type="button" variant="outline" onClick={() => { setIsEditingBio(false); setDraftBio(displayBio); }}>Cancel</Button>
+                  <Button type="button" onClick={saveBio} isLoading={isSavingBio}>{isSavingBio ? 'Saving...' : 'Save'}</Button>
                 </div>
               </div>
             ) : (

@@ -3,6 +3,7 @@ export { default as WorkerDashboard } from './pages/WorkerDashboard';
 export type { ProviderDashboardSnapshot, ProviderDashboardMetric, ProviderActionItem, ProviderScheduleItem, ProviderServiceHealth, ConfirmedEarningsSummary } from './types/provider-dashboard';
 export { default as CalendarAvailabilityModal } from './components/CalendarAvailabilityModal';
 export { default as ProfileEditModal } from './components/ProfileEditModal';
+export type { ServiceProfileDraft, ServiceProfileUpdate } from './components/ProfileEditModal';
 export { default as SellerScheduleModal } from './components/SellerScheduleModal';
 export { default as InquiryChatModal } from './components/InquiryChatModal';
 export { ActiveInquiriesSection } from './components/ActiveInquiriesSection';
@@ -10,7 +11,10 @@ export { default as WorkProviderSummary } from './components/WorkProviderSummary
 export type { WorkProviderSummaryProps } from './components/WorkProviderSummary';
 export { default as WorkSectionFilter } from './components/WorkSectionFilter';
 export type { WorkSectionFilterProps, WorkSectionOption, WorkSectionValue } from './components/WorkSectionFilter';
+export { default as WorkPaymentQueues } from './components/WorkPaymentQueues';
+export type { WorkPaymentQueuesProps } from './components/WorkPaymentQueues';
 export type { WorkInquiry } from './types/inquiry';
+export type { CashPaymentView, CashReviewDecision, WorkPaymentTransaction } from './types/payment';
 export type { InquiryChatModalProps } from './components/InquiryChatModal';
 export { default as SlotEditModal } from './components/SlotEditModal';
 export { default as QrPreviewModal } from './components/modals/QrPreviewModal';

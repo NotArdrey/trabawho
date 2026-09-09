@@ -18,7 +18,7 @@ Visual interest must reinforce hierarchy or explain the product. Use brand color
 ## Brand and semantic color
 
 - Primary brand: `#1557c0`; stronger interactive state: `#0f4396`.
-- Brand highlight: `#ff7a00`; accessible highlight text: `#9a3412`; soft highlight surface: `#fff3e6`. Components consume the `brand-highlight`, `brand-highlight-foreground`, `brand-highlight-soft`, and `brand-highlight-border` semantic tokens instead of raw orange utilities.
+- Brand highlight: `#ff7a00`; strong orange surface: `#b45309`; accessible highlight text: `#9a3412`; soft highlight surface: `#fff3e6`. Components consume semantic highlight tokens instead of raw orange utilities. Orange count surfaces use the strong tone with white text; never pair bright orange with black text.
 - Light mode is white-led: use white and subtle cool-neutral surfaces, TrabaWho blue for primary actions and navigation, and orange for compact highlights.
 - Dark mode is blue-led: use deep navy and dark blue surfaces rather than flat black or neutral gray, with accessible lighter blue interactions and selective orange highlights.
 - Blue remains the dominant interactive color for primary buttons, links, focus rings, navigation text, and confirmed selections. Orange is limited to rating stars, attention and unread counts, selected mobile-filter chips, small active-navigation indicators, required markers, and compact provider or marketplace icons.

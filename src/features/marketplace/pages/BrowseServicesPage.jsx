@@ -1,14 +1,11 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import {
-  BriefcaseBusiness,
   Filter,
-  Layers3,
-  MapPin,
   Search,
-  X,
 } from 'lucide-react';
 import DashboardNavigation from '../../../shared/components/DashboardNavigation';
+import { Button } from '@/components/ui/button';
 import { SearchFilterBar } from '@/components/ui/search-filter-bar';
 import {
   Pagination,
@@ -37,6 +34,7 @@ import BookingTermsModal from '../../bookings/components/BookingTermsModal';
 import ServiceCard from '../components/ServiceCard';
 import WorkerDetailModal from '../components/WorkerDetailModal';
 import ReviewsModal from '../components/ReviewsModal';
+import { MarketplaceFilterPanel } from '../components/MarketplaceFilterPanel';
 import {
   buildWeeklyScheduleFromSlots,
   createScheduleForProvider,
@@ -270,6 +268,15 @@ function BrowseServicesPage({
     const items = services.map((service) => service.location).filter(Boolean);
     return ['All Districts', ...Array.from(new Set(items))];
   }, [services]);
+
+  const categoryFilters = useMemo(() => categories.map((category) => ({
+    label: category,
+    count: category === 'All' ? services.length : services.filter((item) => {
+      const serviceLabel = getDisplayServiceType(item);
+      const core = ['Tutor', 'Technician', 'Cleaner'];
+      return category === 'More Services' ? !core.includes(serviceLabel) : serviceLabel === category;
+    }).length,
+  })), [categories, services]);
 
   const filteredServices = useMemo(() => {
     const normalizedSearch = String(searchQuery || '').trim().toLowerCase();
@@ -580,124 +587,38 @@ function BrowseServicesPage({
       )}
 
       <main className="gl-shell gl-page-pad">
-        <section className="browse-hero gl-card" aria-labelledby="browse-page-title">
+        <section className="browse-hero gl-card !grid-cols-1" aria-labelledby="browse-page-title">
           <div>
-            <span className="gl-eyebrow">
-              <Search size={15} aria-hidden="true" />
-              Service Marketplace
-            </span>
-            <h1 className="gl-title" id="browse-page-title">Find trusted local help</h1>
+            <h1 className="gl-title !mt-0" id="browse-page-title">Find trusted local help</h1>
             <p className="gl-subtitle">
               Compare providers by service, location, schedule readiness, and reviews before opening a booking flow.
             </p>
           </div>
 
-          <div className="browse-kpis marketplace-summary" aria-label="Marketplace summary">
-            <div className="marketplace-stat">
-              <BriefcaseBusiness aria-hidden="true" />
-              <p className="gl-kpi-value">{services.length}</p>
-              <p className="gl-kpi-label">Active services</p>
-            </div>
-            <div className="marketplace-stat">
-              <Layers3 aria-hidden="true" />
-              <p className="gl-kpi-value">{Math.max(0, categories.length - 1)}</p>
-              <p className="gl-kpi-label">Categories</p>
-            </div>
-            <div className="marketplace-stat">
-              <MapPin aria-hidden="true" />
-              <p className="gl-kpi-value">{districts.length - 1}</p>
-              <p className="gl-kpi-label">Locations</p>
-            </div>
-          </div>
         </section>
 
         <section className="browse-marketplace" aria-label="Service marketplace">
-          <aside
-            id="browse-filter-options"
-            className={`browse-filter-rail gl-card ${showMobileFilters ? 'mobile-open' : ''}`}
-            aria-label="Browse filters"
-          >
-            <div className="browse-filter-head">
-              <Filter size={17} aria-hidden="true" />
-              <strong>Filters</strong>
-              <button
-                type="button"
-                className="browse-filter-close"
-                onClick={() => setShowMobileFilters(false)}
-                aria-label="Close filters"
-              >
-                <X size={18} aria-hidden="true" />
-              </button>
-            </div>
-
-            <div className="browse-filter-group">
-              <span>Category</span>
-              <div className="browse-filter-options" aria-label="Service categories">
-                {categories.map((category) => (
-                  <button
-                    key={category}
-                    className={`browse-filter-option ${activeCategory === category ? 'active' : ''}`}
-                    type="button"
-                    aria-label={category}
-                    onClick={() => {
-                      setActiveCategory(category);
-                      resetPage();
-                    }}
-                  >
-                    <span>{category}</span>
-                    <small>{category === 'All' ? services.length : services.filter((item) => {
-                      const serviceLabel = getDisplayServiceType(item);
-                      const core = ['Tutor', 'Technician', 'Cleaner'];
-                      return category === 'More Services' ? !core.includes(serviceLabel) : serviceLabel === category;
-                    }).length}</small>
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {isPublic ? (
-              <label className="browse-filter-group">
-                <span>Location</span>
-                <div className="browse-search">
-                  <MapPin size={17} aria-hidden="true" />
-                  <input
-                    className="gl-input"
-                    value={localLocationQuery}
-                    onChange={handleLocationChange}
-                    placeholder="City or province"
-                  />
-                </div>
-              </label>
-            ) : (
-              <div className="browse-filter-group">
-                <span>District</span>
-                <Select value={selectedDistrict} onValueChange={(value) => {
-                  setSelectedDistrict(value);
-                  resetPage();
-                }}>
-                  <SelectTrigger
-                    className="focus:border-foreground focus:ring-0 focus:ring-offset-0"
-                    aria-label="Filter by district"
-                  >
-                    <SelectValue placeholder="All districts" />
-                  </SelectTrigger>
-                  <SelectContent position="popper">
-                    {districts.map((district) => (
-                      <SelectItem key={district} value={district}>{district}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
-
-            <button
-              type="button"
-              className="gl-button secondary browse-clear-button"
-              onClick={handleClearFilters}
-            >
-              Clear filters
-            </button>
-          </aside>
+          <MarketplaceFilterPanel
+            activeCategory={activeCategory}
+            categories={categoryFilters}
+            districts={districts}
+            hasActiveFilters={hasActiveFilters}
+            isOpen={showMobileFilters}
+            isPublic={isPublic}
+            locationQuery={localLocationQuery}
+            onCategoryChange={(category) => {
+              setActiveCategory(category);
+              resetPage();
+            }}
+            onClear={handleClearFilters}
+            onClose={() => setShowMobileFilters(false)}
+            onDistrictChange={(value) => {
+              setSelectedDistrict(value);
+              resetPage();
+            }}
+            onLocationChange={(value) => handleLocationChange({ target: { value } })}
+            selectedDistrict={selectedDistrict}
+          />
 
           <section className="browse-results-panel">
             <SearchFilterBar
@@ -725,16 +646,17 @@ function BrowseServicesPage({
                     <SelectItem value="newest">Newest</SelectItem>
                   </SelectContent>
                 </Select>
-                  <button
+                  <Button
                     type="button"
-                    className="gl-button secondary browse-mobile-filter-button"
+                    variant="secondary"
+                    className="hidden max-[880px]:col-start-2 max-[880px]:inline-flex"
                     onClick={() => setShowMobileFilters((open) => !open)}
                     aria-expanded={showMobileFilters}
                     aria-controls="browse-filter-options"
                   >
                     <Filter size={17} aria-hidden="true" />
                     {showMobileFilters ? 'Hide filters' : 'Filters'}
-                  </button>
+                  </Button>
                 </div>
               )}
             />

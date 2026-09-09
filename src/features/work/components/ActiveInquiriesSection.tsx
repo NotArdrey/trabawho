@@ -20,12 +20,20 @@ const statusTone = (status: string) => {
   return "bg-muted text-muted-foreground";
 };
 
+const formatRequestDate = (value: string) => {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
+  const parsed = new Date(`${value}T00:00:00`);
+  return Number.isNaN(parsed.getTime())
+    ? value
+    : parsed.toLocaleDateString("en-PH", { day: "numeric", month: "short", year: "numeric" });
+};
+
 export function ActiveInquiriesSection({ inquiries, onRespond }: ActiveInquiriesSectionProps) {
   return (
     <WorkflowPanel className="mb-4 max-md:mb-3" contentClassName="px-5 max-md:px-4" data-testid="work-inquiries-section" icon={Inbox} title="Active inquiries" description="Clients waiting for your response." tone="highlight" status={<Badge variant={inquiries.length ? "brand" : "secondary"}>{inquiries.length}</Badge>}>
       {inquiries.length ? <div className="divide-y">
         {inquiries.map((inquiry) => (
-          <article key={inquiry.id} className="py-5 first:pt-4 last:pb-1">
+          <article key={inquiry.id} className="py-5 first:pt-4">
             <div className="flex items-start justify-between gap-4 max-sm:flex-wrap">
               <div className="flex min-w-0 flex-1 items-center gap-3">
                 <img className="size-12 shrink-0 rounded-full object-cover" src={getProfilePhotoUrl(inquiry.clientPhoto)} alt={inquiry.clientName} />
@@ -45,10 +53,20 @@ export function ActiveInquiriesSection({ inquiries, onRespond }: ActiveInquiries
             </div>
 
             <div className="mt-4 flex items-center justify-between gap-4 border-t pt-4 max-sm:flex-col max-sm:items-stretch">
-              <div className="flex flex-wrap gap-x-4 gap-y-1.5 text-xs text-muted-foreground">
-                <span className="inline-flex items-center gap-1.5"><WalletCards className="size-3.5" aria-hidden="true" />{inquiry.proposedBudget}</span>
-                {inquiry.requestDate ? <span className="inline-flex items-center gap-1.5"><CalendarDays className="size-3.5" aria-hidden="true" />{inquiry.requestDate}</span> : null}
-              </div>
+              <dl className="flex flex-wrap gap-2 text-xs">
+                {inquiry.proposedBudget ? (
+                  <div className="flex min-h-11 items-center gap-2 rounded-lg bg-emerald-50 px-3 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-200">
+                    <WalletCards className="size-4" aria-hidden="true" />
+                    <div><dt className="text-[10px] font-semibold uppercase tracking-wide opacity-75">Budget</dt><dd className="font-bold">{inquiry.proposedBudget}</dd></div>
+                  </div>
+                ) : null}
+                {inquiry.requestDate ? (
+                  <div className="flex min-h-11 items-center gap-2 rounded-lg bg-primary/10 px-3 text-primary">
+                    <CalendarDays className="size-4" aria-hidden="true" />
+                    <div><dt className="text-[10px] font-semibold uppercase tracking-wide opacity-75">Requested date</dt><dd className="font-bold">{formatRequestDate(inquiry.requestDate)}</dd></div>
+                  </div>
+                ) : null}
+              </dl>
               <Button type="button" className="shadow-none max-sm:w-full" onClick={() => onRespond(inquiry.id)} aria-label={`Respond to ${inquiry.clientName}`}>
                 <MessageSquareText aria-hidden="true" />Respond{inquiry.messages > 0 ? ` (${inquiry.messages})` : ""}
               </Button>
