@@ -16,7 +16,6 @@ import { getThemeTokens } from '../../../shared/styles/themeTokens';
 import { useWorkPayments, useWorkProfileServices, useWorkSchedule } from '../hooks';
 import {
   Ban,
-  BriefcaseBusiness,
   CalendarDays,
   CircleDollarSign,
   Loader2,
@@ -28,6 +27,7 @@ import {
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { WorkflowEmptyState, WorkflowPanel } from '@/components/ui/workflow-panel';
 
 const formatDateLong = (date) =>
   date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
@@ -707,7 +707,6 @@ const MyWork = ({ appTheme = 'light', themeMode = 'system', onThemeChange, curre
 
   const isHovered = (key) => hoverKey === key;
   const sectionTitleStyle = { fontSize: '22px', fontWeight: 800, color: themeTokens.textPrimary, margin: '0 0 4px 0', lineHeight: 1.2 };
-  const cardMutedTextStyle = { margin: 0, color: themeTokens.textSecondary };
   const cardStrongTextStyle = { color: themeTokens.textPrimary };
   const queueMetaTextStyle = { margin: 0, color: themeTokens.textSecondary, fontSize: '12px' };
   const queueServiceTextStyle = { margin: 0, color: themeTokens.textPrimary, fontWeight: 700, fontSize: '13px' };
@@ -851,10 +850,6 @@ const MyWork = ({ appTheme = 'light', themeMode = 'system', onThemeChange, curre
 
         <header className="my-work-page-heading max-[760px]:relative">
           <div className="my-work-page-heading-copy">
-            <Badge variant="secondary" className="my-work-page-eyebrow">
-              <BriefcaseBusiness size={14} aria-hidden="true" />
-              Provider workspace
-            </Badge>
             <h1>Manage My Work</h1>
             <p>Handle client requests, payments, refunds, and your published services from one place.</p>
           </div>
@@ -995,11 +990,7 @@ const MyWork = ({ appTheme = 'light', themeMode = 'system', onThemeChange, curre
             
             {showInquiriesSection && <ActiveInquiriesSection inquiries={activeInquiries} onRespond={handleRespondClick} />}
 
-            {showCashApprovalSection && <section className="my-work-queue-section" style={sx('payment-confirm-section')} data-testid="work-cash-section">
-              <div className="my-work-section-heading" style={sx('section-header')}>
-                <span className="my-work-section-icon tone-green"><CircleDollarSign size={18} aria-hidden="true" /></span>
-                <div><h2 style={sectionTitleStyle}>Cash confirmations</h2><p style={sx('section-subtitle')}>Review cash payments submitted through your confirmation QR.</p></div>
-              </div>
+            {showCashApprovalSection && <WorkflowPanel className="mb-4" contentClassName="p-5 max-md:p-4" data-testid="work-cash-section" icon={CircleDollarSign} title="Cash confirmations" description="Review cash payments submitted through your confirmation QR." tone="success" status={<Badge variant={cashConfirmationNotifications.length ? 'brand' : 'secondary'}>{cashConfirmationNotifications.length}</Badge>}>
               <div className="my-work-segmented-control" aria-label="Cash confirmation view">
                   <Button
                     type="button"
@@ -1020,10 +1011,7 @@ const MyWork = ({ appTheme = 'light', themeMode = 'system', onThemeChange, curre
               </div>
 
               {cashConfirmationNotifications.length === 0 ? (
-                <div className="my-work-empty-state" style={sx('payment-confirm-card')}>
-                  <CircleDollarSign size={20} aria-hidden="true" />
-                  <p style={cardMutedTextStyle}>{cashPaymentView === 'pending' ? 'No cash confirmation requests for this week.' : 'No completed cash transactions.'}</p>
-                </div>
+                <WorkflowEmptyState className="min-h-32" icon={CircleDollarSign} title={cashPaymentView === 'pending' ? 'No requests to review' : 'No completed transactions'} description={cashPaymentView === 'pending' ? 'New cash confirmation requests for this week will appear here.' : 'Approved or denied cash confirmations will appear here.'} tone="success" />
               ) : (
                 <div style={sx('payment-confirm-grid')}>
                   {cashConfirmationNotifications.map((txn) => {
@@ -1085,20 +1073,12 @@ const MyWork = ({ appTheme = 'light', themeMode = 'system', onThemeChange, curre
                   })}
                 </div>
               )}
-            </section>}
+            </WorkflowPanel>}
             
             {showRefundSection && (
-              <section className="my-work-queue-section" style={sx('refund-section')} data-testid="work-refund-section">
-                <div className="my-work-section-heading" style={sx('section-header')}>
-                  <span className="my-work-section-icon tone-blue"><RotateCcw size={18} aria-hidden="true" /></span>
-                  <div><h2 style={sectionTitleStyle}>GCash refund queue</h2><p style={sx('section-subtitle')}>Track refund cases that require provider or client confirmation.</p></div>
-                  <Badge variant={refundTransactions.length ? 'warning' : 'secondary'}>{refundTransactions.length}</Badge>
-                </div>
+              <WorkflowPanel className="mb-4" contentClassName="p-5 max-md:p-4" data-testid="work-refund-section" icon={RotateCcw} title="GCash refund queue" description="Track refund cases that require provider or client confirmation." tone="primary" status={<Badge variant={refundTransactions.length ? 'warning' : 'secondary'}>{refundTransactions.length}</Badge>}>
                 {refundTransactions.length === 0 ? (
-                  <div className="my-work-empty-state" style={sx('payment-confirm-card')}>
-                    <RotateCcw size={20} aria-hidden="true" />
-                    <p style={cardMutedTextStyle}>No refund scenarios for this week.</p>
-                  </div>
+                  <WorkflowEmptyState className="min-h-32" icon={RotateCcw} title="No refunds to review" description="Refund cases for this week will appear here when action is required." tone="primary" />
                 ) : (
                   <div style={sx('refund-grid')}>
                     {refundTransactions.map((txn) => (
@@ -1148,21 +1128,13 @@ const MyWork = ({ appTheme = 'light', themeMode = 'system', onThemeChange, curre
                     ))}
                   </div>
                 )}
-              </section>
+              </WorkflowPanel>
             )}
 
             {showCancelledSection && (
-              <section className="my-work-queue-section" style={sx('cancelled-section')} data-testid="work-cancelled-section">
-                <div className="my-work-section-heading" style={sx('section-header')}>
-                  <span className="my-work-section-icon tone-red"><Ban size={18} aria-hidden="true" /></span>
-                  <div><h2 style={sectionTitleStyle}>Cancelled cash bookings</h2><p style={sx('section-subtitle')}>Review cancelled cash bookings that do not require a GCash refund.</p></div>
-                  <Badge variant="secondary">{cancelledCashTransactions.length}</Badge>
-                </div>
+              <WorkflowPanel className="mb-4" contentClassName="p-5 max-md:p-4" data-testid="work-cancelled-section" icon={Ban} title="Cancelled cash bookings" description="Review cancelled cash bookings that do not require a GCash refund." status={<Badge variant="secondary">{cancelledCashTransactions.length}</Badge>}>
                 {cancelledCashTransactions.length === 0 ? (
-                  <div className="my-work-empty-state" style={sx('payment-confirm-card')}>
-                    <Ban size={20} aria-hidden="true" />
-                    <p style={cardMutedTextStyle}>No cancelled cash bookings for this week.</p>
-                  </div>
+                  <WorkflowEmptyState className="min-h-32" icon={Ban} title="No cancelled bookings" description="Cancelled cash bookings for this week will appear here." />
                 ) : (
                   <div style={sx('cancelled-grid')}>
                     {cancelledCashTransactions.map((txn) => (
@@ -1179,7 +1151,7 @@ const MyWork = ({ appTheme = 'light', themeMode = 'system', onThemeChange, curre
                     ))}
                   </div>
                 )}
-              </section>
+              </WorkflowPanel>
             )}
 
             {showScheduleSection && <section style={sx('schedule-section')} data-testid="work-schedule-section">

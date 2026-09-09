@@ -5862,91 +5862,6 @@ textarea {
   flex-wrap: wrap;
 }
 
-/* Empty State Modern */
-.bookings-empty-card {
-  padding: 48px 24px;
-  text-align: center;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 16px;
-  border-radius: 16px;
-  border: 1px dashed var(--gl-border-strong);
-  background: var(--gl-surface);
-  box-shadow: var(--gl-shadow-soft);
-  max-width: 680px;
-  margin: 12px auto 0;
-  width: 100%;
-}
-
-.bookings-empty-icon-box {
-  width: 68px;
-  height: 68px;
-  border-radius: 20px;
-  background: var(--gl-accent-soft);
-  color: var(--gl-blue);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border: 1px solid var(--gl-accent-border);
-}
-
-.bookings-empty-title {
-  margin: 0;
-  font-size: 22px;
-  font-weight: 850;
-  color: var(--gl-text);
-}
-
-.bookings-empty-desc {
-  margin: 0;
-  font-size: 14px;
-  color: var(--gl-text-2);
-  line-height: 1.6;
-  max-width: 480px;
-}
-
-.bookings-empty-actions {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin-top: 8px;
-  flex-wrap: wrap;
-  justify-content: center;
-}
-
-.bookings-quick-categories {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-top: 12px;
-  flex-wrap: wrap;
-  justify-content: center;
-  padding-top: 14px;
-  border-top: 1px solid var(--gl-border);
-  width: 100%;
-  max-width: 460px;
-}
-
-.bookings-quick-category-pill {
-  padding: 5px 12px;
-  border-radius: 999px;
-  background: var(--gl-surface-2);
-  border: 1px solid var(--gl-border);
-  color: var(--gl-text-2);
-  font-size: 12px;
-  font-weight: 700;
-  cursor: pointer;
-  transition: all 0.15s ease;
-}
-
-.bookings-quick-category-pill:hover {
-  background: var(--gl-accent-soft);
-  color: var(--gl-blue);
-  border-color: var(--gl-accent-border);
-}
-
 /* Skeleton Loading */
 .booking-skeleton-card {
   padding: 24px;
@@ -6265,11 +6180,6 @@ body::-webkit-scrollbar,
   min-width: 0;
 }
 
-.my-work-page-eyebrow {
-  gap: 6px;
-  margin-bottom: 10px;
-}
-
 .my-work-page-heading h1 {
   margin: 0;
   color: var(--gl-text);
@@ -6298,57 +6208,6 @@ body::-webkit-scrollbar,
   min-height: 44px;
 }
 
-[data-testid="my-work-page"] .my-work-queue-section {
-  margin-bottom: 16px !important;
-  padding: 20px !important;
-  border: 1px solid var(--gl-border) !important;
-  border-radius: 12px !important;
-  background: var(--gl-surface) !important;
-}
-
-.my-work-section-heading {
-  display: grid !important;
-  grid-template-columns: auto minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 12px;
-  margin-bottom: 16px !important;
-  text-align: left !important;
-}
-
-.my-work-section-heading h2 {
-  margin: 0 0 3px !important;
-  font-size: 19px !important;
-}
-
-.my-work-section-icon {
-  display: inline-flex;
-  width: 40px;
-  height: 40px;
-  align-items: center;
-  justify-content: center;
-  border-radius: 10px;
-}
-
-.my-work-section-icon.tone-orange {
-  color: #c2410c;
-  background: #ffedd5;
-}
-
-.my-work-section-icon.tone-green {
-  color: #047857;
-  background: #d1fae5;
-}
-
-.my-work-section-icon.tone-blue {
-  color: var(--gl-blue);
-  background: var(--gl-accent-soft);
-}
-
-.my-work-section-icon.tone-red {
-  color: #b91c1c;
-  background: #fee2e2;
-}
-
 .my-work-segmented-control {
   display: inline-flex;
   gap: 4px;
@@ -6367,22 +6226,6 @@ body::-webkit-scrollbar,
 
 
 
-
-.my-work-empty-state {
-  display: flex !important;
-  min-height: 64px;
-  align-items: center;
-  gap: 10px !important;
-  padding: 14px !important;
-  border: 1px dashed var(--gl-border-strong) !important;
-  background: var(--gl-surface-2) !important;
-  box-shadow: none !important;
-}
-
-.my-work-empty-state > svg {
-  flex: 0 0 auto;
-  color: var(--gl-text-3);
-}
 
 [data-testid="my-work-page"] .my-work-stats-footer {
   gap: 12px !important;
@@ -6423,28 +6266,11 @@ body::-webkit-scrollbar,
     flex: 1;
   }
 
-  [data-testid="my-work-page"] .my-work-queue-section {
-    padding: 16px !important;
-  }
-
-  .my-work-section-heading {
-    grid-template-columns: auto minmax(0, 1fr) auto;
-    gap: 10px;
-  }
-
-  .my-work-section-heading h2 {
-    font-size: 17px !important;
-  }
-
 
 
 
 
 }
-
-[data-theme="dark"] .my-work-section-icon.tone-orange { color: #fdba74; background: rgba(154, 52, 18, 0.28); }
-[data-theme="dark"] .my-work-section-icon.tone-green { color: #6ee7b7; background: rgba(6, 95, 70, 0.3); }
-[data-theme="dark"] .my-work-section-icon.tone-red { color: #fca5a5; background: rgba(153, 27, 27, 0.28); }
 
 /* Profile: one flat content surface with dividers instead of nested bordered cards. */
 .gl-app-shell-active [data-testid="profile-page"] > main.profile-main-modern {

@@ -1,9 +1,9 @@
 [
-  { "path": "src/shared/styles/modern.css", "baselineLines": 7003 },
-  { "path": "src/features/work/pages/MyWork.jsx", "baselineLines": 1610 },
+  { "path": "src/shared/styles/modern.css", "baselineLines": 6829 },
+  { "path": "src/features/work/pages/MyWork.jsx", "baselineLines": 1582 },
   { "path": "src/features/bookings/services/bookingService.js", "baselineLines": 1566 },
   { "path": "src/shared/services/authService.js", "baselineLines": 1465 },
-  { "path": "src/features/bookings/pages/MyBookings.jsx", "baselineLines": 1314 },
+  { "path": "src/features/bookings/pages/MyBookings.jsx", "baselineLines": 1240 },
   { "path": "src/features/auth/pages/AuthPage.jsx", "baselineLines": 1394 },
   { "path": "src/features/bookings/components/ChatWindow.jsx", "baselineLines": 1039 },
   { "path": "src/features/marketplace/pages/BrowseServicesPage.jsx", "baselineLines": 903 },

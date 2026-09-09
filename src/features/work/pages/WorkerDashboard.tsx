@@ -14,13 +14,12 @@ import {
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { MetricCard } from "@/components/ui/metric-card";
-import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
+import { WorkflowEmptyState, WorkflowPanel, WorkflowStatGrid } from "@/components/ui/workflow-panel";
 import DashboardNavigation from "@/shared/components/DashboardNavigation";
 import { useProviderDashboard } from "@/features/work/hooks/useProviderDashboard";
-import type { ProviderActionItem } from "@/features/work/types/provider-dashboard";
+import type { ProviderActionItem, ProviderScheduleItem, ProviderServiceHealth } from "@/features/work/types/provider-dashboard";
 
 type SellerProfile = Record<string, unknown> & {
   userId?: string;
@@ -70,6 +69,44 @@ const metricActionLabels = {
 
 function DashboardSkeleton() {
   return <div className="space-y-5" aria-label="Loading provider dashboard"><Skeleton className="h-28 w-full" /><div className="grid gap-3 md:grid-cols-4">{[0, 1, 2, 3].map((item) => <Skeleton key={item} className="h-28" />)}</div><div className="grid gap-4 lg:grid-cols-[minmax(0,1.65fr)_minmax(18rem,0.85fr)]"><Skeleton className="h-80" /><Skeleton className="h-80" /></div></div>;
+}
+
+function AttentionPanel({ actions, onOpen }: { actions: readonly ProviderActionItem[]; onOpen: (action: ProviderActionItem) => void }) {
+  return (
+    <WorkflowPanel icon={CircleAlert} title="Needs your attention" description="Priority updates across your provider workspace." tone="highlight" status={<Badge variant={actions.length ? "brand" : "success"}>{actions.length || "Clear"}</Badge>}>
+      {actions.length ? <div className="divide-y px-2 py-1">{actions.map((action) => (
+        <button key={action.id} type="button" className="group flex min-h-[76px] w-full items-center gap-3 rounded-lg px-2 py-3 text-left transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:px-3" onClick={() => onOpen(action)}>
+          <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-brand-highlight-soft text-brand-highlight-foreground"><CircleAlert className="size-4" aria-hidden="true" /></span>
+          <span className="min-w-0 flex-1"><strong className="block text-sm text-foreground">{action.title}</strong><span className="mt-1 block text-sm leading-5 text-muted-foreground sm:truncate">{action.detail}</span><span className="mt-1 flex flex-wrap gap-x-3 text-xs text-muted-foreground">{action.schedule ? <span>{action.schedule}</span> : null}{action.amount ? <span>{action.amount}</span> : null}</span></span>
+          {action.status ? <Badge variant="outline" className="hidden shrink-0 sm:inline-flex">{action.status}</Badge> : null}
+          <ArrowRight className="size-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5 group-hover:text-primary" aria-hidden="true" />
+        </button>
+      ))}</div> : <WorkflowEmptyState icon={ListChecks} title="You're all caught up" description="New requests and account actions will appear here." tone="success" />}
+    </WorkflowPanel>
+  );
+}
+
+function SchedulePanel({ items, nextAppointment, onOpenBookings, onManageAvailability }: { items: readonly ProviderScheduleItem[]; nextAppointment: ProviderScheduleItem | null; onOpenBookings?: () => void; onManageAvailability?: () => void }) {
+  return (
+    <WorkflowPanel icon={CalendarCheck} title="Today's schedule" description={items.length ? `${items.length} job${items.length === 1 ? "" : "s"} scheduled` : "No jobs scheduled today"} tone="primary">
+      {items.length ? <div className="divide-y px-2 py-1">{items.slice(0, 4).map((item) => <button key={item.id} type="button" className="group flex min-h-[68px] w-full items-start gap-3 rounded-lg px-2 py-3 text-left hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:px-3" onClick={onOpenBookings}><Clock3 className="mt-0.5 size-4 shrink-0 text-primary" aria-hidden="true" /><span className="min-w-0 flex-1"><strong className="block text-sm">{item.service}</strong><span className="mt-1 block text-xs leading-5 text-muted-foreground">{item.client} · {item.schedule}</span></span><ArrowRight className="mt-1 size-4 shrink-0 text-muted-foreground group-hover:text-primary" aria-hidden="true" /></button>)}</div> : <WorkflowEmptyState icon={CalendarCheck} title="Your day is clear" description="Set availability so clients can book a time that works for you." tone="primary" action={<Button type="button" size="sm" variant="outline" onClick={onManageAvailability}>Manage availability</Button>} />}
+      {nextAppointment && !items.some((item) => item.id === nextAppointment.id) ? <div className="border-t bg-muted/20 px-4 py-4 sm:px-5"><p className="text-xs font-bold uppercase tracking-wide text-muted-foreground">Next appointment</p><p className="mt-2 text-sm font-semibold">{nextAppointment.service}</p><p className="mt-1 text-xs text-muted-foreground">{nextAppointment.client} · {nextAppointment.schedule}</p></div> : null}
+    </WorkflowPanel>
+  );
+}
+
+function ServiceHealthPanel({ health, onManageServices }: { health: ProviderServiceHealth; onManageServices?: () => void }) {
+  const action = <Button type="button" size="sm" variant="outline" onClick={onManageServices}><Store aria-hidden="true" />Manage services</Button>;
+  return (
+    <WorkflowPanel icon={Store} title="Service health" description="Live status for your published services and availability." tone="neutral" action={action}>
+      <WorkflowStatGrid aria-label="Service health statistics" items={[
+        { id: "listings", label: "Active listings", value: <>{health.activeListings} <span className="text-sm font-medium text-muted-foreground">of {health.totalListings}</span></> },
+        { id: "slots", label: "Available slots", value: health.availableSlots },
+        { id: "rating", label: "Provider rating", value: <span className="inline-flex items-center gap-1"><Star className="size-4 fill-brand-highlight text-brand-highlight" aria-hidden="true" />{health.rating ?? "—"}</span> },
+        { id: "reviews", label: "Published reviews", value: health.reviewCount },
+      ]} />
+    </WorkflowPanel>
+  );
 }
 
 function WorkerDashboard({
@@ -130,10 +167,6 @@ function WorkerDashboard({
           <>
             <section className="flex flex-col justify-between gap-4 md:flex-row md:items-center" aria-labelledby="provider-dashboard-title">
               <div className="min-w-0">
-                <div className="mb-2 flex flex-wrap items-center gap-2">
-                  <Badge variant="secondary">Provider overview</Badge>
-                  {snapshot?.serviceHealth.verificationStatus ? <Badge variant={snapshot.serviceHealth.verificationStatus === "approved" ? "success" : "warning"}>{snapshot.serviceHealth.verificationStatus}</Badge> : null}
-                </div>
                 <h1 id="provider-dashboard-title" className="text-3xl font-bold tracking-tight md:text-4xl">Good to see you, {snapshot?.providerName || "Provider"}.</h1>
                 <p className="mt-2 max-w-2xl text-muted-foreground">Review work that needs attention, today’s schedule, and the health of your services.</p>
               </div>
@@ -151,43 +184,11 @@ function WorkerDashboard({
                 </section>
 
                 <section className="grid gap-4 lg:grid-cols-[minmax(0,1.65fr)_minmax(18rem,0.85fr)]">
-                  <Card className="border-border shadow-none">
-                    <CardHeader className="flex-row items-start justify-between space-y-0 p-5">
-                      <div><CardTitle>Needs your attention</CardTitle><CardDescription className="mt-1">The most important items across your provider workspace.</CardDescription></div>
-                      <Badge variant={snapshot.actions.length ? "warning" : "success"}>{snapshot.actions.length || "Clear"}</Badge>
-                    </CardHeader>
-                    <CardContent className="space-y-1 px-3 pb-3">
-                      {snapshot.actions.length ? snapshot.actions.map((action, index) => (
-                        <div key={action.id}>
-                          {index > 0 ? <Separator /> : null}
-                          <button type="button" className="flex min-h-20 w-full items-center gap-3 rounded-lg px-2 py-3 text-left transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" onClick={() => openAction(action)}>
-                            <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-brand-highlight-soft text-brand-highlight-foreground"><CircleAlert className="size-4" aria-hidden="true" /></span>
-                            <span className="min-w-0 flex-1"><strong className="block text-sm">{action.title}</strong><span className="mt-1 block text-sm leading-5 text-muted-foreground sm:truncate">{action.detail}</span><span className="mt-1 flex flex-wrap gap-x-3 text-xs text-muted-foreground">{action.schedule ? <span>{action.schedule}</span> : null}{action.amount ? <span>{action.amount}</span> : null}</span></span>
-                            {action.status ? <Badge variant="outline" className="hidden sm:inline-flex">{action.status}</Badge> : null}<ArrowRight className="size-4 shrink-0" aria-hidden="true" />
-                          </button>
-                        </div>
-                      )) : <div className="grid min-h-48 place-items-center px-5 text-center"><div><span className="mx-auto flex size-11 items-center justify-center rounded-lg bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-200"><ListChecks className="size-5" aria-hidden="true" /></span><p className="mt-3 font-semibold">You’re all caught up</p><p className="mt-1 text-sm text-muted-foreground">New requests and account actions will appear here.</p></div></div>}
-                    </CardContent>
-                  </Card>
-
-                  <Card className="border-border shadow-none">
-                    <CardHeader className="p-5"><CardTitle>Today’s schedule</CardTitle><CardDescription>{snapshot.todaySchedule.length ? `${snapshot.todaySchedule.length} job${snapshot.todaySchedule.length === 1 ? "" : "s"} scheduled` : "No jobs scheduled today"}</CardDescription></CardHeader>
-                    <CardContent className="space-y-3 px-5 pb-5">
-                      {snapshot.todaySchedule.length ? snapshot.todaySchedule.slice(0, 4).map((item) => <button key={item.id} type="button" className="flex w-full gap-3 rounded-lg bg-secondary/60 p-3 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" onClick={onOpenMyBookings}><Clock3 className="mt-0.5 size-4 shrink-0 text-primary" aria-hidden="true" /><span><strong className="block text-sm">{item.service}</strong><span className="block text-xs text-muted-foreground">{item.client} · {item.schedule}</span></span></button>) : <div className="rounded-lg bg-secondary/60 p-4"><p className="text-sm font-semibold">Your day is clear</p><p className="mt-1 text-xs text-muted-foreground">Manage availability from My Work.</p></div>}
-                      {snapshot.nextAppointment && !snapshot.todaySchedule.some((item) => item.id === snapshot.nextAppointment?.id) ? <><Separator /><div><p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Next appointment</p><p className="mt-2 text-sm font-semibold">{snapshot.nextAppointment.service}</p><p className="text-xs text-muted-foreground">{snapshot.nextAppointment.client} · {snapshot.nextAppointment.schedule}</p></div></> : null}
-                    </CardContent>
-                  </Card>
+                  <AttentionPanel actions={snapshot.actions} onOpen={openAction} />
+                  <SchedulePanel items={snapshot.todaySchedule} nextAppointment={snapshot.nextAppointment} onOpenBookings={onOpenMyBookings} onManageAvailability={onOpenMyWork} />
                 </section>
 
-                <Card className="border-border shadow-none">
-                  <CardHeader className="flex flex-col items-stretch gap-4 space-y-0 p-5 sm:flex-row sm:items-start sm:justify-between"><div><CardTitle>Service health</CardTitle><CardDescription className="mt-1">Live status from your published services and availability.</CardDescription></div><Button type="button" className="w-full sm:w-auto" variant="outline" onClick={onOpenMyWork}><Store aria-hidden="true" />Manage services</Button></CardHeader>
-                  <CardContent className="grid grid-cols-2 gap-x-4 gap-y-5 px-5 pb-5 lg:grid-cols-4">
-                    <div><p className="text-xs text-muted-foreground">Active listings</p><p className="mt-1 text-xl font-bold">{snapshot.serviceHealth.activeListings} <span className="text-sm font-medium text-muted-foreground">of {snapshot.serviceHealth.totalListings}</span></p></div>
-                    <div><p className="text-xs text-muted-foreground">Available slots</p><p className="mt-1 text-xl font-bold">{snapshot.serviceHealth.availableSlots}</p></div>
-                    <div><p className="text-xs text-muted-foreground">Provider rating</p><p className="mt-1 flex items-center gap-1 text-xl font-bold"><Star className="size-4 fill-brand-highlight text-brand-highlight" aria-hidden="true" />{snapshot.serviceHealth.rating ?? "—"}</p></div>
-                    <div><p className="text-xs text-muted-foreground">Published reviews</p><p className="mt-1 text-xl font-bold">{snapshot.serviceHealth.reviewCount}</p></div>
-                  </CardContent>
-                </Card>
+                <ServiceHealthPanel health={snapshot.serviceHealth} onManageServices={onOpenMyWork} />
               </>
             ) : null}
           </>

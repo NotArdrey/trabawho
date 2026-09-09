@@ -1,7 +1,8 @@
-import { CalendarDays, Inbox, MessageSquareText, Star, WalletCards } from "lucide-react";
+import { CalendarDays, Inbox, ListChecks, MessageSquareText, Star, WalletCards } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { WorkflowEmptyState, WorkflowPanel } from "@/components/ui/workflow-panel";
 import { cn } from "@/lib/utils";
 import { getProfilePhotoUrl } from "@/shared/utils/profilePhoto";
 import type { WorkInquiry } from "@/features/work/types/inquiry";
@@ -21,19 +22,8 @@ const statusTone = (status: string) => {
 
 export function ActiveInquiriesSection({ inquiries, onRespond }: ActiveInquiriesSectionProps) {
   return (
-    <section className="mb-4 rounded-xl border bg-card p-5 shadow-none max-md:mb-3 max-md:p-4" data-testid="work-inquiries-section">
-      <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-start gap-3 pb-4">
-        <span className="flex size-10 items-center justify-center rounded-lg bg-brand-highlight-soft text-brand-highlight-foreground">
-          <Inbox className="size-[18px]" aria-hidden="true" />
-        </span>
-        <div className="min-w-0">
-          <h2 className="text-xl font-bold leading-tight text-foreground max-md:text-[17px]">Active inquiries</h2>
-          <p className="mt-1 text-sm text-muted-foreground">Clients waiting for your response.</p>
-        </div>
-        <Badge variant={inquiries.length ? "brand" : "secondary"}>{inquiries.length}</Badge>
-      </div>
-
-      <div className="divide-y">
+    <WorkflowPanel className="mb-4 max-md:mb-3" contentClassName="px-5 max-md:px-4" data-testid="work-inquiries-section" icon={Inbox} title="Active inquiries" description="Clients waiting for your response." tone="highlight" status={<Badge variant={inquiries.length ? "brand" : "secondary"}>{inquiries.length}</Badge>}>
+      {inquiries.length ? <div className="divide-y">
         {inquiries.map((inquiry) => (
           <article key={inquiry.id} className="py-5 first:pt-4 last:pb-1">
             <div className="flex items-start justify-between gap-4 max-sm:flex-wrap">
@@ -65,7 +55,7 @@ export function ActiveInquiriesSection({ inquiries, onRespond }: ActiveInquiries
             </div>
           </article>
         ))}
-      </div>
-    </section>
+      </div> : <WorkflowEmptyState icon={ListChecks} title="No active inquiries" description="New client requests will appear here when they need your response." tone="success" />}
+    </WorkflowPanel>
   );
 }

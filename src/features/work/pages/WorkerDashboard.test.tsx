@@ -36,6 +36,7 @@ const snapshot: ProviderDashboardSnapshot = {
 
 describe("WorkerDashboard", () => {
   beforeEach(() => {
+    refresh.mockClear();
     useProviderDashboard.mockReturnValue({ snapshot, isLoading: false, error: "", refresh });
   });
 
@@ -48,5 +49,41 @@ describe("WorkerDashboard", () => {
     expect(screen.getByText("₱1,500")).toBeVisible();
     fireEvent.click(screen.getByRole("button", { name: /Respond to client request/i }));
     expect(onOpenMyWork).toHaveBeenCalledOnce();
+  });
+
+  it("makes clear queues and an empty day recognizable and actionable", () => {
+    const onOpenMyWork = vi.fn();
+    useProviderDashboard.mockReturnValue({ snapshot: { ...snapshot, actions: [], todaySchedule: [] }, isLoading: false, error: "", refresh });
+    render(<WorkerDashboard sellerProfile={{ userId: "worker-1" }} onOpenMyWork={onOpenMyWork} />);
+
+    expect(screen.getByRole("heading", { name: "You're all caught up" })).toBeVisible();
+    expect(screen.getByRole("heading", { name: "Your day is clear" })).toBeVisible();
+    fireEvent.click(screen.getByRole("button", { name: "Manage availability" }));
+    expect(onOpenMyWork).toHaveBeenCalledOnce();
+  });
+
+  it("separates the next appointment from today's schedule", () => {
+    useProviderDashboard.mockReturnValue({ snapshot: { ...snapshot, todaySchedule: [], nextAppointment: snapshot.todaySchedule[0] }, isLoading: false, error: "", refresh });
+    render(<WorkerDashboard sellerProfile={{ userId: "worker-1" }} />);
+    expect(screen.getByText("Next appointment")).toBeVisible();
+    expect(screen.getByText("Ana · Sep 8, 2:00 PM")).toBeVisible();
+  });
+
+  it("shows incomplete service health without inventing a rating", () => {
+    useProviderDashboard.mockReturnValue({ snapshot: { ...snapshot, serviceHealth: { ...snapshot.serviceHealth, totalListings: 0, activeListings: 0, availableSlots: 0, rating: null, reviewCount: 0 } }, isLoading: false, error: "", refresh });
+    render(<WorkerDashboard sellerProfile={{ userId: "worker-1" }} />);
+    expect(screen.getByLabelText("Service health statistics")).toHaveTextContent("0 of 0");
+    expect(screen.getByLabelText("Service health statistics")).toHaveTextContent("—");
+  });
+
+  it("preserves loading and recoverable error states", () => {
+    useProviderDashboard.mockReturnValue({ snapshot: null, isLoading: true, error: "", refresh });
+    const { rerender } = render(<WorkerDashboard sellerProfile={{ userId: "worker-1" }} />);
+    expect(screen.getByLabelText("Loading provider dashboard")).toBeVisible();
+
+    useProviderDashboard.mockReturnValue({ snapshot, isLoading: false, error: "Connection unavailable", refresh });
+    rerender(<WorkerDashboard sellerProfile={{ userId: "worker-1" }} />);
+    fireEvent.click(screen.getByRole("button", { name: "Try again" }));
+    expect(refresh).toHaveBeenCalledOnce();
   });
 });

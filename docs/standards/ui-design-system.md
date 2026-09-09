@@ -51,6 +51,9 @@ Visual interest must reinforce hierarchy or explain the product. Use brand color
 - Registration uses a short step flow with visible progress, per-step validation, and Previous/Next navigation. Every step uses the same section-heading treatment; do not introduce a one-off card for an individual step.
 - Use blue for the active form mode and primary submit action. Use orange only as a supporting accent for progress, identity, location, or other important contextual information.
 - Information panels use flat semantic surfaces and clear borders. They must not use luminous gradients or shadow effects to attract attention.
+- Operational regions use the shared workflow-panel primitives so users can recognize purpose without rereading the full panel. Each panel has an icon-led tinted header, a clear title and description, optional text-backed status, one content region, and at most one primary contextual action.
+- Workflow panels use a single outer boundary. Separate rows, statistics, actions, and empty states with spacing, surface contrast, and dividers rather than nested bordered cards.
+- Empty workflow states name the current condition, explain what will appear there, and show one contextual action only when the user has a useful next step. Desktop panel actions sit in the header; on mobile they move below the relevant content.
 - Dialogs trap focus and restore it. Destructive decisions use Alert Dialog and name the affected record.
 - Use inline feedback for form/section outcomes, transient notifications for routine success, and banners only for ongoing conditions.
 - Data regions explicitly handle initial loading, empty, partial, success, recoverable error, permission-denied, and offline states.

@@ -2,6 +2,7 @@ import { Bell, BriefcaseBusiness, CalendarClock, CheckCheck, CreditCard, Message
 
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { WorkflowEmptyState } from "@/components/ui/workflow-panel";
 import { cn } from "@/lib/utils";
 
 export interface AppNotification {
@@ -55,7 +56,7 @@ function NotificationCenter({ notifications, open, onOpenChange, onMarkAllRead, 
         ) : error ? (
           <div className="grid min-h-44 place-items-center px-6 py-8 text-center"><div><p className="font-semibold">Could not load notifications</p><p className="mt-1 text-sm text-muted-foreground">Check your connection and try again.</p>{onRetry ? <Button className="mt-4" type="button" variant="outline" size="sm" onClick={onRetry}>Try again</Button> : null}</div></div>
         ) : notifications.length === 0 ? (
-          <div className="grid min-h-44 place-items-center px-6 py-8 text-center"><div><span className="mx-auto mb-3 flex size-10 items-center justify-center rounded-lg bg-accent text-primary"><Bell aria-hidden="true" className="size-5" /></span><p className="font-semibold">No notifications yet</p><p className="mt-1 text-sm text-muted-foreground">Booking and message updates will appear here.</p></div></div>
+          <WorkflowEmptyState className="min-h-44" icon={Bell} title="No notifications yet" description="Booking and message updates will appear here." tone="primary" />
         ) : (
           <div className="max-h-[min(28rem,70vh)] overflow-y-auto p-2">
             {notifications.map((notification) => {

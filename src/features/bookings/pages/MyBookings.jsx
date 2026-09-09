@@ -28,6 +28,7 @@ import { Button } from '@/components/ui/button';
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { MetricCard } from '@/components/ui/metric-card';
 import { SearchFilterBar } from '@/components/ui/search-filter-bar';
+import { WorkflowEmptyState } from '@/components/ui/workflow-panel';
 import { paths } from '@/app/router/routes';
 
 import {
@@ -820,7 +821,7 @@ const MyBookings = ({
               <Button
                 type="button"
                 variant="outline"
-                className="text-orange-700 hover:text-orange-800 dark:text-orange-300"
+                className="text-brand-highlight-foreground hover:text-brand-highlight-foreground"
                 onClick={() => ratingCtrl.handleOpenRating(booking.id)}
               >
                 <Star size={16} aria-hidden="true" />
@@ -837,11 +838,7 @@ const MyBookings = ({
     <main className="gl-shell gl-page-pad bookings-launchpad">
       <section className="bookings-hero" aria-labelledby="bookings-title">
         <div className="bookings-hero-copy">
-          <span className="gl-eyebrow">
-            <CalendarCheck size={15} aria-hidden="true" />
-            Booking Hub
-          </span>
-          <h1 id="bookings-title" className="gl-title">{isWorkerAccount ? 'Bookings' : 'My Bookings'}</h1>
+          <h1 id="bookings-title" className="gl-title !mt-0">{isWorkerAccount ? 'Bookings' : 'My Bookings'}</h1>
           <p className="gl-subtitle">
             {shouldLoadSellerBookings
               ? 'Review client bookings, scheduled jobs, payment states, and delivery progress.'
@@ -926,83 +923,27 @@ const MyBookings = ({
 
       {/* Empty State: No bookings at all */}
       {!bookingListCtrl.isLoading && allBookings.length === 0 && (
-        <div className="bookings-empty-card" data-testid="bookings-empty-state">
-          <div className="bookings-empty-icon-box">
-            <CalendarX2 size={32} aria-hidden="true" />
-          </div>
-          <div>
-            <h2 className="bookings-empty-title">No bookings yet</h2>
-            <p className="bookings-empty-desc">
-              {shouldLoadSellerBookings
-                ? 'Client booking requests and service appointments for your profile will appear here.'
-                : 'You haven\'t booked any services yet. Discover top-rated local providers for home tutoring, appliance repair, cleaning, and more.'}
-            </p>
-          </div>
-
-          <div className="bookings-empty-actions">
-            {shouldLoadSellerBookings ? (
-              <Button type="button" onClick={onOpenMyWork}>Manage My Work</Button>
-            ) : (
-              <Button type="button" onClick={onOpenBrowseServices}>
-                <Search size={16} aria-hidden="true" />
-                Browse Marketplace
-              </Button>
-            )}
-          </div>
-
-          {!shouldLoadSellerBookings && <div className="bookings-quick-categories">
-            <span style={{ fontSize: '12px', color: 'var(--gl-text-3)', fontWeight: 800, textTransform: 'uppercase' }}>
-              Explore:
-            </span>
-            {['Tutor', 'Technician', 'Cleaner', 'More Services'].map((cat) => (
-              <button
-                key={cat}
-                type="button"
-                className="bookings-quick-category-pill"
-                onClick={onOpenBrowseServices}
-              >
-                {cat}
-              </button>
-            ))}
-          </div>}
-        </div>
+        <WorkflowEmptyState
+          className="rounded-xl border bg-card"
+          data-testid="bookings-empty-state"
+          icon={CalendarX2}
+          title="No bookings yet"
+          description={shouldLoadSellerBookings ? 'Client booking requests and service appointments for your profile will appear here.' : 'You haven\'t booked any services yet. Browse trusted local providers when you are ready.'}
+          tone="primary"
+          action={shouldLoadSellerBookings ? <Button type="button" onClick={onOpenMyWork}>Manage My Work</Button> : <Button type="button" onClick={onOpenBrowseServices}><Search size={16} aria-hidden="true" />Browse Marketplace</Button>}
+        />
       )}
 
       {/* Filter Empty State: Filter/Search yielded 0 results */}
       {!bookingListCtrl.isLoading && allBookings.length > 0 && displayedBookings.length === 0 && (
-        <div className="bookings-empty-card" data-testid="bookings-filter-empty-state">
-          <div
-            className="bookings-empty-icon-box"
-            style={{
-              background: 'var(--gl-warning-soft)',
-              color: 'var(--gl-amber)',
-              borderColor: 'var(--gl-warning-border)',
-            }}
-          >
-            <Filter size={32} aria-hidden="true" />
-          </div>
-          <div>
-            <h2 className="bookings-empty-title">No matching bookings</h2>
-            <p className="bookings-empty-desc">
-              No bookings match your current filter or search criteria. Try clearing search keywords or selecting another status tab.
-            </p>
-          </div>
-          <div className="bookings-empty-actions">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => {
-                bookingListCtrl.setActiveFilter('all');
-                bookingListCtrl.setDisplayFilter('all');
-                updateSearchParams({ filter: '', q: '' });
-                onSearchChange?.({ target: { value: '' } });
-              }}
-            >
-              <RotateCcw size={16} aria-hidden="true" />
-              Reset All Filters
-            </Button>
-          </div>
-        </div>
+        <WorkflowEmptyState
+          className="rounded-xl border bg-card"
+          data-testid="bookings-filter-empty-state"
+          icon={Filter}
+          title="No matching bookings"
+          description="No bookings match your current search or status filter. Reset the filters to see the full list."
+          action={<Button type="button" variant="outline" onClick={() => { bookingListCtrl.setActiveFilter('all'); bookingListCtrl.setDisplayFilter('all'); updateSearchParams({ filter: '', q: '' }); onSearchChange?.({ target: { value: '' } }); }}><RotateCcw size={16} aria-hidden="true" />Reset filters</Button>}
+        />
       )}
 
       {/* Bookings List Cards */}
@@ -1049,29 +990,14 @@ const MyBookings = ({
 
       {isChatRoute && bookingListCtrl.bookings.length === 0 && !bookingListCtrl.isLoading && (
         <main className="gl-shell gl-page-pad">
-          <div className="bookings-empty-card">
-            <div className="bookings-empty-icon-box">
-              <MessageCircle size={32} aria-hidden="true" />
-            </div>
-            <div>
-              <h2 className="bookings-empty-title">No conversations yet</h2>
-              <p className="bookings-empty-desc">
-                {shouldLoadSellerBookings
-                  ? 'Client booking requests and conversations for your services will appear here.'
-                  : 'Start a booking from the marketplace to open a conversation here.'}
-              </p>
-            </div>
-            <div className="bookings-empty-actions">
-              {shouldLoadSellerBookings ? (
-                <Button type="button" onClick={onOpenMyWork}>Manage My Work</Button>
-              ) : (
-                <Button type="button" onClick={onOpenBrowseServices}>
-                  <Search size={16} aria-hidden="true" />
-                  Browse Services
-                </Button>
-              )}
-            </div>
-          </div>
+          <WorkflowEmptyState
+            className="rounded-xl border bg-card"
+            icon={MessageCircle}
+            title="No conversations yet"
+            description={shouldLoadSellerBookings ? 'Client booking requests and conversations for your services will appear here.' : 'Start a booking from the marketplace to open a conversation here.'}
+            tone="primary"
+            action={shouldLoadSellerBookings ? <Button type="button" onClick={onOpenMyWork}>Manage My Work</Button> : <Button type="button" onClick={onOpenBrowseServices}><Search size={16} aria-hidden="true" />Browse Services</Button>}
+          />
         </main>
       )}
 
