@@ -15,4 +15,8 @@ When documents disagree, follow the highest applicable document and update the l
 
 - [`migrations/react-typescript-shadcn.md`](migrations/react-typescript-shadcn.md)
 
-Historical root-level plans remain reference material. They are not a substitute for the standards above.
+## Integrations
+
+- [`integrations/supabase.md`](integrations/supabase.md) — local configuration, database-change boundaries, and concise troubleshooting.
+
+Superseded plans, temporary fixes, generated logs, and one-off diagnostic notes do not belong in the repository. Record active work in the migration ledger or the applicable maintained standard.

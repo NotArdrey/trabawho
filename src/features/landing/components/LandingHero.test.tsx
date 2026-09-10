@@ -29,4 +29,18 @@ describe("LandingHero", () => {
     fireEvent.submit(screen.getByRole("search"));
     expect(onSearch).toHaveBeenCalledWith({ query: "", location: "" });
   });
+
+  it("presents booking signals over the local hero image", () => {
+    const { container } = render(<LandingHero onSearch={vi.fn()} />);
+
+    expect(screen.getByRole("img", { name: /local appliance technician/i })).toHaveAttribute(
+      "src",
+      "/images/landing-services-hero-v2.jpg",
+    );
+    expect(screen.getAllByText("Make a more informed choice")).toHaveLength(2);
+    expect(screen.getByText("Identity verified")).toBeInTheDocument();
+    expect(screen.getByText("4.9 from verified reviews")).toBeInTheDocument();
+    expect(container.querySelector('[class*="animate-in"]')).toBeInTheDocument();
+    expect(container.querySelector('[class*="animate-pulse"]')).not.toBeInTheDocument();
+  });
 });

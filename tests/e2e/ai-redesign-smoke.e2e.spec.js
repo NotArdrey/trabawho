@@ -46,7 +46,7 @@ async function loginAs(page, email, password = DEMO_PASSWORD) {
   await page.getByRole('button', { name: /^Sign in$/i }).first().click();
   await expect(page.getByRole('heading', { name: 'Sign in' })).toBeVisible();
   await page.getByLabel('Email').fill(email);
-  await page.getByLabel('Password').fill(password);
+  await page.getByLabel('Password', { exact: true }).fill(password);
   await page.locator('form').getByRole('button', { name: /^Sign in$/ }).click();
   await expect(page.getByRole('heading', { name: 'Sign in' })).toHaveCount(0, { timeout: 20_000 });
 }

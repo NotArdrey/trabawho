@@ -554,9 +554,6 @@ function BrowseServicesPage({
         ? `${mockPayment?.paymentPlan === 'downpayment' ? '50% downpayment' : 'Full payment'} booking created. GCash payment is pending provider verification before confirmation.`
         : `Booking scheduled with ${paymentLabel}. Payment is required before final completion.`
     );
-    setIsPaymentModalOpen(false);
-    setPendingBooking(null);
-    setSelectedWorker(null);
     setIsBookingSubmitting(false);
   };
 

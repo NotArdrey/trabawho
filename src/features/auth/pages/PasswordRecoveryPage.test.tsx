@@ -42,4 +42,19 @@ describe("PasswordRecoveryPage", () => {
 
     await waitFor(() => expect(completePasswordRecovery).toHaveBeenCalledWith("Professional9"));
   });
+
+  it("reveals each password field independently", async () => {
+    const user = userEvent.setup();
+    render(<MemoryRouter><PasswordRecoveryPage /></MemoryRouter>);
+
+    const password = screen.getByLabelText("New password");
+    const confirmation = screen.getByLabelText("Confirm new password");
+
+    await user.click(screen.getByRole("button", { name: "Show password" }));
+    expect(password).toHaveAttribute("type", "text");
+    expect(confirmation).toHaveAttribute("type", "password");
+
+    await user.click(screen.getByRole("button", { name: "Show confirm password" }));
+    expect(confirmation).toHaveAttribute("type", "text");
+  });
 });

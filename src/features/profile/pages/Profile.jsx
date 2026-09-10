@@ -4,6 +4,7 @@ import DigitalPortfolioModal from '../components/DigitalPortfolioModal';
 import PaymentModal from '../../bookings/components/PaymentModal';
 import BookingTermsModal from '../../bookings/components/BookingTermsModal';
 import AccountPrivacyPanel from '../components/AccountPrivacyPanel';
+import { ProfilePhotoDialog } from '../components/ProfilePhotoDialog';
 import { getThemeTokens } from '../../../shared/styles/themeTokens';
 import { getProfilePhotoUrl, hasUploadedProfilePhoto } from '../../../shared/utils/profilePhoto';
 import { fetchSellerServices, updateServiceAdBoost, uploadPortfolioDocument } from '../../../shared/services/authService';
@@ -65,8 +66,6 @@ function Profile({ appTheme = 'light', themeMode = 'system', onThemeChange, curr
     typeof window !== 'undefined' ? window.innerWidth <= 768 : false
   );
 
-  const cameraInputRef = useRef(null);
-  const deviceInputRef = useRef(null);
   const portfolioDocInputRef = useRef(null);
   const themeTokens = getThemeTokens(appTheme);
   const normalizedRole = String(sellerProfile?.role || '').trim().toLowerCase();
@@ -437,14 +436,6 @@ function Profile({ appTheme = 'light', themeMode = 'system', onThemeChange, curr
     boosterLabel: { display: 'grid', gap: '6px', color: themeTokens.textPrimary, fontSize: '13px', fontWeight: 700 },
     boosterHint: { margin: '10px 0 0', color: themeTokens.textSecondary, fontSize: '13px', fontWeight: 700 },
     boosterSuccess: { margin: '10px 0 0', color: themeTokens.successText, background: themeTokens.successBg, border: `1px solid ${themeTokens.successBorder}`, borderRadius: '8px', padding: '9px 10px', fontWeight: 700, fontSize: '13px' },
-    photoSourceOverlay: { position: 'fixed', inset: 0, background: 'rgba(0, 0, 0, 0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 220 },
-    photoSourceModal: { width: 'min(460px, 94vw)', background: themeTokens.surface, color: themeTokens.textPrimary, border: `1px solid ${themeTokens.border}`, borderRadius: '14px', padding: '20px', boxShadow: themeTokens.shadow },
-    modalTitle: { margin: '0 0 8px', fontSize: '1.55rem', lineHeight: 1.2, color: themeTokens.textPrimary },
-    modalText: { margin: '0 0 8px', color: themeTokens.textSecondary, fontSize: '1rem' },
-    modalHint: { margin: '0 0 14px', color: themeTokens.textMuted, fontSize: '0.9rem' },
-    photoSourceActions: { display: 'grid', gap: '8px' },
-    photoActionBtn: { border: 'none', borderRadius: '10px', padding: '12px', cursor: 'pointer', fontWeight: 700, fontSize: '1rem', background: themeTokens.accent, color: '#ffffff' },
-    cancelBtn: { border: `1px solid ${themeTokens.border}`, borderRadius: '10px', padding: '12px', cursor: 'pointer', fontWeight: 700, fontSize: '1rem', background: themeTokens.surfaceAlt, color: themeTokens.textPrimary },
   };
 
   const boostTerms = [
@@ -499,7 +490,7 @@ function Profile({ appTheme = 'light', themeMode = 'system', onThemeChange, curr
                 <div style={{ ...styles.textPlaceholder, width: '120px' }} />
               </div>
             ) : (
-              <button className="profile-photo-control" style={styles.profilePhotoButton} onClick={() => setIsPhotoSourceOpen(true)} aria-label={`${hasCustomProfilePhoto ? 'Change' : 'Add'} profile photo`}>
+              <button className="profile-photo-control" style={styles.profilePhotoButton} onClick={() => { setSaveError(''); setIsPhotoSourceOpen(true); }} aria-label={`${hasCustomProfilePhoto ? 'Change' : 'Add'} profile photo`}>
                 <span className="profile-photo-frame"><img src={profilePhoto} alt="" style={styles.profilePhoto} /><span className="profile-photo-camera"><Camera size={16} aria-hidden="true" /></span></span>
                 <span style={styles.profilePhotoEdit}>{isSavingPhoto ? 'Saving photo…' : (hasCustomProfilePhoto ? 'Change photo' : 'Add photo')}</span>
               </button>
@@ -705,44 +696,15 @@ function Profile({ appTheme = 'light', themeMode = 'system', onThemeChange, curr
             />
           </div>
 
-          {isPhotoSourceOpen && (
-            <div style={styles.photoSourceOverlay}>
-              <div style={styles.photoSourceModal}>
-                <h3 style={styles.modalTitle}>Change Profile Photo</h3>
-                <p style={styles.modalText}>Select image source:</p>
-                <p style={styles.modalHint}>Supported on phone, tablet, and desktop. Max file size: 2 MB.</p>
-                <div style={styles.photoSourceActions}>
-                  <button style={styles.photoActionBtn} onClick={() => cameraInputRef.current && cameraInputRef.current.click()}>Use Camera</button>
-                  <button style={styles.photoActionBtn} onClick={() => deviceInputRef.current && deviceInputRef.current.click()}>From Device</button>
-                  {hasCustomProfilePhoto && (
-                    <button
-                      style={{ ...styles.cancelBtn }}
-                      onClick={handleRemovePhoto}
-                    >
-                      {isSavingPhoto ? 'Removing...' : 'Remove Photo'}
-                    </button>
-                  )}
-                  <button style={styles.cancelBtn} onClick={() => setIsPhotoSourceOpen(false)}>Cancel</button>
-                </div>
-
-                <input
-                  ref={cameraInputRef}
-                  type="file"
-                  accept="image/*"
-                  capture="user"
-                  style={{ display: 'none' }}
-                  onChange={handleImageSelection}
-                />
-                <input
-                  ref={deviceInputRef}
-                  type="file"
-                  accept="image/*"
-                  style={{ display: 'none' }}
-                  onChange={handleImageSelection}
-                />
-              </div>
-            </div>
-          )}
+          <ProfilePhotoDialog
+            error={saveError}
+            hasPhoto={hasCustomProfilePhoto}
+            isOpen={isPhotoSourceOpen}
+            isSaving={isSavingPhoto}
+            onImageSelection={handleImageSelection}
+            onOpenChange={setIsPhotoSourceOpen}
+            onRemovePhoto={handleRemovePhoto}
+          />
 
           <BookingTermsModal
             isOpen={isBoostTermsOpen}

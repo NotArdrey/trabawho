@@ -29,7 +29,7 @@ describe("WorkerDetailModal", () => {
     await user.click(screen.getByRole("button", { name: "View Maria Teresa Cruz profile photo" }));
     expect(screen.getByRole("dialog", { name: "Maria Teresa Cruz profile photo" })).toBeInTheDocument();
 
-    await user.click(screen.getByRole("button", { name: "Close profile photo" }));
+    await user.click(screen.getByRole("button", { name: "Close" }));
     expect(screen.queryByRole("dialog", { name: "Maria Teresa Cruz profile photo" })).not.toBeInTheDocument();
   });
 
@@ -47,5 +47,17 @@ describe("WorkerDetailModal", () => {
       "src",
       "https://example.com/service-work.jpg",
     );
+  });
+
+  it("preserves the message and booking actions", async () => {
+    const user = userEvent.setup();
+    const onBookNow = vi.fn();
+    render(<WorkerDetailModal isOpen worker={worker} onClose={vi.fn()} onBookNow={onBookNow} />);
+
+    await user.click(screen.getByRole("button", { name: "Message Maria Teresa Cruz" }));
+    expect(onBookNow).toHaveBeenCalledWith(expect.objectContaining({ actionType: "inquire" }));
+
+    await user.click(screen.getByRole("button", { name: "Book now" }));
+    expect(onBookNow).toHaveBeenCalledWith(worker);
   });
 });

@@ -133,7 +133,7 @@ export default function LandingPage({
       <main>
         <LandingHero onSearch={handleSearch} />
         <LandingCategories onSelect={handleSearch} />
-        <FeaturedServices onBrowseAll={() => goTo("/services")} onSelect={handleSearch} />
+        <FeaturedServices onSelect={handleSearch} />
         <LandingSections onBecomeProvider={() => openAuthMode("register")} />
       </main>
       <LandingFooter />

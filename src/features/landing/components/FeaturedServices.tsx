@@ -7,7 +7,6 @@ import { fetchFeaturedServices } from "../services/featured-services";
 import type { LandingFeaturedService, LandingSearchParams } from "../types";
 
 interface FeaturedServicesProps {
-  onBrowseAll: () => void;
   onSelect: (search: LandingSearchParams) => void;
 }
 
@@ -19,11 +18,11 @@ function ServiceCard({
   onSelect: (search: LandingSearchParams) => void;
 }) {
   return (
-    <article className="overflow-hidden rounded-xl border bg-card">
+    <article className="group overflow-hidden rounded-xl border bg-card transition-[box-shadow,transform] duration-300 hover:-translate-y-1 hover:shadow-xl focus-within:shadow-lg motion-reduce:transform-none motion-reduce:transition-none">
       <div className="aspect-[16/10] overflow-hidden bg-muted">
         {service.photoUrl ? (
           <img
-            className="h-full w-full object-cover"
+            className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.035] motion-reduce:transform-none motion-reduce:transition-none"
             src={service.photoUrl}
             alt={`${service.providerName}, ${service.serviceType} provider`}
             loading="lazy"
@@ -50,7 +49,7 @@ function ServiceCard({
         <div className="mt-4 flex flex-wrap gap-x-4 gap-y-2 text-sm text-muted-foreground">
           {service.rating !== undefined && (
             <span className="inline-flex items-center gap-1">
-              <Star className="size-4 text-amber-500" fill="currentColor" aria-hidden="true" />
+              <Star className="size-4 fill-brand-highlight text-brand-highlight" aria-hidden="true" />
               {service.rating.toFixed(1)}
               {service.reviewCount !== undefined && ` (${service.reviewCount})`}
             </span>
@@ -92,7 +91,7 @@ function ServiceSkeleton() {
   );
 }
 
-export default function FeaturedServices({ onBrowseAll, onSelect }: FeaturedServicesProps) {
+export default function FeaturedServices({ onSelect }: FeaturedServicesProps) {
   const [services, setServices] = useState<LandingFeaturedService[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
@@ -131,17 +130,14 @@ export default function FeaturedServices({ onBrowseAll, onSelect }: FeaturedServ
   return (
     <section className="py-14 sm:py-20" aria-labelledby="featured-services-title">
       <div className="mx-auto max-w-7xl px-4 sm:px-6">
-        <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
-          <div>
-            <p className="text-sm font-semibold text-primary">Available on TrabaWho</p>
-            <h2 id="featured-services-title" className="mt-2 text-3xl font-bold tracking-tight text-foreground">
-              Featured local services
-            </h2>
-            <p className="mt-2 max-w-2xl text-muted-foreground">
-              Explore active listings and compare the information each provider has shared.
-            </p>
-          </div>
-          <Button className="self-start" variant="outline" onClick={onBrowseAll}>Browse all services</Button>
+        <div>
+          <p className="text-sm font-semibold text-primary">Available on TrabaWho</p>
+          <h2 id="featured-services-title" className="mt-2 text-3xl font-bold tracking-tight text-foreground">
+            Featured local services
+          </h2>
+          <p className="mt-2 max-w-2xl text-muted-foreground">
+            Explore active listings and compare the information each provider has shared.
+          </p>
         </div>
 
         <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4" aria-busy={isLoading}>

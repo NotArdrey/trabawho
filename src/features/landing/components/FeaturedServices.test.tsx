@@ -32,7 +32,7 @@ describe("FeaturedServices", () => {
       },
     ]);
 
-    render(<FeaturedServices onBrowseAll={vi.fn()} onSelect={vi.fn()} />);
+    render(<FeaturedServices onSelect={vi.fn()} />);
 
     expect(await screen.findByText("Apartment Cleaning")).toBeInTheDocument();
     expect(screen.getByText("Maria Cruz")).toBeInTheDocument();
@@ -43,14 +43,14 @@ describe("FeaturedServices", () => {
 
   it("shows an explicit empty state", async () => {
     fetchFeaturedServicesMock.mockResolvedValue([]);
-    render(<FeaturedServices onBrowseAll={vi.fn()} onSelect={vi.fn()} />);
+    render(<FeaturedServices onSelect={vi.fn()} />);
 
     expect(await screen.findByText("No featured services are available yet.")).toBeInTheDocument();
   });
 
   it("shows a recoverable error state", async () => {
     fetchFeaturedServicesMock.mockRejectedValue(new Error("network unavailable"));
-    render(<FeaturedServices onBrowseAll={vi.fn()} onSelect={vi.fn()} />);
+    render(<FeaturedServices onSelect={vi.fn()} />);
 
     expect(await screen.findByRole("alert")).toHaveTextContent(
       "Featured services are unavailable right now.",
@@ -67,7 +67,7 @@ describe("FeaturedServices", () => {
     );
 
     const { container } = render(
-      <FeaturedServices onBrowseAll={vi.fn()} onSelect={vi.fn()} />,
+      <FeaturedServices onSelect={vi.fn()} />,
     );
 
     expect(container.querySelector('[aria-busy="true"]')).toBeInTheDocument();

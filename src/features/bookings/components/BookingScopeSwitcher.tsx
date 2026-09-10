@@ -15,7 +15,7 @@ const options = [
 
 function BookingScopeSwitcher({ onValueChange, value }: BookingScopeSwitcherProps) {
   return (
-    <div className="inline-flex w-full rounded-xl border border-border bg-secondary/60 p-1 sm:w-auto" aria-label="Booking collection">
+    <div className="inline-flex w-full rounded-xl bg-secondary/80 p-1.5 sm:w-auto" aria-label="Booking collection">
       {options.map((option) => {
         const Icon = option.icon;
         const isActive = value === option.value;
@@ -25,7 +25,7 @@ function BookingScopeSwitcher({ onValueChange, value }: BookingScopeSwitcherProp
             type="button"
             className={cn(
               "flex min-h-11 min-w-0 flex-1 items-center justify-center gap-2 rounded-lg px-4 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:flex-none",
-              isActive ? "bg-background text-primary shadow-sm" : "text-muted-foreground hover:text-foreground",
+              isActive ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground hover:bg-background/70 hover:text-foreground",
             )}
             aria-pressed={isActive}
             onClick={() => onValueChange(option.value)}

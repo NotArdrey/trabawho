@@ -1,5 +1,6 @@
 import {
   ArrowRight,
+  ArrowUpRight,
   BookOpen,
   BrushCleaning,
   CalendarDays,
@@ -12,6 +13,7 @@ import {
 } from "lucide-react";
 
 import type { LandingCategory, LandingSearchParams } from "../types";
+import SpotlightButton from "./SpotlightButton";
 
 interface CategoryDefinition extends LandingCategory {
   icon: LucideIcon;
@@ -54,18 +56,20 @@ export default function LandingCategories({ onSelect }: LandingCategoriesProps) 
 
         <div className="mt-8 grid grid-cols-2 gap-3 md:grid-cols-4">
           {categories.map(({ icon: Icon, ...category }) => (
-            <button
-              className="group min-h-36 rounded-xl border bg-card p-4 text-left transition-colors hover:border-primary/40 hover:bg-muted/40 sm:p-5"
+            <SpotlightButton
+              className="min-h-36 rounded-xl border bg-card p-4 text-left transition-[box-shadow,transform] duration-300 hover:-translate-y-0.5 hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 motion-reduce:transform-none motion-reduce:transition-none sm:p-5"
               key={category.label}
               onClick={() => onSelect({ query: category.query })}
               type="button"
+              aria-label={`${category.label}: ${category.description}`}
             >
-              <span className="flex size-10 items-center justify-center rounded-lg bg-primary/10 text-primary">
+              <ArrowUpRight className="absolute right-4 top-4 size-4 translate-y-1 text-brand-highlight-foreground opacity-0 transition-[opacity,transform] duration-300 group-hover:translate-y-0 group-hover:opacity-100 group-focus-visible:translate-y-0 group-focus-visible:opacity-100 motion-reduce:transform-none motion-reduce:transition-none" aria-hidden="true" />
+              <span className="flex size-10 items-center justify-center rounded-lg bg-primary/10 text-primary transition-colors duration-300 group-hover:bg-brand-highlight-soft group-hover:text-brand-highlight-foreground group-focus-visible:bg-brand-highlight-soft group-focus-visible:text-brand-highlight-foreground">
                 <Icon className="size-5" aria-hidden="true" />
               </span>
               <span className="mt-4 block font-semibold text-foreground">{category.label}</span>
               <span className="mt-1 block text-sm leading-5 text-muted-foreground">{category.description}</span>
-            </button>
+            </SpotlightButton>
           ))}
         </div>
       </div>

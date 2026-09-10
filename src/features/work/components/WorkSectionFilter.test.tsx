@@ -24,6 +24,14 @@ describe("WorkSectionFilter", () => {
     expect(onValueChange).toHaveBeenCalledWith("inquiries");
   });
 
+  it("makes the selected queue and its purpose clear", () => {
+    render(<WorkSectionFilter value="cash-approvals" options={options} onValueChange={vi.fn()} />);
+
+    expect(screen.getAllByText("Cash payment review queue")).toHaveLength(2);
+    expect(within(screen.getByLabelText("Work sections")).getByRole("button", { name: "Cash" }))
+      .toHaveClass("bg-brand-highlight-strong", "text-white");
+  });
+
   it("supports keyboard activation and only renders supplied sections", async () => {
     const user = userEvent.setup();
     const onValueChange = vi.fn();
@@ -37,7 +45,7 @@ describe("WorkSectionFilter", () => {
 
   it("supports pointer dragging and keeps the selected chip in view", () => {
     const { rerender } = render(<WorkSectionFilter value="all" options={options} onValueChange={vi.fn()} />);
-    const rail = screen.getByRole("group", { name: "Work sections" });
+    const rail = screen.getByRole("toolbar", { name: "Work sections" });
     Object.defineProperty(rail, "scrollLeft", { configurable: true, value: 80, writable: true });
 
     fireEvent.pointerDown(rail, { pointerId: 1, pointerType: "mouse", clientX: 120 });
@@ -47,5 +55,17 @@ describe("WorkSectionFilter", () => {
     expect(rail.scrollLeft).toBe(120);
     rerender(<WorkSectionFilter value="cash-approvals" options={options} onValueChange={vi.fn()} />);
     expect(scrollIntoViewMock).toHaveBeenCalled();
+  });
+
+  it("supports arrow-key navigation between queues", async () => {
+    const user = userEvent.setup();
+    const onValueChange = vi.fn();
+    render(<WorkSectionFilter value="all" options={options} onValueChange={onValueChange} />);
+    within(screen.getByLabelText("Work sections")).getByRole("button", { name: "All" }).focus();
+
+    await user.keyboard("{ArrowRight}");
+
+    expect(onValueChange).toHaveBeenCalledWith("inquiries");
+    expect(within(screen.getByLabelText("Work sections")).getByRole("button", { name: "Inquiries" })).toHaveFocus();
   });
 });

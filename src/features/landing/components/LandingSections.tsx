@@ -1,6 +1,7 @@
 import {
   CalendarCheck,
   CheckCircle2,
+  ArrowRight,
   MessageSquareText,
   Search,
   ShieldCheck,
@@ -51,8 +52,8 @@ export default function LandingSections({ onBecomeProvider }: LandingSectionsPro
           </div>
           <div className="mt-8 grid gap-4 md:grid-cols-3">
             {trustItems.map(({ icon: Icon, title, description }) => (
-              <article className="rounded-xl border bg-card p-6" key={title}>
-                <Icon className="size-6 text-primary" aria-hidden="true" />
+              <article className="rounded-xl border bg-card p-6 transition-shadow duration-300 hover:shadow-md" key={title}>
+                <span className="flex size-11 items-center justify-center rounded-xl bg-primary/10 text-primary"><Icon className="size-6" aria-hidden="true" /></span>
                 <h3 className="mt-4 text-lg font-bold text-foreground">{title}</h3>
                 <p className="mt-2 text-sm leading-6 text-muted-foreground">{description}</p>
               </article>
@@ -69,10 +70,11 @@ export default function LandingSections({ onBecomeProvider }: LandingSectionsPro
               How TrabaWho works
             </h2>
           </div>
-          <ol className="mt-10 grid gap-8 md:grid-cols-3">
+          <ol className="relative mt-10 grid gap-8 md:grid-cols-3">
+            <span className="absolute left-[16.66%] right-[16.66%] top-6 hidden h-px bg-gradient-to-r from-primary/20 via-brand-highlight/60 to-primary/20 md:block" aria-hidden="true" />
             {steps.map(({ icon: Icon, title, description }, index) => (
               <li className="relative text-center" key={title}>
-                <span className="mx-auto flex size-12 items-center justify-center rounded-full border bg-background text-primary">
+                <span className="relative mx-auto flex size-12 items-center justify-center rounded-full border bg-background text-primary shadow-sm ring-4 ring-background">
                   <Icon className="size-5" aria-hidden="true" />
                 </span>
                 <p className="mt-4 text-sm font-semibold text-primary">Step {index + 1}</p>
@@ -85,10 +87,12 @@ export default function LandingSections({ onBecomeProvider }: LandingSectionsPro
       </section>
 
       <section className="px-4 pb-16 sm:px-6 sm:pb-20" aria-labelledby="provider-cta-title">
-        <div className="mx-auto flex max-w-7xl flex-col justify-between gap-8 rounded-xl border bg-primary px-6 py-10 text-primary-foreground sm:px-10 lg:flex-row lg:items-center">
+        <div className="relative isolate mx-auto flex max-w-7xl flex-col justify-between gap-8 overflow-hidden rounded-2xl bg-gradient-to-br from-primary via-primary to-primary/80 px-6 py-10 text-primary-foreground shadow-xl shadow-primary/10 sm:px-10 lg:flex-row lg:items-center">
+          <div className="pointer-events-none absolute -right-16 -top-24 -z-10 size-80 rounded-full bg-brand-highlight/25 blur-3xl" aria-hidden="true" />
+          <div className="pointer-events-none absolute -bottom-32 left-1/3 -z-10 size-72 rounded-full bg-white/10 blur-3xl" aria-hidden="true" />
           <div className="max-w-2xl">
-            <span className="inline-flex items-center gap-2 text-sm font-semibold">
-              <CheckCircle2 className="size-4" aria-hidden="true" /> For local professionals
+            <span className="inline-flex items-center gap-2 rounded-full bg-white/15 px-3 py-1.5 text-sm font-semibold backdrop-blur-sm">
+              <CheckCircle2 className="size-4 text-brand-highlight" aria-hidden="true" /> For local professionals
             </span>
             <h2 id="provider-cta-title" className="mt-3 text-3xl font-bold tracking-tight">
               Turn your skills into opportunities.
@@ -97,8 +101,10 @@ export default function LandingSections({ onBecomeProvider }: LandingSectionsPro
               Create your account, complete provider onboarding, and present your services to potential clients.
             </p>
           </div>
-          <Button className="self-start bg-background text-foreground hover:bg-background/90" size="lg" onClick={onBecomeProvider}>
-            Become a service provider
+          <Button className="group relative isolate self-start overflow-hidden border-0 bg-background px-6 text-primary shadow-lg hover:bg-background focus-visible:ring-white" size="lg" onClick={onBecomeProvider}>
+            <span className="absolute inset-y-0 -left-16 -z-10 w-10 -skew-x-12 bg-gradient-to-r from-transparent via-brand-highlight-soft to-transparent transition-transform duration-700 group-hover:translate-x-[18rem] group-focus-visible:translate-x-[18rem] motion-reduce:hidden" aria-hidden="true" />
+            <span className="relative">Become a service provider</span>
+            <ArrowRight className="relative transition-transform duration-300 group-hover:translate-x-1 group-focus-visible:translate-x-1 motion-reduce:transform-none" aria-hidden="true" />
           </Button>
         </div>
       </section>

@@ -28,6 +28,7 @@ type PasswordRecoveryValues = z.infer<typeof passwordRecoverySchema>;
 export default function PasswordRecoveryPage() {
   const navigate = useNavigate();
   const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmation, setShowConfirmation] = useState(false);
   const [submitError, setSubmitError] = useState("");
   const {
     register,
@@ -79,9 +80,10 @@ export default function PasswordRecoveryPage() {
               />
               <button
                 type="button"
-                className="absolute inset-y-0 right-0 flex w-11 items-center justify-center rounded-r-md text-muted-foreground hover:text-foreground"
+                className="absolute inset-y-0 right-0 flex w-11 items-center justify-center rounded-r-md text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
                 onClick={() => setShowPassword((visible) => !visible)}
                 aria-label={showPassword ? "Hide password" : "Show password"}
+                aria-pressed={showPassword}
               >
                 {showPassword ? <EyeOff aria-hidden="true" /> : <Eye aria-hidden="true" />}
               </button>
@@ -92,14 +94,26 @@ export default function PasswordRecoveryPage() {
 
           <div className="grid gap-2">
             <Label htmlFor="recovery-confirmation">Confirm new password</Label>
-            <Input
-              id="recovery-confirmation"
-              type={showPassword ? "text" : "password"}
-              autoComplete="new-password"
-              aria-invalid={Boolean(errors.confirmation)}
-              aria-describedby={errors.confirmation ? "recovery-confirmation-error" : undefined}
-              {...register("confirmation")}
-            />
+            <div className="relative">
+              <Input
+                id="recovery-confirmation"
+                type={showConfirmation ? "text" : "password"}
+                autoComplete="new-password"
+                aria-invalid={Boolean(errors.confirmation)}
+                aria-describedby={errors.confirmation ? "recovery-confirmation-error" : undefined}
+                className="pr-12"
+                {...register("confirmation")}
+              />
+              <button
+                type="button"
+                className="absolute inset-y-0 right-0 flex w-11 items-center justify-center rounded-r-md text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
+                onClick={() => setShowConfirmation((visible) => !visible)}
+                aria-label={showConfirmation ? "Hide confirm password" : "Show confirm password"}
+                aria-pressed={showConfirmation}
+              >
+                {showConfirmation ? <EyeOff aria-hidden="true" /> : <Eye aria-hidden="true" />}
+              </button>
+            </div>
             {errors.confirmation ? <p id="recovery-confirmation-error" className="text-sm text-destructive" role="alert">{errors.confirmation.message}</p> : null}
           </div>
 

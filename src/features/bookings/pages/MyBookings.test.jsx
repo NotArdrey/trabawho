@@ -152,8 +152,8 @@ describe('MyBookings Redesign Component', () => {
     expect(screen.getByTestId('booking-card-b2')).toBeInTheDocument();
     expect(screen.getByText('Juan Dela Cruz')).toBeInTheDocument();
     expect(screen.getByText('Maria Santos')).toBeInTheDocument();
-    expect(screen.getByText('₱1,500')).toBeInTheDocument();
-    expect(screen.getByText('₱2,200')).toBeInTheDocument();
+    expect(screen.getByText('PHP 1,500')).toBeInTheDocument();
+    expect(screen.getByText('PHP 2,200')).toBeInTheDocument();
   });
 
   test('allows searching bookings by provider or service name', () => {
@@ -195,7 +195,11 @@ describe('MyBookings Redesign Component', () => {
 
     renderBookings(<MyBookings currentView="my-bookings" />);
 
-    fireEvent.click(screen.getByRole('button', { name: /Pay Now/i }));
+    const messageButton = screen.getByRole('button', { name: /Message provider/i });
+    const payButton = screen.getByRole('button', { name: /Pay Now/i });
+    expect(messageButton.compareDocumentPosition(payButton) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+
+    fireEvent.click(payButton);
     fireEvent.click(screen.getByTestId('mock-terms-modal'));
 
     expect(screen.getByTestId('mock-payment-modal')).toBeInTheDocument();

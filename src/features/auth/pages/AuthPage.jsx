@@ -7,7 +7,6 @@ import {
   ExternalLink,
   FileText,
   Home,
-  Lock,
   LogIn,
   Mail,
   MapPin,
@@ -54,6 +53,7 @@ import {
   logRegistrationDebug,
 } from '../../../shared/services/registrationLogger';
 import BrandWordmark from '../../../shared/components/BrandWordmark';
+import PasswordField from '../components/PasswordField';
 
 const PSGC_BASE_URL = 'https://psgc.gitlab.io/api';
 const REGISTRATION_STEPS = [
@@ -1076,41 +1076,29 @@ function AuthPage({
                 </div>
               </label>
 
-              <label className="auth-field" htmlFor="password">
-                <span>Password</span>
-                <div className="auth-input-wrap">
-                  <Lock size={18} aria-hidden="true" />
-                  <input
-                    id="password"
-                    name="password"
-                    type="password"
-                    value={formData.password}
-                    onChange={handleInputChange}
-                    placeholder="Enter your password"
-                    autoComplete={isLoginMode ? 'current-password' : 'new-password'}
-                    required
-                  />
-                </div>
-              </label>
+              <PasswordField
+                id="password"
+                label="Password"
+                name="password"
+                value={formData.password}
+                onChange={handleInputChange}
+                placeholder="Enter your password"
+                autoComplete={isLoginMode ? 'current-password' : 'new-password'}
+                required
+              />
 
                   {isRegisterMode && (
                     <>
-                  <label className="auth-field" htmlFor="confirmPassword">
-                    <span>Confirm Password</span>
-                    <div className="auth-input-wrap">
-                      <Lock size={18} aria-hidden="true" />
-                      <input
-                        id="confirmPassword"
-                        name="confirmPassword"
-                        type="password"
-                        value={formData.confirmPassword}
-                        onChange={handleInputChange}
-                        placeholder="Confirm your password"
-                        autoComplete="new-password"
-                        required
-                      />
-                    </div>
-                    </label>
+                    <PasswordField
+                      id="confirmPassword"
+                      label="Confirm Password"
+                      name="confirmPassword"
+                      value={formData.confirmPassword}
+                      onChange={handleInputChange}
+                      placeholder="Confirm your password"
+                      autoComplete="new-password"
+                      required
+                    />
                     </>
                   )}
                 </>

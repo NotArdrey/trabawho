@@ -1,5 +1,5 @@
 import { type FormEvent, useState } from "react";
-import { ArrowRight, MapPin, Search, ShieldCheck } from "lucide-react";
+import { ArrowRight, BadgeCheck, CalendarClock, MapPin, MessageCircle, Search, ShieldCheck, Star } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -23,20 +23,15 @@ export default function LandingHero({ onSearch }: LandingHeroProps) {
   };
 
   return (
-    <section className="relative overflow-hidden border-b bg-background pt-16" aria-labelledby="landing-hero-title">
-      <svg
-        className="pointer-events-none absolute -left-24 top-14 h-[34rem] w-[52rem] text-primary opacity-[0.07] dark:opacity-[0.11]"
-        viewBox="0 0 832 544"
-        fill="none"
-        aria-hidden="true"
-      >
-        <path d="M0 72H832M0 152H832M0 232H832M0 312H832M0 392H832M0 472H832" stroke="currentColor" />
-        <path d="M88 0V544M200 0V544M312 0V544M424 0V544M536 0V544M648 0V544M760 0V544" stroke="currentColor" />
-        <path d="M88 392L200 312L312 344L424 216L536 248L648 136L760 184" stroke="currentColor" strokeWidth="2" />
-        <circle cx="200" cy="312" r="7" fill="currentColor" />
-        <circle cx="424" cy="216" r="7" fill="currentColor" />
-        <circle cx="648" cy="136" r="7" fill="currentColor" />
-      </svg>
+    <section className="relative isolate overflow-hidden border-b bg-background pt-16" aria-labelledby="landing-hero-title">
+      <img
+        className="absolute inset-0 -z-20 size-full object-cover object-[72%_center] sm:object-center"
+        src="/images/landing-services-hero-v2.jpg"
+        alt="A local appliance technician repairing a washing machine in a bright home"
+        fetchPriority="high"
+      />
+      <div className="absolute inset-0 -z-10 bg-gradient-to-r from-background via-background/95 to-background/70 sm:via-background/85 sm:to-background/20 lg:via-background/65 dark:from-background dark:via-background/90 dark:to-background/60 sm:dark:to-background/35" aria-hidden="true" />
+      <div className="absolute inset-x-0 bottom-0 -z-10 h-40 bg-gradient-to-t from-background/70 to-transparent" aria-hidden="true" />
 
       <div className="relative mx-auto grid max-w-7xl items-center gap-10 px-4 py-12 sm:px-6 sm:py-16 lg:grid-cols-[1.05fr_0.95fr] lg:gap-16 lg:py-20">
         <div className="relative z-10 max-w-2xl">
@@ -107,22 +102,54 @@ export default function LandingHero({ onSearch }: LandingHeroProps) {
               </button>
             ))}
           </div>
+
+          <div className="relative mt-8 min-h-36 lg:hidden" aria-label="Information available before booking">
+            <div className="absolute left-0 top-0 max-w-[18rem] origin-bottom-left motion-safe:animate-in motion-safe:fade-in-0 motion-safe:zoom-in-75 motion-safe:fill-mode-backwards motion-safe:delay-100 motion-safe:duration-500">
+              <div className="relative rounded-[1.35rem] rounded-bl-md bg-brand-highlight-strong px-4 py-3 text-white shadow-xl shadow-black/15">
+                <p className="flex items-center gap-2 font-bold"><MessageCircle className="size-5" aria-hidden="true" />Make a more informed choice</p>
+                <p className="mt-1 text-sm text-white/90">Compare real reviews and availability.</p>
+                <span className="absolute -bottom-2 left-7 size-4 rotate-45 rounded-sm bg-brand-highlight-strong" aria-hidden="true" />
+              </div>
+            </div>
+            <div className="absolute bottom-0 right-0 flex origin-bottom-right items-center gap-2 rounded-2xl rounded-br-md border border-white/70 bg-white/95 px-3 py-2 text-xs font-semibold text-slate-900 shadow-lg backdrop-blur motion-safe:animate-in motion-safe:fade-in-0 motion-safe:zoom-in-75 motion-safe:fill-mode-backwards motion-safe:delay-300 motion-safe:duration-500">
+              <Star className="size-4 fill-brand-highlight text-brand-highlight" aria-hidden="true" />4.9 verified rating
+            </div>
+          </div>
         </div>
 
-        <div className="relative mx-auto w-full max-w-xl lg:max-w-none">
-          <div className="overflow-hidden rounded-xl border bg-muted">
-            <img
-              className="aspect-[4/3] h-full w-full object-cover"
-              src="https://images.unsplash.com/photo-1581092918056-0c4c3acd3789?w=1200&h=900&fit=crop&auto=format&q=82"
-              alt="A service technician preparing tools for a local job"
-              fetchPriority="high"
-            />
+        <div className="relative mx-auto hidden min-h-[27rem] w-full max-w-xl lg:block lg:max-w-none" aria-label="Information available before booking">
+          <div className="absolute left-2 top-20 max-w-[20rem] origin-bottom-left motion-safe:animate-in motion-safe:fade-in-0 motion-safe:zoom-in-75 motion-safe:fill-mode-backwards motion-safe:delay-100 motion-safe:duration-500">
+            <div className="relative rounded-[1.4rem] rounded-bl-md bg-brand-highlight-strong px-5 py-4 text-white shadow-xl shadow-black/15">
+              <div className="flex items-start gap-3">
+                <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-white/20"><MessageCircle className="size-5" aria-hidden="true" /></span>
+                <div>
+                  <p className="font-bold">Make a more informed choice</p>
+                  <p className="mt-1 text-sm leading-5 text-white/90">Compare verified details before you book.</p>
+                </div>
+              </div>
+              <span className="absolute -bottom-2 left-7 size-5 rotate-45 rounded-sm bg-brand-highlight-strong" aria-hidden="true" />
+            </div>
           </div>
-          <div className="absolute bottom-4 left-4 right-4 rounded-lg border bg-background/95 p-4 backdrop-blur-sm sm:left-6 sm:right-auto sm:max-w-xs">
-            <p className="text-sm font-semibold text-foreground">Make a more informed choice</p>
-            <p className="mt-1 text-sm leading-5 text-muted-foreground">
-              Review provider information, pricing, and scheduling options before you book.
-            </p>
+
+          <div className="absolute right-2 top-5 origin-bottom-right motion-safe:animate-in motion-safe:fade-in-0 motion-safe:zoom-in-75 motion-safe:fill-mode-backwards motion-safe:delay-300 motion-safe:duration-500">
+            <div className="flex items-center gap-2 rounded-2xl rounded-br-md border border-white/70 bg-white/95 px-4 py-3 text-sm font-semibold text-slate-900 shadow-lg backdrop-blur">
+              <BadgeCheck className="size-5 text-primary" aria-hidden="true" />
+              Identity verified
+            </div>
+          </div>
+
+          <div className="absolute bottom-16 left-16 origin-bottom-left motion-safe:animate-in motion-safe:fade-in-0 motion-safe:zoom-in-75 motion-safe:fill-mode-backwards motion-safe:delay-500 motion-safe:duration-500">
+            <div className="flex items-center gap-2 rounded-2xl rounded-bl-md border border-white/70 bg-white/95 px-4 py-3 text-sm font-semibold text-slate-900 shadow-lg backdrop-blur">
+              <Star className="size-5 fill-brand-highlight text-brand-highlight" aria-hidden="true" />
+              4.9 from verified reviews
+            </div>
+          </div>
+
+          <div className="absolute bottom-4 right-0 origin-bottom-right motion-safe:animate-in motion-safe:fade-in-0 motion-safe:zoom-in-75 motion-safe:fill-mode-backwards motion-safe:delay-700 motion-safe:duration-500">
+            <div className="flex items-center gap-2 rounded-2xl rounded-br-md border border-white/70 bg-white/95 px-4 py-3 text-sm font-semibold text-slate-900 shadow-lg backdrop-blur">
+              <CalendarClock className="size-5 text-primary" aria-hidden="true" />
+              Saturday · 10:00 AM
+            </div>
           </div>
         </div>
       </div>

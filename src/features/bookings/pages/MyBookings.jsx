@@ -23,9 +23,9 @@ import SlotSelectionModal from '../components/SlotSelectionModal';
 import PaymentModal from '../components/PaymentModal';
 import BookingTermsModal from '../components/BookingTermsModal';
 import RatingModal from '../components/RatingModal';
+import { BookingDetailsDialog } from '../components/BookingDetailsDialog';
 import { BookingScopeSwitcher } from '../components/BookingScopeSwitcher';
 import { Button } from '@/components/ui/button';
-import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { MetricCard } from '@/components/ui/metric-card';
 import { SearchFilterBar } from '@/components/ui/search-filter-bar';
 import { WorkflowEmptyState } from '@/components/ui/workflow-panel';
@@ -65,7 +65,7 @@ const isBookingNavigationMatch = (booking = {}, navigationId = null) => {
   ].some((candidate) => candidate && String(candidate) === targetId);
 };
 
-const formatPhp = (value) => `\u20B1${Number(value || 0).toLocaleString('en-PH', {
+const formatPhp = (value) => `PHP ${Number(value || 0).toLocaleString('en-PH', {
   minimumFractionDigits: Number(value || 0) % 1 === 0 ? 0 : 2,
   maximumFractionDigits: 2,
 })}`;
@@ -731,27 +731,26 @@ const MyBookings = ({
         </div>
 
         <div className="booking-card-footer">
-          <div className="booking-price-box">
-            <span className="booking-price-label">{shouldLoadSellerBookings ? 'Booking amount:' : 'Service price:'}</span>
-            <span className="booking-price-value">
-              {formatPhp(booking.quoteAmount || booking.totalChargedAmount || 0)}
-            </span>
+          <dl className="flex min-w-0 flex-wrap items-stretch gap-2 text-sm">
+            <div className="min-w-32 rounded-lg bg-muted/50 px-3 py-2">
+              <dt className="text-xs font-semibold text-muted-foreground">{shouldLoadSellerBookings ? 'Booking amount' : 'Service price'}</dt><dd className="mt-1 font-bold text-foreground">{formatPhp(booking.quoteAmount || booking.totalChargedAmount || 0)}</dd>
+            </div>
             {!shouldLoadSellerBookings && booking.transactionFeeAmount > 0 && (
-              <span className="booking-price-detail">
-                Fee: {formatPhp(booking.transactionFeeAmount)}
-              </span>
+              <div className="min-w-28 rounded-lg bg-muted/50 px-3 py-2">
+                <dt className="text-xs font-semibold text-muted-foreground">Platform fee</dt><dd className="mt-1 font-bold text-foreground">{formatPhp(booking.transactionFeeAmount)}</dd>
+              </div>
             )}
             {!shouldLoadSellerBookings && booking.totalChargedAmount > 0 && (
-              <span className="booking-price-total">
-                Total: {formatPhp(booking.totalChargedAmount)}
-              </span>
+              <div className="min-w-32 rounded-lg bg-emerald-50 px-3 py-2 dark:bg-emerald-950/30">
+                <dt className="text-xs font-semibold text-muted-foreground">Total payment</dt><dd className="mt-1 font-extrabold text-emerald-700 dark:text-emerald-300">{formatPhp(booking.totalChargedAmount)}</dd>
+              </div>
             )}
             {booking.paymentPlan === 'downpayment' && (
-              <span className="booking-price-detail">
-                Paid: {formatPhp(booking.amountPaid)} · Balance: {formatPhp(booking.balanceDueAmount)}
-              </span>
+              <div className="min-w-48 rounded-lg bg-muted/50 px-3 py-2">
+                <dt className="text-xs font-semibold text-muted-foreground">Payment progress</dt><dd className="mt-1 font-bold text-foreground">Paid: {formatPhp(booking.amountPaid)} · Balance: {formatPhp(booking.balanceDueAmount)}</dd>
+              </div>
             )}
-          </div>
+          </dl>
 
           <div className="booking-card-actions">
             <Button
@@ -763,6 +762,15 @@ const MyBookings = ({
               View Details
             </Button>
 
+            <Button
+              type="button"
+              variant={hasPrimaryWorkflowAction ? 'outline' : 'primary'}
+              onClick={() => handleOpenChat(booking.id)}
+            >
+              <MessageCircle size={16} aria-hidden="true" />
+              {messageLabel}
+            </Button>
+
             {canPayNow && (
               <Button
                 type="button"
@@ -772,15 +780,6 @@ const MyBookings = ({
                 {booking.paymentStatus === 'partially_paid' ? 'Pay Balance' : 'Pay Now'}
               </Button>
             )}
-
-            <Button
-              type="button"
-              variant={hasPrimaryWorkflowAction ? 'outline' : 'primary'}
-              onClick={() => handleOpenChat(booking.id)}
-            >
-              <MessageCircle size={16} aria-hidden="true" />
-              {messageLabel}
-            </Button>
 
             {!shouldLoadSellerBookings && booking.cashCollectionStatus === 'seller_claimed' && (
               <Button
@@ -1148,59 +1147,13 @@ const MyBookings = ({
         </>
       )}
 
-      <Dialog open={Boolean(detailBooking)} onOpenChange={(open) => { if (!open) setDetailBookingId(null); }}>
-        {detailBooking && (
-          <DialogContent className="max-w-2xl">
-            <DialogHeader>
-              <span className="gl-eyebrow w-fit">Booking details</span>
-              <DialogTitle>{detailBooking.serviceType}</DialogTitle>
-              <DialogDescription>{shouldLoadSellerBookings ? detailBooking.clientName : detailBooking.workerName}</DialogDescription>
-            </DialogHeader>
-
-            <div className="booking-detail-modal-grid">
-              <div><span>Status</span><strong>{getStatusMeta(detailBooking.status).label}</strong></div>
-              <div><span>Date</span><strong>{detailBooking.selectedSlot?.date || detailBooking.requestDate || 'Coordinated in chat'}</strong></div>
-              <div><span>Time</span><strong>{formatBookingTimeRange(detailBooking.selectedSlot?.timeBlock)}</strong></div>
-              <div><span>Payment</span><strong>{detailBooking.paymentMethod === 'gcash-advance' ? 'GCash Advance' : 'Pending Selection'}</strong></div>
-              <div><span>{shouldLoadSellerBookings ? 'Booking amount' : 'Service price'}</span><strong>{formatPhp(detailBooking.quoteAmount || 0)}</strong></div>
-              {!shouldLoadSellerBookings && <div><span>Total charged</span><strong>{formatPhp(detailBooking.totalChargedAmount || detailBooking.quoteAmount || 0)}</strong></div>}
-              <div>
-                <span>Provider confirmation</span>
-                <strong>{['seller_claimed', 'buyer_confirmed'].includes(detailBooking.deliveryStatus) ? 'Delivered ✓' : 'Awaiting provider'}</strong>
-              </div>
-              <div>
-                <span>Client confirmation</span>
-                <strong>{detailBooking.deliveryStatus === 'buyer_confirmed' ? 'Completed ✓' : detailBooking.deliveryStatus === 'seller_claimed' ? 'Awaiting client' : 'Waiting for delivery'}</strong>
-              </div>
-              {detailBooking.paymentReference && <div><span>Reference</span><strong>{detailBooking.paymentReference}</strong></div>}
-              {detailBooking.completedAt && <div><span>Completed</span><strong>{new Date(detailBooking.completedAt).toLocaleDateString('en-PH')}</strong></div>}
-            </div>
-
-            {detailBooking.description && <p className="booking-detail-modal-description">{detailBooking.description}</p>}
-            {(detailBooking.rating || detailBooking.review) && (
-              <div className="booking-detail-review">
-                <strong>{detailBooking.rating} / 5 stars</strong>
-                {detailBooking.review && <p>{detailBooking.review}</p>}
-                {detailBooking.reviewImageUrl && <img src={detailBooking.reviewImageUrl} alt="Customer review" />}
-              </div>
-            )}
-
-            <DialogFooter>
-              <DialogClose asChild><Button type="button" variant="outline">Close</Button></DialogClose>
-              <Button
-                type="button"
-                onClick={() => {
-                  setDetailBookingId(null);
-                  handleOpenChat(detailBooking.id);
-                }}
-              >
-                <MessageCircle size={16} aria-hidden="true" />
-                {shouldLoadSellerBookings ? 'Message client' : 'Message provider'}
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        )}
-      </Dialog>
+      <BookingDetailsDialog
+        booking={detailBooking}
+        isProviderView={shouldLoadSellerBookings}
+        statusLabel={detailBooking ? getStatusMeta(detailBooking.status).label : ''}
+        onClose={() => setDetailBookingId(null)}
+        onMessage={(bookingId) => { setDetailBookingId(null); handleOpenChat(bookingId); }}
+      />
 
       {currentBooking && uiState === 'payment' && (
         <PaymentModal

@@ -198,6 +198,26 @@ export default function DashboardNavigation({
     </nav>
   );
 
+  const renderAccountMenuItems = () => (
+    <>
+      <DropdownMenuItem onSelect={onOpenProfile}><UserRound />Profile</DropdownMenuItem>
+      <DropdownMenuItem onSelect={onOpenAccountSettings || onOpenProfile}><Shield />Account &amp; Privacy</DropdownMenuItem>
+      <DropdownMenuItem onSelect={onOpenSettings}><Settings />Settings</DropdownMenuItem>
+      {sellerProfile?.role === "admin" && <DropdownMenuItem onSelect={onToggleAdminView}><Shield />{isAdminView ? "Switch to Client View" : "Switch to Admin View"}</DropdownMenuItem>}
+      {isWorkerAccount && !isAdminAccount && (
+        <DropdownMenuItem
+          className="my-1 border border-primary/20 bg-primary/10 font-semibold text-primary focus:bg-primary/15 focus:text-primary [&>svg]:text-primary"
+          onSelect={switchWorkerWorkspace}
+        >
+          <BriefcaseBusiness />
+          {isProviderWorkspace ? "Switch to client workspace" : "Switch to provider workspace"}
+        </DropdownMenuItem>
+      )}
+      <DropdownMenuSeparator />
+      <DropdownMenuItem className="text-destructive focus:bg-destructive/10 focus:text-destructive" onSelect={() => setIsLogoutModalOpen(true)}><LogOut />Logout</DropdownMenuItem>
+    </>
+  );
+
   return (
     <>
       <aside className="fixed inset-y-0 left-0 z-[140] hidden w-[248px] flex-col gap-[18px] border-r bg-background/95 px-3.5 pb-3.5 pt-[18px] shadow-[10px_0_30px_rgba(15,23,42,0.04)] backdrop-blur min-[881px]:flex">
@@ -222,11 +242,15 @@ export default function DashboardNavigation({
             <Button type="button" variant="ghost" className={cn("justify-start px-2.5 text-muted-foreground", activeKey === "profile" && "bg-accent text-foreground")} onClick={onOpenProfile}><UserRound />Profile</Button>
             <Button type="button" variant="ghost" className={cn("justify-start px-2.5 text-muted-foreground", activeKey === "settings" && "bg-accent text-foreground")} onClick={onOpenSettings}><Settings />Settings</Button>
           </div>
-          <button type="button" className="grid min-h-[58px] grid-cols-[38px_minmax(0,1fr)_16px] items-center gap-2 rounded-lg bg-muted/50 p-2 text-left hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" onClick={onOpenProfile}>
+          <button type="button" className="grid min-h-[58px] w-full grid-cols-[38px_minmax(0,1fr)_20px] items-center gap-2 rounded-lg bg-muted/50 p-2 text-left hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" onClick={onOpenProfile} aria-label="Open profile">
             <img className="size-[38px] rounded-lg object-cover" src={profilePhotoUrl} alt="" />
             <span className="min-w-0"><strong className="block truncate text-xs">{displayName}</strong><small className="mt-1 block truncate text-[10px] text-muted-foreground">{workspaceLabel}</small></span>
             <ChevronRight className="size-4 text-muted-foreground" aria-hidden />
           </button>
+          <Button type="button" variant="outline" className="w-full justify-start border-destructive/30 px-3 text-destructive hover:bg-destructive/10 hover:text-destructive" onClick={() => setIsLogoutModalOpen(true)}>
+            <LogOut aria-hidden />
+            Log out
+          </Button>
         </div>
       </aside>
 
@@ -239,21 +263,7 @@ export default function DashboardNavigation({
           <DropdownMenu open={isProfileMenuOpen} onOpenChange={(open) => { if (open) setIsNotificationOpen(false); setIsProfileMenuOpen(open); }}>
             <DropdownMenuTrigger asChild><Button type="button" variant="ghost" size="icon" className="rounded-full p-0.5 min-[881px]:hidden" aria-label="Profile menu"><img className="size-10 rounded-full object-cover" src={profilePhotoUrl} alt="Profile" /></Button></DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-60">
-              <DropdownMenuItem onSelect={onOpenProfile}><UserRound />Profile</DropdownMenuItem>
-              <DropdownMenuItem onSelect={onOpenAccountSettings || onOpenProfile}><Shield />Account &amp; Privacy</DropdownMenuItem>
-              <DropdownMenuItem onSelect={onOpenSettings}><Settings />Settings</DropdownMenuItem>
-              {sellerProfile?.role === "admin" && <DropdownMenuItem onSelect={onToggleAdminView}><Shield />{isAdminView ? "Switch to Client View" : "Switch to Admin View"}</DropdownMenuItem>}
-              {isWorkerAccount && !isAdminAccount && (
-                <DropdownMenuItem
-                  className="my-1 border border-primary/20 bg-primary/10 font-semibold text-primary focus:bg-primary/15 focus:text-primary [&>svg]:text-primary"
-                  onSelect={switchWorkerWorkspace}
-                >
-                  <BriefcaseBusiness />
-                  {isProviderWorkspace ? "Switch to client workspace" : "Switch to provider workspace"}
-                </DropdownMenuItem>
-              )}
-              <DropdownMenuSeparator />
-              <DropdownMenuItem className="text-destructive focus:bg-destructive/10 focus:text-destructive" onSelect={() => setIsLogoutModalOpen(true)}><LogOut />Logout</DropdownMenuItem>
+              {renderAccountMenuItems()}
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
