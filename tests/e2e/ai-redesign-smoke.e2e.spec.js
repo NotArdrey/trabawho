@@ -280,7 +280,7 @@ test.describe('AI redesign smoke verification', () => {
     await loginAs(page, DEMO_ADMIN_EMAIL);
 
     await expect(page.getByRole('heading', { name: 'TrabaWho Admin Dashboard' })).toBeVisible({ timeout: 20_000 });
-    await page.getByRole('button', { name: 'Back to App' }).click();
+    await page.getByRole('button', { name: 'Back to TrabaWho' }).first().click();
     await expect(page.getByTestId('client-home-dashboard')).toBeVisible({ timeout: 20_000 });
     await page.getByRole('button', { name: /^Browse$/ }).click();
     await expect(page.getByTestId('app-browse-services')).toBeVisible({ timeout: 20_000 });

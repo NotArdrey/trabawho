@@ -7,8 +7,8 @@ export const corsHeaders = {
   "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
 };
 
-const TERMINAL_STATUSES = new Set(["DECLINED", "ABANDONED", "EXPIRED", "SUPERSEDED"]);
-const ACTIVE_STATUSES = new Set(["PENDING", "NOT_STARTED", "IN_PROGRESS", "PROCESSING", "SUBMITTED", "STARTED", "CREATED"]);
+const TERMINAL_STATUSES = new Set(["DECLINED", "RESUBMISSION_REQUIRED", "ABANDONED", "EXPIRED", "SUPERSEDED"]);
+const ACTIVE_STATUSES = new Set(["PENDING", "NOT_STARTED", "IN_PROGRESS", "PROCESSING", "SUBMITTED", "STARTED", "CREATED", "AWAITING_USER"]);
 const PUBLIC_IDENTITY_ROLES = new Set(["fan", "musician"]);
 const PUBLIC_APP_ROLES = new Set(["client", "worker"]);
 
@@ -66,6 +66,9 @@ export const normalizeStatus = (value: unknown) => {
   }
   if (["IN_REVIEW", "PENDING_REVIEW", "PENDING_REVIEW_REQUIRED", "MANUAL_REVIEW", "PENDING_MANUAL_REVIEW", "REVIEW"].includes(normalized)) {
     return "PENDING_REVIEW";
+  }
+  if (["RESUBMITTED", "RESUBMISSION", "RESUBMIT", "RESUBMISSION_REQUIRED", "NEEDS_RESUBMISSION"].includes(normalized)) {
+    return "RESUBMISSION_REQUIRED";
   }
   if (ACTIVE_STATUSES.has(normalized)) return "PENDING";
   return normalized;
@@ -240,6 +243,10 @@ export const resolveSourceStatus = (source: any) => {
 
 export const resolveDiditDecisionStatus = (source: any) => {
   const sourceStatus = resolveSourceStatus(source);
+  if (["APPROVED", "DECLINED", "PENDING_REVIEW", "RESUBMISSION_REQUIRED", "ABANDONED", "EXPIRED", "PENDING"].includes(sourceStatus)) {
+    return sourceStatus;
+  }
+
   const decision = findDecisionObject(source);
   if (!decision) return sourceStatus;
 
@@ -564,6 +571,9 @@ export const queueManualIdentityReview = async (
     frontImagePath = null,
     backImagePath = null,
     selfieImagePath = null,
+    nameOnId = null,
+    identityDocumentNumber = null,
+    idDocumentExpiry = null,
   }: Record<string, unknown>,
 ) => {
   if (!isUuid(userId)) return null;
@@ -592,6 +602,9 @@ export const queueManualIdentityReview = async (
     front_image_path: cleanString(frontImagePath) || null,
     back_image_path: cleanString(backImagePath) || null,
     selfie_image_path: cleanString(selfieImagePath) || null,
+    name_on_id: cleanString(nameOnId || verifiedFullLegalName) || null,
+    id_number: cleanString(identityDocumentNumber) || null,
+    id_expiry_date: cleanString(idDocumentExpiry) || null,
     expected_decision_by: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
     updated_at: nowIso,
   };
@@ -718,6 +731,14 @@ export const buildProfilePayload = ({
   identityStatus,
   diditSessionId = null,
   idDocumentExpiry = null,
+  documentTypeKey = null,
+  verificationMethod = null,
+  province = null,
+  city = null,
+  barangay = null,
+  address = null,
+  identityVerificationConsent = false,
+  dataPrivacyConsent = false,
 }: Record<string, unknown>) => {
   const resolvedAppRole = normalizeAppRole(appRole);
   const resolvedIdentityStatus = normalizeStatus(identityStatus) || "PENDING_REVIEW";
@@ -730,12 +751,20 @@ export const buildProfilePayload = ({
     is_worker: resolvedAppRole === "worker",
     role: resolvedAppRole,
     account_status: "active",
+    province: cleanString(province) || null,
+    city: cleanString(city) || null,
+    barangay: cleanString(barangay) || null,
+    address: cleanString(address) || null,
     identity_required: true,
     identity_role: normalizeIdentityRole(identityRole),
     is_verified: isApproved,
     verification_status: resolvedIdentityStatus,
     didit_session_id: cleanString(diditSessionId) || null,
     id_document_expiry: cleanString(idDocumentExpiry) || null,
+    identity_document_type: cleanString(documentTypeKey) || null,
+    verification_method: cleanString(verificationMethod).toUpperCase() || null,
+    identity_verification_consent: identityVerificationConsent === true,
+    data_privacy_consent: dataPrivacyConsent === true,
     id_verified_at: isApproved ? new Date().toISOString() : null,
     updated_at: new Date().toISOString(),
   };

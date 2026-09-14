@@ -743,6 +743,10 @@ export const isAccountBlockedForLogin = (profile = null) => {
       return 'Identity verification was not completed. Please restart verified registration before logging in.';
     }
 
+    if (identityStatus === 'RESUBMISSION_REQUIRED') {
+      return 'New identity information is required. Restart registration and submit updated verification evidence.';
+    }
+
     if (identityStatus !== 'APPROVED') {
       return 'Identity verification is still required before login access is allowed.';
     }

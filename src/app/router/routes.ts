@@ -32,7 +32,25 @@ export const paths = {
   preferences: "/settings/preferences",
   sellerOnboarding: "/seller/onboarding",
   admin: "/admin",
+  adminUsers: "/admin/users",
+  adminJobs: "/admin/jobs",
+  adminEmployers: "/admin/employers",
+  adminApplications: "/admin/applications",
+  adminModeration: "/admin/moderation",
+  adminAuditLogs: "/admin/audit-logs",
+  adminSettings: "/admin/settings",
 } as const satisfies Record<string, AppRoute | "/messages">;
+
+const adminPaths = new Set<string>([
+  paths.admin,
+  paths.adminUsers,
+  paths.adminJobs,
+  paths.adminEmployers,
+  paths.adminApplications,
+  paths.adminModeration,
+  paths.adminAuditLogs,
+  paths.adminSettings,
+]);
 
 const publicPaths = new Set<string>([
   paths.home,
@@ -78,6 +96,7 @@ const viewPaths: Record<LegacyView, string> = {
 };
 
 export function viewFromPathname(pathname: string): LegacyView | null {
+  if (adminPaths.has(pathname)) return "admin-dashboard";
   if (pathname === paths.messages || pathname.startsWith(`${paths.messages}/`)) return "chat";
   return exactViewPaths[pathname] ?? null;
 }
@@ -101,7 +120,7 @@ export function isKnownPath(pathname: string): boolean {
 }
 
 export function canAccessPath(pathname: string, role: UserRole): boolean {
-  if (pathname === paths.admin) return role === "admin";
+  if (adminPaths.has(pathname)) return role === "admin";
   if (pathname === paths.workerDashboard || pathname === paths.workerBookings) return role === "worker" || role === "admin";
   return true;
 }

@@ -6,43 +6,32 @@ const corsHeaders = {
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 };
 
+const locationFixtures = {
+  provinces: [{ code: '0300000000', name: 'Bulacan' }],
+  cities: [{ code: '0314100000', name: 'Meycauayan City' }],
+  barangays: [{ code: '0314100001', name: 'Bagbaguin' }],
+};
+
 function collectConsoleFailures(page) {
   const failures = [];
-
   page.on('console', (message) => {
-    if (message.type() === 'error') {
-      failures.push(message.text());
-    }
+    if (message.type() === 'error') failures.push(message.text());
   });
-
-  page.on('pageerror', (error) => {
-    failures.push(error.message);
-  });
-
+  page.on('pageerror', (error) => failures.push(error.message));
   return failures;
 }
 
 async function expectNoHorizontalOverflow(page) {
   const issue = await page.evaluate(() => {
-    const bodyText = document.body.innerText.trim();
-    if (bodyText.length < 40) return 'Page rendered too little visible text.';
-
+    if (document.body.innerText.trim().length < 40) return 'Page rendered too little visible text.';
     const overflow = document.documentElement.scrollWidth - window.innerWidth;
-    if (overflow > 8) return `Page has horizontal overflow of ${overflow}px.`;
-
-    return '';
+    return overflow > 8 ? `Page has horizontal overflow of ${overflow}px.` : '';
   });
-
   expect(issue).toBe('');
 }
 
 async function fulfillJson(route, payload, status = 200) {
-  await route.fulfill({
-    status,
-    headers: corsHeaders,
-    contentType: 'application/json',
-    body: JSON.stringify(payload),
-  });
+  await route.fulfill({ status, headers: corsHeaders, contentType: 'application/json', body: JSON.stringify(payload) });
 }
 
 function readJsonBody(request) {
@@ -53,33 +42,26 @@ function readJsonBody(request) {
   }
 }
 
-async function mockDiditRoutes(page, finalStatus, createUserPayload = {}) {
+async function mockLocationRoutes(page) {
+  await page.route('https://psgc.gitlab.io/api/provinces/', (route) => fulfillJson(route, locationFixtures.provinces));
+  await page.route('https://psgc.gitlab.io/api/provinces/*/cities-municipalities/', (route) => fulfillJson(route, locationFixtures.cities));
+  await page.route('https://psgc.gitlab.io/api/cities-municipalities/*/barangays/', (route) => fulfillJson(route, locationFixtures.barangays));
+}
+
+async function mockDiditRoutes(page, finalStatus, capture = {}) {
   await page.route('**/functions/v1/create-didit-session', async (route) => {
     const request = route.request();
     if (request.method() === 'OPTIONS') {
       await route.fulfill({ status: 204, headers: corsHeaders });
       return;
     }
-
     const body = readJsonBody(request);
     if (body.action === 'get_session') {
-      await fulfillJson(route, {
-        success: true,
-        sessionId: 'didit-session-123',
-        status: finalStatus,
-        businessStatus: finalStatus,
-        verification_data: { status: finalStatus },
-      });
+      await fulfillJson(route, { success: true, sessionId: 'didit-session-123', status: finalStatus, businessStatus: finalStatus, verification_data: { status: finalStatus } });
       return;
     }
-
-    await fulfillJson(route, {
-      success: true,
-      sessionId: 'didit-session-123',
-      sessionNonce: 'nonce-123',
-      workflowId: '53ea504a-5de7-4ed3-b402-0f0604be5b87',
-      verificationUrl: 'https://verification.didit.me/session/demo',
-    });
+    capture.createSessionPayload = body;
+    await fulfillJson(route, { success: true, sessionId: 'didit-session-123', sessionNonce: 'nonce-123', workflowId: '53ea504a-5de7-4ed3-b402-0f0604be5b87', verificationUrl: 'https://verification.didit.me/session/demo' });
   });
 
   await page.route('**/functions/v1/create-unverified-user', async (route) => {
@@ -88,211 +70,185 @@ async function mockDiditRoutes(page, finalStatus, createUserPayload = {}) {
       await route.fulfill({ status: 204, headers: corsHeaders });
       return;
     }
-
+    capture.createUserPayload = readJsonBody(request);
     await fulfillJson(route, {
       success: true,
       userId: '00000000-0000-4000-8000-000000000053',
       identityStatus: finalStatus === 'PENDING_REVIEW' ? 'PENDING_REVIEW' : 'APPROVED',
       emailConfirmationRequired: finalStatus === 'APPROVED',
       emailConfirmationDeferred: finalStatus !== 'APPROVED',
-      ...createUserPayload,
+      message: finalStatus === 'APPROVED' ? 'Identity approved. Confirm your email before logging in.' : 'Your account was created and is waiting for identity review.',
     });
   });
 }
 
-async function fillDiditSignup(page, email = 'verified-user@example.com') {
-  await page.getByLabel('Email').fill(email);
-  await page.getByLabel('Password', { exact: true }).fill('Password123!');
-  await page.getByLabel('Confirm password').fill('Password123!');
-  await page.getByLabel(/I consent to TrabaWho/i).check();
-  await page.getByRole('button', { name: /Start Didit Verification/i }).click();
+async function chooseSelectOption(page, label, optionName) {
+  await page.getByRole('combobox', { name: label, exact: true }).click();
+  await page.getByRole('option', { name: optionName, exact: true }).click();
 }
 
-test.describe('identity-first registration', () => {
-  test('Didit approval creates an unconfirmed account and asks for email confirmation', async ({ page }) => {
-    const consoleFailures = collectConsoleFailures(page);
-    await mockDiditRoutes(page, 'APPROVED');
+async function completeRegistrationForm(page, options = {}) {
+  const { accountType = 'Client', document = 'National ID / ID card', email = 'verified-user@example.com' } = options;
 
-    await page.goto('/#identity-register');
-    await expect(page.getByTestId('identity-registration-page')).toBeVisible();
-    await fillDiditSignup(page);
+  await page.getByRole('radio', { name: new RegExp(accountType) }).check();
+  await chooseSelectOption(page, 'Identity document', document);
+  await page.getByRole('button', { name: 'Next' }).click();
+  await page.getByLabel('Email', { exact: true }).fill(email);
+  await page.getByLabel('Password', { exact: true }).fill('Password123!');
+  await page.getByLabel('Confirm password', { exact: true }).fill('Password123!');
+  await page.getByRole('button', { name: 'Next' }).click();
+  await chooseSelectOption(page, 'Province', 'Bulacan');
+  await chooseSelectOption(page, 'City or municipality', 'Meycauayan City');
+  await chooseSelectOption(page, 'Barangay', 'Bagbaguin');
+  await page.getByLabel('Specific address').fill('12 Mabini Street');
+  await page.getByRole('button', { name: 'Next' }).click();
+  await page.getByLabel(/Identity verification consent/i).check();
+  await page.getByLabel(/RA 10173 Terms and Conditions/i).check();
+}
+
+test.describe('canonical registration and identity verification', () => {
+  test.beforeEach(async ({ page }) => {
+    await mockLocationRoutes(page);
+  });
+
+  test('validates each registration step before advancing', async ({ page }) => {
+    await page.goto('/register');
+    await page.getByRole('button', { name: 'Next' }).click();
+    await expect(page.getByText('Choose Client or Worker.')).toBeVisible();
+    await expect(page.getByText('Choose an identity document.')).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Choose your account' })).toBeVisible();
+
+    await page.getByRole('radio', { name: /Client/ }).check();
+    await chooseSelectOption(page, 'Identity document', 'Passport');
+    await page.getByRole('button', { name: 'Next' }).click();
+    await page.getByLabel('Email', { exact: true }).fill('not-an-email');
+    await page.getByLabel('Password', { exact: true }).fill('password');
+    await page.getByLabel('Confirm password', { exact: true }).fill('different');
+    await page.getByRole('button', { name: 'Next' }).click();
+    await expect(page.getByText('Enter a valid email address.')).toBeVisible();
+    await expect(page.getByText('Include at least one uppercase letter and one number.')).toBeVisible();
+    await expect(page.getByText('Passwords do not match.')).toBeVisible();
+  });
+
+  test('Didit approval preserves account, location, and consent data through account creation', async ({ page }) => {
+    const consoleFailures = collectConsoleFailures(page);
+    const capture = {};
+    await mockDiditRoutes(page, 'APPROVED', capture);
+    await page.goto('/register');
+    await completeRegistrationForm(page, { accountType: 'Worker' });
+
+    await expect(page.getByText('Worker', { exact: true })).toBeVisible();
+    await expect(page.getByText(/Bagbaguin, Meycauayan City, Bulacan/)).toBeVisible();
+    await expect(page.getByText(/Didit powers the automatic verification/i)).toBeVisible();
+    await expect(page.getByRole('link', { name: /Didit verification privacy notice/i })).toHaveAttribute('href', 'https://didit.me/terms/verification-privacy-notice/');
+    await expect(page.getByRole('link', { name: /Didit end-user terms/i })).toHaveAttribute('href', 'https://didit.me/terms/identity-verification/');
+    await page.getByRole('button', { name: /Start Didit verification/i }).click();
+    await expect(page.getByTestId('didit-session-panel')).toBeVisible();
+    await expect(page.getByRole('link', { name: /Open Didit verification/i })).toHaveAttribute('href', /verification\.didit\.me/);
+    expect(capture.createSessionPayload).toMatchObject({
+      app_role: 'worker',
+      document_type: 'id_card',
+      service_location: { province: 'Bulacan', city_municipality: 'Meycauayan City', barangay: 'Bagbaguin', specific_address: '12 Mabini Street' },
+      consent: { identity_verification_consent: true, data_privacy_consent: true },
+    });
+
+    await page.getByRole('button', { name: /Check verification status/i }).click();
+    await expect(page.getByTestId('identity-outcome')).toContainText('Identity approved');
+    await expect(page.getByTestId('identity-outcome')).toContainText('Confirm your email');
+    expect(capture.createUserPayload).toMatchObject({
+      appRole: 'worker',
+      verificationMode: 'didit',
+      serviceLocation: { province: 'Bulacan', cityMunicipality: 'Meycauayan City', barangay: 'Bagbaguin', specificAddress: '12 Mabini Street' },
+    });
+    await expectNoHorizontalOverflow(page);
+    expect(consoleFailures).toEqual([]);
+  });
+
+  test('Didit pending and declined results remain gated and recoverable', async ({ page }) => {
+    await mockDiditRoutes(page, 'PENDING_REVIEW');
+    await page.goto('/register');
+    await completeRegistrationForm(page, { email: 'pending-review@example.com' });
+    await page.getByRole('button', { name: /Start Didit verification/i }).click();
+    await page.getByRole('button', { name: /Check verification status/i }).click();
+    await expect(page.getByTestId('identity-outcome')).toContainText('Identity review pending');
+    await expect(page.getByTestId('identity-outcome')).toContainText('waiting for identity review');
+
+    await page.evaluate(() => sessionStorage.clear());
+    await page.unroute('**/functions/v1/create-didit-session');
+    await page.unroute('**/functions/v1/create-unverified-user');
+    await mockDiditRoutes(page, 'DECLINED');
+    await page.goto('/register');
+    await completeRegistrationForm(page, { email: 'declined-user@example.com' });
+    await page.getByRole('button', { name: /Start Didit verification/i }).click();
+    await page.getByRole('button', { name: /Check verification status/i }).click();
+    await expect(page.getByTestId('identity-outcome')).toContainText('Verification was not completed');
+    await page.getByRole('button', { name: /Try another verification method/i }).click();
+    await expect(page.getByRole('heading', { name: 'Choose your account' })).toBeVisible();
+  });
+
+  test('Didit resubmission keeps the hosted session available', async ({ page }) => {
+    await mockDiditRoutes(page, 'Resubmitted');
+    await page.goto('/register');
+    await completeRegistrationForm(page, { email: 'resubmit-user@example.com' });
+    await page.getByRole('button', { name: /Start Didit verification/i }).click();
+    await page.getByRole('button', { name: /Check verification status/i }).click();
 
     await expect(page.getByTestId('didit-session-panel')).toBeVisible();
-    await expect(page.getByRole('link', { name: /Open Didit Verification/i })).toHaveAttribute('href', /verification\.didit\.me/);
-
-    await page.getByRole('button', { name: /Check Verification Status/i }).click();
-    await expect(page.getByTestId('identity-outcome')).toContainText('Email confirmation sent');
-    await expect(page.getByTestId('identity-outcome')).toContainText('confirm your email before logging in');
-
-    await expectNoHorizontalOverflow(page);
-    expect(consoleFailures).toEqual([]);
+    await expect(page.getByText(/Didit needs new information/i)).toBeVisible();
+    await expect(page.getByRole('link', { name: /Open Didit verification/i })).toBeVisible();
   });
 
-  test('Didit pending review creates a gated account without sending login access', async ({ page }) => {
-    const consoleFailures = collectConsoleFailures(page);
-    await mockDiditRoutes(page, 'PENDING_REVIEW');
-
-    await page.goto('/#identity-register');
-    await fillDiditSignup(page, 'pending-review@example.com');
-    await page.getByRole('button', { name: /Check Verification Status/i }).click();
-
-    await expect(page.getByTestId('identity-outcome')).toContainText('Identity review pending');
-    await expect(page.getByTestId('identity-outcome')).toContainText('access is held until identity review is approved');
-
-    await expectNoHorizontalOverflow(page);
-    expect(consoleFailures).toEqual([]);
-  });
-
-  test('Didit terminal failure returns the user to retry registration', async ({ page }) => {
-    const consoleFailures = collectConsoleFailures(page);
-    await mockDiditRoutes(page, 'DECLINED');
-
-    await page.goto('/#identity-register');
-    await fillDiditSignup(page, 'declined-user@example.com');
-    await page.getByRole('button', { name: /Check Verification Status/i }).click();
-
-    await expect(page.getByTestId('identity-outcome')).toContainText('Verification was not completed');
-    await page.getByRole('button', { name: /Try Again/i }).click();
-    await expect(page.getByRole('button', { name: /Start Didit Verification/i })).toBeVisible();
-
-    await expectNoHorizontalOverflow(page);
-    expect(consoleFailures).toEqual([]);
-  });
-
-  test('manual document review submits unsupported IDs to the review queue', async ({ page }) => {
+  test('manual document path asks for evidence only after review and consent', async ({ page }) => {
     const consoleFailures = collectConsoleFailures(page);
     let manualPayload = null;
-
     await page.route('**/functions/v1/manual-identity-review', async (route) => {
       const request = route.request();
       if (request.method() === 'OPTIONS') {
         await route.fulfill({ status: 204, headers: corsHeaders });
         return;
       }
-
       manualPayload = readJsonBody(request);
-      await fulfillJson(route, {
-        success: true,
-        userId: '00000000-0000-4000-8000-000000000054',
-        manualReviewId: 'manual-review-123',
-        identityStatus: 'PENDING_REVIEW',
-        message: 'Manual review submitted.',
-      });
+      await fulfillJson(route, { success: true, userId: '00000000-0000-4000-8000-000000000054', manualReviewId: 'manual-review-123', identityStatus: 'PENDING_REVIEW', message: 'Manual review submitted. Email confirmation will be sent after identity approval.' });
     });
 
-    await page.goto('/#identity-register');
-    await page.getByLabel('Identity document').selectOption('umid');
+    await page.goto('/register');
+    await completeRegistrationForm(page, { document: 'UMID', email: 'manual-user@example.com' });
+    await expect(page.getByTestId('manual-review-fields')).toHaveCount(0);
+    await page.getByRole('button', { name: /Continue to manual verification/i }).click();
     await expect(page.getByTestId('manual-review-fields')).toBeVisible();
-
-    await page.getByLabel('Email').fill('manual-user@example.com');
-    await page.getByLabel('Password', { exact: true }).fill('Password123!');
-    await page.getByLabel('Confirm password').fill('Password123!');
     await page.getByLabel('Name on ID').fill('Manual User');
     await page.getByLabel('ID number').fill('UMID-1234567');
     await page.getByLabel('ID expiry date').fill('2030-05-13');
-    await page.locator('#manual-front-image').setInputFiles({
-      name: 'front.png',
-      mimeType: 'image/png',
-      buffer: Buffer.from('front-image'),
-    });
-    await page.locator('#manual-back-image').setInputFiles({
-      name: 'back.png',
-      mimeType: 'image/png',
-      buffer: Buffer.from('back-image'),
-    });
-    await page.locator('#manual-selfie-image').setInputFiles({
-      name: 'selfie.png',
-      mimeType: 'image/png',
-      buffer: Buffer.from('selfie-image'),
-    });
-    await page.getByLabel(/I consent to TrabaWho/i).check();
-    await page.getByRole('button', { name: /Submit Manual Review/i }).click();
+    await page.locator('#frontImage').setInputFiles({ name: 'front.png', mimeType: 'image/png', buffer: Buffer.from('front-image') });
+    await page.locator('#backImage').setInputFiles({ name: 'back.png', mimeType: 'image/png', buffer: Buffer.from('back-image') });
+    await page.locator('#selfieImage').setInputFiles({ name: 'selfie.png', mimeType: 'image/png', buffer: Buffer.from('selfie-image') });
+    await page.getByRole('button', { name: /Submit manual review/i }).click();
 
     await expect(page.getByTestId('identity-outcome')).toContainText('Manual review submitted');
     expect(manualPayload).toMatchObject({
       action: 'submit_manual_review_signup',
       email: 'manual-user@example.com',
+      appRole: 'client',
       documentTypeKey: 'umid',
       identityDocumentNumber: 'UMID-1234567',
+      serviceLocation: { province: 'Bulacan', cityMunicipality: 'Meycauayan City', barangay: 'Bagbaguin', specificAddress: '12 Mabini Street' },
+      consent: { identityVerificationConsent: true, dataPrivacyConsent: true },
     });
-
     await expectNoHorizontalOverflow(page);
     expect(consoleFailures).toEqual([]);
   });
 
-  test('all ID document options route to the correct verification path', async ({ page }) => {
+  test('all registration entry points use the canonical responsive flow', async ({ page }) => {
     const consoleFailures = collectConsoleFailures(page);
-
-    await page.goto('/#identity-register');
-    await expect(page.getByTestId('identity-registration-page')).toBeVisible();
-
-    const expectedModes = {
-      id_card: 'didit',
-      passport: 'didit',
-      drivers_license: 'didit',
-      umid: 'manual_review',
-      postal_id: 'manual_review',
-      voter_id: 'manual_review',
-      prc_id: 'manual_review',
-      health_insurance: 'manual_review',
-      custom_document: 'manual_review',
-    };
-
-    const options = await page.getByLabel('Identity document').locator('option').evaluateAll((nodes) =>
-      nodes.map((node) => ({ value: node.value, label: node.textContent.trim() }))
-    );
-
-    expect(options.map((option) => option.value)).toEqual(Object.keys(expectedModes));
-
-    for (const option of options) {
-      await page.getByLabel('Identity document').selectOption(option.value);
-      const manualVisible = await page.getByTestId('manual-review-fields').isVisible().catch(() => false);
-      const actualMode = manualVisible ? 'manual_review' : 'didit';
-      expect(actualMode, `${option.label} should use ${expectedModes[option.value]}`).toBe(expectedModes[option.value]);
-
-      const actionLabel = actualMode === 'manual_review' ? /Submit Manual Review/i : /Start Didit Verification/i;
-      await expect(page.getByRole('button', { name: actionLabel })).toBeVisible();
+    await page.setViewportSize({ width: 390, height: 844 });
+    for (const path of ['/register', '/#register', '/#identity-register']) {
+      await page.goto(path);
+      await expect(page.getByTestId('registration-page')).toBeVisible();
+      await expect(page.getByRole('heading', { name: 'Choose your account' })).toBeVisible();
+      await expect(page.getByRole('radio', { name: /Client/ })).toBeVisible();
+      await expect(page.getByRole('radio', { name: /Worker/ })).toBeVisible();
+      await expectNoHorizontalOverflow(page);
     }
-
-    await expectNoHorizontalOverflow(page);
-    expect(consoleFailures).toEqual([]);
-  });
-
-  test('identity route is responsive on mobile direct entry', async ({ page }) => {
-    const consoleFailures = collectConsoleFailures(page);
-
-    await page.setViewportSize({ width: 390, height: 844 });
-    await page.goto('/#identity-register');
-
-    await expect(page.getByTestId('identity-registration-page')).toBeVisible();
-    await expect(page.getByRole('heading', { name: /Create a verified account/i })).toBeVisible();
-    await expect(page.getByRole('button', { name: /Start Didit Verification/i })).toBeVisible();
-    await expectNoHorizontalOverflow(page);
-
-    expect(consoleFailures).toEqual([]);
-  });
-
-  test('existing register route includes identity controls on mobile', async ({ page }) => {
-    const consoleFailures = collectConsoleFailures(page);
-
-    await page.setViewportSize({ width: 390, height: 844 });
-    await page.goto('/#register');
-
-    await expect(page.getByRole('heading', { name: /Create Account/i })).toBeVisible();
-    await expect(page.getByLabel('First Name')).toHaveCount(0);
-    await expect(page.getByLabel('Middle Name')).toHaveCount(0);
-    await expect(page.getByLabel('Last Name')).toHaveCount(0);
-    const accountType = page.getByLabel('Account Type');
-    await expect(accountType).toBeVisible();
-    await expect(page.getByLabel('Identity document')).toBeVisible();
-    await accountType.click();
-    await expect(page.getByRole('option', { name: 'Client' })).toBeVisible();
-    await expect(page.getByRole('option', { name: 'Worker' })).toBeVisible();
-    await page.getByRole('option', { name: 'Client' }).click();
-    await expect(accountType).not.toContainText(/fan|musician/i);
-    await expect(page.getByRole('link', { name: 'Go to next page' })).toBeVisible();
-    await expectNoHorizontalOverflow(page);
-
     expect(consoleFailures).toEqual([]);
   });
 });

@@ -1,22 +1,31 @@
 // @ts-nocheck
+const getTrustedRedirect = (candidate: string | null) => {
+  const configuredAppUrl = Deno.env.get("TRABAWHO_APP_URL") || Deno.env.get("SITE_URL") || "";
+  if (!candidate || !configuredAppUrl) return null;
+
+  try {
+    const allowedOrigin = new URL(configuredAppUrl).origin;
+    const requestedUrl = new URL(candidate);
+    return requestedUrl.origin === allowedOrigin ? requestedUrl : null;
+  } catch {
+    return null;
+  }
+};
+
 Deno.serve(async (req: Request) => {
   const url = new URL(req.url);
-  const redirectTo = url.searchParams.get("redirect_to");
+  const redirectTo = getTrustedRedirect(url.searchParams.get("redirect_to"));
   const params = new URLSearchParams(url.searchParams);
   params.delete("redirect_to");
   params.delete("apikey");
 
   if (redirectTo) {
-    const target = decodeURIComponent(redirectTo);
-    const suffix = params.toString();
-    const [baseTarget, hashFragment] = target.split("#", 2);
-    const separator = baseTarget.includes("?") ? "&" : "?";
-    const nextTarget = suffix ? `${baseTarget}${separator}${suffix}` : baseTarget;
+    params.forEach((value, key) => redirectTo.searchParams.set(key, value));
 
     return new Response(null, {
       status: 302,
       headers: {
-        Location: hashFragment ? `${nextTarget}#${hashFragment}` : nextTarget,
+        Location: redirectTo.toString(),
       },
     });
   }

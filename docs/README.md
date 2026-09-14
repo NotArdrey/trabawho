@@ -15,4 +15,12 @@ When documents disagree, follow the highest applicable document and update the l
 
 - [`migrations/react-typescript-shadcn.md`](migrations/react-typescript-shadcn.md)
 
+## Architecture reference
+
+- [`architecture/system-architecture.md`](architecture/system-architecture.md) — current system context, runtime containers, data domains, critical flows, security boundaries, and deployment model.
+
+## Feature requirements
+
+- [`features/admin/README.md`](features/admin/README.md) — Admin portal requirements, permissions, moderation workflows, and management interfaces.
+
 Historical root-level plans remain reference material. They are not a substitute for the standards above.

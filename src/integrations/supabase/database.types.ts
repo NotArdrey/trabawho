@@ -31,6 +31,10 @@ export interface Database {
         city: string | null;
         barangay: string | null;
         address: string | null;
+        identity_document_type: string | null;
+        verification_method: "DIDIT" | "MANUAL" | null;
+        identity_verification_consent: boolean;
+        data_privacy_consent: boolean;
         is_client: boolean;
         is_worker: boolean;
       }>;

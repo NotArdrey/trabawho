@@ -31,46 +31,40 @@ import {
   updateRegistrationAttempt,
   verifySessionNonce,
 } from "../_shared/identityRegistration.ts";
+import {
+  assertCompleteRegistrationDetails,
+  normalizeRegistrationDetails,
+} from "../_shared/registrationDetails.ts";
 
 const fetchLiveDiditDecision = async (sessionId: string) => {
   const diditApiKey = Deno.env.get("DIDIT_API_KEY") || "";
   if (!diditApiKey || !sessionId) return {};
 
-  let merged: Record<string, unknown> = {};
-  for (const url of [
-    `https://verification.didit.me/v3/session/${encodeURIComponent(sessionId)}/decision/`,
-    `https://verification.didit.me/v3/session/${encodeURIComponent(sessionId)}`,
-  ]) {
-    try {
-      const response = await fetch(url, {
+  try {
+    const response = await fetch(
+      `https://verification.didit.me/v3/session/${encodeURIComponent(sessionId)}/decision/`,
+      {
         method: "GET",
-        headers: {
-          "Content-Type": "application/json",
-          "x-api-key": diditApiKey,
-        },
-      });
-      if (!response.ok) continue;
-      const payload = await response.json();
-      merged = { ...merged, ...payload };
-    } catch (error) {
-      console.error("create_unverified_user_didit_lookup_failed", {
-        sessionId,
-        message: error instanceof Error ? error.message : String(error),
-      });
+        headers: { "x-api-key": diditApiKey, Accept: "application/json" },
+      },
+    );
+    if (!response.ok) {
+      console.error("create_unverified_user_didit_lookup_failed", { sessionId, status: response.status });
+      return {};
     }
+    return await response.json();
+  } catch (error) {
+    console.error("create_unverified_user_didit_lookup_failed", {
+      sessionId,
+      message: error instanceof Error ? error.message : String(error),
+    });
+    return {};
   }
-
-  return merged;
-};
-
-const isDiditAutoApproveEnabled = () => {
-  const value = cleanString(Deno.env.get("TRABAWHO_DIDIT_AUTO_APPROVE") || Deno.env.get("DIDIT_AUTO_APPROVE"));
-  return ["1", "true", "yes", "on"].includes(value.toLowerCase());
 };
 
 const ensureSignupAuthUser = async (
   supabaseAdmin: any,
-  { email, password, identityRole, appRole, fullName, identityStatus, diditSessionId, documentType, documentTypeKey }: Record<string, unknown>,
+  { email, password, identityRole, appRole, fullName, identityStatus, diditSessionId, documentType, documentTypeKey, registrationDetails }: Record<string, unknown>,
 ) => {
   const existingUser = await findAuthUserByEmail(supabaseAdmin, email);
   const metadata = {
@@ -85,6 +79,12 @@ const ensureSignupAuthUser = async (
     selected_document_type_key: cleanString(documentTypeKey),
     verification_mode: "didit",
     didit_session_id: cleanString(diditSessionId),
+    province: cleanString(registrationDetails?.province),
+    city: cleanString(registrationDetails?.city),
+    barangay: cleanString(registrationDetails?.barangay),
+    address: cleanString(registrationDetails?.address),
+    identity_verification_consent: registrationDetails?.identityVerificationConsent === true,
+    data_privacy_consent: registrationDetails?.dataPrivacyConsent === true,
   };
 
   if (existingUser) {
@@ -160,6 +160,9 @@ serve(async (req: Request) => {
       return jsonResponse({ success: false, error: "Didit session could not be validated. Please restart identity verification." });
     }
 
+    const registrationDetails = normalizeRegistrationDetails(localSession.verification_data);
+    assertCompleteRegistrationDetails(registrationDetails);
+
     const nonceHash = localSession?.verification_data?.session_nonce_hash;
     if (nonceHash && !(await verifySessionNonce(diditSessionId, sessionNonce, nonceHash))) {
       await updateRegistrationAttempt(supabaseAdmin, attemptId, { success: false, reason: "invalid_session_nonce" });
@@ -204,8 +207,7 @@ serve(async (req: Request) => {
       fullName,
     });
 
-    const autoApproveDidit = isDiditAutoApproveEnabled();
-    let finalIdentityStatus = resolvedStatus === "APPROVED" || autoApproveDidit ? "APPROVED" : "PENDING_REVIEW";
+    let finalIdentityStatus = resolvedStatus === "APPROVED" ? "APPROVED" : "PENDING_REVIEW";
     let duplicateIdentity = { hasDuplicate: false, matches: [] };
     if (documentFingerprint) {
       duplicateIdentity = await findDuplicateIdentityClaim(supabaseAdmin, {
@@ -213,7 +215,7 @@ serve(async (req: Request) => {
         role: identityRole,
         email,
       });
-      if (duplicateIdentity.hasDuplicate && !autoApproveDidit) finalIdentityStatus = "PENDING_REVIEW";
+      if (duplicateIdentity.hasDuplicate) finalIdentityStatus = "PENDING_REVIEW";
     }
 
     const authUser = await ensureSignupAuthUser(supabaseAdmin, {
@@ -226,6 +228,7 @@ serve(async (req: Request) => {
       diditSessionId,
       documentType,
       documentTypeKey,
+      registrationDetails,
     });
 
     const profilePayload = buildProfilePayload({
@@ -237,6 +240,9 @@ serve(async (req: Request) => {
       identityStatus: finalIdentityStatus,
       diditSessionId,
       idDocumentExpiry: document.expiry || null,
+      documentTypeKey,
+      verificationMethod: "DIDIT",
+      ...registrationDetails,
     });
 
     const { error: profileError } = await supabaseAdmin
@@ -309,7 +315,7 @@ serve(async (req: Request) => {
       success: true,
       user_id: authUser.id,
       didit_session_id: diditSessionId,
-      metadata: { identityRole, appRole, identityStatus: finalIdentityStatus, autoApproveDidit },
+      metadata: { identityRole, appRole, identityStatus: finalIdentityStatus },
     });
 
     return jsonResponse({
@@ -321,7 +327,6 @@ serve(async (req: Request) => {
       emailConfirmationDeferred: finalIdentityStatus !== "APPROVED",
       emailDelivery,
       manualReviewId: manualReview?.id || null,
-      autoApproved: autoApproveDidit,
       message: finalIdentityStatus === "APPROVED"
         ? "Identity approved. Confirm your email before logging in."
         : "Your account was created and is waiting for identity review.",

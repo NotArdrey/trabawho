@@ -283,6 +283,11 @@ function AuthPage({
           return;
         }
 
+        if (diditSession.status === 'RESUBMISSION_REQUIRED') {
+          setLoginStatusMessage('Didit needs new information. Return to registration and reopen the same verification session.');
+          return;
+        }
+
         if (isTerminalIdentityFailure(diditSession.status)) {
           clearIdentitySignupState();
           setLoginStatusMessage('Didit did not approve this attempt. Please start registration again with a valid document.');

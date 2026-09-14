@@ -21,7 +21,14 @@ export type AppRoute =
   | "/settings/account"
   | "/settings/preferences"
   | "/seller/onboarding"
-  | "/admin";
+  | "/admin"
+  | "/admin/users"
+  | "/admin/jobs"
+  | "/admin/employers"
+  | "/admin/applications"
+  | "/admin/moderation"
+  | "/admin/audit-logs"
+  | "/admin/settings";
 
 export interface UserLocation {
   province: string;

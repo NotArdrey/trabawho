@@ -2,7 +2,7 @@ import { useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 
 import Navigation from "@/shared/components/Navigation";
-import { AuthPage, IdentityRegistrationPage } from "@/features/auth";
+import { AuthPage, RegistrationPage } from "@/features/auth";
 import { BrowseServicesPage } from "@/features/marketplace";
 
 import FeaturedServices from "../components/FeaturedServices";
@@ -74,6 +74,10 @@ export default function LandingPage({
   };
 
   if (authMode) {
+    if (authMode === "register") {
+      return <RegistrationPage onBack={() => goTo("/")} onLogin={() => openAuthMode("login")} />;
+    }
+
     return (
       <AuthPage
         mode={authMode}
@@ -87,7 +91,7 @@ export default function LandingPage({
   }
 
   if (isIdentityRegisterOpen) {
-    return <IdentityRegistrationPage onBack={() => goTo("/")} onLogin={() => openAuthMode("login")} />;
+    return <RegistrationPage onBack={() => goTo("/")} onLogin={() => openAuthMode("login")} />;
   }
 
   if (isPublicBrowseOpen) {

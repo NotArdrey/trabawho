@@ -1,10 +1,12 @@
 const { createClient } = require('@supabase/supabase-js');
-const { requireEnv } = require('./env');
+const { loadRepoEnv, requireEnv } = require('./env');
+
+loadRepoEnv();
 
 const DEMO_CLIENT_EMAIL = 'demo.user@trabawho.test';
 const DEMO_ADMIN_EMAIL = 'demo.admin@trabawho.test';
 const DEMO_WORKER_EMAIL = 'demo.worker@trabawho.test';
-const DEMO_PASSWORD = 'pass123';
+const DEMO_PASSWORD = process.env.APP_PASSWORD || 'pass123';
 
 function createTestSupabaseClient() {
   return createClient(

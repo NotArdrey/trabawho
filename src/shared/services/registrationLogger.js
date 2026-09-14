@@ -11,6 +11,14 @@ const SENSITIVE_KEYS = new Set([
   'accessToken',
   'refreshToken',
   'token',
+  'address',
+  'specificAddress',
+  'specific_address',
+  'fullName',
+  'manualFullName',
+  'identityDocumentNumber',
+  'idDocumentNumber',
+  'documentNumber',
 ]);
 
 const URL_KEYS = new Set([

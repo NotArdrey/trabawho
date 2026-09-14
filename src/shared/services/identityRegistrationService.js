@@ -50,10 +50,13 @@ export const normalizeIdentityStatus = (value) => {
     return 'PENDING_REVIEW';
   }
   if (['DECLINED', 'REJECTED', 'DENIED'].includes(normalized)) return 'DECLINED';
+  if (['RESUBMITTED', 'RESUBMISSION', 'RESUBMIT', 'RESUBMISSION_REQUIRED', 'NEEDS_RESUBMISSION'].includes(normalized)) {
+    return 'RESUBMISSION_REQUIRED';
+  }
   if (['ABANDONED', 'EXPIRED', 'CANCELLED', 'CANCELED', 'KYC_EXPIRED'].includes(normalized)) {
     return normalized === 'CANCELED' ? 'CANCELLED' : normalized;
   }
-  if (['NOT_STARTED', 'IN_PROGRESS', 'PENDING', 'PROCESSING', 'SUBMITTED', 'STARTED', 'CREATED'].includes(normalized)) {
+  if (['NOT_STARTED', 'IN_PROGRESS', 'PENDING', 'PROCESSING', 'SUBMITTED', 'STARTED', 'CREATED', 'AWAITING_USER'].includes(normalized)) {
     return 'PENDING';
   }
   return normalized;
@@ -66,8 +69,6 @@ export const isActiveIdentityStatus = (status) =>
   IDENTITY_STATUS.ACTIVE.includes(normalizeIdentityStatus(status));
 
 const getWindowOrigin = () => (typeof window === 'undefined' ? '' : window.location.origin);
-
-export const getIdentityRedirectUrl = () => `${getWindowOrigin()}/?check_verification=true#login`;
 
 const buildTempSignupRef = () => {
   const suffix = typeof crypto !== 'undefined' && crypto.randomUUID
@@ -189,9 +190,16 @@ export const startDiditIdentitySession = async (formData) => {
     role: identityRole,
     app_role: appRole,
     document_type: documentType.key,
-    redirect_url: getIdentityRedirectUrl(),
-    callback: getIdentityRedirectUrl(),
-    existing_session_id: formData.existingSessionId || undefined,
+    service_location: {
+      province: cleanString(formData.province),
+      city_municipality: cleanString(formData.city),
+      barangay: cleanString(formData.barangay),
+      specific_address: cleanString(formData.address),
+    },
+    consent: {
+      identity_verification_consent: formData.acceptedIdentityTerms === true,
+      data_privacy_consent: formData.acceptedRaTerms === true,
+    },
   });
 
   const sessionId = data.sessionId || data.session_id;
@@ -219,6 +227,12 @@ export const startDiditIdentitySession = async (formData) => {
     sessionNonce: data.sessionNonce || data.session_nonce || '',
     verificationUrl,
     workflowId: data.workflowId || data.workflow_id || null,
+    province: cleanString(formData.province),
+    city: cleanString(formData.city),
+    barangay: cleanString(formData.barangay),
+    address: cleanString(formData.address),
+    acceptedIdentityTerms: formData.acceptedIdentityTerms === true,
+    acceptedRaTerms: formData.acceptedRaTerms === true,
   };
 
   saveIdentitySignupState(nextState);
@@ -280,6 +294,16 @@ export const finishDiditIdentitySignup = async (state, status) => {
     verificationMode: 'didit',
     redirectTo: `${getWindowOrigin()}/#login`,
     diditStatus: normalizeIdentityStatus(status),
+    serviceLocation: {
+      province: cleanString(state.province),
+      cityMunicipality: cleanString(state.city),
+      barangay: cleanString(state.barangay),
+      specificAddress: cleanString(state.address),
+    },
+    consent: {
+      identityVerificationConsent: state.acceptedIdentityTerms === true,
+      dataPrivacyConsent: state.acceptedRaTerms === true,
+    },
   });
 
   clearIdentitySignupState();
@@ -349,6 +373,16 @@ export const submitManualIdentityReview = async (formData) => {
     backImage,
     selfieImage,
     source: 'MANUAL_UPLOAD',
+    serviceLocation: {
+      province: cleanString(formData.province),
+      cityMunicipality: cleanString(formData.city),
+      barangay: cleanString(formData.barangay),
+      specificAddress: cleanString(formData.address),
+    },
+    consent: {
+      identityVerificationConsent: formData.acceptedIdentityTerms === true,
+      dataPrivacyConsent: formData.acceptedRaTerms === true,
+    },
   });
 
   clearIdentitySignupState();

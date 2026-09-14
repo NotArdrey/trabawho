@@ -108,8 +108,14 @@ test('admin demo account logs in and can access the admin dashboard', async ({ p
 
   await loginAs(page, DEMO_ADMIN_EMAIL);
   await expect(page.getByRole('heading', { name: 'TrabaWho Admin Dashboard' })).toBeVisible({ timeout: 20_000 });
-  await expect(page.getByText('Admin Portal UI')).toBeVisible();
-  await page.getByRole('button', { name: 'Back to App' }).click();
+  await expect(page.getByRole('heading', { name: 'Pending reviews' })).toBeVisible();
+  await page.getByRole('button', { name: /^Users/ }).click();
+  await expect(page).toHaveURL(/\/admin\/users$/);
+  await expect(page.getByRole('heading', { name: 'User management', level: 2 })).toBeVisible();
+  await page.getByRole('button', { name: /^Jobs$/ }).click();
+  await expect(page).toHaveURL(/\/admin\/jobs$/);
+  await expect(page.getByText('Data connection pending')).toBeVisible();
+  await page.getByRole('button', { name: 'Back to TrabaWho' }).first().click();
   await expect(page.getByLabel('My Work')).toBeVisible();
 
   expect(consoleFailures).toEqual([]);
