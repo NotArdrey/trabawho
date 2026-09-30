@@ -55,7 +55,7 @@ function AttachmentUpload({ acceptLabel = "PDF, Word, JPG, PNG, or WEBP", isUplo
           <p className="mt-0.5 text-xs text-muted-foreground">{acceptLabel}</p>
         </div>
       </div>
-      <Button type="button" variant="outline" className="w-full bg-background sm:w-auto" onClick={onChoose} disabled={isUploading}>
+      <Button type="button" className="w-full sm:w-auto" onClick={onChoose} disabled={isUploading}>
         {isUploading ? <LoaderCircle className="animate-spin" aria-hidden="true" /> : <Upload aria-hidden="true" />}
         {isUploading ? "Uploading…" : "Choose file"}
       </Button>

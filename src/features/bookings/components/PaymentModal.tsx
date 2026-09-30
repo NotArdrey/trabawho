@@ -46,11 +46,7 @@ interface PaymentBooking {
   workerName?: string;
 }
 
-export interface MockPaymentDetails {
-  mockPaymentReference: string;
-  mockPaymentAt: string;
-  mockPaymentProvider: string;
-  mockPaymentStatus: "test-approved";
+export interface PaymentSelectionDetails {
   serviceAmount: number;
   transactionFeeRate: number;
   transactionFeePercent: string;
@@ -69,7 +65,7 @@ export interface PaymentModalProps {
   booking: PaymentBooking;
   confirmLabel?: string;
   onCancel: () => void;
-  onSelectPayment: (method: ResolvedPaymentMethod, details: MockPaymentDetails) => unknown;
+  onSelectPayment: (method: ResolvedPaymentMethod, details: PaymentSelectionDetails) => unknown;
   scheduleLabel?: string;
   scheduleValue?: string;
   subtitle?: string;
@@ -104,12 +100,6 @@ function formatSchedule(booking: PaymentBooking) {
   return `${dateLabel} · ${formatTime(time)}`;
 }
 
-function buildMockReference(method: ResolvedPaymentMethod) {
-  const date = new Date();
-  const stamp = [date.getFullYear(), String(date.getMonth() + 1).padStart(2, "0"), String(date.getDate()).padStart(2, "0")].join("");
-  return `MOCK-${method.toUpperCase()}-${stamp}-${Math.floor(Math.random() * 900000 + 100000)}`;
-}
-
 export default function PaymentModal({
   advancePaymentDescription,
   amountLabel = "Service price",
@@ -134,7 +124,6 @@ export default function PaymentModal({
   const [paymentPlan, setPaymentPlan] = useState<PaymentPlan>(booking.paymentPlan === "downpayment" ? "downpayment" : "full");
   const [afterServiceChannel, setAfterServiceChannel] = useState<"cash" | "gcash">(afterServicePaymentType === "gcash-only" ? "gcash" : "cash");
   const [isProcessing, setIsProcessing] = useState(false);
-  const [completedReference, setCompletedReference] = useState("");
   const [submitError, setSubmitError] = useState("");
 
   const amountDueNow = isPayingRemainingBalance
@@ -159,11 +148,7 @@ export default function PaymentModal({
     try {
       setSubmitError("");
       setIsProcessing(true);
-      const paymentDetails: MockPaymentDetails = {
-        mockPaymentReference: buildMockReference(resolvedMethod),
-        mockPaymentAt: new Date().toISOString(),
-        mockPaymentProvider: resolvedMethod.includes("gcash") ? "GCash sandbox" : "Cash confirmation sandbox",
-        mockPaymentStatus: "test-approved",
+      const paymentDetails: PaymentSelectionDetails = {
         serviceAmount: baseAmount,
         transactionFeeRate: pricing.transactionFeeRate,
         transactionFeePercent: pricing.transactionFeePercent,
@@ -176,9 +161,8 @@ export default function PaymentModal({
         paymentAttemptAmount: amountDueNow,
       };
       await Promise.resolve(onSelectPayment(resolvedMethod, paymentDetails));
-      setCompletedReference(paymentDetails.mockPaymentReference);
     } catch {
-      setSubmitError("We couldn’t save this payment choice. Please try again.");
+      setSubmitError("We couldn't open secure GCash checkout. Please try again.");
     } finally {
       setIsProcessing(false);
     }
@@ -193,8 +177,8 @@ export default function PaymentModal({
               <WalletCards className="size-5" aria-hidden="true" />
             </span>
             <div>
-              <DialogTitle className="text-2xl">{isProcessing ? "Creating your booking" : completedReference ? "Booking request created" : title}</DialogTitle>
-              <DialogDescription className="mt-1.5 leading-5">{isProcessing ? "Saving your booking and payment choice securely." : completedReference ? "Your request was saved successfully." : resolvedSubtitle}</DialogDescription>
+              <DialogTitle className="text-2xl">{isProcessing ? "Opening secure checkout" : title}</DialogTitle>
+              <DialogDescription className="mt-1.5 leading-5">{isProcessing ? "Preparing your booking on PayMongo." : resolvedSubtitle}</DialogDescription>
             </div>
           </div>
         </DialogHeader>
@@ -204,27 +188,9 @@ export default function PaymentModal({
             <span className="flex size-16 items-center justify-center rounded-full bg-primary/10 text-primary">
               <LoaderCircle className="size-8 animate-spin" aria-hidden="true" />
             </span>
-            <h3 className="mt-5 text-xl font-bold text-foreground">Creating your booking</h3>
-            <p className="mt-2 max-w-sm text-sm leading-6 text-muted-foreground">Keep this window open while we save the schedule and payment information.</p>
+            <h3 className="mt-5 text-xl font-bold text-foreground">Opening secure GCash checkout</h3>
+            <p className="mt-2 max-w-sm text-sm leading-6 text-muted-foreground">Keep this window open while PayMongo prepares the payment page.</p>
           </div>
-        ) : completedReference ? (
-          <>
-            <div className="flex flex-col items-center px-6 py-10 text-center">
-              <span className="flex size-16 items-center justify-center rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300">
-                <CheckCircle2 className="size-9" aria-hidden="true" />
-              </span>
-              <h3 className="mt-5 text-2xl font-bold text-foreground">Your booking request is ready</h3>
-              <p className="mt-2 max-w-md text-sm leading-6 text-muted-foreground">The provider can now review your request. You’ll receive an update when the booking moves forward.</p>
-              <div className="mt-6 grid w-full max-w-md gap-3 rounded-xl bg-muted/45 p-4 text-left sm:grid-cols-2">
-                <div><p className="text-xs font-bold uppercase tracking-wide text-muted-foreground">Service</p><p className="mt-1 font-semibold text-foreground">{booking.serviceType || "Service booking"}</p></div>
-                <div><p className="text-xs font-bold uppercase tracking-wide text-muted-foreground">Amount submitted</p><p className="mt-1 text-lg font-extrabold text-emerald-600 dark:text-emerald-400">{formatPhp(amountDueNow)}</p></div>
-                <div className="sm:col-span-2"><p className="text-xs font-bold uppercase tracking-wide text-muted-foreground">Test payment reference</p><p className="mt-1 break-all font-mono text-sm font-semibold text-foreground">{completedReference}</p></div>
-              </div>
-            </div>
-            <DialogFooter className="bg-muted/40 px-4 py-4 sm:px-6">
-              <Button type="button" className="w-full sm:w-auto" onClick={onCancel}>Done</Button>
-            </DialogFooter>
-          </>
         ) : (
           <>
           <div className="grid gap-5 px-4 py-5 sm:px-6 sm:py-6">
@@ -348,7 +314,7 @@ export default function PaymentModal({
           <Button type="button" variant="outline" onClick={onCancel} disabled={isProcessing}>Cancel</Button>
           <Button type="button" onClick={() => { void handleConfirmPayment(); }} disabled={!selectedMethod} isLoading={isProcessing}>
             {isProcessing ? <LoaderCircle className="animate-spin" aria-hidden="true" /> : <Send aria-hidden="true" />}
-            {isProcessing ? "Saving payment…" : confirmLabel}
+            {isProcessing ? "Opening checkout..." : confirmLabel}
           </Button>
         </DialogFooter>
           </>

@@ -1134,7 +1134,6 @@ export const createClientBooking = async ({ provider, pendingBooking, paymentMet
     refund_eligible: paymentMethod === 'gcash-advance',
     can_rate: false,
     created_via: 'marketplace',
-    mock_payment: mockPayment,
     payment_plan: mockPayment?.paymentPlan || 'full',
   };
 
@@ -1143,11 +1142,7 @@ export const createClientBooking = async ({ provider, pendingBooking, paymentMet
     p_slot_id: slotId,
     p_payment_method: paymentMethod,
     p_total_amount: totalAmount,
-    p_metadata: {
-      ...metadata,
-      payment_reference: mockPayment?.mockPaymentReference || null,
-      transaction_id: mockPayment?.mockPaymentReference || null,
-    },
+    p_metadata: metadata,
   });
 
   if (error) throw mapDatabaseError(error);

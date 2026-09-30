@@ -26,6 +26,7 @@ import {
 import SuccessNotification from '../../../shared/components/SuccessNotification';
 import ErrorNotification from '../../../shared/components/ErrorNotification';
 import { createClientBooking, startServiceConversation } from '../../bookings/services/bookingService';
+import { createPayMongoCheckout, redirectToPayMongo } from '../../bookings/services/paymongoCheckout';
 import { fetchAllActiveServices } from '../../../shared/services/authService';
 import { supabase } from '../../../shared/services/supabaseClient';
 import BookingCalendarModal from '../../bookings/components/BookingCalendarModal';
@@ -510,12 +511,14 @@ function BrowseServicesPage({
     try {
       setIsBookingSubmitting(true);
       setBookingError('');
-      await createClientBooking({
+      const createdBooking = await createClientBooking({
         provider: worker,
         pendingBooking,
         paymentMethod: selectedPaymentMethod,
         mockPayment,
       });
+      const checkout = await createPayMongoCheckout(createdBooking);
+      redirectToPayMongo(checkout);
     } catch (error) {
       setBookingError(error?.message || 'Unable to create booking.');
       setIsBookingSubmitting(false);
@@ -542,18 +545,6 @@ function BrowseServicesPage({
       };
     });
 
-    const paymentLabel =
-      selectedPaymentMethod === 'gcash-advance'
-        ? 'GCash advance payment'
-        : selectedPaymentMethod === 'after-service-cash'
-          ? 'cash after-service payment'
-          : 'GCash after-service payment';
-
-    setBookingMessage(
-      selectedPaymentMethod === 'gcash-advance'
-        ? `${mockPayment?.paymentPlan === 'downpayment' ? '50% downpayment' : 'Full payment'} booking created. GCash payment is pending provider verification before confirmation.`
-        : `Booking scheduled with ${paymentLabel}. Payment is required before final completion.`
-    );
     setIsBookingSubmitting(false);
   };
 

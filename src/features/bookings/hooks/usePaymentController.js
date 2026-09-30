@@ -13,6 +13,7 @@
 
 import { useState, useCallback } from 'react';
 import { selectBookingPaymentPlan } from '../services/bookingService';
+import { createPayMongoCheckout, redirectToPayMongo } from '../services/paymongoCheckout';
 
 export function usePaymentController(onPaymentProofSubmit, onPaymentMethodSelect, updateBooking, replaceBooking) {
   // ========================================================================
@@ -112,6 +113,8 @@ export function usePaymentController(onPaymentProofSubmit, onPaymentMethodSelect
     if (paymentMethod === 'gcash-advance') {
       if (booking?.paymentStatus === 'partially_paid') {
         onPaymentMethodSelect?.(booking.id, paymentMethod, mockPayment);
+        const checkout = await createPayMongoCheckout(booking);
+        redirectToPayMongo(checkout);
         return booking;
       }
       const updated = await selectBookingPaymentPlan(
@@ -120,6 +123,8 @@ export function usePaymentController(onPaymentProofSubmit, onPaymentMethodSelect
       );
       replaceBooking?.(updated);
       onPaymentMethodSelect?.(booking.id, paymentMethod, mockPayment);
+      const checkout = await createPayMongoCheckout(updated);
+      redirectToPayMongo(checkout);
       return updated;
     }
 

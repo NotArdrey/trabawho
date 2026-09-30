@@ -44,6 +44,13 @@ describe("DigitalPortfolioModal", () => {
     expect(screen.getAllByText("No reviews yet").length).toBeGreaterThan(0);
   });
 
+  it("provides a bounded touch-scrollable mobile content region", () => {
+    render(<DigitalPortfolioModal {...provider} />);
+    const region = screen.getByRole("region", { name: "Portfolio preview content" });
+    expect(region).toHaveClass("min-h-0", "touch-pan-y", "overflow-y-auto", "overscroll-y-contain");
+    expect(screen.getByRole("dialog")).toHaveClass("grid-rows-[auto_minmax(0,1fr)_auto]", "overflow-hidden");
+  });
+
   it("downloads the visible portfolio data", async () => {
     const user = userEvent.setup();
     render(<DigitalPortfolioModal {...provider} />);

@@ -1160,7 +1160,7 @@ const MyBookings = ({
           booking={currentBooking}
           onSelectPayment={(method, mockPayment) => handleSelectPaymentMethod(currentBooking.id, method, mockPayment)}
           onCancel={handleBackToList}
-          confirmLabel={currentBooking.paymentStatus === 'partially_paid' ? 'Pay Remaining Balance' : 'Submit Payment'}
+          confirmLabel={currentBooking.paymentStatus === 'partially_paid' ? 'Pay Remaining Balance' : 'Continue to GCash'}
         />
       )}
 

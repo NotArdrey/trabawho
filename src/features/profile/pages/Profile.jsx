@@ -5,6 +5,7 @@ import PaymentModal from '../../bookings/components/PaymentModal';
 import BookingTermsModal from '../../bookings/components/BookingTermsModal';
 import AccountPrivacyPanel from '../components/AccountPrivacyPanel';
 import { ProfilePhotoDialog } from '../components/ProfilePhotoDialog';
+import { ProfileNameDialog } from '../components/ProfileNameDialog';
 import { getThemeTokens } from '../../../shared/styles/themeTokens';
 import { getProfilePhotoUrl, hasUploadedProfilePhoto } from '../../../shared/utils/profilePhoto';
 import { fetchSellerServices, updateServiceAdBoost, uploadPortfolioDocument } from '../../../shared/services/authService';
@@ -44,8 +45,6 @@ function Profile({ appTheme = 'light', themeMode = 'system', onThemeChange, curr
   const [isPhotoSourceOpen, setIsPhotoSourceOpen] = useState(false);
   const [isPortfolioModalOpen, setIsPortfolioModalOpen] = useState(false);
   const isBackHovered = false;
-  const [isHeadingHovered, setIsHeadingHovered] = useState(false);
-  const [isPortfolioHovered, setIsPortfolioHovered] = useState(false);
   const [isSavingName, setIsSavingName] = useState(false);
   const [isSavingBio, setIsSavingBio] = useState(false);
   const [isSavingPhoto, setIsSavingPhoto] = useState(false);
@@ -401,11 +400,6 @@ function Profile({ appTheme = 'light', themeMode = 'system', onThemeChange, curr
     avatarPlaceholder: { width: isMobile ? '112px' : '142px', height: isMobile ? '112px' : '142px', borderRadius: '50%', background: themeTokens.surfaceSoft },
     textPlaceholder: { height: '12px', borderRadius: '999px', background: themeTokens.surfaceSoft },
     profilePhotoEdit: { fontSize: '12px', fontWeight: 700, color: themeTokens.accent },
-    inlineEditRow: { display: 'flex', alignItems: 'center', gap: '8px', marginTop: '12px', justifyContent: 'center', flexWrap: 'wrap' },
-    inlineEditInput: { minWidth: isMobile ? '0' : '260px', width: isMobile ? '100%' : 'auto', border: `1px solid ${themeTokens.inputBorder}`, borderRadius: '8px', padding: '8px 10px', fontSize: '16px', background: themeTokens.inputBg, color: themeTokens.inputText },
-    inlineEditSave: { border: 'none', borderRadius: '8px', padding: '8px 10px', cursor: 'pointer', fontWeight: 700, background: themeTokens.accent, color: '#ffffff' },
-    inlineEditCancel: { border: 'none', borderRadius: '8px', padding: '8px 10px', cursor: 'pointer', fontWeight: 700, background: themeTokens.surfaceAlt, color: themeTokens.textPrimary },
-    editableHeading: { margin: '12px 0 8px', color: isHeadingHovered ? themeTokens.accent : themeTokens.textPrimary, cursor: 'pointer' },
     verifiedBadge: { display: 'inline-block', background: themeTokens.successBg, color: themeTokens.successText, border: `1px solid ${themeTokens.successBorder}`, borderRadius: '999px', padding: '6px 12px', fontSize: '12px', fontWeight: 700 },
     profileSection: { marginBottom: '18px', padding: '14px', border: `1px solid ${themeTokens.border}`, borderRadius: '10px', background: themeTokens.surfaceAlt },
     portfolioSection: { background: themeTokens.accentSoft, border: `2px solid ${themeTokens.accent}` },
@@ -425,7 +419,7 @@ function Profile({ appTheme = 'light', themeMode = 'system', onThemeChange, curr
       fontWeight: 600,
     },
     portfolioParagraph: { margin: 0, color: themeTokens.textPrimary, lineHeight: 1.55 },
-    generatePortfolioBtn: { width: '100%', border: 'none', borderRadius: '8px', padding: '12px', background: isPortfolioHovered ? themeTokens.accentHover : themeTokens.accent, color: '#ffffff', fontWeight: 700, fontSize: '14px', cursor: 'pointer', marginTop: '8px', transition: 'all 0.3s ease', transform: isPortfolioHovered ? 'translateY(-2px)' : 'translateY(0)', boxShadow: isPortfolioHovered ? themeTokens.accentShadow : 'none' },
+    generatePortfolioBtn: { width: '100%', border: 'none', borderRadius: '8px', padding: '12px', background: themeTokens.accent, color: '#ffffff', fontWeight: 700, fontSize: '14px', cursor: 'pointer', marginTop: '8px' },
     portfolioDocActions: { display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '12px' },
     portfolioDocList: { display: 'grid', gap: '8px', marginTop: '12px' },
     portfolioDocItem: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px', padding: '10px', borderRadius: '8px', border: `1px solid ${themeTokens.border}`, background: themeTokens.surface },
@@ -479,7 +473,7 @@ function Profile({ appTheme = 'light', themeMode = 'system', onThemeChange, curr
 
       <main className="profile-main-modern" style={styles.main}>
         <div className="profile-surface" style={styles.card}>
-          {saveError && <p style={styles.saveError}>{saveError}</p>}
+          {saveError && !isEditingName && <p style={styles.saveError}>{saveError}</p>}
 
           <div className="profile-identity" style={styles.hero}>
             {isProfileLoading ? (
@@ -498,28 +492,11 @@ function Profile({ appTheme = 'light', themeMode = 'system', onThemeChange, curr
 
             {isProfileLoading ? (
               <div style={{ ...styles.textPlaceholder, width: '220px' }} />
-            ) : isEditingName ? (
-              <div style={styles.inlineEditRow}>
-                <input style={{ ...styles.inlineEditInput, minWidth: '160px' }} type="text" value={draftFirstName} onChange={(event) => setDraftFirstName(event.target.value)} placeholder="First name" />
-                <input style={{ ...styles.inlineEditInput, minWidth: '160px' }} type="text" value={draftMiddleName} onChange={(event) => setDraftMiddleName(event.target.value)} placeholder="Middle name (optional)" />
-                <input style={{ ...styles.inlineEditInput, minWidth: '160px' }} type="text" value={draftLastName} onChange={(event) => setDraftLastName(event.target.value)} placeholder="Last name" />
-                <button style={styles.inlineEditSave} onClick={saveName} disabled={isSavingName}>{isSavingName ? 'Saving...' : 'Save'}</button>
-                <button style={styles.inlineEditCancel} onClick={() => { setIsEditingName(false); setDraftFirstName(firstName); setDraftMiddleName(middleName); setDraftLastName(lastName); }}>
-                  Cancel
-                </button>
-              </div>
             ) : (
-              <button
-                type="button"
-                className="profile-name-control"
-                style={styles.editableHeading}
-                onMouseEnter={() => setIsHeadingHovered(true)}
-                onMouseLeave={() => setIsHeadingHovered(false)}
-                onClick={() => setIsEditingName(true)}
-                aria-label="Edit profile name"
-              >
-                <span>{displayName}</span><Pencil size={15} aria-hidden="true" />
-              </button>
+              <div className="mt-3 flex max-w-full items-center justify-center gap-1">
+                <h1 className="min-w-0 break-words text-xl font-bold tracking-tight text-foreground sm:text-2xl">{displayName}</h1>
+                <Button type="button" variant="ghost" size="icon" className="text-primary" onClick={() => { setSaveError(''); setIsEditingName(true); }} aria-label="Edit profile name"><Pencil aria-hidden="true" /></Button>
+              </div>
             )}
 
             {isProfileLoading ? (
@@ -533,7 +510,7 @@ function Profile({ appTheme = 'light', themeMode = 'system', onThemeChange, curr
             <div style={styles.sectionHeadingRow}>
               <div className="profile-section-title"><UserRoundCog size={18} aria-hidden="true" /><h2 style={styles.h2}>About</h2></div>
               {!isEditingBio && (
-                <Button type="button" variant="ghost" size="sm" onClick={() => setIsEditingBio(true)}><Pencil aria-hidden="true" />Edit</Button>
+                <Button type="button" size="sm" onClick={() => setIsEditingBio(true)}><Pencil aria-hidden="true" />Edit</Button>
               )}
             </div>
 
@@ -582,10 +559,7 @@ function Profile({ appTheme = 'light', themeMode = 'system', onThemeChange, curr
                 </div>
                 <Button
                   type="button"
-                  variant="outline"
-                  className="profile-generate-button"
-                  onMouseEnter={() => setIsPortfolioHovered(true)}
-                  onMouseLeave={() => setIsPortfolioHovered(false)}
+                  className="w-full sm:w-auto"
                   onClick={() => setIsPortfolioModalOpen(true)}
                 >
                   <Download aria-hidden="true" />Preview portfolio
@@ -621,7 +595,6 @@ function Profile({ appTheme = 'light', themeMode = 'system', onThemeChange, curr
               )}
             </section>
           )}
-
           {isWorkerRole && (
             <section className="profile-flat-section" style={styles.profileSection}>
               <div className="profile-section-title"><Rocket size={18} aria-hidden="true" /><h2 style={styles.h2}>Ad booster</h2></div>
@@ -705,6 +678,12 @@ function Profile({ appTheme = 'light', themeMode = 'system', onThemeChange, curr
             onOpenChange={setIsPhotoSourceOpen}
             onRemovePhoto={handleRemovePhoto}
           />
+          <ProfileNameDialog
+            error={saveError} firstName={draftFirstName} middleName={draftMiddleName} lastName={draftLastName}
+            isOpen={isEditingName} isSaving={isSavingName} onSave={saveName}
+            onFirstNameChange={setDraftFirstName} onMiddleNameChange={setDraftMiddleName} onLastNameChange={setDraftLastName}
+            onOpenChange={(open) => { setIsEditingName(open); if (!open) { setDraftFirstName(firstName); setDraftMiddleName(middleName); setDraftLastName(lastName); setSaveError(''); } }}
+          />
 
           <BookingTermsModal
             isOpen={isBoostTermsOpen}
@@ -742,7 +721,8 @@ function Profile({ appTheme = 'light', themeMode = 'system', onThemeChange, curr
             serviceType={sellerProfile?.serviceType ? (sellerProfile.serviceType === 'Others' ? sellerProfile.customServiceType : sellerProfile.serviceType) : 'General Service'}
             bio={displayBio}
             location={localizedAddress}
-            rating={4.8}
+            rating={sellerProfile?.averageRating || sellerProfile?.avgRating || sellerProfile?.rating}
+            profilePhoto={profilePhoto} isVerified={isVerifiedWorker}
             gcashNumber={sellerProfile?.gcashNumber || '09XXXXXXXXX'}
             onClose={() => setIsPortfolioModalOpen(false)}
           />

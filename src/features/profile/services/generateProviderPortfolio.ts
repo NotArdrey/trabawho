@@ -1,3 +1,5 @@
+import { isSupabaseConfigured, supabase } from "@/integrations/supabase";
+
 interface ProviderPortfolioData {
   bio: string;
   gcashNumber?: string;
@@ -32,10 +34,34 @@ const loadImage = (url: string): Promise<HTMLImageElement> => new Promise((resol
   image.src = url;
 });
 
+function getSupabaseStorageLocation(url: string): { bucket: string; path: string } | null {
+  try {
+    const pathname = new URL(url, window.location.origin).pathname;
+    const match = pathname.match(/\/storage\/v1\/object\/(?:public|sign)\/([^/]+)\/(.+)$/);
+    if (!match) return null;
+    return { bucket: decodeURIComponent(match[1]), path: match[2].split("/").map(decodeURIComponent).join("/") };
+  } catch {
+    return null;
+  }
+}
+
+async function fetchImageBlob(url: string): Promise<Blob> {
+  try {
+    const response = await fetch(url, { cache: "no-store", credentials: "omit" });
+    if (response.ok) return response.blob();
+  } catch {
+    // Authenticated Storage download below handles private or stale public URLs.
+  }
+
+  const storageLocation = getSupabaseStorageLocation(url);
+  if (!storageLocation || !isSupabaseConfigured) throw new Error("Unable to load image.");
+  const { data, error } = await supabase.storage.from(storageLocation.bucket).download(storageLocation.path);
+  if (error || !data) throw new Error("Unable to load image.");
+  return data;
+}
+
 async function imageUrlToPngDataUrl(url: string, options: CanvasImageOptions = {}): Promise<string> {
-  const response = await fetch(url);
-  if (!response.ok) throw new Error("Unable to load image.");
-  const objectUrl = URL.createObjectURL(await response.blob());
+  const objectUrl = URL.createObjectURL(await fetchImageBlob(url));
 
   try {
     const image = await loadImage(objectUrl);
@@ -102,13 +128,15 @@ async function generateProviderPortfolio(data: ProviderPortfolioData): Promise<v
   doc.rect(0, 0, pageWidth, 49, "F");
   doc.setFillColor(...COLORS.white);
   doc.roundedRect(margin, 11, 15, 15, 3, 3, "F");
-  if (logoResult.status === "fulfilled") doc.addImage(logoResult.value, "PNG", margin + 3.8, 13, 7.5, 11);
+  if (logoResult.status === "fulfilled") doc.addImage(logoResult.value, "PNG", margin + 2, 13, 11, 11);
   doc.setFont("helvetica", "bold");
   doc.setFontSize(14);
   doc.setTextColor(...COLORS.white);
-  doc.text("Traba", margin + 20, 19.5);
+  const wordmarkX = margin + 20;
+  doc.text("Traba", wordmarkX, 19.5);
+  const trabaWidth = doc.getTextWidth("Traba");
   doc.setTextColor(...COLORS.orange);
-  doc.text("Who", margin + 36.3, 19.5);
+  doc.text("Who", wordmarkX + trabaWidth, 19.5);
   doc.setFontSize(8);
   doc.setTextColor(219, 234, 254);
   doc.text("LOCAL SERVICES MARKETPLACE", margin + 20, 24.5);
@@ -223,5 +251,5 @@ async function generateProviderPortfolio(data: ProviderPortfolioData): Promise<v
   doc.save(`${safeName}-TrabaWho-Portfolio.pdf`);
 }
 
-export { generateProviderPortfolio, getPaymentLabel };
+export { fetchImageBlob, generateProviderPortfolio, getPaymentLabel, getSupabaseStorageLocation };
 export type { ProviderPortfolioData };

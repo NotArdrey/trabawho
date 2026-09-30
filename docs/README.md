@@ -18,5 +18,10 @@ When documents disagree, follow the highest applicable document and update the l
 ## Integrations
 
 - [`integrations/supabase.md`](integrations/supabase.md) — local configuration, database-change boundaries, and concise troubleshooting.
+- [`integrations/paymongo.md`](integrations/paymongo.md) — hosted GCash checkout, webhook security, deployment, and verification.
+
+## Active roadmaps
+
+- [`roadmaps/booking-transactions.md`](roadmaps/booking-transactions.md) — booking lifecycle, PayMongo integration, refunds, disputes, and provider payouts.
 
 Superseded plans, temporary fixes, generated logs, and one-off diagnostic notes do not belong in the repository. Record active work in the migration ledger or the applicable maintained standard.

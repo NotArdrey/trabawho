@@ -37,8 +37,7 @@ describe("PaymentModal", () => {
         totalChargedAmount: 997.5,
       }),
     );
-    expect(screen.getByRole("heading", { name: "Your booking request is ready" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Done" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /continue with gcash/i })).toBeInTheDocument();
   });
 
   it("supports canceling from the footer", async () => {
