@@ -107,7 +107,7 @@ function bookingAction(booking: UnknownRecord, now: Date): ProviderActionItem | 
   };
   if (text(booking.cashConfirmationStatus) === "pending-worker-review") return { ...base, priority: 1, title: "Review payment confirmation", destination: "work" };
   if (text(booking.refundStatus) && !["completed", "approved"].includes(text(booking.refundStatus).toLowerCase())) return { ...base, priority: 1, title: "Review refund request", destination: "work" };
-  if (INQUIRY_STATUSES.has(normalizedStatus)) return { ...base, priority: 2, title: "Respond to client request", destination: "work" };
+  if (INQUIRY_STATUSES.has(normalizedStatus)) return { ...base, priority: 2, title: "Respond to client request", destination: "bookings" };
   if (date && sameDay(date, now) && !TERMINAL_STATUSES.has(normalizedStatus)) return { ...base, priority: 4, title: "Job scheduled today", destination: "bookings" };
   if (!TERMINAL_STATUSES.has(normalizedStatus)) return { ...base, priority: 5, title: "Active booking update", destination: "bookings" };
   return null;

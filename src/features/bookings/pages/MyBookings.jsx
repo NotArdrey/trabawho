@@ -318,8 +318,7 @@ const MyBookings = ({
   }, [activeScope, onOpenChatPage]);
 
   const handleOpenSlotSelection = useCallback(() => {
-    setScheduleAction('checkout');
-    setUiState('slots');
+    setPendingCheckoutSlot(null); setScheduleAction('checkout'); setUiState('slots');
   }, []);
 
   const handleLeaveRating = useCallback(async (payload) => {
@@ -332,10 +331,11 @@ const MyBookings = ({
   }, [pushHeaderNotification, ratingCtrl]);
 
   const handleOpenPaymentSelection = useCallback(() => {
-    setIsTermsModalOpen(true);
+    setPendingCheckoutSlot(null); setIsTermsModalOpen(true);
   }, []);
 
   const handlePayBooking = useCallback((bookingId) => {
+    setPendingCheckoutSlot(null);
     setSelectedBookingId(bookingId);
     setIsTermsModalOpen(true);
   }, []);
@@ -405,6 +405,7 @@ const MyBookings = ({
       return;
     }
     setPendingCheckoutSlot({ bookingId, slot: slotInfo });
+    setUiState('terms');
     setIsTermsModalOpen(true);
   }, [bookingListCtrl, isChatRoute, pushHeaderNotification, scheduleAction]);
 
@@ -601,39 +602,38 @@ const MyBookings = ({
       tone: 'orange',
     },
   ], [bookingListCtrl.isLoading, allBookings.length, activeBookingsCount, completedBookingsCount, pendingActionCount, shouldLoadSellerBookings]);
-
   const filterDefinitions = shouldLoadSellerBookings
     ? [
-        ['all', 'All'],
         ['action-needed', 'Action needed'],
         ['scheduled', 'Scheduled'],
         ['delivered', 'Delivered'],
+        ['all', 'All'],
         ['completed', 'Completed'],
         ['refunds', 'Refunds'],
         ['cancelled', 'Cancelled'],
       ]
     : [
-        ['all', 'All'],
         ['active', 'Active'],
         ['payment-due', 'Payment due'],
         ['delivered', 'Delivered'],
+        ['all', 'All'],
         ['completed', 'Completed'],
         ['refunds', 'Refunds'],
         ['cancelled', 'Cancelled'],
       ];
   const allowedFilters = filterDefinitions.map(([value]) => value);
-  const requestedFilter = searchParams.get('filter') || 'all';
-  const selectedDisplayFilter = allowedFilters.includes(requestedFilter) ? requestedFilter : 'all';
+  const defaultFilter = shouldLoadSellerBookings ? 'scheduled' : 'active';
+  const requestedFilter = searchParams.get('filter') || defaultFilter;
+  const selectedDisplayFilter = allowedFilters.includes(requestedFilter) ? requestedFilter : defaultFilter;
   const displayFilters = filterDefinitions.map(([value, label]) => ({
     value,
     label,
     count: allBookings.filter((booking) => matchesBookingHubFilter(booking, value, activeScope)).length,
   }));
-
   const updateSearchParams = (updates, replace = false) => {
     const nextParams = new URLSearchParams(searchParams);
     Object.entries(updates).forEach(([key, value]) => {
-      if (value && value !== 'all') nextParams.set(key, value);
+      if (value && (key === 'filter' || value !== 'all')) nextParams.set(key, value);
       else nextParams.delete(key);
     });
     nextParams.set('scope', activeScope);
@@ -733,7 +733,7 @@ const MyBookings = ({
             } : undefined}
           />
 
-          <div className="booking-details-grid">
+          <div className="booking-details-grid border border-orange-200 dark:border-orange-800/60">
             <div className="booking-detail-item">
               <CalendarDays size={16} aria-hidden="true" />
               <div>
@@ -783,10 +783,11 @@ const MyBookings = ({
             )}
           </div>
         </div>
-
         <BookingCardFooter
           amountLabel={shouldLoadSellerBookings ? 'Booking amount' : 'Service price'}
           amount={formatPhp(booking.quoteAmount || booking.totalChargedAmount || 0)}
+          emphasizeAmount={shouldLoadSellerBookings}
+          requestDate={shouldLoadSellerBookings ? booking.requestDate : undefined}
           platformFee={!shouldLoadSellerBookings && booking.transactionFeeAmount > 0 ? formatPhp(booking.transactionFeeAmount) : undefined}
           totalPayment={!shouldLoadSellerBookings && booking.totalChargedAmount > 0 ? formatPhp(booking.totalChargedAmount) : undefined}
           paymentProgress={booking.paymentPlan === 'downpayment' ? {
@@ -906,7 +907,7 @@ const MyBookings = ({
         </div>
       </section>
 
-      {isWorkerAccount && isProviderBookingsRoute && <BookingScopeSwitcher value={activeScope} onValueChange={handleScopeChange} />}
+      {isWorkerAccount && !isChatRoute && <BookingScopeSwitcher value={activeScope} onValueChange={handleScopeChange} />}
 
       {/* KPI Overview Metrics Grid */}
       <section className="grid auto-cols-[minmax(15rem,1fr)] grid-flow-col gap-3 overflow-x-auto pb-2 md:grid-flow-row md:grid-cols-2 md:overflow-visible lg:grid-cols-4" aria-label="Bookings metrics snapshot">
@@ -985,8 +986,8 @@ const MyBookings = ({
           data-testid="bookings-filter-empty-state"
           icon={Filter}
           title="No matching bookings"
-          description="No bookings match your current search or status filter. Reset the filters to see the full list."
-          action={<Button type="button" variant="outline" onClick={() => { bookingListCtrl.setActiveFilter('all'); bookingListCtrl.setDisplayFilter('all'); updateSearchParams({ filter: '', q: '' }); onSearchChange?.({ target: { value: '' } }); }}><RotateCcw size={16} aria-hidden="true" />Reset filters</Button>}
+          description={selectedDisplayFilter === 'scheduled' && !bookingSearch ? 'No jobs are scheduled right now. Check another status or view all bookings.' : 'No bookings match your current search or status filter. View all bookings to reset the filters.'}
+          action={<Button type="button" variant="outline" onClick={() => { bookingListCtrl.setActiveFilter('all'); bookingListCtrl.setDisplayFilter('all'); updateSearchParams({ filter: 'all', q: '' }); onSearchChange?.({ target: { value: '' } }); }}><RotateCcw size={16} aria-hidden="true" />View all bookings</Button>}
         />
       )}
 
@@ -1073,7 +1074,6 @@ const MyBookings = ({
               onCancel={handleBackToList}
             />
           )}
-
         </>
       )}
 
@@ -1132,7 +1132,7 @@ const MyBookings = ({
         appTheme={appTheme}
         title="Agree Before Payment"
         confirmLabel="Agree and Open Payment"
-        onCancel={() => setIsTermsModalOpen(false)}
+        onCancel={() => { setIsTermsModalOpen(false); if (pendingCheckoutSlot) setUiState('slots'); }}
         onConfirm={handleConfirmPaymentTerms}
       />
     </div>

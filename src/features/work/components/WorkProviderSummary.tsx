@@ -12,7 +12,7 @@ export interface WorkProviderSummaryProps {
   location: string;
   bookingMode: "Time-slot booking" | "Request booking";
   isBoosted?: boolean;
-  activeInquiries: number;
+  activeBookings: number;
   averageRating: string;
   completed: number;
   description: string;
@@ -43,7 +43,7 @@ export default function WorkProviderSummary({
   location,
   bookingMode,
   isBoosted = false,
-  activeInquiries,
+  activeBookings,
   averageRating,
   completed,
   description,
@@ -80,7 +80,7 @@ export default function WorkProviderSummary({
       </div>
 
       <div className="mt-5 grid grid-cols-3 divide-x rounded-xl bg-muted/45 py-4 text-center">
-        <div className="px-2"><strong className="block text-xl font-bold text-foreground">{activeInquiries}</strong><span className="mt-1 block text-[10px] font-semibold uppercase tracking-wide text-muted-foreground sm:text-xs">Active inquiries</span></div>
+        <div className="px-2"><strong className="block text-xl font-bold text-foreground">{activeBookings}</strong><span className="mt-1 block text-[10px] font-semibold uppercase tracking-wide text-muted-foreground sm:text-xs">Active bookings</span></div>
         <div className="px-2"><strong className="flex items-center justify-center gap-1 text-xl font-bold text-foreground"><Star className="size-[18px] fill-brand-highlight text-brand-highlight" aria-hidden="true" />{averageRating}</strong><span className="mt-1 block text-[10px] font-semibold uppercase tracking-wide text-muted-foreground sm:text-xs">Average rating</span></div>
         <div className="px-2"><strong className="block text-xl font-bold text-foreground">{completed}</strong><span className="mt-1 block text-[10px] font-semibold uppercase tracking-wide text-muted-foreground sm:text-xs">Completed</span></div>
       </div>

@@ -26,7 +26,7 @@ const snapshot: ProviderDashboardSnapshot = {
     { id: "messages", label: "Unread messages", value: "3", detail: "From active conversations" },
     { id: "earnings", label: "Confirmed earnings", value: "₱1,500", detail: "1 confirmed payment" },
   ],
-  actions: [{ id: "booking-1", priority: 2, title: "Respond to client request", detail: "Maria · Home repair", status: "Negotiating", bookingId: "booking-1", destination: "work" }],
+  actions: [{ id: "booking-1", priority: 2, title: "Respond to client request", detail: "Maria · Home repair", status: "Negotiating", bookingId: "booking-1", destination: "bookings" }],
   todaySchedule: [{ id: "booking-2", service: "Home repair", client: "Ana", schedule: "Sep 8, 2:00 PM", status: "Scheduled", bookingId: "booking-2" }],
   nextAppointment: null,
   serviceHealth: { totalListings: 2, activeListings: 1, availableSlots: 4, rating: 4.8, reviewCount: 12, verificationStatus: "approved" },
@@ -40,15 +40,16 @@ describe("WorkerDashboard", () => {
     useProviderDashboard.mockReturnValue({ snapshot, isLoading: false, error: "", refresh });
   });
 
-  it("presents provider priorities and opens the existing work flow", () => {
-    const onOpenMyWork = vi.fn();
-    render(<WorkerDashboard sellerProfile={{ userId: "worker-1", role: "worker" }} onOpenMyWork={onOpenMyWork} />);
+  it("presents provider priorities and opens incoming bookings", () => {
+    const onOpenMyBookings = vi.fn();
+    render(<WorkerDashboard sellerProfile={{ userId: "worker-1", role: "worker" }} onOpenMyBookings={onOpenMyBookings} />);
 
     expect(screen.getByRole("heading", { name: /Good to see you, Jose Miguel/i })).toBeVisible();
     expect(screen.getByText("Confirmed earnings")).toBeVisible();
     expect(screen.getByText("₱1,500")).toBeVisible();
+    fireEvent.click(screen.getByRole("button", { name: "Open incoming bookings" }));
     fireEvent.click(screen.getByRole("button", { name: /Respond to client request/i }));
-    expect(onOpenMyWork).toHaveBeenCalledOnce();
+    expect(onOpenMyBookings).toHaveBeenCalledTimes(2);
   });
 
   it("makes clear queues and an empty day recognizable and actionable", () => {

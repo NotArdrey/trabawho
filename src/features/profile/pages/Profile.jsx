@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import DashboardNavigation from '../../../shared/components/DashboardNavigation';
 import DigitalPortfolioModal from '../components/DigitalPortfolioModal';
 import { ProfilePortfolioSection } from '../components/ProfilePortfolioSection';
-import PaymentModal from '../../bookings/components/PaymentModal';
+import { BoostActivationDialog } from '../components/BoostActivationDialog';
 import BookingTermsModal from '../../bookings/components/BookingTermsModal';
 import AccountPrivacyPanel from '../components/AccountPrivacyPanel';
 import { ProfilePhotoDialog } from '../components/ProfilePhotoDialog';
@@ -308,7 +308,7 @@ function Profile({ appTheme = 'light', themeMode = 'system', onThemeChange, curr
     const days = Math.max(1, Number(boostDays) || 7);
     const budget = Math.max(0, Number(boostBudget) || 0);
     if (budget <= 0) {
-      setSaveError('Enter a boost budget before continuing to payment.');
+      setSaveError('Enter a demo boost budget before continuing.');
       return null;
     }
 
@@ -351,19 +351,19 @@ function Profile({ appTheme = 'light', themeMode = 'system', onThemeChange, curr
     setIsBoostPaymentOpen(true);
   };
 
-  const handleSaveBoost = async (paymentMethod, mockPayment) => {
+  const handleSaveBoost = async () => {
     const draft = pendingBoost || buildBoostDraft();
     if (!draft) return;
 
     const boost = {
       ...draft.boost,
       payment: {
-        method: paymentMethod,
+        method: 'demo',
         amount_php: draft.budget,
-        reference: mockPayment?.mockPaymentReference || '',
-        provider: mockPayment?.mockPaymentProvider || 'GCash sandbox',
-        status: mockPayment?.mockPaymentStatus || 'test-approved',
-        confirmed_at: mockPayment?.mockPaymentAt || new Date().toISOString(),
+        reference: `DEMO-BOOST-${Date.now()}`,
+        provider: 'TrabaWho demo',
+        status: 'demo-activated',
+        confirmed_at: new Date().toISOString(),
       },
     };
 
@@ -377,7 +377,7 @@ function Profile({ appTheme = 'light', themeMode = 'system', onThemeChange, curr
       )));
       setIsBoostPaymentOpen(false);
       setPendingBoost(null);
-      setBoostMessage('Payment confirmed. This gig will be prioritized in marketplace recommendation views while the boost is active.');
+      setBoostMessage('Demo boost activated. This gig will be prioritized in marketplace recommendation views while the boost is active.');
     } catch (error) {
       setSaveError(error?.message || 'Unable to save this ad boost.');
     } finally {
@@ -420,9 +420,9 @@ function Profile({ appTheme = 'light', themeMode = 'system', onThemeChange, curr
     portfolioDocItem: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px', padding: '10px', borderRadius: '8px', border: `1px solid ${themeTokens.border}`, background: themeTokens.surface },
     portfolioDocName: { color: themeTokens.textPrimary, fontWeight: 700, textDecoration: 'none', wordBreak: 'break-word' },
     portfolioDocMeta: { margin: '2px 0 0', color: themeTokens.textMuted, fontSize: '12px' },
-    boosterGrid: { display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1.2fr 0.8fr 0.8fr', gap: '10px', marginTop: '12px' },
-    boosterInput: { minHeight: '42px', border: `1px solid ${themeTokens.inputBorder}`, borderRadius: '8px', padding: '9px 10px', background: themeTokens.inputBg, color: themeTokens.inputText, width: '100%', boxSizing: 'border-box' },
-    boosterLabel: { display: 'grid', gap: '6px', color: themeTokens.textPrimary, fontSize: '13px', fontWeight: 700 },
+    boosterGrid: { display: 'grid', gridTemplateColumns: isMobile ? 'minmax(0, 1fr)' : 'minmax(0, 1.2fr) minmax(0, 0.8fr) minmax(0, 0.8fr)', gap: '10px', marginTop: '12px' },
+    boosterInput: { minHeight: '44px', border: `1px solid ${themeTokens.inputBorder}`, borderRadius: '8px', padding: '9px 10px', background: themeTokens.inputBg, color: themeTokens.inputText, width: '100%', boxSizing: 'border-box' },
+    boosterLabel: { display: 'grid', minWidth: 0, gap: '6px', color: themeTokens.textPrimary, fontSize: '13px', fontWeight: 700 },
     boosterHint: { margin: '10px 0 0', color: themeTokens.textSecondary, fontSize: '13px', fontWeight: 700 },
     boosterSuccess: { margin: '10px 0 0', color: themeTokens.successText, background: themeTokens.successBg, border: `1px solid ${themeTokens.successBorder}`, borderRadius: '8px', padding: '9px 10px', fontWeight: 700, fontSize: '13px' },
   };
@@ -430,18 +430,9 @@ function Profile({ appTheme = 'light', themeMode = 'system', onThemeChange, curr
   const boostTerms = [
     'You agree that the selected gig, duration, and budget are accurate before the ad boost is activated.',
     'TrabaWho may use your service title, profile details, location, category, and boost settings to prioritize this gig in marketplace recommendation views.',
-    'This test payment flow records a sandbox payment reference only. No real GCash or cash transfer is processed.',
+    'This demo boost does not collect a card payment, GCash transfer, or real money.',
     'Boost placement can improve visibility, but it does not guarantee client inquiries, bookings, or earnings.',
   ];
-  const boostPaymentBooking = pendingBoost ? {
-    workerName: 'TrabaWho Ad Booster',
-    serviceType: pendingBoost.serviceTitle,
-    quoteAmount: pendingBoost.budget,
-    allowGcashAdvance: true,
-    allowAfterService: false,
-    isRequestBooking: true,
-  } : null;
-
   return (
     <div style={styles.page} data-testid="profile-page">
       <DashboardNavigation
@@ -577,7 +568,7 @@ function Profile({ appTheme = 'light', themeMode = 'system', onThemeChange, curr
                     onValueChange={setSelectedBoostServiceId}
                     disabled={workerServices.length === 0}
                   >
-                    <SelectTrigger id="boost-service" className="w-full bg-background shadow-none">
+                    <SelectTrigger id="boost-service" className="min-w-0 overflow-hidden bg-background shadow-none [&>span]:min-w-0 [&>span]:truncate">
                       <SelectValue placeholder={workerServices.length === 0 ? 'No gigs found' : 'Choose a gig'} />
                     </SelectTrigger>
                     <SelectContent>
@@ -658,29 +649,24 @@ function Profile({ appTheme = 'light', themeMode = 'system', onThemeChange, curr
           <BookingTermsModal
             isOpen={isBoostTermsOpen}
             appTheme={appTheme}
-            title="Agree Before Boost Payment"
-            subtitle="Please review these TrabaWho ad boost terms before continuing to payment."
-            confirmLabel="Agree and Open Payment"
+            title="Review demo boost terms"
+            subtitle="Please review these TrabaWho ad boost terms before activation."
+            confirmLabel="Agree and continue"
             terms={boostTerms}
             agreementLabel="I agree to the TrabaWho ad boost Terms and Conditions for this selected gig."
             onCancel={handleCancelBoostFlow}
             onConfirm={handleConfirmBoostTerms}
           />
 
-          {isBoostPaymentOpen && boostPaymentBooking && (
-            <PaymentModal
-              booking={boostPaymentBooking}
-              title="Pay for Gig Boost"
-              subtitle="Complete the mock payment step before this selected gig boost goes live."
-              amountLabel="Boost budget"
-              scheduleLabel="Duration:"
-              scheduleValue={`${pendingBoost?.days || 1} ${Number(pendingBoost?.days || 1) === 1 ? 'day' : 'days'}`}
-              advancePaymentDescription="Pay now via GCash to activate the selected gig boost."
-              transactionFeeRate={0}
-              testModeTitle="Mock boost payment test mode"
-              testModeDescription="This flow records a sandbox ad-boost payment reference only. No real GCash transfer is processed."
-              confirmLabel="Run Mock Payment & Activate Boost"
-              onSelectPayment={handleSaveBoost}
+          {isBoostPaymentOpen && pendingBoost && (
+            <BoostActivationDialog
+              isOpen={isBoostPaymentOpen}
+              serviceTitle={pendingBoost.serviceTitle}
+              days={pendingBoost.days}
+              budget={pendingBoost.budget}
+              isSaving={isBoostSaving}
+              error={saveError}
+              onConfirm={handleSaveBoost}
               onCancel={handleCancelBoostFlow}
             />
           )}

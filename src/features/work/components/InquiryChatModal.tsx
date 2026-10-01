@@ -152,9 +152,9 @@ function InquiryChatModal({ inquiry, onClose, onBookingUpdated, onError }: Inqui
     <Dialog open onOpenChange={(open) => { if (!open) onClose(); }}>
       <DialogContent
         className={cn(
-          "grid w-[calc(100vw-2rem)] max-w-[40rem] gap-0 overflow-hidden rounded-2xl p-0 shadow-xl",
+          "grid w-[calc(100vw-1rem)] max-w-[36rem]! gap-0 overflow-hidden rounded-2xl p-0 shadow-xl sm:w-[calc(100vw-2rem)]",
           "max-h-[calc(100svh-2rem)] grid-rows-[auto_auto_minmax(13.75rem,auto)_auto]",
-          "max-sm:w-[calc(100vw-1rem)] max-sm:max-h-[calc(100svh-1rem)] max-sm:rounded-xl",
+          "max-sm:max-h-[calc(100svh-1rem)] max-sm:rounded-xl",
           composerMode === "quote" && "grid-rows-[auto_auto_auto]",
         )}
         data-testid="inquiry-response-dialog"

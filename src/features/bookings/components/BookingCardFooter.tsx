@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { CalendarClock, CalendarX2, ChevronDown, Eye, MessageCircle } from "lucide-react";
+import { CalendarClock, CalendarDays, CalendarX2, ChevronDown, Eye, MessageCircle } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -9,13 +9,16 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { cn } from "@/lib/utils";
 
 interface BookingCardFooterProps {
   amountLabel: string;
   amount: string;
+  emphasizeAmount?: boolean;
   platformFee?: string;
   totalPayment?: string;
   paymentProgress?: { paid: string; balance: string };
+  requestDate?: string;
   messageLabel: string;
   messageIsPrimary: boolean;
   onViewDetails: () => void;
@@ -28,9 +31,11 @@ interface BookingCardFooterProps {
 export function BookingCardFooter({
   amountLabel,
   amount,
+  emphasizeAmount = false,
   platformFee,
   totalPayment,
   paymentProgress,
+  requestDate,
   messageLabel,
   messageIsPrimary,
   onViewDetails,
@@ -40,32 +45,43 @@ export function BookingCardFooter({
   children,
 }: BookingCardFooterProps) {
   const hasManagementActions = Boolean(onReschedule || onCancel);
+  const parsedRequestDate = requestDate && /^\d{4}-\d{2}-\d{2}$/.test(requestDate) ? new Date(`${requestDate}T00:00:00`) : null;
+  const requestedOn = parsedRequestDate && !Number.isNaN(parsedRequestDate.getTime())
+    ? parsedRequestDate.toLocaleDateString("en-PH", { day: "numeric", month: "short", year: "numeric" })
+    : requestDate;
 
   return (
     <footer className="grid min-w-0 gap-4 border-t border-border/70 pt-4">
-      <section aria-label="Payment summary" className="min-w-0 rounded-xl bg-muted/40 px-4 py-3">
-        <dl className="grid min-w-0 grid-cols-2 gap-x-5 gap-y-3 sm:grid-cols-[repeat(3,minmax(7rem,auto))_minmax(12rem,1fr)]">
-          <div className="min-w-0">
-            <dt className="text-xs font-medium text-muted-foreground">{amountLabel}</dt>
-            <dd className="mt-1 text-sm font-bold text-foreground">{amount}</dd>
+      <section aria-label="Payment summary" className="min-w-0">
+        <dl className="grid min-w-0 grid-cols-2 gap-2 sm:flex sm:flex-wrap">
+          <div className={cn("min-w-0 rounded-lg px-3 py-2 sm:min-w-28", emphasizeAmount ? "bg-emerald-50 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-200 sm:min-w-40" : "bg-muted/60")}>
+            <dt className={cn("text-xs font-medium", emphasizeAmount ? "text-emerald-800 dark:text-emerald-200" : "text-muted-foreground")}>{amountLabel}</dt>
+            <dd className={cn("mt-1 font-bold tabular-nums", emphasizeAmount ? "text-lg text-emerald-700 dark:text-emerald-300" : "text-sm text-foreground")}>{amount}</dd>
           </div>
 
+          {requestedOn && (
+            <div className="min-w-0 rounded-lg bg-primary/10 px-3 py-2 text-primary sm:min-w-40">
+              <dt className="flex items-center gap-1 text-xs font-medium"><CalendarDays className="size-3.5" aria-hidden="true" />Requested on</dt>
+              <dd className="mt-1 text-sm font-bold">{requestedOn}</dd>
+            </div>
+          )}
+
           {platformFee && (
-            <div className="min-w-0">
+            <div className="min-w-0 rounded-lg bg-muted/60 px-3 py-2 sm:min-w-28">
               <dt className="text-xs font-medium text-muted-foreground">Platform fee</dt>
               <dd className="mt-1 text-sm font-bold text-foreground">{platformFee}</dd>
             </div>
           )}
 
           {totalPayment && (
-            <div className="min-w-0">
+            <div className="min-w-0 rounded-lg bg-emerald-50 px-3 py-2 dark:bg-emerald-950/40 sm:min-w-28">
               <dt className="text-xs font-medium text-muted-foreground">Total payment</dt>
               <dd className="mt-1 text-sm font-extrabold text-emerald-700 dark:text-emerald-300">{totalPayment}</dd>
             </div>
           )}
 
           {paymentProgress && (
-            <div className="col-span-2 min-w-0 sm:col-span-1 sm:border-l sm:border-border/70 sm:pl-5">
+            <div className="col-span-2 min-w-0 rounded-lg bg-muted/60 px-3 py-2 sm:min-w-48">
               <dt className="text-xs font-medium text-muted-foreground">Payment progress</dt>
               <dd className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-sm font-semibold text-foreground">
                 <span>Paid: {paymentProgress.paid}</span>

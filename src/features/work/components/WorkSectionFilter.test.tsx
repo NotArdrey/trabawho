@@ -5,7 +5,6 @@ import WorkSectionFilter, { type WorkSectionOption } from "./WorkSectionFilter";
 
 const options: WorkSectionOption[] = [
   { value: "all", label: "Show All", shortLabel: "All", description: "Overview of every work section" },
-  { value: "inquiries", label: "Active Inquiries", shortLabel: "Inquiries", description: "Client requests waiting for a response" },
   { value: "cash-approvals", label: "Payment Confirmations", shortLabel: "Cash", description: "Cash payment review queue" },
 ];
 
@@ -20,8 +19,8 @@ describe("WorkSectionFilter", () => {
   it("selects a mobile chip with one action", async () => {
     const onValueChange = vi.fn();
     render(<WorkSectionFilter value="all" options={options} onValueChange={onValueChange} />);
-    await userEvent.click(within(screen.getByLabelText("Work sections")).getByRole("button", { name: "Inquiries" }));
-    expect(onValueChange).toHaveBeenCalledWith("inquiries");
+    await userEvent.click(within(screen.getByLabelText("Work sections")).getByRole("button", { name: "Cash" }));
+    expect(onValueChange).toHaveBeenCalledWith("cash-approvals");
   });
 
   it("makes the selected queue and its purpose clear", () => {
@@ -65,7 +64,7 @@ describe("WorkSectionFilter", () => {
 
     await user.keyboard("{ArrowRight}");
 
-    expect(onValueChange).toHaveBeenCalledWith("inquiries");
-    expect(within(screen.getByLabelText("Work sections")).getByRole("button", { name: "Inquiries" })).toHaveFocus();
+    expect(onValueChange).toHaveBeenCalledWith("cash-approvals");
+    expect(within(screen.getByLabelText("Work sections")).getByRole("button", { name: "Cash" })).toHaveFocus();
   });
 });

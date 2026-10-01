@@ -55,6 +55,7 @@ export interface DashboardMetric {
 }
 
 export interface UpcomingBooking {
+  id: string | number | null;
   provider: string;
   schedule: string;
   service: string;
@@ -147,7 +148,7 @@ export function buildDashboardModel(data: DashboardSnapshot, isLoading: boolean)
     .filter(({ booking, startDate }) => !terminalStatuses.has(booking.status || "") && (scheduledStatuses.has(booking.status || "") || Boolean(startDate)) && (!startDate || startDate.getTime() >= now.getTime() - 86400000))
     .sort((a, b) => !a.startDate ? 1 : !b.startDate ? -1 : a.startDate.getTime() - b.startDate.getTime())
     .slice(0, 3)
-    .map(({ booking }) => ({ service: booking.serviceType || "Service", provider: booking.workerName || "Provider", schedule: formatSchedule(booking), status: booking.status || "Pending" }));
+    .map(({ booking }) => ({ id: booking.id ?? null, service: booking.serviceType || "Service", provider: booking.workerName || "Provider", schedule: formatSchedule(booking), status: booking.status || "Pending" }));
   const actionNeededCount = bookings.filter((booking) => clientActionStatuses.has(booking.status || "") || Boolean(booking.canRate)).length;
   const loadingBookings = isLoading && bookings.length === 0;
   const metrics: DashboardMetric[] = [

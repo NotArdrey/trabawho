@@ -61,7 +61,7 @@ const metricTones = {
 } as const;
 
 const metricActionLabels = {
-  inquiries: "Open provider inquiries",
+  inquiries: "Open incoming bookings",
   today: "Open today's incoming bookings",
   messages: "Open client messages",
   earnings: "Open earnings in My Work",
@@ -137,7 +137,7 @@ function WorkerDashboard({
 
   const openMetric = (metricId: keyof typeof metricIcons) => {
     if (metricId === "messages") onOpenChatPage?.();
-    else if (metricId === "today") onOpenMyBookings?.();
+    else if (metricId === "today" || metricId === "inquiries") onOpenMyBookings?.();
     else onOpenMyWork?.();
   };
 

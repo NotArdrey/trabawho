@@ -33,6 +33,8 @@ describe("client Dashboard", () => {
   });
 
   it("separates upcoming services from recent activity", async () => {
+    const user = userEvent.setup();
+    const onOpenChatPage = vi.fn();
     fetchSnapshot.mockResolvedValue({
       user: { id: "client-1" },
       unreadMessageCount: 0,
@@ -48,10 +50,13 @@ describe("client Dashboard", () => {
       }],
     });
 
-    render(<Dashboard />);
+    render(<Dashboard onOpenChatPage={onOpenChatPage} />);
 
-    expect(await screen.findByRole("heading", { name: "Home cleaning" })).toBeVisible();
+    const bookingButton = await screen.findByRole("button", { name: "Open Home cleaning booking with Nina Flores" });
+    expect(bookingButton).toBeVisible();
     expect(screen.getByText(/Nina Flores/)).toHaveTextContent("Nina Flores");
+    await user.click(bookingButton);
+    expect(onOpenChatPage).toHaveBeenCalledWith("booking-1", "purchases");
     await waitFor(() => expect(screen.getByRole("region", { name: "Recent updates" })).toHaveTextContent("Payment Confirmed"));
   });
 });

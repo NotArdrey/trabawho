@@ -10,10 +10,10 @@ vi.mock('../../../shared/components/DashboardNavigation', () => ({
 
 // Mock child modals
 vi.mock('../components/ChatWindow', () => ({
-  default: ({ viewerRole }) => <div data-testid="mock-chat-window" data-viewer-role={viewerRole}>Chat</div>,
+  default: ({ viewerRole, onOpenSlotSelection }) => <div data-testid="mock-chat-window" data-viewer-role={viewerRole}>Chat<button onClick={onOpenSlotSelection}>Open schedule</button></div>,
 }));
 vi.mock('../components/SlotSelectionModal', () => ({
-  default: () => <div data-testid="mock-slot-modal">Slots</div>,
+  default: ({ onConfirmSlot }) => <div data-testid="mock-slot-modal">Slots<button onClick={() => onConfirmSlot({ slotId: 42, date: '2026-10-10' })}>Review booking</button></div>,
 }));
 vi.mock('../components/PaymentModal', () => ({
   default: () => <div data-testid="mock-payment-modal">Payment</div>,
@@ -141,6 +141,7 @@ describe('MyBookings Redesign Component', () => {
         currentView="my-bookings"
       />
     );
+    fireEvent.click(screen.getByRole('button', { name: 'All, 2' }));
 
     // KPI Metrics
     expect(screen.getByText('Total bookings')).toBeInTheDocument();
@@ -207,6 +208,20 @@ describe('MyBookings Redesign Component', () => {
     expect(screen.getByTestId('mock-payment-modal')).toBeInTheDocument();
   });
 
+  test('closes schedule before opening terms and payment review', () => {
+    mockCurrentBookings = [mockBookings[0]];
+    renderBookings(<MyBookings currentView="chat" selectedChatBookingId="b1" />, '/chats?scope=purchases');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Open schedule' }));
+    expect(screen.getByTestId('mock-slot-modal')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Review booking' }));
+
+    expect(screen.queryByTestId('mock-slot-modal')).not.toBeInTheDocument();
+    expect(screen.getByTestId('mock-terms-modal')).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId('mock-terms-modal'));
+    expect(screen.getByTestId('mock-payment-modal')).toBeInTheDocument();
+  });
+
   test('keeps lower-frequency booking changes in a management menu', async () => {
     mockCurrentBookings = [mockBookings[0]];
 
@@ -262,6 +277,7 @@ describe('MyBookings Redesign Component', () => {
     mockCurrentBookings = [mockBookings[1]];
 
     renderBookings(<MyBookings currentView="my-bookings" />);
+    fireEvent.click(screen.getByRole('button', { name: 'All, 1' }));
     fireEvent.click(screen.getByRole('button', { name: /Rate Service/i }));
 
     expect(mockHandleOpenRating).toHaveBeenCalledWith('b2');
@@ -277,7 +293,15 @@ describe('MyBookings Redesign Component', () => {
 
     expect(screen.getByRole('heading', { name: 'Bookings' })).toBeInTheDocument();
     expect(screen.getByText('Ana Client')).toBeInTheDocument();
-    expect(screen.getAllByRole('button', { name: 'Message client' })).toHaveLength(2);
+    expect(screen.getByRole('button', { name: 'Scheduled, 1' })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getAllByRole('button', { name: 'Message client' })).toHaveLength(1);
+    expect(screen.getByText('PHP 1,500')).toHaveClass('text-lg', 'text-emerald-700');
+    expect(screen.getByText('Requested on')).toBeVisible();
+    expect(screen.getByText(/Aug.*2026/)).toBeVisible();
+    expect(screen.queryByTestId('booking-card-b2')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'All, 2' }));
+    expect(screen.getByTestId('booking-card-b2')).toBeInTheDocument();
+    expect(screen.getByTestId('location-probe')).toHaveTextContent('filter=all');
     expect(mockListRole).toBe('seller');
   });
 
@@ -301,7 +325,7 @@ describe('MyBookings Redesign Component', () => {
     );
 
     expect(screen.getByRole('heading', { name: 'My Bookings' })).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Incoming bookings' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Incoming bookings' })).toHaveAttribute('aria-pressed', 'false');
     expect(mockListRole).toBe('buyer');
   });
 
@@ -314,7 +338,13 @@ describe('MyBookings Redesign Component', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Services I booked' }));
     expect(screen.getByTestId('location-probe')).toHaveTextContent('/bookings?scope=purchases');
+    expect(screen.getByRole('button', { name: 'Services I booked' })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('button', { name: 'Incoming bookings' })).toBeVisible();
     expect(mockListRole).toBe('buyer');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Incoming bookings' }));
+    expect(screen.getByTestId('location-probe')).toHaveTextContent('/worker/bookings?scope=incoming');
+    expect(mockListRole).toBe('seller');
   });
 
   test('uses the booking scope to set the chat participant role', () => {

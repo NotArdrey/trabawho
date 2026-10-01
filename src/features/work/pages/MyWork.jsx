@@ -1,7 +1,5 @@
 import React, { useEffect, useState } from 'react';
 import DashboardNavigation from '../../../shared/components/DashboardNavigation';
-import InquiryChatModal from '../components/InquiryChatModal';
-import { ActiveInquiriesSection } from '../components/ActiveInquiriesSection';
 import WorkProviderSummary from '../components/WorkProviderSummary';
 import WorkSectionFilter from '../components/WorkSectionFilter';
 import WorkPaymentQueues from '../components/WorkPaymentQueues';
@@ -151,7 +149,6 @@ const hoverStyles = {
 const MyWork = ({ appTheme = 'light', themeMode = 'system', onThemeChange, currentView, searchQuery, onSearchChange, onLogout, onOpenSellerSetup, onOpenMyBookings, onOpenChatPage, sellerProfile, onOpenMyWork, onOpenProfile, onOpenAccountSettings, onOpenSettings, onOpenDashboard, onOpenBrowseServices, onBackToDashboard, onAddNewWork, onOpenAdminDashboard }) => {
   // ============ STATE MANAGEMENT ============
 
-  const [selectedChatId, setSelectedChatId] = useState(null);
   const [doneConfirmTarget, setDoneConfirmTarget] = useState(null);
   const [profileEditModalOpen, setProfileEditModalOpen] = useState(false);
   const [isGcashPreviewOpen, setIsGcashPreviewOpen] = useState(false);
@@ -257,21 +254,7 @@ const MyWork = ({ appTheme = 'light', themeMode = 'system', onThemeChange, curre
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  const activeInquiries = transactions
-    .filter((txn) => !['Completed Service', 'Refunded', 'Cancelled (Cash)'].includes(txn.bookingStatus))
-    .map((txn) => ({
-      id: txn.sourceBookingId || txn.id,
-      clientName: txn.clientName,
-      clientPhoto: txn.clientPhoto || txn.rawBooking?.clientPhoto || '',
-      clientRating: null,
-      service: txn.service,
-      description: txn.rawBooking?.description || 'Service booking request',
-      status: txn.bookingStatus || 'Service Scheduled',
-      requestDate: txn.rawBooking?.requestDate || '',
-      proposedBudget: txn.expectedCashAmount ? `PHP ${txn.expectedCashAmount}` : 'See booking',
-      messages: 0,
-      booking: txn.rawBooking,
-    }));  
+  const activeBookingsCount = transactions.filter((txn) => !['Completed Service', 'Service Stopped', 'Refunded', 'Cancelled', 'Cancelled (Cash)'].includes(txn.bookingStatus)).length;
   const getTransactionForBooking = (scheduleRef, clientName) => {
     const matches = weekTransactions.filter(
       (txn) => txn.scheduleRef === scheduleRef && txn.clientName === clientName
@@ -317,22 +300,6 @@ const MyWork = ({ appTheme = 'light', themeMode = 'system', onThemeChange, curre
   };
 
   // ============ EVENT HANDLERS ============
-  
-  /**
-   * handleRespondClick(inquiryId)
-   * Opens the chat modal for a specific inquiry
-   */
-  const handleRespondClick = (inquiryId) => {
-    setSelectedChatId(inquiryId);
-  };
-  
-  /**
-   * handleCloseChat()
-   * Closes the chat modal
-   */
-  const handleCloseChat = () => {
-    setSelectedChatId(null);
-  };
   
   const handleOpenDoneModal = (transaction) => {
     setDoneConfirmTarget(transaction);
@@ -686,7 +653,6 @@ const MyWork = ({ appTheme = 'light', themeMode = 'system', onThemeChange, curre
   const gcashQrImageUrl = `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(`GCash-${gcashNumber}`)}`;
   const cashConfirmQrImageUrl = `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(`CASH-CONFIRM-${currentProfile?.fullName || 'Worker'}-${gcashNumber}`)}`;
   
-  const showInquiriesSection = workSectionFilter === 'all' || workSectionFilter === 'inquiries';
   const showCashApprovalSection = workSectionFilter === 'all' || workSectionFilter === 'cash-approvals';
   const showRefundSection = workSectionFilter === 'all' || workSectionFilter === 'refunds';
   const showCancelledSection = workSectionFilter === 'all' || workSectionFilter === 'cancelled';
@@ -697,7 +663,6 @@ const MyWork = ({ appTheme = 'light', themeMode = 'system', onThemeChange, curre
   });
   const workSectionOptions = [
     { label: 'Show All', shortLabel: 'All', value: 'all', description: 'Overview of every work section' },
-    { label: 'Active Inquiries', shortLabel: 'Inquiries', value: 'inquiries', description: 'Client requests waiting for a response' },
     { label: 'Payment Confirmations', shortLabel: 'Cash', value: 'cash-approvals', description: 'Cash payment review queue' },
     { label: 'Refund Cases', shortLabel: 'Refunds', value: 'refunds', description: 'GCash refund tracking' },
     { label: 'Cancelled Bookings', shortLabel: 'Cancelled', value: 'cancelled', description: 'Cancelled cash bookings' },
@@ -709,12 +674,6 @@ const MyWork = ({ appTheme = 'light', themeMode = 'system', onThemeChange, curre
   // ============ HELPER FUNCTIONS ============
   
   /**
-   * getInquiryById(id)
-   * Retrieves inquiry data for a specific ID
-   */
-  const getInquiryById = (id) => activeInquiries.find(inq => inq.id === id);
-  
-  /**
    * getSlotStatusColor(slotsLeft, capacity)
    * Returns CSS class for slot availability coloring
    */
@@ -723,9 +682,6 @@ const MyWork = ({ appTheme = 'light', themeMode = 'system', onThemeChange, curre
     if (slotsLeft <= capacity / 2) return 'slot-half';
     return 'slot-available';
   };
-  
-  // Currently selected inquiry for chat
-  const selectedInquiry = selectedChatId ? getInquiryById(selectedChatId) : null;
   
   // ============ RENDER ============
   
@@ -881,7 +837,7 @@ const MyWork = ({ appTheme = 'light', themeMode = 'system', onThemeChange, curre
               location={`${currentProfile?.location?.address || currentProfile?.location?.barangay || 'Sabang'}, ${currentProfile?.location?.city || 'Baliwag'}, ${currentProfile?.location?.province || 'Bulacan'}`}
               bookingMode={supportsAvailabilitySchedule ? 'Time-slot booking' : 'Request booking'}
               isBoosted={currentProfile?.isBoosted}
-              activeInquiries={activeInquiries.length}
+              activeBookings={activeBookingsCount}
               averageRating={avgRatingLabel}
               completed={0}
               description={currentServiceDescription}
@@ -895,7 +851,6 @@ const MyWork = ({ appTheme = 'light', themeMode = 'system', onThemeChange, curre
 
             <WorkSectionFilter value={workSectionFilter} options={workSectionOptions} onValueChange={setWorkSectionFilter} />
             
-            {showInquiriesSection && <ActiveInquiriesSection inquiries={activeInquiries} onRespond={handleRespondClick} />}
 
             <WorkPaymentQueues
               cancelledTransactions={cancelledCashTransactions}
@@ -1269,16 +1224,6 @@ const MyWork = ({ appTheme = 'light', themeMode = 'system', onThemeChange, curre
         )}
       </ConfirmActionModal>
       
-      {/* CHAT MODAL */}
-      {selectedChatId && selectedInquiry && (
-        <InquiryChatModal
-          inquiry={selectedInquiry}
-          onClose={handleCloseChat}
-          onBookingUpdated={() => refreshSellerTransactions()}
-          onError={setPaymentError}
-        />
-      )}
-
       {/* SLOT EDIT MODAL */}
       {editSlotModalOpen && <SlotEditModal
         isOpen={editSlotModalOpen}

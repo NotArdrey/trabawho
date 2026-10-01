@@ -4,7 +4,7 @@ import { ListFilter } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 
-export type WorkSectionValue = "all" | "inquiries" | "cash-approvals" | "refunds" | "cancelled" | "schedule";
+export type WorkSectionValue = "all" | "cash-approvals" | "refunds" | "cancelled" | "schedule";
 
 export interface WorkSectionOption {
   value: WorkSectionValue;

@@ -38,7 +38,7 @@ export interface DashboardProps {
   onOpenAccountSettings?: NavigationHandler;
   onOpenAdminDashboard?: NavigationHandler;
   onOpenBrowseServices?: NavigationHandler;
-  onOpenChatPage?: NavigationHandler;
+  onOpenChatPage?: (bookingId?: string | number | null, scope?: "purchases") => void;
   onOpenDashboard?: NavigationHandler;
   onOpenMyBookings?: NavigationHandler;
   onOpenMyWork?: NavigationHandler;
@@ -170,11 +170,12 @@ export default function Dashboard({
             {dashboardModel.upcomingBookings.length ? (
               <div className="divide-y">
                 {dashboardModel.upcomingBookings.map((booking) => (
-                  <article className="grid gap-3 px-4 py-4 sm:grid-cols-[auto_minmax(0,1fr)_auto] sm:items-center sm:px-5" key={`${booking.service}-${booking.schedule}`}>
+                  <button type="button" className="group grid min-h-16 w-full gap-3 px-4 py-4 text-left transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring sm:grid-cols-[auto_minmax(0,1fr)_auto_auto] sm:items-center sm:px-5" key={booking.id ?? `${booking.service}-${booking.schedule}`} aria-label={`Open ${booking.service} booking with ${booking.provider}`} onClick={() => { if (booking.id != null) onOpenChatPage?.(booking.id, "purchases"); else onOpenMyBookings?.(); }}>
                     <span className="flex size-10 items-center justify-center rounded-lg bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-200"><CalendarCheck className="size-5" aria-hidden="true" /></span>
-                    <div className="min-w-0"><h3 className="font-bold text-foreground">{booking.service}</h3><p className="mt-1 text-sm text-muted-foreground">{booking.provider} · <strong className="font-semibold text-foreground">{booking.schedule}</strong></p></div>
+                    <span className="min-w-0"><strong className="block font-bold text-foreground">{booking.service}</strong><span className="mt-1 block text-sm text-muted-foreground">{booking.provider} · <strong className="font-semibold text-foreground">{booking.schedule}</strong></span></span>
                     <Badge variant="success" className="w-fit">{booking.status}</Badge>
-                  </article>
+                    <ArrowRight className="hidden size-4 text-muted-foreground transition-transform group-hover:translate-x-0.5 group-hover:text-primary sm:block" aria-hidden="true" />
+                  </button>
                 ))}
               </div>
             ) : (

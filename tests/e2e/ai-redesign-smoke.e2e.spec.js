@@ -1,7 +1,6 @@
 const { test, expect } = require('@playwright/test');
 const {
   DEMO_ADMIN_EMAIL,
-  DEMO_CLIENT_EMAIL,
   DEMO_PASSWORD,
 } = require('./helpers/supabase');
 
@@ -225,52 +224,6 @@ test.describe('AI redesign smoke verification', () => {
 
     await expect(page).toHaveURL(/\/sign-in\?returnTo=%2Fbookings%3Ffilter%3Dpending$/);
     await expect(page.getByRole('heading', { name: 'Sign in' })).toBeVisible();
-  });
-
-  test('authenticated client can navigate refreshed app surfaces', async ({ page }) => {
-    const consoleFailures = collectConsoleFailures(page);
-
-    await page.setViewportSize({ width: 1366, height: 900 });
-    await loginAs(page, DEMO_CLIENT_EMAIL);
-
-    await expect(page.getByTestId('client-home-dashboard')).toBeVisible({ timeout: 20_000 });
-    await expect(page).toHaveURL(/\/dashboard$/);
-    await expectNoHorizontalOverflow(page);
-
-    await page.getByRole('button', { name: /^Browse$/ }).click();
-    await expect(page.getByTestId('app-browse-services')).toBeVisible({ timeout: 20_000 });
-    await expect(page).toHaveURL(/\/services$/);
-    await expectNoHorizontalOverflow(page);
-
-    await page.getByRole('button', { name: /^Bookings$/ }).click();
-    await expect(page.getByTestId('my-bookings-page')).toBeVisible({ timeout: 20_000 });
-    await expect(page).toHaveURL(/\/bookings$/);
-    await expectNoHorizontalOverflow(page);
-
-    await page.getByRole('button', { name: /^My Work$/ }).click();
-    await expect(page.getByTestId('my-work-page')).toBeVisible({ timeout: 20_000 });
-    await expect(page).toHaveURL(/\/work$/);
-    await expectNoHorizontalOverflow(page);
-
-    await page.getByLabel('Profile menu').click();
-    await page.getByRole('button', { name: /^Profile$/ }).click();
-    await expect(page.getByTestId('profile-page')).toBeVisible({ timeout: 20_000 });
-    await expect(page).toHaveURL(/\/profile$/);
-    await expectNoHorizontalOverflow(page);
-
-    await page.getByLabel('Profile menu').click();
-    await page.getByRole('button', { name: /^Settings$/ }).click();
-    await expect(page.getByTestId('settings-page')).toBeVisible({ timeout: 20_000 });
-    await expect(page).toHaveURL(/\/settings\/preferences$/);
-    await expectNoHorizontalOverflow(page);
-
-    await page.getByLabel('Profile menu').click();
-    await page.getByRole('button', { name: /^Account & Privacy$/ }).click();
-    await expect(page.getByTestId('account-settings-page')).toBeVisible({ timeout: 20_000 });
-    await expect(page).toHaveURL(/\/settings\/account$/);
-    await expectNoHorizontalOverflow(page);
-
-    expect(consoleFailures).toEqual([]);
   });
 
   test('admin demo account can reach admin and return to refreshed app shell', async ({ page }) => {

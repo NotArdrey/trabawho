@@ -37,6 +37,7 @@ beforeEach(() => {
 describe("InquiryChatModal", () => {
   it("supports a keyboard reply and exposes the empty conversation state", async () => {
     render(<InquiryChatModal inquiry={inquiry} onClose={vi.fn()} />);
+    expect(screen.getByTestId("inquiry-response-dialog")).toHaveClass("max-w-[36rem]!");
     expect(await screen.findByText("Start the conversation")).toBeVisible();
 
     const reply = screen.getByLabelText("Reply to Joshua Santos");
