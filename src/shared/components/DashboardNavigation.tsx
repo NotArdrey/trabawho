@@ -105,7 +105,8 @@ export default function DashboardNavigation({
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
   const [isLogoutModalOpen, setIsLogoutModalOpen] = useState(false);
   const [showMobileSearch, setShowMobileSearch] = useState(false);
-  const [workerWorkspace, setWorkerWorkspace] = useState(() => localStorage.getItem("trabawho-worker-workspace") || "provider");
+  const workspaceUserId = sellerProfile?.userId || sellerProfile?.user_id || "anonymous";
+  const workspaceStorageKey = `trabawho-worker-workspace:${workspaceUserId}`;
   const { notifications, isLoading, error, markRead, markAllRead, retry } = useRealtimeNotifications(sellerProfile?.userId || sellerProfile?.user_id);
 
   useEffect(() => {
@@ -129,7 +130,7 @@ export default function DashboardNavigation({
   const isAdminAccount = Boolean(sellerProfile?.isAdmin) || role === "admin";
   const isWorkerAccount = isWorkerProfile(sellerProfile);
   const routeWorkspace = PROVIDER_VIEWS.has(currentView) ? "provider" : CLIENT_VIEWS.has(currentView) ? "client" : null;
-  const resolvedWorkspace = routeWorkspace || workerWorkspace;
+  const resolvedWorkspace = routeWorkspace || localStorage.getItem(workspaceStorageKey) || "provider";
   const isProviderWorkspace = isWorkerAccount && resolvedWorkspace === "provider";
   const showGlobalSearch = currentView !== "browse-services";
   const profilePhotoUrl = getProfilePhotoUrl(sellerProfile?.profilePhoto);
@@ -139,13 +140,12 @@ export default function DashboardNavigation({
 
   useEffect(() => {
     if (!isWorkerAccount) return;
-    if (routeWorkspace) localStorage.setItem("trabawho-worker-workspace", routeWorkspace);
-  }, [isWorkerAccount, routeWorkspace]);
+    if (routeWorkspace) localStorage.setItem(workspaceStorageKey, routeWorkspace);
+  }, [isWorkerAccount, routeWorkspace, workspaceStorageKey]);
 
   const switchWorkerWorkspace = () => {
     const nextWorkspace = isProviderWorkspace ? "client" : "provider";
-    setWorkerWorkspace(nextWorkspace);
-    localStorage.setItem("trabawho-worker-workspace", nextWorkspace);
+    localStorage.setItem(workspaceStorageKey, nextWorkspace);
     void navigate(nextWorkspace === "provider" ? paths.workerDashboard : paths.dashboard);
   };
 

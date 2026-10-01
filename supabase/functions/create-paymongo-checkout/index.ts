@@ -28,6 +28,12 @@ interface PaymentAttempt {
   status: string;
 }
 
+interface CheckoutStart {
+  bookingId: string;
+  holdExpiresAt: string | null;
+  paymentAttempt: PaymentAttempt;
+}
+
 const parseAttempt = (value: unknown): PaymentAttempt => {
   const record = asRecord(Array.isArray(value) ? value[0] : value);
   const amount = Number(record.amount);
@@ -53,17 +59,40 @@ const parseAttempt = (value: unknown): PaymentAttempt => {
   };
 };
 
+const parseCheckoutStart = (value: unknown): CheckoutStart => {
+  const result = asRecord(Array.isArray(value) ? value[0] : value);
+  const booking = asRecord(result.booking);
+  return {
+    bookingId: cleanPaymentString(booking.id),
+    holdExpiresAt: cleanPaymentString(result.holdExpiresAt) || null,
+    paymentAttempt: parseAttempt(result.paymentAttempt),
+  };
+};
+
 const getAppUrl = (request: Request) => {
-  const configured = cleanPaymentString(Deno.env.get("TRABAWHO_APP_URL"));
-  const candidate = configured || cleanPaymentString(request.headers.get("origin"));
-  try {
-    const url = new URL(candidate);
-    const local = ["localhost", "127.0.0.1"].includes(url.hostname);
-    if (url.protocol !== "https:" && !(local && url.protocol === "http:")) throw new Error();
-    return url.origin;
-  } catch {
-    throw new PaymentFunctionError("Payment return URL is not configured.", 500);
-  }
+  const parseOrigin = (candidate: string) => {
+    if (!candidate) return null;
+    try {
+      const url = new URL(candidate);
+      const local = ["localhost", "127.0.0.1"].includes(url.hostname);
+      if (url.protocol !== "https:" && !(local && url.protocol === "http:")) return null;
+      return { local, origin: url.origin };
+    } catch {
+      return null;
+    }
+  };
+
+  const requestOrigin = parseOrigin(cleanPaymentString(request.headers.get("origin")));
+  const configuredOrigin = parseOrigin(cleanPaymentString(Deno.env.get("TRABAWHO_APP_URL")));
+
+  // Local development sessions belong to the exact browser origin (including
+  // its port). Returning to the deployed URL would load a different Supabase
+  // session and can make the user appear to have changed accounts.
+  if (requestOrigin?.local) return requestOrigin.origin;
+  if (configuredOrigin) return configuredOrigin.origin;
+  if (requestOrigin) return requestOrigin.origin;
+
+  throw new PaymentFunctionError("Payment return URL is not configured.", 500);
 };
 
 const parsePayMongoError = (payload: UnknownRecord) => {
@@ -73,42 +102,64 @@ const parsePayMongoError = (payload: UnknownRecord) => {
   return detail || "PayMongo could not create the checkout session.";
 };
 
+const getBookingCheckoutError = (error: UnknownRecord) => {
+  const code = cleanPaymentString(error.code);
+  const message = cleanPaymentString(error.message);
+  const expectedWorkflowCodes = new Set(["22023", "23505", "23514", "42501", "P0002"]);
+  if (expectedWorkflowCodes.has(code) && message && !message.toLowerCase().includes("relation")) {
+    return message.slice(0, 240);
+  }
+  return "This booking is not ready for payment.";
+};
+
 serve(async (request: Request) => {
   if (request.method === "OPTIONS") return new Response("ok", { headers: paymentCorsHeaders });
   if (request.method !== "POST") return paymentJsonResponse({ error: "Method not allowed" }, 405);
 
   try {
     const body = await parsePaymentJson(request);
-    const bookingId = cleanPaymentString(body.bookingId);
+    const bookingId = cleanPaymentString(body.bookingId) || null;
+    const serviceId = Number(body.serviceId) || null;
+    const slotId = Number(body.slotId) || null;
+    const quoteVersion = Number(body.quoteVersion) || null;
+    const paymentPlan = cleanPaymentString(body.paymentPlan) || "full";
     const idempotencyKey = cleanPaymentString(body.idempotencyKey);
-    if (!bookingId || !idempotencyKey) {
-      throw new PaymentFunctionError("Booking and payment request identifiers are required.");
+    if ((!bookingId && (!serviceId || !slotId)) || !idempotencyKey) {
+      throw new PaymentFunctionError("Choose a booking time before starting payment.");
     }
 
     const secretKey = cleanPaymentString(Deno.env.get("PAYMONGO_SECRET_KEY"));
     if (!secretKey.startsWith("sk_test_") && !secretKey.startsWith("sk_live_")) {
       throw new PaymentFunctionError("PayMongo is not configured.", 503);
     }
-    const environment = secretKey.startsWith("sk_live_") ? "live" : "test";
+    if (!secretKey.startsWith("sk_test_")) {
+      throw new PaymentFunctionError("This demo only accepts PayMongo test payments.", 503);
+    }
     const userClient = createPaymentUserClient(request);
-    const { data: attemptData, error: attemptError } = await userClient.rpc(
-      "create_booking_payment_attempt",
+    const { data: checkoutData, error: attemptError } = await userClient.rpc(
+      "start_booking_checkout",
       {
         p_booking_id: bookingId,
-        p_idempotency_key: idempotencyKey,
-        p_environment: environment,
+        p_service_id: serviceId,
+        p_slot_id: slotId,
+        p_quote_version: quoteVersion,
+        p_payment_plan: paymentPlan,
+        p_operation_id: idempotencyKey,
       },
     );
     if (attemptError) {
       console.error("paymongo_attempt_create_failed", { code: attemptError.code, bookingId });
-      throw new PaymentFunctionError("This booking is not ready for payment.", 409);
+      throw new PaymentFunctionError(getBookingCheckoutError(asRecord(attemptError)), 409);
     }
 
-    const attempt = parseAttempt(attemptData);
+    const checkoutStart = parseCheckoutStart(checkoutData);
+    const attempt = checkoutStart.paymentAttempt;
     if (attempt.checkout_url && new Date(attempt.expires_at).getTime() > Date.now()) {
       return paymentJsonResponse({
         checkoutUrl: attempt.checkout_url,
         paymentAttemptId: attempt.id,
+        bookingId: checkoutStart.bookingId,
+        holdExpiresAt: checkoutStart.holdExpiresAt,
       });
     }
 
@@ -135,7 +186,7 @@ serve(async (request: Request) => {
         currency: attempt.currency,
         quantity: 1,
       }],
-      payment_method_types: ["gcash"],
+      payment_method_types: ["card"],
       success_url: `${appUrl}/bookings?payment=verifying&${returnQuery}`,
       cancel_url: `${appUrl}/bookings?payment=cancelled&${returnQuery}`,
       reference_number: attempt.reference_number,
@@ -187,7 +238,12 @@ serve(async (request: Request) => {
       throw new PaymentFunctionError("Checkout was created but could not be attached to the booking.", 500);
     }
 
-    return paymentJsonResponse({ checkoutUrl, paymentAttemptId: attempt.id });
+    return paymentJsonResponse({
+      checkoutUrl,
+      paymentAttemptId: attempt.id,
+      bookingId: checkoutStart.bookingId,
+      holdExpiresAt: checkoutStart.holdExpiresAt,
+    });
   } catch (error) {
     const safeError = safePaymentError(error);
     if (safeError.status >= 500) console.error("paymongo_checkout_failed", error);

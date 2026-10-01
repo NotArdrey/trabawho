@@ -159,6 +159,7 @@ function BookingCalendarDialog({ onClose, worker, schedule, onConfirmBooking }: 
   const canConfirmManual = Boolean(schedule.manualScheduling && selectedDate);
   const canConfirmFixed = Boolean(!schedule.manualScheduling && selectedDate && selectedBlock && selectedBlock.slotsLeft > 0);
   const canReview = canConfirmManual || canConfirmFixed;
+  const hasPublishedTimes = Boolean(schedule.manualScheduling || Object.values(schedule.dayBlocks || {}).some((blocks) => blocks.some((block) => block.slotsLeft > 0)));
 
   const changeMonth = (offset: number) => {
     setVisibleMonth((current) => new Date(current.getFullYear(), current.getMonth() + offset, 1));
@@ -225,6 +226,15 @@ function BookingCalendarDialog({ onClose, worker, schedule, onConfirmBooking }: 
           </DialogHeader>
 
           <div className="grid gap-5 px-4 py-5 sm:px-6 sm:py-6">
+            {!hasPublishedTimes ? (
+              <div className="flex gap-3 rounded-xl border border-brand-highlight/30 bg-brand-highlight-soft p-4" role="status">
+                <AlertCircle className="mt-0.5 size-5 shrink-0 text-brand-highlight-foreground" aria-hidden="true" />
+                <div>
+                  <p className="font-semibold text-foreground">No booking times are published yet</p>
+                  <p className="mt-1 text-sm leading-5 text-muted-foreground">This provider currently has no future availability. Close this window and try another provider, or check again later.</p>
+                </div>
+              </div>
+            ) : null}
             <section ref={calendarSectionRef} tabIndex={-1} aria-labelledby="booking-month-heading" className="scroll-mt-4 focus:outline-none">
               <div className="mb-3 flex items-center justify-between gap-3">
                 <Button variant="outline" size="icon" onClick={() => changeMonth(-1)} aria-label="Previous month"><ChevronLeft aria-hidden="true" /></Button>
@@ -244,7 +254,13 @@ function BookingCalendarDialog({ onClose, worker, schedule, onConfirmBooking }: 
                     const disabled = !cell.isCurrentMonth || isPast || !meta.canBookDate;
                     const selected = selectedDate === dateValue;
                     const dateLabel = formatLongDate(dateValue);
-                    const availability = meta.manualScheduling ? "open scheduling" : `${meta.slotCount} ${meta.slotCount === 1 ? "slot" : "slots"} available`;
+                    const availability = meta.manualScheduling
+                      ? "open scheduling"
+                      : meta.slotCount > 0
+                        ? `${meta.slotCount} ${meta.slotCount === 1 ? "slot" : "slots"} available`
+                        : meta.isOperatingDay
+                          ? "fully booked"
+                          : "no times offered";
 
                     return (
                       <button
@@ -265,7 +281,7 @@ function BookingCalendarDialog({ onClose, worker, schedule, onConfirmBooking }: 
                       >
                         <span className="text-sm font-bold sm:text-base">{cell.date.getDate()}</span>
                         <span className={cn("hidden text-[11px] font-medium sm:block", selected ? "text-primary-foreground/85" : "text-muted-foreground")}>
-                          {meta.manualScheduling ? "Open" : meta.slotCount ? `${meta.slotCount} left` : "Full"}
+                          {meta.manualScheduling ? "Open" : meta.slotCount ? `${meta.slotCount} left` : meta.isOperatingDay ? "Full" : "No times"}
                         </span>
                         {!disabled && !selected ? <span className="size-1.5 rounded-full bg-primary sm:hidden" aria-hidden="true" /> : null}
                         {selected ? <Check className="absolute right-1.5 top-1.5 size-4" aria-hidden="true" /> : null}

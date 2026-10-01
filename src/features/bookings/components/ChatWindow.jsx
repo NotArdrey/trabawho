@@ -1,6 +1,8 @@
 import React, { useMemo, useState, useEffect, useRef } from 'react';
 import { Archive, ArrowLeft, MessageCircle, MoreVertical, Send, Trash2 } from 'lucide-react';
 import { SearchFilterBar } from '@/components/ui/search-filter-bar';
+import { ProviderQuoteComposer } from './ProviderQuoteComposer';
+import { BookingQuoteCard } from './BookingQuoteCard';
 import { getThemeTokens } from '../../../shared/styles/themeTokens';
 import { fetchBookingMessages, sendBookingMessage } from '../services/bookingService';
 
@@ -19,12 +21,11 @@ const getChatListKey = (booking = {}, viewerRole = 'buyer') => {
   ].map(normalizeChatKeyPart).join('|');
 };
 
-const ChatWindow = ({ appTheme = 'light', booking, onApproveQuote, onRejectQuote, onStopServiceAccepted, bookings, onSelectBooking, selectedBookingId, onOpenSlotSelection, onOpenPaymentSelection, onRequestRefund, onConfirmRefundReceived, onLeaveRating, onArchiveChat, onDeleteChat, viewerRole = 'buyer', initialMobileListOpen = false }) => {
+const ChatWindow = ({ appTheme = 'light', booking, onApproveQuote, onRejectQuote, onProposeQuote, onStopServiceAccepted, bookings, onSelectBooking, selectedBookingId, onOpenSlotSelection, onOpenPaymentSelection, onRequestRefund, onConfirmRefundReceived, onLeaveRating, onArchiveChat, onDeleteChat, viewerRole = 'buyer', initialMobileListOpen = false }) => {
   const [messages, setMessages] = useState([]);
   const [clientMessage, setClientMessage] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [messageError, setMessageError] = useState('');
-  const [isApproveHovered, setIsApproveHovered] = useState(false);
   const [isSendHovered, setIsSendHovered] = useState(false);
   const [isInputFocused, setIsInputFocused] = useState(false);
   const [hoveredChatId, setHoveredChatId] = useState(null);
@@ -45,7 +46,7 @@ const ChatWindow = ({ appTheme = 'light', booking, onApproveQuote, onRejectQuote
   const [chatFilter, setChatFilter] = useState('all');
   const conversationMenuRef = useRef(null);
 
-  const hasSellerQuote = messages.some((message) => message.type === 'quote');
+  const hasSellerQuote = Boolean(booking?.activeQuote) || messages.some((message) => message.type === 'quote');
   const isRecurringService = booking?.billingCycle === 'weekly' || booking?.billingCycle === 'monthly';
   const isServiceStopped =
     booking?.status === 'Service Stopped'
@@ -344,10 +345,6 @@ const ChatWindow = ({ appTheme = 'light', booking, onApproveQuote, onRejectQuote
     quoteDelivery: { fontSize: '12px', color: chatTheme.textSecondary, margin: '0 0 8px 0', display: 'flex', justifyContent: 'space-between' },
     label: { fontWeight: 600, color: chatTheme.textPrimary },
     quoteNote: { fontSize: '12px', color: chatTheme.textSecondary, margin: 0, padding: '12px', background: chatTheme.bgTertiary, borderRadius: '6px', borderLeft: `3px solid ${themeTokens.accent}` },
-    quoteActionBar: { background: chatTheme.bgSecondary, borderTop: `1px solid ${chatTheme.border}`, padding: '16px', marginTop: 'auto', flexShrink: 0 },
-    actionContent: { textAlign: 'center' },
-    actionPrompt: { fontSize: '13px', color: chatTheme.textPrimary, fontWeight: 600, margin: '0 0 12px 0' },
-    approveBtn: { padding: '12px 24px', background: isApproveHovered ? themeTokens.accentHover : themeTokens.accent, color: 'white', border: `1px solid ${themeTokens.accent}`, borderRadius: '8px 0 0 8px', fontSize: '14px', fontWeight: 700, cursor: 'pointer', transition: 'all 0.3s ease', width: '100%', textTransform: 'uppercase', letterSpacing: '0.5px', transform: isApproveHovered ? 'translateY(-2px)' : 'translateY(0)', boxShadow: 'none' },
     inputArea: { display: 'flex', gap: '8px', padding: '12px', borderTop: `1px solid ${chatTheme.border}`, background: chatTheme.bgSecondary, flexShrink: 0 },
     messageInput: { flex: 1, padding: '10px 12px', border: `1px solid ${isInputFocused ? themeTokens.accent : chatTheme.border}`, borderRadius: '8px', fontSize: '14px', fontFamily: 'inherit', transition: 'all 0.2s ease', outline: 'none', boxShadow: isInputFocused ? `0 0 0 2px ${themeTokens.accentSoft}` : 'none', background: chatTheme.bgTertiary, color: chatTheme.textPrimary },
     sendBtn: { padding: '10px 20px', background: !clientMessage.trim() ? chatTheme.disabledBg : (isSendHovered ? themeTokens.accentHover : themeTokens.accent), color: 'white', border: 'none', borderRadius: '8px', fontSize: '14px', fontWeight: 600, cursor: !clientMessage.trim() ? 'not-allowed' : 'pointer', transition: 'all 0.2s ease' },
@@ -388,8 +385,6 @@ const ChatWindow = ({ appTheme = 'light', booking, onApproveQuote, onRejectQuote
     modalBtnCancel: { padding: '9px 14px', border: 'none', borderRadius: '8px', background: isDarkMode ? '#58606c' : '#e2e8f0', color: chatTheme.textPrimary, fontWeight: 700, cursor: 'pointer' },
     modalBtnPrimary: { padding: '9px 14px', border: 'none', borderRadius: '8px', background: themeTokens.accent, color: '#fff', fontWeight: 700, cursor: 'pointer' },
     modalBtnDanger: { padding: '9px 14px', border: 'none', borderRadius: '8px', background: '#dc2626', color: '#fff', fontWeight: 700, cursor: 'pointer' },
-    quoteDecisionActions: { display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) auto', gap: 0, width: '100%', maxWidth: '100%', alignItems: 'stretch' },
-    rejectQuoteBtn: { padding: '12px 18px', minWidth: '138px', background: chatTheme.bgTertiary, color: chatTheme.dangerText, border: `1px solid ${chatTheme.dangerText}`, borderLeft: 'none', borderRadius: '0 8px 8px 0', fontSize: '13px', fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' },
   };
 
   const getMessageStyle = (msg) => {
@@ -651,28 +646,27 @@ const ChatWindow = ({ appTheme = 'light', booking, onApproveQuote, onRejectQuote
 
           </div>
 
-          {canReviewQuote && (
-            <div style={styles.quoteActionBar}>
-              <div style={styles.actionContent}>
-                <p style={styles.actionPrompt}>Review this quote and choose what to do next.</p>
-                <div className="booking-quote-actions" style={styles.quoteDecisionActions}>
-                  <button
-                    style={styles.approveBtn}
-                    onMouseEnter={() => setIsApproveHovered(true)}
-                    onMouseLeave={() => setIsApproveHovered(false)}
-                    onClick={handleApproveQuoteClick}
-                  >
-                    Approve Quote
-                  </button>
-                  <button
-                    style={styles.rejectQuoteBtn}
-                    onClick={() => setShowRejectQuoteModal(true)}
-                  >
-                    Reject Quote
-                  </button>
-                </div>
+          {booking?.activeQuote && (
+            <BookingQuoteCard
+              quote={booking.activeQuote}
+              canRespond={viewerRole === 'buyer' && canReviewQuote}
+              onAccept={handleApproveQuoteClick}
+              onReject={() => setShowRejectQuoteModal(true)}
+            />
+          )}
+
+          {canReviewQuote && !booking?.activeQuote && (
+            <div className="border-t bg-muted/30 p-4 text-center">
+              <p className="mb-3 text-sm font-semibold text-foreground">Review this quote and choose what to do next.</p>
+              <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2">
+                <button className="min-h-11 rounded-md bg-primary px-5 font-semibold text-primary-foreground" onClick={handleApproveQuoteClick}>Approve quote</button>
+                <button className="min-h-11 rounded-md border border-destructive px-4 font-semibold text-destructive" onClick={() => setShowRejectQuoteModal(true)}>Reject quote</button>
               </div>
             </div>
+          )}
+
+          {viewerRole === 'seller' && isRequestBooking && !isClosedConversation && onProposeQuote && (
+            <ProviderQuoteComposer onSubmit={onProposeQuote} />
           )}
 
           {shouldShowSlotSelectionNotice && (

@@ -1,6 +1,6 @@
 # PayMongo
 
-TrabaWho uses PayMongo Hosted Checkout v2 for the GCash sandbox flow. Checkout
+TrabaWho uses PayMongo Hosted Checkout v2 for the card sandbox flow. Checkout
 sessions are created by a Supabase Edge Function, and only a signed PayMongo
 webhook may confirm payment in the database.
 
@@ -32,6 +32,9 @@ documentation example, or commit.
   and records a paid checkout through a service-role-only RPC.
 - `supabase/migrations/20260930090000_paymongo_checkout_foundation.sql` adds
   payment-attempt and provider-event records plus controlled RPCs.
+- `supabase/migrations/20261001090000_transaction_safe_booking_holds.sql`
+  atomically reserves capacity, aligns attempts to a 15-minute hold, and keeps
+  late payments from reclaiming an expired schedule.
 - `src/features/bookings/services/paymongoCheckout.ts` invokes checkout from the
   browser and validates the returned PayMongo URL.
 
@@ -44,17 +47,21 @@ documentation example, or commit.
 5. Deploy `paymongo-webhook` without Supabase JWT verification. PayMongo
    authenticates to this endpoint through its own HMAC signature.
 6. Register the public webhook URL in PayMongo test mode for
-   `checkout_session.payment.paid`.
-7. Copy the generated endpoint signing secret into
-   `PAYMONGO_WEBHOOK_SECRET` and redeploy or restart the webhook function.
-8. Send a PayMongo test event, then complete a sandbox GCash checkout.
+   `checkout_session.payment.paid`. The reusable
+   `scripts/register-paymongo-webhook.ps1` command registers or reuses the
+   endpoint, stores its signing secret in Supabase, and verifies a signed
+   diagnostic request without creating payment data.
+7. If the endpoint signing secret is rotated in PayMongo, rerun that script to
+   synchronize `PAYMONGO_WEBHOOK_SECRET`.
+8. Send a PayMongo test event, then complete a sandbox card checkout.
 
 Do not deploy the checkout function before the database migration. Do not
 activate the client redirect before both functions are reachable.
 
 ## Verification checklist
 
-- The browser receives only `checkoutUrl` and `paymentAttemptId`.
+- The browser receives only `checkoutUrl`, `paymentAttemptId`, `bookingId`, and
+  the server-generated `holdExpiresAt` timestamp.
 - The checkout URL uses `https://checkout.paymongo.com`.
 - Returning through `success_url` does not mark a booking paid by itself.
 - A valid paid webhook confirms the correct installment once.
@@ -67,8 +74,10 @@ activate the client redirect before both functions are reachable.
 
 ## Recovery
 
-If checkout creation fails, the booking remains payment-pending and may be
-retried with the same browser operation ID. If webhook processing fails, leave
+If checkout creation fails, the booking remains payment-pending until its hold
+expires and may be retried with the same browser operation ID. A paid webhook
+received after expiry is marked for refund review and does not reclaim the
+released slot. If webhook processing fails, leave
 the booking pending, inspect function logs without printing secrets or raw
 customer data, and reconcile the provider payment before any manual action.
 

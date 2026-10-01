@@ -5151,44 +5151,6 @@ textarea {
   font-weight: 700;
 }
 
-.booking-card-footer {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 14px;
-  flex-wrap: wrap;
-  padding-top: 14px;
-  border-top: 1px solid var(--gl-border);
-}
-
-.booking-price-box {
-  display: flex;
-  align-items: baseline;
-  gap: 6px;
-  flex-wrap: wrap;
-}
-
-.booking-price-label {
-  font-size: 12px;
-  font-weight: 700;
-  color: var(--gl-text-3);
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-}
-
-.booking-price-value {
-  font-size: 20px;
-  font-weight: 850;
-  color: var(--gl-green);
-}
-
-.booking-card-actions {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-
 /* Skeleton Loading */
 .booking-skeleton-card {
   padding: 24px;
@@ -5231,18 +5193,6 @@ textarea {
     align-items: flex-start;
   }
 
-  .booking-card-footer {
-    flex-direction: column;
-    align-items: stretch;
-  }
-
-  .booking-card-actions {
-    width: 100%;
-  }
-
-  .booking-card-actions > button {
-    flex: 1;
-  }
 }
 
 .booking-detail-review {
@@ -5710,38 +5660,6 @@ body::-webkit-scrollbar,
   box-shadow: none !important;
 }
 
-[data-testid="profile-page"] .profile-portfolio-section {
-  background: transparent !important;
-}
-
-.profile-portfolio-heading {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 20px;
-}
-
-.profile-portfolio-heading > div {
-  min-width: 0;
-}
-
-.profile-generate-button {
-  width: auto !important;
-  flex: 0 0 auto;
-  background: var(--gl-surface) !important;
-  box-shadow: none !important;
-}
-
-[data-testid="profile-page"] .profile-portfolio-section > div[style*="flex-wrap"] {
-  display: block !important;
-  margin-top: 16px !important;
-}
-
-[data-testid="profile-page"] .profile-portfolio-section > div[style*="display: grid"] {
-  gap: 8px !important;
-  margin-top: 8px !important;
-}
-
 @media (max-width: 880px) {
   .gl-app-shell-active [data-testid="profile-page"] > main.profile-main-modern {
     width: 100% !important;
@@ -5780,14 +5698,6 @@ body::-webkit-scrollbar,
     padding: 20px 0 !important;
   }
 
-  .profile-generate-button {
-    width: 100% !important;
-  }
-
-  .profile-portfolio-heading {
-    flex-direction: column;
-    gap: 14px;
-  }
 }
 
 .booking-chat-search {

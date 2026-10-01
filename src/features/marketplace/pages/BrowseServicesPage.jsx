@@ -25,7 +25,7 @@ import {
 } from '@/components/ui/select';
 import SuccessNotification from '../../../shared/components/SuccessNotification';
 import ErrorNotification from '../../../shared/components/ErrorNotification';
-import { createClientBooking, startServiceConversation } from '../../bookings/services/bookingService';
+import { startServiceConversation } from '../../bookings/services/bookingService';
 import { createPayMongoCheckout, redirectToPayMongo } from '../../bookings/services/paymongoCheckout';
 import { fetchAllActiveServices } from '../../../shared/services/authService';
 import { supabase } from '../../../shared/services/supabaseClient';
@@ -36,8 +36,8 @@ import ServiceCard from '../components/ServiceCard';
 import WorkerDetailModal from '../components/WorkerDetailModal';
 import ReviewsModal from '../components/ReviewsModal';
 import { MarketplaceFilterPanel } from '../components/MarketplaceFilterPanel';
+import { useMarketplaceSchedules } from '../hooks/useMarketplaceSchedules';
 import {
-  buildWeeklyScheduleFromSlots,
   createScheduleForProvider,
   getDisplayServiceType,
   getProviderQuoteAmount,
@@ -126,7 +126,7 @@ function BrowseServicesPage({
   const [reviewsTarget, setReviewsTarget] = useState(null);
   const [reviewsBySeller, setReviewsBySeller] = useState({});
   const [isReviewsLoading, setIsReviewsLoading] = useState(false);
-  const [schedulesByProvider, setSchedulesByProvider] = useState({});
+  const { refreshSchedules, schedulesByProvider } = useMarketplaceSchedules(services);
 
   const searchQuery = isPublic ? localSearchQuery : externalSearchQuery;
   const locationQuery = isPublic ? localLocationQuery : '';
@@ -168,52 +168,6 @@ function BrowseServicesPage({
       mounted = false;
     };
   }, [sellerProfile]);
-
-  useEffect(() => {
-    let mounted = true;
-
-    const loadSlots = async () => {
-      const serviceIds = services.map((item) => item.rawService?.id).filter(Boolean);
-
-      setSchedulesByProvider((prev) => {
-        const next = { ...prev };
-        services.forEach((provider) => {
-          if (!next[provider.id]) next[provider.id] = createScheduleForProvider(provider);
-        });
-        return next;
-      });
-
-      if (serviceIds.length === 0) return;
-
-      const { data, error } = await supabase
-        .from('service_slots')
-        .select('*')
-        .in('service_id', serviceIds)
-        .order('start_ts', { ascending: true });
-
-      if (error || !mounted) return;
-
-      const slotsByService = {};
-      (data || []).forEach((slot) => {
-        if (!slotsByService[slot.service_id]) slotsByService[slot.service_id] = [];
-        slotsByService[slot.service_id].push(slot);
-      });
-
-      setSchedulesByProvider((prev) => {
-        const next = { ...prev };
-        services.forEach((provider) => {
-          const slots = slotsByService[provider.rawService?.id] || [];
-          next[provider.id] = buildWeeklyScheduleFromSlots(slots, provider);
-        });
-        return next;
-      });
-    };
-
-    loadSlots();
-    return () => {
-      mounted = false;
-    };
-  }, [services]);
 
   useEffect(() => {
     if (!reviewsTarget || !reviewsSellerId || reviewsBySeller[reviewsSellerId]) return undefined;
@@ -503,49 +457,33 @@ function BrowseServicesPage({
 
   const handleSelectPayment = async (selectedPaymentMethod, mockPayment) => {
     if (!pendingBooking) return;
-
-    const { workerId, selectedSlot } = pendingBooking;
-    const { dateKey, dayKey, blockId } = selectedSlot;
-    const worker = services.find((item) => item.id === workerId) || selectedWorker;
+    if (selectedPaymentMethod !== 'paymongo-card') {
+      setBookingError('GCash is coming soon. Choose PayMongo card checkout to continue.');
+      return;
+    }
 
     try {
       setIsBookingSubmitting(true);
       setBookingError('');
-      const createdBooking = await createClientBooking({
-        provider: worker,
-        pendingBooking,
-        paymentMethod: selectedPaymentMethod,
-        mockPayment,
+      const checkout = await createPayMongoCheckout({
+        ...pendingBooking,
+        paymentPlan: mockPayment?.paymentPlan || 'full',
       });
-      const checkout = await createPayMongoCheckout(createdBooking);
       redirectToPayMongo(checkout);
     } catch (error) {
-      setBookingError(error?.message || 'Unable to create booking.');
       setIsBookingSubmitting(false);
-      return;
+      const message = error?.message || 'Unable to reserve this booking.';
+      if (/time (?:is|was).*(?:unavailable|booked)|slot.*(?:unavailable|full)/i.test(message)) {
+        setIsPaymentModalOpen(false);
+        setPendingBooking(null);
+        refreshSchedules();
+        setIsBookingCalendarOpen(true);
+        setBookingError('That time is no longer available. Availability has been refreshed—choose another time.');
+        return;
+      }
+      setBookingError(message);
+      throw error;
     }
-
-    setSchedulesByProvider((prev) => {
-      const providerSchedule = prev[workerId] || {};
-      const applyDecrement = (blocks = []) =>
-        blocks.map((block) => (
-          block.id === blockId ? { ...block, slotsLeft: Math.max(0, (block.slotsLeft || 0) - 1) } : block
-        ));
-
-      return {
-        ...prev,
-        [workerId]: {
-          ...providerSchedule,
-          dayBlocks: {
-            ...providerSchedule.dayBlocks,
-            ...(dateKey ? { [dateKey]: applyDecrement(providerSchedule.dayBlocks?.[dateKey] || []) } : {}),
-            ...(dayKey ? { [dayKey]: applyDecrement(providerSchedule.dayBlocks?.[dayKey] || []) } : {}),
-          },
-        },
-      };
-    });
-
-    setIsBookingSubmitting(false);
   };
 
   return (

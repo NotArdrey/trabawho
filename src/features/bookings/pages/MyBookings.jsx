@@ -8,7 +8,6 @@ import {
   CheckCircle2,
   Clock,
   CreditCard,
-  Eye,
   Filter,
   MessageCircle,
   Receipt,
@@ -25,11 +24,17 @@ import BookingTermsModal from '../components/BookingTermsModal';
 import RatingModal from '../components/RatingModal';
 import { BookingDetailsDialog } from '../components/BookingDetailsDialog';
 import { BookingScopeSwitcher } from '../components/BookingScopeSwitcher';
+import { ReservationStatus } from '../components/ReservationStatus';
+import { CancelBookingDialog } from '../components/CancelBookingDialog';
+import { BookingRequestReviewDialog } from '../components/BookingRequestReviewDialog';
+import { PaymentReturnStatus } from '../components/PaymentReturnStatus';
+import { BookingCardFooter } from '../components/BookingCardFooter';
 import { Button } from '@/components/ui/button';
 import { MetricCard } from '@/components/ui/metric-card';
 import { SearchFilterBar } from '@/components/ui/search-filter-bar';
 import { WorkflowEmptyState } from '@/components/ui/workflow-panel';
 import { paths } from '@/app/router/routes';
+import { hasPastUnpaidSchedule } from '@/features/bookings/utils/bookingSchedule';
 
 import {
   useBookingListController,
@@ -44,6 +49,14 @@ import {
   fetchBookingById,
   markBookingDelivered,
 } from '../services/bookingService';
+import {
+  cancelBooking,
+  proposeBookingQuote,
+  rejectBookingQuote,
+  rescheduleBooking,
+  reviewBookingCancellation,
+  reviewBookingReschedule,
+} from '../services/bookingTransactions';
 
 const WORKER_ROLE_VALUES = new Set(['worker', 'workers', 'seller', 'sellers']);
 const CLIENT_ROLE_VALUES = new Set(['client', 'clients', 'buyer', 'buyers', 'customer', 'customers']);
@@ -116,6 +129,12 @@ const getStatusMeta = (status) => {
   if (status === 'Refund Processing' || status === 'Refunded') {
     return { className: 'booking-status-cancelled', icon: RotateCcw, label: status };
   }
+  if (status === 'Refund Pending' || status === 'Cancellation Requested') {
+    return { className: 'booking-status-pending', icon: Clock, label: status };
+  }
+  if (status === 'Reservation Expired') {
+    return { className: 'booking-status-pending', icon: CalendarX2, label: 'Choose New Time' };
+  }
   if (status === 'Cancelled' || status === 'Cancelled (Cash)') {
     return { className: 'booking-status-cancelled', icon: AlertCircle, label: 'Cancelled' };
   }
@@ -179,10 +198,6 @@ const MyBookings = ({
   onOpenBrowseServices,
   onOpenAdminDashboard,
 }) => {
-  // ========================================================================
-  // CONTROLLER HOOKS INITIALIZATION
-  // ========================================================================
-  
   const [, setHeaderNotifications] = useState([]);
   const pushHeaderNotification = useCallback((title, message) => {
     const id = `notif-${Date.now()}-${Math.floor(Math.random() * 999)}`;
@@ -210,8 +225,8 @@ const MyBookings = ({
   const [resolvedChatScope, setResolvedChatScope] = useState(null);
   const isProviderBookingsRoute = location.pathname === paths.workerBookings;
   const defaultScope = isWorkerAccount && isProviderBookingsRoute ? 'incoming' : 'purchases';
-  const activeScope = isWorkerAccount && (explicitScope || resolvedChatScope)
-    ? (explicitScope || resolvedChatScope)
+  const activeScope = isWorkerAccount && isChatRoute
+    ? (explicitScope || resolvedChatScope || defaultScope)
     : defaultScope;
   const shouldLoadSellerBookings = activeScope === 'incoming';
   const isResolvingChatScope = Boolean(isWorkerAccount && isChatRoute && selectedChatBookingId && !explicitScope && !resolvedChatScope);
@@ -237,7 +252,6 @@ const MyBookings = ({
     setSearchParams(nextParams, { replace: true });
   }, [activeScope, isChatRoute, requestedScope, searchParams, setSearchParams]);
 
-  // Main booking list controller
   const bookingListCtrl = useBookingListController([], {
     autoLoad: !isResolvingChatScope,
     includeStandaloneChats: isChatRoute,
@@ -245,7 +259,6 @@ const MyBookings = ({
     sellerId: shouldLoadSellerBookings ? sellerProfile?.userId : null,
   });
 
-  // Payment controller
   const paymentCtrl = usePaymentController(
     undefined, // onPaymentProofSubmit
     undefined, // onPaymentMethodSelect
@@ -253,25 +266,23 @@ const MyBookings = ({
     bookingListCtrl.replaceBooking
   );
 
-  // Refund controller
   const refundCtrl = useRefundController(
     bookingListCtrl.replaceBooking,
     pushHeaderNotification
   );
 
-  // Rating controller
   const ratingCtrl = useRatingController(
     bookingListCtrl.updateBooking,
     pushHeaderNotification
   );
 
-  // ========================================================================
-  // LOCAL UI STATE
-  // ========================================================================
-  
   const [selectedBookingId, setSelectedBookingId] = useState(selectedChatBookingId || null);
   const [uiState, setUiState] = useState(() => (isChatRoute ? 'chat' : 'list'));
   const [isTermsModalOpen, setIsTermsModalOpen] = useState(false);
+  const [pendingCheckoutSlot, setPendingCheckoutSlot] = useState(null);
+  const [scheduleAction, setScheduleAction] = useState('checkout');
+  const [cancelBookingId, setCancelBookingId] = useState(null);
+  const [reviewRequest, setReviewRequest] = useState(null);
   const [detailBookingId, setDetailBookingId] = useState(null);
   const [isMobile, setIsMobile] = useState(() =>
     typeof window !== 'undefined' ? window.innerWidth <= 768 : false
@@ -300,15 +311,14 @@ const MyBookings = ({
     setUiState('chat');
   }, [selectedChatBookingId]);
 
-  // Chat navigation
   const handleOpenChat = useCallback((bookingId) => {
     setSelectedBookingId(bookingId);
     setUiState('chat');
     onOpenChatPage?.(bookingId, activeScope);
   }, [activeScope, onOpenChatPage]);
 
-  // Slot selection
   const handleOpenSlotSelection = useCallback(() => {
+    setScheduleAction('checkout');
     setUiState('slots');
   }, []);
 
@@ -339,9 +349,10 @@ const MyBookings = ({
     const booking = bookingListCtrl.getBooking(bookingId);
     if (booking) {
       try {
-        await paymentCtrl.handleSelectPaymentMethod(booking, paymentMethod, mockPayment);
-        setUiState('confirmed');
-
+        const checkoutBooking = pendingCheckoutSlot?.bookingId === bookingId
+          ? { ...booking, selectedSlot: pendingCheckoutSlot.slot }
+          : booking;
+        await paymentCtrl.handleSelectPaymentMethod(checkoutBooking, paymentMethod, mockPayment);
         if (paymentMethod === 'after-service-cash') {
           pushHeaderNotification(
             'Cash QR Ready',
@@ -350,11 +361,10 @@ const MyBookings = ({
         }
       } catch (error) {
         pushHeaderNotification('Payment Update Failed', error?.message || 'Unable to update payment method.');
+        throw error; // Keep the payment dialog open and surface the server's safe recovery message.
       }
     }
-  }, [paymentCtrl, bookingListCtrl, pushHeaderNotification]);
-
-  // Refund workflow
+  }, [paymentCtrl, bookingListCtrl, pendingCheckoutSlot, pushHeaderNotification]);
   const handleRequestRefund = useCallback(async (bookingId, reason) => {
     const booking = bookingListCtrl.getBooking(bookingId);
     if (booking) {
@@ -377,32 +387,71 @@ const MyBookings = ({
     }
   }, [refundCtrl, bookingListCtrl, pushHeaderNotification]);
 
-  // Slot and payment confirmation
   const handleConfirmSlot = useCallback(async (bookingId, slotInfo) => {
-    try {
-      await bookingListCtrl.updateBooking(bookingId, {
-        selectedSlot: slotInfo,
-        status: 'Slot Selected - Payment Pending',
-      });
-      setIsTermsModalOpen(true);
-    } catch (error) {
-      pushHeaderNotification('Slot Update Failed', error?.message || 'Unable to update selected slot.');
+    if (scheduleAction === 'reschedule') {
+      try {
+        const result = await rescheduleBooking({ bookingId, newSlotId: Number(slotInfo.slotId) });
+        bookingListCtrl.replaceBooking(await fetchBookingById(bookingId));
+        pushHeaderNotification(
+          result.outcome === 'approval_required' ? 'Reschedule Requested' : 'Schedule Updated',
+          result.outcome === 'approval_required'
+            ? 'Your current time stays reserved until the provider reviews the new request.'
+            : 'Your booking has moved to the selected time.'
+        );
+        setUiState(isChatRoute ? 'chat' : 'list');
+      } catch (error) {
+        pushHeaderNotification('Reschedule Failed', error?.message || 'Unable to change this booking time.');
+      }
+      return;
     }
-  }, [bookingListCtrl, pushHeaderNotification]);
+    setPendingCheckoutSlot({ bookingId, slot: slotInfo });
+    setIsTermsModalOpen(true);
+  }, [bookingListCtrl, isChatRoute, pushHeaderNotification, scheduleAction]);
 
-  // Quote operations
-  const handleApproveQuote = useCallback(async (bookingId) => {
-    try {
-      await bookingListCtrl.handleApproveQuote(bookingId);
-      setUiState('chat');
-    } catch (error) {
-      pushHeaderNotification('Quote Update Failed', error?.message || 'Unable to approve quote.');
+  const handleCancelBooking = useCallback(async (reason) => {
+    if (!cancelBookingId) return;
+    const result = await cancelBooking({ bookingId: cancelBookingId, reason });
+    bookingListCtrl.replaceBooking(await fetchBookingById(cancelBookingId));
+    setCancelBookingId(null);
+    pushHeaderNotification(
+      result.outcome === 'review_required' ? 'Cancellation Requested' : 'Booking Cancelled',
+      result.outcome === 'review_required'
+        ? 'The provider will review your request. Your payment has not been changed.'
+        : 'The reserved time is now available again.'
+    );
+  }, [bookingListCtrl, cancelBookingId, pushHeaderNotification]);
+
+  const handleReviewRequest = useCallback(async (decision, note) => {
+    if (!reviewRequest) return;
+    if (reviewRequest.kind === 'cancellation') {
+      await reviewBookingCancellation({ bookingId: reviewRequest.bookingId, decision, reason: note });
+    } else {
+      await reviewBookingReschedule({ requestId: reviewRequest.requestId, decision, reason: note });
     }
+    bookingListCtrl.replaceBooking(await fetchBookingById(reviewRequest.bookingId));
+    setReviewRequest(null);
+    pushHeaderNotification(
+      decision === 'approve' ? 'Request Approved' : 'Request Declined',
+      decision === 'approve' ? 'The booking has been updated safely.' : 'The existing booking details remain in place.'
+    );
+  }, [bookingListCtrl, pushHeaderNotification, reviewRequest]);
+
+  const handleApproveQuote = useCallback(async (bookingId) => {
+    const booking = bookingListCtrl.getBooking(bookingId);
+    if (!booking?.activeQuote) {
+      pushHeaderNotification('Quote Unavailable', 'Ask the provider to send an updated price and schedule.');
+      return;
+    }
+    setSelectedBookingId(bookingId);
+    setIsTermsModalOpen(true);
   }, [bookingListCtrl, pushHeaderNotification]);
 
   const handleRejectQuote = useCallback(async (bookingId, reason) => {
     try {
-      await bookingListCtrl.handleRejectQuote(bookingId, reason);
+      const booking = bookingListCtrl.getBooking(bookingId);
+      if (!booking?.quoteVersion) throw new Error('This quote is no longer available.');
+      await rejectBookingQuote({ bookingId, quoteVersion: Number(booking.quoteVersion), reason });
+      bookingListCtrl.replaceBooking(await fetchBookingById(bookingId));
       pushHeaderNotification('Quote Rejected', 'Your reason was sent to the worker so they can review or revise the quote.');
       setUiState('chat');
     } catch (error) {
@@ -410,7 +459,12 @@ const MyBookings = ({
     }
   }, [bookingListCtrl, pushHeaderNotification]);
 
-  // Service control
+  const handleProposeQuote = useCallback(async (bookingId, input) => {
+    await proposeBookingQuote({ bookingId, ...input });
+    bookingListCtrl.replaceBooking(await fetchBookingById(bookingId));
+    pushHeaderNotification('Quote Sent', 'The client can now review the price and exact schedule.');
+  }, [bookingListCtrl, pushHeaderNotification]);
+
   const handleStopServiceAccepted = useCallback(async (bookingId) => {
     try {
       await bookingListCtrl.handleStopServiceAccepted(bookingId);
@@ -473,7 +527,6 @@ const MyBookings = ({
   const handleArchiveChat = useCallback((targetBooking) => hideCurrentChat(targetBooking, 'archive'), [hideCurrentChat]);
   const handleDeleteChat = useCallback((targetBooking) => hideCurrentChat(targetBooking, 'delete'), [hideCurrentChat]);
 
-  // Navigation
   const handleBackToList = useCallback(() => {
     setSelectedBookingId(null);
     setUiState(isChatRoute ? 'chat' : 'list');
@@ -503,12 +556,7 @@ const MyBookings = ({
   const currentBooking = bookingListCtrl.bookings.find((b) => isBookingNavigationMatch(b, selectedBookingId));
   const detailBooking = bookingListCtrl.bookings.find((b) => String(b.id) === String(detailBookingId));
   const ratingBooking = bookingListCtrl.bookings.find((b) => String(b.id) === String(ratingCtrl.ratingTargetId));
-  const currentBookingFee = Number(currentBooking?.transactionFeeAmount || 0);
-  const currentBookingTotal = Number(currentBooking?.totalChargedAmount || currentBooking?.quoteAmount || 0);
 
-  // ========================================================================
-  // COMPUTED KPI & FILTER COUNTS
-  // ========================================================================
   const allBookings = useMemo(() => bookingListCtrl.bookings || [], [bookingListCtrl.bookings]);
 
   const activeBookingsCount = useMemo(() => (
@@ -595,13 +643,10 @@ const MyBookings = ({
   const handleScopeChange = (nextScope) => {
     const nextParams = new URLSearchParams();
     nextParams.set('scope', nextScope);
-    const destination = nextScope === 'incoming' || isProviderBookingsRoute
-      ? paths.workerBookings
-      : paths.bookings;
+    const destination = nextScope === 'incoming' ? paths.workerBookings : paths.bookings;
     navigate(`${destination}?${nextParams.toString()}`);
   };
 
-  // Search filter applied on top of list controller
   const bookingSearch = searchParams.get('q') || '';
   const activeSearch = bookingSearch.trim().toLowerCase();
 
@@ -627,18 +672,13 @@ const MyBookings = ({
     }
     return list;
   }, [activeScope, activeSearch, allBookings, selectedDisplayFilter]);
-
-  // ========================================================================
-  // RENDER BOOKINGS LIST
-  // ========================================================================
-
   const renderBookingCard = (booking) => {
-    const statusMeta = getStatusMeta(booking.status);
+    const scheduleHasPassed = hasPastUnpaidSchedule(booking);
+    const statusMeta = getStatusMeta(scheduleHasPassed ? 'Reservation Expired' : booking.status);
     const StatusIcon = statusMeta.icon;
     const canPayNow = !shouldLoadSellerBookings && (
       ['Payment Pending', 'Slot Selected - Payment Pending'].includes(booking.status)
-      || booking.paymentStatus === 'partially_paid'
-    );
+      || booking.paymentStatus === 'partially_paid') && !scheduleHasPassed;
     const hasPrimaryWorkflowAction = canPayNow
       || (!shouldLoadSellerBookings && booking.cashCollectionStatus === 'seller_claimed')
       || (!shouldLoadSellerBookings && booking.deliveryStatus === 'seller_claimed')
@@ -681,6 +721,18 @@ const MyBookings = ({
             <p className="booking-card-desc">{booking.description}</p>
           )}
 
+          <ReservationStatus
+            scheduleStatus={scheduleHasPassed ? 'passed' : booking.scheduleStatus}
+            expiresAt={booking.holdExpiresAt}
+            actionLabel={booking.quoteVersion ? 'Retry saved quote' : undefined}
+            onChooseAnotherTime={!shouldLoadSellerBookings ? () => {
+              setSelectedBookingId(booking.id);
+              if (scheduleHasPassed) { setScheduleAction('reschedule'); setUiState('slots'); }
+              else if (booking.quoteVersion) setIsTermsModalOpen(true);
+              else setUiState('slots');
+            } : undefined}
+          />
+
           <div className="booking-details-grid">
             <div className="booking-detail-item">
               <CalendarDays size={16} aria-hidden="true" />
@@ -705,8 +757,10 @@ const MyBookings = ({
               <div>
                 <span>Payment: </span>
                 <strong>
-                  {booking.paymentMethod === 'gcash-advance'
-                    ? 'GCash Advance'
+                  {booking.paymentMethod === 'paymongo-card'
+                    ? 'PayMongo Card'
+                    : booking.paymentMethod === 'gcash-advance'
+                    ? 'Legacy GCash'
                     : booking.paymentMethod === 'after-service-cash'
                     ? 'Cash on Meetup'
                     : booking.paymentMethod === 'after-service-gcash'
@@ -730,54 +784,48 @@ const MyBookings = ({
           </div>
         </div>
 
-        <div className="booking-card-footer">
-          <dl className="flex min-w-0 flex-wrap items-stretch gap-2 text-sm">
-            <div className="min-w-32 rounded-lg bg-muted/50 px-3 py-2">
-              <dt className="text-xs font-semibold text-muted-foreground">{shouldLoadSellerBookings ? 'Booking amount' : 'Service price'}</dt><dd className="mt-1 font-bold text-foreground">{formatPhp(booking.quoteAmount || booking.totalChargedAmount || 0)}</dd>
-            </div>
-            {!shouldLoadSellerBookings && booking.transactionFeeAmount > 0 && (
-              <div className="min-w-28 rounded-lg bg-muted/50 px-3 py-2">
-                <dt className="text-xs font-semibold text-muted-foreground">Platform fee</dt><dd className="mt-1 font-bold text-foreground">{formatPhp(booking.transactionFeeAmount)}</dd>
-              </div>
-            )}
-            {!shouldLoadSellerBookings && booking.totalChargedAmount > 0 && (
-              <div className="min-w-32 rounded-lg bg-emerald-50 px-3 py-2 dark:bg-emerald-950/30">
-                <dt className="text-xs font-semibold text-muted-foreground">Total payment</dt><dd className="mt-1 font-extrabold text-emerald-700 dark:text-emerald-300">{formatPhp(booking.totalChargedAmount)}</dd>
-              </div>
-            )}
-            {booking.paymentPlan === 'downpayment' && (
-              <div className="min-w-48 rounded-lg bg-muted/50 px-3 py-2">
-                <dt className="text-xs font-semibold text-muted-foreground">Payment progress</dt><dd className="mt-1 font-bold text-foreground">Paid: {formatPhp(booking.amountPaid)} · Balance: {formatPhp(booking.balanceDueAmount)}</dd>
-              </div>
-            )}
-          </dl>
-
-          <div className="booking-card-actions">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => setDetailBookingId(booking.id)}
-            >
-              <Eye size={16} aria-hidden="true" />
-              View Details
-            </Button>
-
-            <Button
-              type="button"
-              variant={hasPrimaryWorkflowAction ? 'outline' : 'primary'}
-              onClick={() => handleOpenChat(booking.id)}
-            >
-              <MessageCircle size={16} aria-hidden="true" />
-              {messageLabel}
-            </Button>
-
+        <BookingCardFooter
+          amountLabel={shouldLoadSellerBookings ? 'Booking amount' : 'Service price'}
+          amount={formatPhp(booking.quoteAmount || booking.totalChargedAmount || 0)}
+          platformFee={!shouldLoadSellerBookings && booking.transactionFeeAmount > 0 ? formatPhp(booking.transactionFeeAmount) : undefined}
+          totalPayment={!shouldLoadSellerBookings && booking.totalChargedAmount > 0 ? formatPhp(booking.totalChargedAmount) : undefined}
+          paymentProgress={booking.paymentPlan === 'downpayment' ? {
+            paid: formatPhp(booking.amountPaid),
+            balance: formatPhp(booking.balanceDueAmount),
+          } : undefined}
+          messageLabel={messageLabel}
+          messageIsPrimary={!hasPrimaryWorkflowAction}
+          onViewDetails={() => setDetailBookingId(booking.id)}
+          onMessage={() => handleOpenChat(booking.id)}
+          onReschedule={!shouldLoadSellerBookings && !['Completed Service', 'Cancelled', 'Cancelled (Cash)', 'Refunded'].includes(booking.status) && booking.selectedSlot ? () => {
+            setSelectedBookingId(booking.id);
+            setScheduleAction('reschedule');
+            setUiState('slots');
+          } : undefined}
+          onCancel={!shouldLoadSellerBookings && !['Completed Service', 'Cancelled', 'Cancelled (Cash)', 'Refunded'].includes(booking.status) ? () => setCancelBookingId(booking.id) : undefined}
+        >
             {canPayNow && (
               <Button
                 type="button"
+                className="col-span-2 w-full sm:w-auto"
                 onClick={() => handlePayBooking(booking.id)}
               >
-                <CreditCard size={16} aria-hidden="true" />
+                <CreditCard aria-hidden="true" />
                 {booking.paymentStatus === 'partially_paid' ? 'Pay Balance' : 'Pay Now'}
+              </Button>
+            )}
+
+            {shouldLoadSellerBookings && booking.cancellationStatus === 'requested' && (
+              <Button type="button" onClick={() => setReviewRequest({ kind: 'cancellation', bookingId: booking.id })}>
+                <CalendarX2 size={16} aria-hidden="true" />
+                Review cancellation
+              </Button>
+            )}
+
+            {shouldLoadSellerBookings && booking.rescheduleRequest && (
+              <Button type="button" onClick={() => setReviewRequest({ kind: 'reschedule', bookingId: booking.id, requestId: booking.rescheduleRequest.id })}>
+                <CalendarDays size={16} aria-hidden="true" />
+                Review reschedule
               </Button>
             )}
 
@@ -827,8 +875,7 @@ const MyBookings = ({
                 Rate Service
               </Button>
             )}
-          </div>
-        </div>
+        </BookingCardFooter>
       </article>
     );
   };
@@ -837,7 +884,7 @@ const MyBookings = ({
     <main className="gl-shell gl-page-pad bookings-launchpad">
       <section className="bookings-hero" aria-labelledby="bookings-title">
         <div className="bookings-hero-copy">
-          <h1 id="bookings-title" className="gl-title !mt-0">{isWorkerAccount ? 'Bookings' : 'My Bookings'}</h1>
+          <h1 id="bookings-title" className="gl-title !mt-0">{shouldLoadSellerBookings ? 'Bookings' : 'My Bookings'}</h1>
           <p className="gl-subtitle">
             {shouldLoadSellerBookings
               ? 'Review client bookings, scheduled jobs, payment states, and delivery progress.'
@@ -859,7 +906,7 @@ const MyBookings = ({
         </div>
       </section>
 
-      {isWorkerAccount && <BookingScopeSwitcher value={activeScope} onValueChange={handleScopeChange} />}
+      {isWorkerAccount && isProviderBookingsRoute && <BookingScopeSwitcher value={activeScope} onValueChange={handleScopeChange} />}
 
       {/* KPI Overview Metrics Grid */}
       <section className="grid auto-cols-[minmax(15rem,1fr)] grid-flow-col gap-3 overflow-x-auto pb-2 md:grid-flow-row md:grid-cols-2 md:overflow-visible lg:grid-cols-4" aria-label="Bookings metrics snapshot">
@@ -920,7 +967,6 @@ const MyBookings = ({
         </div>
       )}
 
-      {/* Empty State: No bookings at all */}
       {!bookingListCtrl.isLoading && allBookings.length === 0 && (
         <WorkflowEmptyState
           className="rounded-xl border bg-card"
@@ -933,7 +979,6 @@ const MyBookings = ({
         />
       )}
 
-      {/* Filter Empty State: Filter/Search yielded 0 results */}
       {!bookingListCtrl.isLoading && allBookings.length > 0 && displayedBookings.length === 0 && (
         <WorkflowEmptyState
           className="rounded-xl border bg-card"
@@ -945,7 +990,6 @@ const MyBookings = ({
         />
       )}
 
-      {/* Bookings List Cards */}
       {!bookingListCtrl.isLoading && displayedBookings.length > 0 && (
         <section className="bookings-list" aria-label="Bookings list">
           {displayedBookings.map((booking) => renderBookingCard(booking))}
@@ -953,10 +997,6 @@ const MyBookings = ({
       )}
     </main>
   );
-
-  // ========================================================================
-  // RENDER - Main Page Component
-  // ========================================================================
 
   return (
     <div
@@ -984,6 +1024,7 @@ const MyBookings = ({
         isAdminView={false}
         onToggleAdminView={() => { if (typeof onOpenAdminDashboard === 'function') onOpenAdminDashboard(); }}
       />
+      <PaymentReturnStatus onBookingUpdated={bookingListCtrl.replaceBooking} />
 
       {!isChatRoute && renderBookingsList()}
 
@@ -1013,6 +1054,7 @@ const MyBookings = ({
               onSelectBooking={handleOpenChat}
               onApproveQuote={() => handleApproveQuote(currentBooking.id)}
               onRejectQuote={(reason) => handleRejectQuote(currentBooking.id, reason)}
+              onProposeQuote={(input) => handleProposeQuote(currentBooking.id, input)}
               onOpenSlotSelection={handleOpenSlotSelection}
               onOpenPaymentSelection={handleOpenPaymentSelection}
               onRequestRefund={(reason) => handleRequestRefund(currentBooking.id, reason)}
@@ -1024,7 +1066,7 @@ const MyBookings = ({
             />
           )}
 
-          {isChatRoute && uiState === 'slots' && (
+          {uiState === 'slots' && (
             <SlotSelectionModal
               booking={currentBooking}
               onConfirmSlot={(slotInfo) => handleConfirmSlot(currentBooking.id, slotInfo)}
@@ -1032,118 +1074,6 @@ const MyBookings = ({
             />
           )}
 
-          {uiState === 'confirmed' && (
-            <div
-              style={{
-                position: 'fixed',
-                inset: 0,
-                background: 'rgba(15, 23, 42, 0.65)',
-                backdropFilter: 'blur(6px)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                zIndex: 1100,
-                padding: '16px',
-              }}
-            >
-              <div
-                className="gl-card"
-                style={{
-                  maxWidth: '520px',
-                  width: '100%',
-                  padding: isMobile ? '24px 16px' : '36px 28px',
-                  boxShadow: '0 25px 60px rgba(0, 0, 0, 0.3)',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '20px',
-                }}
-              >
-                <div style={{ textAlign: 'center' }}>
-                  <div
-                    style={{
-                      width: '64px',
-                      height: '64px',
-                      borderRadius: '50%',
-                      background: 'var(--gl-success-soft)',
-                      color: 'var(--gl-green)',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      margin: '0 auto 12px',
-                      border: '2px solid var(--gl-success-border)',
-                    }}
-                  >
-                    <CheckCircle2 size={36} />
-                  </div>
-                  <h2 style={{ margin: 0, fontSize: '24px', fontWeight: 850, color: 'var(--gl-text)' }}>
-                    Booking Confirmed!
-                  </h2>
-                  <p style={{ margin: '6px 0 0', fontSize: '14px', color: 'var(--gl-text-2)' }}>
-                    Your service booking has been processed successfully.
-                  </p>
-                </div>
-
-                <div
-                  style={{
-                    background: 'var(--gl-surface-2)',
-                    border: '1px solid var(--gl-border)',
-                    borderRadius: '10px',
-                    padding: '16px',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: '10px',
-                  }}
-                >
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px' }}>
-                    <span style={{ color: 'var(--gl-text-3)', fontWeight: 600 }}>Worker:</span>
-                    <strong style={{ color: 'var(--gl-text)' }}>{currentBooking.workerName}</strong>
-                  </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px' }}>
-                    <span style={{ color: 'var(--gl-text-3)', fontWeight: 600 }}>Service:</span>
-                    <strong style={{ color: 'var(--gl-text)' }}>{currentBooking.serviceType}</strong>
-                  </div>
-                  {currentBookingFee > 0 && (
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px' }}>
-                      <span style={{ color: 'var(--gl-text-3)', fontWeight: 600 }}>Transaction Fee:</span>
-                      <strong style={{ color: 'var(--gl-text)' }}>{formatPhp(currentBookingFee)}</strong>
-                    </div>
-                  )}
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px' }}>
-                    <span style={{ color: 'var(--gl-text-3)', fontWeight: 600 }}>Total Cost:</span>
-                    <strong style={{ color: 'var(--gl-green)', fontSize: '15px' }}>{formatPhp(currentBookingTotal)}</strong>
-                  </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px' }}>
-                    <span style={{ color: 'var(--gl-text-3)', fontWeight: 600 }}>Scheduled Date:</span>
-                    <strong style={{ color: 'var(--gl-text)' }}>{currentBooking.selectedSlot?.date || 'Coordinated through chat'}</strong>
-                  </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px' }}>
-                    <span style={{ color: 'var(--gl-text-3)', fontWeight: 600 }}>Payment Method:</span>
-                    <strong style={{ color: 'var(--gl-blue)' }}>
-                      {currentBooking.paymentMethod === 'gcash-advance'
-                        ? 'GCash Advance Payment'
-                        : currentBooking.paymentMethod === 'after-service-gcash'
-                        ? 'Pay After Service (GCash)'
-                        : 'Pay After Service (Cash)'}
-                    </strong>
-                  </div>
-                </div>
-
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', textAlign: 'center' }}>
-                  <button
-                    type="button"
-                    className="gl-button primary"
-                    style={{ width: '100%', minHeight: '44px', justifyContent: 'center' }}
-                    onClick={handleNewInquiry}
-                  >
-                    Back to My Bookings
-                  </button>
-                  <p style={{ margin: 0, fontSize: '12px', color: 'var(--gl-text-3)', lineHeight: 1.4 }}>
-                    Cash confirmation has been sent to the worker review queue. You can track progress anytime from this dashboard.
-                  </p>
-                </div>
-              </div>
-            </div>
-          )}
         </>
       )}
 
@@ -1153,14 +1083,34 @@ const MyBookings = ({
         statusLabel={detailBooking ? getStatusMeta(detailBooking.status).label : ''}
         onClose={() => setDetailBookingId(null)}
         onMessage={(bookingId) => { setDetailBookingId(null); handleOpenChat(bookingId); }}
+        onPay={!shouldLoadSellerBookings ? (bookingId) => { setDetailBookingId(null); handlePayBooking(bookingId); } : undefined}
+      />
+      <CancelBookingDialog
+        open={Boolean(cancelBookingId)}
+        serviceName={bookingListCtrl.getBooking(cancelBookingId)?.serviceType || 'booking'}
+        hasVerifiedPayment={['partially_paid', 'paid'].includes(bookingListCtrl.getBooking(cancelBookingId)?.paymentStatus)}
+        onCancel={() => setCancelBookingId(null)}
+        onConfirm={handleCancelBooking}
+      />
+
+      <BookingRequestReviewDialog
+        open={Boolean(reviewRequest)}
+        title={reviewRequest?.kind === 'cancellation' ? 'Review cancellation request' : 'Review reschedule request'}
+        description={reviewRequest?.kind === 'cancellation'
+          ? 'Approving releases the schedule and marks the verified payment for refund review. No refund is issued automatically.'
+          : 'Approving rechecks availability before replacing the current schedule. Declining keeps the existing time.'}
+        onClose={() => setReviewRequest(null)}
+        onDecision={handleReviewRequest}
       />
 
       {currentBooking && uiState === 'payment' && (
         <PaymentModal
-          booking={currentBooking}
+          booking={pendingCheckoutSlot?.bookingId === currentBooking.id
+            ? { ...currentBooking, selectedSlot: pendingCheckoutSlot.slot }
+            : currentBooking}
           onSelectPayment={(method, mockPayment) => handleSelectPaymentMethod(currentBooking.id, method, mockPayment)}
           onCancel={handleBackToList}
-          confirmLabel={currentBooking.paymentStatus === 'partially_paid' ? 'Pay Remaining Balance' : 'Continue to GCash'}
+          confirmLabel={currentBooking.paymentStatus === 'partially_paid' ? 'Pay remaining balance' : 'Reserve and continue'}
         />
       )}
 

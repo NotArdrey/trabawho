@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import DashboardNavigation from '../../../shared/components/DashboardNavigation';
 import DigitalPortfolioModal from '../components/DigitalPortfolioModal';
+import { ProfilePortfolioSection } from '../components/ProfilePortfolioSection';
 import PaymentModal from '../../bookings/components/PaymentModal';
 import BookingTermsModal from '../../bookings/components/BookingTermsModal';
 import AccountPrivacyPanel from '../components/AccountPrivacyPanel';
@@ -9,11 +10,10 @@ import { ProfileNameDialog } from '../components/ProfileNameDialog';
 import { getThemeTokens } from '../../../shared/styles/themeTokens';
 import { getProfilePhotoUrl, hasUploadedProfilePhoto } from '../../../shared/utils/profilePhoto';
 import { fetchSellerServices, updateServiceAdBoost, uploadPortfolioDocument } from '../../../shared/services/authService';
-import { Attachment, AttachmentUpload } from '@/components/ui/attachment';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Camera, Download, FileText, MapPin, Pencil, Rocket, ShieldCheck, UserRoundCog } from 'lucide-react';
+import { Camera, MapPin, Pencil, Rocket, ShieldCheck, UserRoundCog } from 'lucide-react';
 
 function Profile({ appTheme = 'light', themeMode = 'system', onThemeChange, currentView, searchQuery, onSearchChange, onLogout, onOpenSellerSetup, onOpenMyBookings, onOpenChatPage, sellerProfile, onOpenMyWork, onOpenProfile, onOpenAccountSettings, onOpenSettings, onOpenDashboard, onOpenBrowseServices, userLocation, onUpdateProfile, onUpdatePassword, onOpenAdminDashboard }) {
   const MAX_PROFILE_PHOTO_BYTES = 2 * 1024 * 1024;
@@ -402,9 +402,7 @@ function Profile({ appTheme = 'light', themeMode = 'system', onThemeChange, curr
     profilePhotoEdit: { fontSize: '12px', fontWeight: 700, color: themeTokens.accent },
     verifiedBadge: { display: 'inline-block', background: themeTokens.successBg, color: themeTokens.successText, border: `1px solid ${themeTokens.successBorder}`, borderRadius: '999px', padding: '6px 12px', fontSize: '12px', fontWeight: 700 },
     profileSection: { marginBottom: '18px', padding: '14px', border: `1px solid ${themeTokens.border}`, borderRadius: '10px', background: themeTokens.surfaceAlt },
-    portfolioSection: { background: themeTokens.accentSoft, border: `2px solid ${themeTokens.accent}` },
     h2: { margin: '0 0 8px', color: themeTokens.textPrimary, fontSize: '18px' },
-    h2Portfolio: { margin: '0 0 8px', color: themeTokens.accent, fontSize: '18px' },
     sectionHeadingRow: { display: 'flex', alignItems: isMobile ? 'flex-start' : 'center', justifyContent: 'space-between', gap: isMobile ? '8px' : '0', flexWrap: isMobile ? 'wrap' : 'nowrap', marginBottom: '8px' },
     sectionEditBtn: { border: `1px solid ${themeTokens.border}`, borderRadius: '8px', background: themeTokens.surface, color: themeTokens.textPrimary, padding: '4px 10px', fontWeight: 700, cursor: 'pointer' },
     paragraph: { margin: 0, color: themeTokens.textSecondary, lineHeight: 1.55 },
@@ -418,10 +416,7 @@ function Profile({ appTheme = 'light', themeMode = 'system', onThemeChange, curr
       fontSize: '0.92rem',
       fontWeight: 600,
     },
-    portfolioParagraph: { margin: 0, color: themeTokens.textPrimary, lineHeight: 1.55 },
     generatePortfolioBtn: { width: '100%', border: 'none', borderRadius: '8px', padding: '12px', background: themeTokens.accent, color: '#ffffff', fontWeight: 700, fontSize: '14px', cursor: 'pointer', marginTop: '8px' },
-    portfolioDocActions: { display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '12px' },
-    portfolioDocList: { display: 'grid', gap: '8px', marginTop: '12px' },
     portfolioDocItem: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px', padding: '10px', borderRadius: '8px', border: `1px solid ${themeTokens.border}`, background: themeTokens.surface },
     portfolioDocName: { color: themeTokens.textPrimary, fontWeight: 700, textDecoration: 'none', wordBreak: 'break-word' },
     portfolioDocMeta: { margin: '2px 0 0', color: themeTokens.textMuted, fontSize: '12px' },
@@ -551,49 +546,24 @@ function Profile({ appTheme = 'light', themeMode = 'system', onThemeChange, curr
           </section>
 
           {isWorkerRole && (
-            <section className="profile-flat-section profile-portfolio-section" style={{ ...styles.profileSection, ...styles.portfolioSection }}>
-              <div className="profile-portfolio-heading">
-                <div>
-                  <div className="profile-section-title"><FileText size={18} aria-hidden="true" /><h2 style={styles.h2Portfolio}>Professional portfolio</h2></div>
-                  <p style={styles.portfolioParagraph}>Create a shareable PDF with your profile details and verification QR code.</p>
-                </div>
-                <Button
-                  type="button"
-                  className="w-full sm:w-auto"
-                  onClick={() => setIsPortfolioModalOpen(true)}
-                >
-                  <Download aria-hidden="true" />Preview portfolio
-                </Button>
-              </div>
-
-              <div style={styles.portfolioDocActions}>
-                <AttachmentUpload
-                  onChoose={() => portfolioDocInputRef.current && portfolioDocInputRef.current.click()}
-                  isUploading={isUploadingPortfolioDoc}
-                />
-                <input
-                  ref={portfolioDocInputRef}
-                  type="file"
-                  accept=".pdf,.doc,.docx,image/jpeg,image/png,image/webp"
-                  style={{ display: 'none' }}
-                  onChange={handlePortfolioDocumentSelection}
-                />
-              </div>
-
-              {portfolioDocuments.length > 0 && (
-                <div style={styles.portfolioDocList}>
-                  {portfolioDocuments.map((document) => (
-                    <Attachment
-                      key={document.storagePath || document.publicUrl}
-                      name={document.name}
-                      href={document.publicUrl}
-                      description={`${document.uploadedAt ? String(document.uploadedAt).slice(0, 10) : 'Uploaded'} · ${Math.ceil((document.size || 0) / 1024)} KB`}
-                      onRemove={() => handleRemovePortfolioDocument(document.storagePath)}
-                    />
-                  ))}
-                </div>
-              )}
-            </section>
+            <>
+              <ProfilePortfolioSection
+                documents={portfolioDocuments}
+                isUploading={isUploadingPortfolioDoc}
+                onChooseFile={() => portfolioDocInputRef.current?.click()}
+                onPreview={() => setIsPortfolioModalOpen(true)}
+                onRemoveDocument={handleRemovePortfolioDocument}
+              />
+              <input
+                ref={portfolioDocInputRef}
+                type="file"
+                accept=".pdf,.doc,.docx,image/jpeg,image/png,image/webp"
+                className="hidden"
+                tabIndex={-1}
+                aria-hidden="true"
+                onChange={handlePortfolioDocumentSelection}
+              />
+            </>
           )}
           {isWorkerRole && (
             <section className="profile-flat-section" style={styles.profileSection}>

@@ -24,12 +24,21 @@ describe("BookingTermsModal", () => {
     const onConfirm = vi.fn();
     render(<ControlledTermsModal onConfirm={onConfirm} />);
 
-    const continueButton = screen.getByRole("button", { name: "Agree and continue" });
+    const continueButton = screen.getByRole("button", { name: "Agree and open checkout" });
     expect(continueButton).toBeDisabled();
 
     await user.click(screen.getByRole("checkbox"));
     expect(continueButton).toBeEnabled();
     await user.click(continueButton);
     expect(onConfirm).toHaveBeenCalledOnce();
+  });
+
+  it("presents the agreement as scannable booking decisions", () => {
+    render(<ControlledTermsModal />);
+
+    expect(screen.getByRole("heading", { name: "Review before payment" })).toBeVisible();
+    expect(screen.getByText("15-minute reservation")).toBeVisible();
+    expect(screen.getByText("Changes and cancellations")).toBeVisible();
+    expect(screen.getByText("Demo payment")).toBeVisible();
   });
 });

@@ -210,7 +210,13 @@ export const buildWeeklyScheduleFromSlots = (slots = [], provider = {}) => {
     });
   });
 
-  if (operatingDaysSet.size === 0) return createScheduleForProvider(provider);
+  if (operatingDaysSet.size === 0) {
+    return {
+      manualScheduling: false,
+      operatingDays: [],
+      dayBlocks: {},
+    };
+  }
 
   return {
     manualScheduling: false,

@@ -23,10 +23,10 @@ The database already has useful foundations:
 - Completion and participant checks before reviews
 - Basic dispute fields and immutable audit events
 
-The current flow is not ready for real money because the interface generates a
-local `MOCK-*` payment reference while the database requires a trusted server to
-confirm payment. Cancellation, refund, slot-release, and provider-payout
-workflows are also incomplete.
+The working demo path now redirects to PayMongo hosted card checkout and waits
+for its signed webhook before confirming payment. It is still not ready for
+real money because refund execution, reconciliation, cancellation policy,
+provider payouts, and production operations remain incomplete.
 
 ## Guiding rules
 
@@ -91,7 +91,9 @@ Before implementation, record these decisions:
 Initial demo decision:
 
 - Use PayMongo test mode with hosted checkout.
-- Support GCash first.
+- Support PayMongo hosted card checkout first.
+- Keep GCash visible but disabled as `Coming soon` until it has a working,
+  verified integration.
 - Create checkout sessions in a Supabase Edge Function.
 - Treat the signed PayMongo webhook as the payment source of truth.
 - Keep all sandbox language explicit until live credentials and production
@@ -99,11 +101,12 @@ Initial demo decision:
 
 Implementation status on October 1, 2026:
 
-- Checkout, webhook, payment-attempt migration, and browser integration are
-  implemented locally.
-- Migration application, Edge Function deployment, secret configuration,
-  PayMongo webhook registration, and sandbox end-to-end verification remain
-  pending.
+- Checkout, webhook, payment-attempt and slot-hold migrations, browser
+  integration, and both Edge Function deployments are applied to the TrabaWho
+  Supabase project.
+- The PayMongo test API secret, paid-checkout webhook registration, and webhook
+  signing secret are configured. Signed endpoint verification passes; a full
+  sandbox checkout using an authenticated test booking remains pending.
 
 ## Phase 1: Payment foundation
 
@@ -157,7 +160,7 @@ Priority: P0 -- required before any real-money demo
 
 ### Acceptance criteria
 
-- [ ] A successful test GCash payment confirms exactly one booking.
+- [ ] A successful PayMongo test-card payment confirms exactly one booking.
 - [ ] Closing the browser before redirect does not lose a successful payment.
 - [ ] Replaying the same webhook does not duplicate payment or audit records.
 - [ ] A forged client response cannot mark a booking paid.
@@ -168,18 +171,18 @@ Priority: P0 -- required before any real-money demo
 
 Priority: P0
 
-- [ ] Add `hold_expires_at` and an explicit slot-hold state.
-- [ ] Create one RPC that locks the slot, checks capacity, creates or updates the
+- [x] Add `hold_expires_at` and an explicit slot-hold state.
+- [x] Create one RPC that locks the slot, checks capacity, creates or updates the
       booking, creates the payment attempt, and records the hold.
-- [ ] Add an expiration job that releases unpaid holds.
-- [ ] Create controlled RPCs for cancellation, rescheduling, and slot release.
-- [ ] Recalculate slot availability from authoritative active bookings or keep
+- [x] Add an expiration job that releases unpaid holds.
+- [x] Create controlled RPCs for cancellation, rescheduling, and slot release.
+- [x] Recalculate slot availability from authoritative active bookings or keep
       counters synchronized in the same transaction.
-- [ ] Route request-flow slot selection through the same capacity checks as
+- [x] Route request-flow slot selection through the same capacity checks as
       direct booking.
-- [ ] Reject past slots and invalid time ranges.
-- [ ] Reject self-booking.
-- [ ] Prevent duplicate active requests with a database constraint or a
+- [x] Reject past slots and invalid time ranges.
+- [x] Reject self-booking.
+- [x] Prevent duplicate active requests with a database constraint or a
       transaction-safe idempotency key.
 
 ### Acceptance criteria

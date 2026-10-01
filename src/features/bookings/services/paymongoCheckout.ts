@@ -2,21 +2,38 @@ import { supabase } from "@/integrations/supabase";
 
 interface CheckoutBooking {
   amountPaid?: number | string;
-  id: string;
+  id?: string;
+  quoteVersion?: number | string;
+  serviceId?: number | string;
+  selectedSlot?: {
+    slotId?: number | string | null;
+    rawSlot?: { id?: number | string | null } | null;
+    timeBlock?: { rawSlot?: { id?: number | string | null } | null } | null;
+  } | null;
   paymentPlan?: string;
   paymentStatus?: string;
 }
 
 interface CheckoutFunctionResponse {
   checkoutUrl?: unknown;
+  bookingId?: unknown;
   error?: unknown;
+  holdExpiresAt?: unknown;
   paymentAttemptId?: unknown;
 }
 
 export interface PayMongoCheckout {
+  bookingId: string;
   checkoutUrl: string;
+  holdExpiresAt: string | null;
   paymentAttemptId: string;
 }
+
+const getSlotId = (booking: CheckoutBooking) =>
+  booking.selectedSlot?.timeBlock?.rawSlot?.id
+  ?? booking.selectedSlot?.rawSlot?.id
+  ?? booking.selectedSlot?.slotId
+  ?? null;
 
 const getPaymentPurpose = (booking: CheckoutBooking) =>
   booking.paymentStatus === "partially_paid" || Number(booking.amountPaid || 0) > 0
@@ -24,7 +41,7 @@ const getPaymentPurpose = (booking: CheckoutBooking) =>
     : "initial";
 
 const getIdempotencyStorageKey = (booking: CheckoutBooking) =>
-  `trabawho:paymongo:${booking.id}:${getPaymentPurpose(booking)}:${booking.paymentPlan || "full"}`;
+  `trabawho:paymongo:${booking.id || `${booking.serviceId}:${getSlotId(booking)}`}:${getPaymentPurpose(booking)}:${booking.paymentPlan || "full"}`;
 
 const createOperationId = () => {
   if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
@@ -57,14 +74,39 @@ const validateCheckoutUrl = (value: unknown) => {
   }
 };
 
+const getCheckoutInvocationError = async (error: unknown) => {
+  if (error && typeof error === "object" && "context" in error) {
+    const context = (error as { context?: unknown }).context;
+    if (context instanceof Response) {
+      try {
+        const payload: unknown = await context.clone().json();
+        if (payload && typeof payload === "object" && "error" in payload) {
+          const message = (payload as { error?: unknown }).error;
+          if (typeof message === "string" && message.trim()) return message.trim().slice(0, 300);
+        }
+      } catch {
+        // Fall back to the safe client-facing message below.
+      }
+    }
+  }
+  return "Unable to open secure PayMongo checkout. Please try again.";
+};
+
 export async function createPayMongoCheckout(booking: CheckoutBooking): Promise<PayMongoCheckout> {
-  if (!booking?.id) throw new Error("Select a booking before starting payment.");
+  const slotId = getSlotId(booking);
+  if (!booking?.id && (!booking?.serviceId || !slotId)) {
+    throw new Error("Choose an available time before starting payment.");
+  }
 
   const rawResponse: unknown = await supabase.functions.invoke<CheckoutFunctionResponse>(
     "create-paymongo-checkout",
     {
       body: {
-        bookingId: booking.id,
+        bookingId: booking.id || null,
+        serviceId: booking.serviceId || null,
+        slotId,
+        quoteVersion: booking.quoteVersion || null,
+        paymentPlan: booking.paymentPlan || "full",
         idempotencyKey: getStableIdempotencyKey(booking),
       },
     },
@@ -76,16 +118,23 @@ export async function createPayMongoCheckout(booking: CheckoutBooking): Promise<
     ? response.data as CheckoutFunctionResponse
     : undefined;
 
-  if (response.error) throw new Error("Unable to open secure GCash checkout. Please try again.");
+  if (response.error) throw new Error(await getCheckoutInvocationError(response.error));
   if (typeof data?.error === "string" && data.error) throw new Error(data.error);
 
   const paymentAttemptId = typeof data?.paymentAttemptId === "string"
     ? data.paymentAttemptId.trim()
     : "";
   if (!paymentAttemptId) throw new Error("The payment attempt could not be created.");
+  const bookingId = typeof data?.bookingId === "string" ? data.bookingId.trim() : "";
+  if (!bookingId) throw new Error("The booking reservation could not be created.");
+  const holdExpiresAt = typeof data?.holdExpiresAt === "string" && data.holdExpiresAt
+    ? data.holdExpiresAt
+    : null;
 
   return {
+    bookingId,
     checkoutUrl: validateCheckoutUrl(data?.checkoutUrl),
+    holdExpiresAt,
     paymentAttemptId,
   };
 }

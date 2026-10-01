@@ -3,10 +3,10 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const { invoke } = vi.hoisted(() => ({
   invoke: vi.fn<(
     name: string,
-    options: { body: { bookingId: string; idempotencyKey: string } },
+    options: { body: { bookingId: string | null; idempotencyKey: string; paymentPlan: string; quoteVersion: string | number | null; serviceId: string | number | null; slotId: string | number | null } },
   ) => Promise<{
-    data: { checkoutUrl: string; paymentAttemptId: string };
-    error: Error | null;
+    data: { bookingId: string; checkoutUrl: string; holdExpiresAt: string | null; paymentAttemptId: string };
+    error: (Error & { context?: Response }) | null;
   }>>(),
 }));
 
@@ -26,6 +26,8 @@ describe("createPayMongoCheckout", () => {
     invoke.mockResolvedValue({
       data: {
         checkoutUrl: "https://checkout.paymongo.com/test-session",
+        bookingId: "booking-1",
+        holdExpiresAt: "2026-10-01T10:15:00Z",
         paymentAttemptId: "attempt-1",
       },
       error: null,
@@ -44,12 +46,26 @@ describe("createPayMongoCheckout", () => {
 
   it("rejects checkout URLs outside PayMongo", async () => {
     invoke.mockResolvedValue({
-      data: { checkoutUrl: "https://example.com/fake", paymentAttemptId: "attempt-1" },
+      data: { bookingId: "booking-1", checkoutUrl: "https://example.com/fake", holdExpiresAt: null, paymentAttemptId: "attempt-1" },
       error: null,
     });
 
     await expect(createPayMongoCheckout({ id: "booking-1" })).rejects.toThrow(
       "invalid checkout link",
+    );
+  });
+
+  it("preserves the safe server explanation when checkout is rejected", async () => {
+    const error = Object.assign(new Error("Edge Function returned a non-2xx status code"), {
+      context: new Response(JSON.stringify({ error: "Selected time is no longer available." }), {
+        headers: { "Content-Type": "application/json" },
+        status: 409,
+      }),
+    });
+    invoke.mockResolvedValue({ data: undefined as never, error });
+
+    await expect(createPayMongoCheckout({ id: "booking-1" })).rejects.toThrow(
+      "Selected time is no longer available.",
     );
   });
 });

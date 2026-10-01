@@ -197,12 +197,48 @@ describe('MyBookings Redesign Component', () => {
 
     const messageButton = screen.getByRole('button', { name: /Message provider/i });
     const payButton = screen.getByRole('button', { name: /Pay Now/i });
+    const detailsButton = screen.getByRole('button', { name: /View details/i });
+    expect(detailsButton.compareDocumentPosition(messageButton) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(messageButton.compareDocumentPosition(payButton) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
 
     fireEvent.click(payButton);
     fireEvent.click(screen.getByTestId('mock-terms-modal'));
 
     expect(screen.getByTestId('mock-payment-modal')).toBeInTheDocument();
+  });
+
+  test('keeps lower-frequency booking changes in a management menu', async () => {
+    mockCurrentBookings = [mockBookings[0]];
+
+    renderBookings(<MyBookings currentView="my-bookings" />);
+
+    expect(screen.queryByRole('button', { name: 'Reschedule' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Cancel booking' })).not.toBeInTheDocument();
+
+    fireEvent.pointerDown(screen.getByRole('button', { name: /Manage booking/i }));
+
+    const rescheduleAction = await screen.findByRole('menuitem', { name: 'Reschedule' });
+    expect(screen.getByRole('menuitem', { name: 'Cancel booking' })).toBeInTheDocument();
+
+    fireEvent.click(rescheduleAction);
+    expect(screen.getByTestId('mock-slot-modal')).toBeInTheDocument();
+  });
+
+  test('replaces payment with schedule recovery when an unpaid appointment has passed', () => {
+    mockCurrentBookings = [{
+      ...mockBookings[0],
+      status: 'Payment Pending',
+      paymentStatus: 'pending_provider',
+      scheduleStatus: 'confirmed',
+      raw: { booking: { start_ts: '2020-01-01T09:00:00Z' } },
+    }];
+
+    renderBookings(<MyBookings currentView="my-bookings" />);
+
+    expect(screen.queryByRole('button', { name: /Pay Now/i })).not.toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Scheduled time has passed' })).toBeVisible();
+    fireEvent.click(screen.getByRole('button', { name: 'Choose another time' }));
+    expect(screen.getByTestId('mock-slot-modal')).toBeInTheDocument();
   });
 
   test('shows the provider confirmation action before client completion', () => {
@@ -256,7 +292,20 @@ describe('MyBookings Redesign Component', () => {
     expect(mockListRole).toBe('buyer');
   });
 
-  test('keeps a worker in the provider route while switching booking scopes', () => {
+  test('gives a provider-capable account the same client booking shell on the client route', () => {
+    mockCurrentBookings = mockBookings;
+
+    renderBookings(
+      <MyBookings currentView="my-bookings" sellerProfile={{ role: 'worker', userId: 'worker-1' }} />,
+      '/bookings?scope=incoming',
+    );
+
+    expect(screen.getByRole('heading', { name: 'My Bookings' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Incoming bookings' })).not.toBeInTheDocument();
+    expect(mockListRole).toBe('buyer');
+  });
+
+  test('moves a worker to the client route when opening purchased services', () => {
     mockCurrentBookings = mockBookings;
     renderBookings(
       <MyBookings currentView="worker-bookings" sellerProfile={{ role: 'worker', userId: 'worker-1' }} />,
@@ -264,7 +313,7 @@ describe('MyBookings Redesign Component', () => {
     );
 
     fireEvent.click(screen.getByRole('button', { name: 'Services I booked' }));
-    expect(screen.getByTestId('location-probe')).toHaveTextContent('/worker/bookings?scope=purchases');
+    expect(screen.getByTestId('location-probe')).toHaveTextContent('/bookings?scope=purchases');
     expect(mockListRole).toBe('buyer');
   });
 

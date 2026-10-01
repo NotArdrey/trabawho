@@ -197,13 +197,17 @@ const buildSelectedSlot = (booking = {}, metadata = {}) => {
 
 const uiStatusFromDb = (booking = {}, metadata = {}) => {
   if (booking.dispute_status === 'open') return 'Dispute Open';
+  if (booking.cancellation_status === 'requested') return 'Cancellation Requested';
+  if (booking.payment_status === 'refund_pending') return 'Refund Pending';
   if (booking.status === 'completed') return 'Completed Service';
   if (booking.status === 'refunded') return 'Refunded';
   if (booking.status === 'cancelled') {
     return metadata.payment_method === 'after-service-cash' ? 'Cancelled (Cash)' : 'Cancelled';
   }
   if (booking.delivery_status === 'seller_claimed') return 'Service Delivered';
-  if (metadata.payment_method === 'gcash-advance') {
+  if (booking.schedule_status === 'expired') return 'Reservation Expired';
+  if (booking.schedule_status === 'held') return 'Payment Pending';
+  if (['gcash-advance', 'paymongo-card'].includes(metadata.payment_method)) {
     if (booking.payment_status === 'paid') return 'Payment Confirmed';
     if (booking.payment_status === 'partially_paid') return 'Downpayment Paid';
     return 'Payment Pending';
@@ -293,6 +297,8 @@ export const mapBookingRowToUiBooking = (booking = {}, context = {}) => {
     ?? getNumberOrNull(mockPayment?.totalChargedAmount)
     ?? fallbackPricing.totalChargedAmount;
   const bookingMode = getServiceBookingMode(service, seller, metadata);
+  const activeQuote = context.quotesByBookingId?.[booking.id] || null;
+  const rescheduleRequest = context.rescheduleByBookingId?.[booking.id] || null;
 
   return {
     id: booking.id,
@@ -313,8 +319,16 @@ export const mapBookingRowToUiBooking = (booking = {}, context = {}) => {
     bookingModeLabel: getBookingModeLabel(bookingMode),
     isRequestBooking: bookingMode === 'calendar-only',
     quoteApproved: metadata.quote_approved !== undefined ? Boolean(metadata.quote_approved) : booking.status !== 'pending',
+    quoteStatus: booking.quote_status || (metadata.quote_approved ? 'accepted' : 'not_required'),
     quoteRejectionReason: metadata.quote_rejection_reason || metadata.quoteRejectionReason || null,
+    activeQuote,
+    quoteVersion: activeQuote?.version || metadata.active_quote_version || null,
     selectedSlot,
+    scheduleStatus: booking.schedule_status || (selectedSlot ? 'confirmed' : 'unscheduled'),
+    holdExpiresAt: booking.hold_expires_at || null,
+    cancellationStatus: booking.cancellation_status || 'none',
+    cancellationReason: booking.cancellation_reason || null,
+    rescheduleRequest,
     paymentMethod,
     allowGcashAdvance: metadata.allow_gcash_advance !== false,
     allowAfterService: false,
@@ -347,7 +361,7 @@ export const mapBookingRowToUiBooking = (booking = {}, context = {}) => {
     cashVerifierQrId: metadata.cash_verifier_qr_id || metadata.cashVerifierQrId || (booking.id ? `CASHQR-${booking.id}` : ''),
     submittedCashAmount: metadata.submitted_cash_amount ?? metadata.submittedCashAmount ?? null,
     expectedCashAmount: totalChargedAmount,
-    refundEligible: metadata.refund_eligible ?? (paymentMethod === 'gcash-advance' && booking.status === 'completed'),
+    refundEligible: metadata.refund_eligible ?? (['gcash-advance', 'paymongo-card'].includes(paymentMethod) && booking.status === 'completed'),
     refundStatus,
     refundAmount: metadata.refund_amount ?? metadata.refundAmount ?? null,
     refundReason: metadata.refund_reason || metadata.refundReason || '',
@@ -365,6 +379,7 @@ export const mapBookingRowToUiBooking = (booking = {}, context = {}) => {
       service,
       seller,
       review,
+      activeQuote,
       metadata,
     },
   };
@@ -392,18 +407,29 @@ export const hydrateBookingRows = async (bookingRows = []) => {
   const buyerIds = unique(rows.map((row) => row.buyer_id));
   const bookingIds = unique(rows.map((row) => row.id));
 
-  const [services, sellers, buyerProfiles, reviews] = await Promise.all([
+  const [services, sellers, buyerProfiles, reviews, quotes, rescheduleRequests] = await Promise.all([
     fetchRowsByIds('services', 'id', serviceIds, '*'),
     fetchRowsByIds('sellers', 'user_id', sellerIds, '*'),
     fetchRowsByIds('profiles', 'user_id', buyerIds, 'user_id, full_name, profile_photo'),
     fetchRowsByIds('reviews', 'booking_id', bookingIds, '*'),
+    fetchRowsByIds('booking_quotes', 'booking_id', bookingIds, '*'),
+    fetchRowsByIds('booking_reschedule_requests', 'booking_id', bookingIds, '*'),
   ]);
 
   const servicesById = Object.fromEntries(services.map((row) => [row.id, row]));
   const sellersById = Object.fromEntries(sellers.map((row) => [row.user_id, row]));
   const profilesById = Object.fromEntries(buyerProfiles.map((row) => [row.user_id, row]));
+  const quotesByBookingId = quotes
+    .sort((left, right) => Number(right.version || 0) - Number(left.version || 0))
+    .reduce((result, quote) => {
+      if (!result[quote.booking_id]) result[quote.booking_id] = quote;
+      return result;
+    }, {});
+  const rescheduleByBookingId = rescheduleRequests
+    .filter((request) => request.status === 'pending')
+    .reduce((result, request) => ({ ...result, [request.booking_id]: request }), {});
 
-  return rows.map((row) => mapBookingRowToUiBooking(row, { servicesById, sellersById, profilesById, reviews }));
+  return rows.map((row) => mapBookingRowToUiBooking(row, { servicesById, sellersById, profilesById, reviews, quotesByBookingId, rescheduleByBookingId }));
 };
 
 export const hydrateConversationRows = async (conversationRows = []) => {
@@ -1108,7 +1134,7 @@ export const createClientBooking = async ({ provider, pendingBooking, paymentMet
   const slotId = rawSlot?.id || selectedSlot?.slotId || null;
   const totalAmount = getNumberOrNull(pendingBooking?.quoteAmount) ?? getRateAmount(rawService);
   const totalChargedAmount = getNumberOrNull(mockPayment?.totalChargedAmount) ?? totalAmount;
-  const uiStatus = paymentMethod === 'gcash-advance' ? 'Payment Pending' : 'Service Scheduled';
+  const uiStatus = paymentMethod === 'paymongo-card' ? 'Payment Pending' : 'Service Scheduled';
   const cashStatus = paymentMethod === 'after-service-cash' ? 'awaiting-client-scan' : null;
   const bookingMode = provider?.bookingMode === 'calendar-only' || pendingBooking?.bookingMode === 'calendar-only'
     ? 'calendar-only'
@@ -1131,7 +1157,7 @@ export const createClientBooking = async ({ provider, pendingBooking, paymentMet
     allow_after_service: false,
     after_service_payment_type: 'gcash-only',
     expected_cash_amount: totalChargedAmount,
-    refund_eligible: paymentMethod === 'gcash-advance',
+    refund_eligible: paymentMethod === 'paymongo-card',
     can_rate: false,
     created_via: 'marketplace',
     payment_plan: mockPayment?.paymentPlan || 'full',
@@ -1150,7 +1176,7 @@ export const createClientBooking = async ({ provider, pendingBooking, paymentMet
   return mapped;
 };
 
-export const createClientBookingRequest = async ({ provider, assistantContext = null } = {}) => {
+export const createClientBookingRequest = async ({ provider } = {}) => {
   const user = await getAuthUser();
   if (!user?.id) throw new Error('Please sign in before requesting a booking.');
 
@@ -1163,69 +1189,11 @@ export const createClientBookingRequest = async ({ provider, assistantContext = 
     throw new Error('Unable to create request because the selected service is missing database IDs.');
   }
 
-  const { data: existingRows, error: existingError } = await supabase
-    .from('bookings')
-    .select('*')
-    .eq('service_id', serviceId)
-    .eq('seller_id', sellerId)
-    .eq('buyer_id', user.id)
-    .eq('status', 'pending')
-    .order('updated_at', { ascending: false })
-    .limit(1);
-
-  if (existingError) throw mapDatabaseError(existingError);
-  if (existingRows?.[0]) {
-    const [mapped] = await hydrateBookingRows([existingRows[0]]);
-    return mapped;
-  }
-
-  const totalAmount = getRateAmount(rawService)
-    || getNumberOrNull(provider?.hourlyRate)
-    || getNumberOrNull(provider?.dailyRate)
-    || getNumberOrNull(provider?.weeklyRate)
-    || getNumberOrNull(provider?.monthlyRate)
-    || getNumberOrNull(provider?.projectRate)
-    || 0;
-  const bookingMode = provider?.bookingMode === 'calendar-only' ? 'calendar-only' : 'with-slots';
-  const metadata = {
-    ui_status: 'Negotiating',
-    quote_approved: false,
-    booking_mode: bookingMode,
-    booking_mode_label: getBookingModeLabel(bookingMode),
-    booking_flow: bookingMode === 'calendar-only' ? 'request-booking' : 'worker-chat',
-    worker_name: provider?.name || getSellerName(rawService, seller),
-    client_name: getProfileNameFromUser(user),
-    service_type: provider?.serviceType || getServiceType(rawService, seller),
-    description: provider?.description || rawService.short_description || rawService.description || '',
-    quote_amount: totalAmount,
-    selected_slot: null,
-    payment_method: null,
-    allow_gcash_advance: true,
-    allow_after_service: true,
-    after_service_payment_type: 'both',
-    refund_eligible: false,
-    can_rate: false,
-    created_via: 'marketplace-request',
-    assistant_context: assistantContext || null,
-  };
-
-  const { data, error } = await supabase
-    .from('bookings')
-    .insert([{
-      service_id: serviceId,
-      seller_id: sellerId,
-      buyer_id: user.id,
-      slot_id: null,
-      start_ts: null,
-      end_ts: null,
-      status: 'pending',
-      total_amount: totalAmount || null,
-      currency: rawService.currency || 'PHP',
-      payment_reference: null,
-      metadata,
-    }])
-    .select('*')
-    .single();
+  const operationId = `booking-request:${serviceId}:${user.id}`;
+  const { data, error } = await supabase.rpc('create_booking_request', {
+    p_service_id: serviceId,
+    p_operation_id: operationId,
+  });
 
   if (error) throw mapDatabaseError(error);
   const [mapped] = await hydrateBookingRows([data]);

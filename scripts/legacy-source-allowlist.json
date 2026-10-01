@@ -22,7 +22,6 @@
   "src/features/bookings/components/ChatWindow.jsx",
   "src/features/bookings/components/RatingModal.jsx",
   "src/features/bookings/components/RatingModal.test.jsx",
-  "src/features/bookings/components/SlotSelectionModal.jsx",
   "src/features/bookings/hooks/useBookingListController.js",
   "src/features/bookings/hooks/useBookingListController.test.js",
   "src/features/bookings/hooks/useCashConfirmationController.js",

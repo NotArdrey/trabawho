@@ -3,10 +3,10 @@ import {
   CalendarDays,
   CheckCircle2,
   CircleDollarSign,
+  CreditCard,
   LoaderCircle,
   LockKeyhole,
   Send,
-  Smartphone,
   WalletCards,
 } from "lucide-react";
 
@@ -24,8 +24,7 @@ import { cn } from "@/lib/utils";
 import { calculateBookingPricing } from "@/features/bookings/utils/bookingPricing";
 
 type PaymentPlan = "full" | "downpayment";
-type PaymentMethod = "gcash-advance" | "after-service";
-type ResolvedPaymentMethod = "gcash-advance" | "after-service-cash" | "after-service-gcash";
+type PaymentMethod = "paymongo-card";
 
 interface PaymentTimeBlock {
   startTime?: string;
@@ -33,7 +32,7 @@ interface PaymentTimeBlock {
 
 interface PaymentBooking {
   id?: string;
-  afterServicePaymentType?: "both" | "cash-only" | "gcash-only";
+  activeQuote?: { proposed_start_ts?: string; proposed_end_ts?: string } | null;
   allowGcashAdvance?: boolean;
   balanceDueAmount?: number | string;
   bookingMode?: string;
@@ -65,7 +64,7 @@ export interface PaymentModalProps {
   booking: PaymentBooking;
   confirmLabel?: string;
   onCancel: () => void;
-  onSelectPayment: (method: ResolvedPaymentMethod, details: PaymentSelectionDetails) => unknown;
+  onSelectPayment: (method: PaymentMethod, details: PaymentSelectionDetails) => unknown;
   scheduleLabel?: string;
   scheduleValue?: string;
   subtitle?: string;
@@ -89,7 +88,15 @@ function formatTime(time?: string) {
 }
 
 function formatSchedule(booking: PaymentBooking) {
-  if (booking.bookingMode === "calendar-only" || booking.isRequestBooking) return "Coordinated through chat";
+  if (booking.activeQuote?.proposed_start_ts) {
+    const start = new Date(booking.activeQuote.proposed_start_ts);
+    const end = booking.activeQuote.proposed_end_ts ? new Date(booking.activeQuote.proposed_end_ts) : null;
+    const date = new Intl.DateTimeFormat("en-PH", { weekday: "short", month: "short", day: "numeric", year: "numeric" }).format(start);
+    const startTime = new Intl.DateTimeFormat("en-PH", { hour: "numeric", minute: "2-digit" }).format(start);
+    const endTime = end ? new Intl.DateTimeFormat("en-PH", { hour: "numeric", minute: "2-digit" }).format(end) : null;
+    return `${date} · ${startTime}${endTime ? `–${endTime}` : ""}`;
+  }
+  if (booking.bookingMode === "calendar-only" || booking.isRequestBooking) return "Waiting for a provider schedule";
   const date = booking.selectedSlot?.date;
   const time = booking.selectedSlot?.timeBlock?.startTime;
   if (!date) return "Schedule pending";
@@ -104,7 +111,7 @@ export default function PaymentModal({
   advancePaymentDescription,
   amountLabel = "Service price",
   booking,
-  confirmLabel = "Continue with GCash",
+  confirmLabel = "Reserve and continue",
   onCancel,
   onSelectPayment,
   scheduleLabel,
@@ -113,16 +120,13 @@ export default function PaymentModal({
   title = "Choose payment",
   transactionFeeRate,
 }: PaymentModalProps) {
-  const allowsAdvanceGcash = booking.allowGcashAdvance !== false;
-  const allowsAfterService = false;
-  const afterServicePaymentType = booking.afterServicePaymentType || "both";
+  const allowsPayMongo = true;
   const isRequestBooking = booking.bookingMode === "calendar-only" || booking.isRequestBooking;
   const baseAmount = Number(booking.quoteAmount || 0) || 0;
   const pricing = calculateBookingPricing(baseAmount, transactionFeeRate);
   const isPayingRemainingBalance = booking.paymentStatus === "partially_paid";
-  const [selectedMethod, setSelectedMethod] = useState<PaymentMethod | null>(allowsAdvanceGcash ? "gcash-advance" : null);
+  const [selectedMethod, setSelectedMethod] = useState<PaymentMethod | null>(allowsPayMongo ? "paymongo-card" : null);
   const [paymentPlan, setPaymentPlan] = useState<PaymentPlan>(booking.paymentPlan === "downpayment" ? "downpayment" : "full");
-  const [afterServiceChannel, setAfterServiceChannel] = useState<"cash" | "gcash">(afterServicePaymentType === "gcash-only" ? "gcash" : "cash");
   const [isProcessing, setIsProcessing] = useState(false);
   const [submitError, setSubmitError] = useState("");
 
@@ -141,10 +145,6 @@ export default function PaymentModal({
       setSubmitError("Select a payment method before continuing.");
       return;
     }
-    const resolvedMethod: ResolvedPaymentMethod = selectedMethod === "after-service"
-      ? afterServiceChannel === "gcash" ? "after-service-gcash" : "after-service-cash"
-      : "gcash-advance";
-
     try {
       setSubmitError("");
       setIsProcessing(true);
@@ -160,9 +160,11 @@ export default function PaymentModal({
         remainingBalanceAmount: remainingBalance,
         paymentAttemptAmount: amountDueNow,
       };
-      await Promise.resolve(onSelectPayment(resolvedMethod, paymentDetails));
-    } catch {
-      setSubmitError("We couldn't open secure GCash checkout. Please try again.");
+      await Promise.resolve(onSelectPayment(selectedMethod, paymentDetails));
+    } catch (error) {
+      setSubmitError(error instanceof Error && error.message
+        ? error.message
+        : "We couldn't open secure PayMongo checkout. Please try again.");
     } finally {
       setIsProcessing(false);
     }
@@ -177,8 +179,8 @@ export default function PaymentModal({
               <WalletCards className="size-5" aria-hidden="true" />
             </span>
             <div>
-              <DialogTitle className="text-2xl">{isProcessing ? "Opening secure checkout" : title}</DialogTitle>
-              <DialogDescription className="mt-1.5 leading-5">{isProcessing ? "Preparing your booking on PayMongo." : resolvedSubtitle}</DialogDescription>
+              <DialogTitle className="text-2xl">{isProcessing ? "Reserving your time" : title}</DialogTitle>
+              <DialogDescription className="mt-1.5 leading-5">{isProcessing ? "Protecting the selected time before opening PayMongo." : resolvedSubtitle}</DialogDescription>
             </div>
           </div>
         </DialogHeader>
@@ -188,8 +190,8 @@ export default function PaymentModal({
             <span className="flex size-16 items-center justify-center rounded-full bg-primary/10 text-primary">
               <LoaderCircle className="size-8 animate-spin" aria-hidden="true" />
             </span>
-            <h3 className="mt-5 text-xl font-bold text-foreground">Opening secure GCash checkout</h3>
-            <p className="mt-2 max-w-sm text-sm leading-6 text-muted-foreground">Keep this window open while PayMongo prepares the payment page.</p>
+            <h3 className="mt-5 text-xl font-bold text-foreground">Reserving your time</h3>
+            <p className="mt-2 max-w-sm text-sm leading-6 text-muted-foreground">Keep this window open while we reserve the schedule and prepare secure card checkout.</p>
           </div>
         ) : (
           <>
@@ -253,37 +255,35 @@ export default function PaymentModal({
               <h3 id="payment-method-heading" className="font-semibold text-foreground">Payment method</h3>
             </div>
 
-            {allowsAdvanceGcash ? (
+            {allowsPayMongo ? (
               <button
                 type="button"
                 role="radio"
-                aria-checked={selectedMethod === "gcash-advance"}
-                onClick={() => { setSelectedMethod("gcash-advance"); setSubmitError(""); }}
+                aria-checked={selectedMethod === "paymongo-card"}
+                onClick={() => { setSelectedMethod("paymongo-card"); setSubmitError(""); }}
                 className={cn(
                   "flex min-h-20 w-full items-start gap-3 rounded-xl bg-muted/45 p-4 text-left transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                  selectedMethod === "gcash-advance" && "bg-primary/10",
+                  selectedMethod === "paymongo-card" && "bg-primary/10 ring-2 ring-primary",
                 )}
               >
-                <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground"><Smartphone className="size-5" aria-hidden="true" /></span>
+                <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground"><CreditCard className="size-5" aria-hidden="true" /></span>
                 <span className="min-w-0 flex-1">
-                  <span className="flex flex-wrap items-center gap-2 font-bold text-foreground">GCash advance payment <Badge variant="default">Selected</Badge></span>
-                  <span className="mt-1 block text-sm leading-5 text-muted-foreground">{advancePaymentDescription || (isRequestBooking ? "Pay through GCash after agreeing on the details in chat." : "Pay securely through the GCash step to reserve this booking.")}</span>
+                  <span className="font-bold text-foreground">Pay securely by card with PayMongo</span>
+                  <span className="mt-1 block text-sm leading-5 text-muted-foreground">{advancePaymentDescription || "Your selected time is reserved for 15 minutes while you complete the test checkout."}</span>
                 </span>
               </button>
             ) : (
               <p className="rounded-xl bg-destructive/10 p-4 text-sm font-medium text-destructive">No payment method is available for this booking.</p>
             )}
 
-            {allowsAfterService ? (
-              <div className="mt-3 rounded-xl bg-muted/45 p-4">
-                <button type="button" role="radio" aria-checked={selectedMethod === "after-service"} onClick={() => setSelectedMethod("after-service")}>Pay after service</button>
-                {selectedMethod === "after-service" && afterServicePaymentType === "both" ? (
-                  <div className="mt-3 flex gap-2">
-                    {(["cash", "gcash"] as const).map((channel) => <Button key={channel} type="button" variant={afterServiceChannel === channel ? "primary" : "outline"} onClick={() => setAfterServiceChannel(channel)}>{channel === "cash" ? "Cash" : "GCash"}</Button>)}
-                  </div>
-                ) : null}
-              </div>
-            ) : null}
+            <div className="mt-3 flex min-h-20 items-start gap-3 rounded-xl bg-muted/35 p-4 opacity-70" role="radio" aria-checked="false" aria-disabled="true">
+              <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground"><WalletCards className="size-5" aria-hidden="true" /></span>
+              <span className="min-w-0 flex-1">
+                <span className="flex flex-wrap items-center gap-2 font-bold text-foreground">GCash <Badge variant="secondary">Coming soon</Badge></span>
+                <span className="mt-1 block text-sm leading-5 text-muted-foreground">GCash is shown for preview only and cannot be selected yet.</span>
+              </span>
+            </div>
+
           </section>
 
           <section className="mt-2 overflow-hidden rounded-xl bg-muted/40" aria-labelledby="payment-breakdown-heading">

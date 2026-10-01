@@ -226,7 +226,7 @@ begin
   for update;
   if not found then raise exception 'PayMongo checkout session was not found' using errcode = 'P0002'; end if;
 
-  if v_attempt.environment <> case when p_livemode then 'live' else 'test' end then
+  if v_attempt.environment <> (case when p_livemode then 'live' else 'test' end) then
     raise exception 'PayMongo environment does not match payment attempt' using errcode = '23514';
   end if;
   if upper(coalesce(p_currency, '')) <> v_attempt.currency

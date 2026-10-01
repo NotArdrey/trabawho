@@ -12,10 +12,9 @@
 // ============================================================================
 
 import { useState, useCallback } from 'react';
-import { selectBookingPaymentPlan } from '../services/bookingService';
 import { createPayMongoCheckout, redirectToPayMongo } from '../services/paymongoCheckout';
 
-export function usePaymentController(onPaymentProofSubmit, onPaymentMethodSelect, updateBooking, replaceBooking) {
+export function usePaymentController(onPaymentProofSubmit, onPaymentMethodSelect, updateBooking) {
   // ========================================================================
   // STATE MANAGEMENT
   // ========================================================================
@@ -110,22 +109,15 @@ export function usePaymentController(onPaymentProofSubmit, onPaymentMethodSelect
    * For cash payments, sets up cash confirmation QR
    */
   const handleSelectPaymentMethod = useCallback(async (booking, paymentMethod, mockPayment = {}) => {
-    if (paymentMethod === 'gcash-advance') {
-      if (booking?.paymentStatus === 'partially_paid') {
-        onPaymentMethodSelect?.(booking.id, paymentMethod, mockPayment);
-        const checkout = await createPayMongoCheckout(booking);
-        redirectToPayMongo(checkout);
-        return booking;
-      }
-      const updated = await selectBookingPaymentPlan(
-        booking,
-        mockPayment?.paymentPlan === 'downpayment' ? 'downpayment' : 'full'
-      );
-      replaceBooking?.(updated);
+    if (paymentMethod === 'paymongo-card') {
+      const checkoutBooking = {
+        ...booking,
+        paymentPlan: mockPayment?.paymentPlan === 'downpayment' ? 'downpayment' : 'full',
+      };
       onPaymentMethodSelect?.(booking.id, paymentMethod, mockPayment);
-      const checkout = await createPayMongoCheckout(updated);
+      const checkout = await createPayMongoCheckout(checkoutBooking);
       redirectToPayMongo(checkout);
-      return updated;
+      return booking;
     }
 
     const updates = {
@@ -153,7 +145,7 @@ export function usePaymentController(onPaymentProofSubmit, onPaymentMethodSelect
 
     // Notify parent
     onPaymentMethodSelect?.(booking.id, paymentMethod, mockPayment);
-  }, [updateBooking, replaceBooking, onPaymentMethodSelect]);
+  }, [updateBooking, onPaymentMethodSelect]);
 
   // ========================================================================
   // RETURN OBJECT - Exposed state and handlers

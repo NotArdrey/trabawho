@@ -26,10 +26,13 @@ describe("PaymentModal", () => {
 
     await user.click(screen.getByRole("radio", { name: /50% downpayment/i }));
     expect(screen.getAllByText("PHP 522.50").length).toBeGreaterThan(0);
-    await user.click(screen.getByRole("button", { name: /continue with gcash/i }));
+    expect(screen.getByText("GCash")).toBeVisible();
+    expect(screen.getByText("Coming soon")).toBeVisible();
+    expect(screen.getByRole("radio", { name: /GCash/i })).toHaveAttribute("aria-disabled", "true");
+    await user.click(screen.getByRole("button", { name: /reserve and continue/i }));
 
     expect(onSelectPayment).toHaveBeenCalledWith(
-      "gcash-advance",
+      "paymongo-card",
       expect.objectContaining({
         paymentPlan: "downpayment",
         paymentAttemptAmount: 522.5,
@@ -37,7 +40,7 @@ describe("PaymentModal", () => {
         totalChargedAmount: 997.5,
       }),
     );
-    expect(screen.getByRole("button", { name: /continue with gcash/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /reserve and continue/i })).toBeInTheDocument();
   });
 
   it("supports canceling from the footer", async () => {
@@ -47,5 +50,16 @@ describe("PaymentModal", () => {
 
     await user.click(screen.getByRole("button", { name: "Cancel" }));
     expect(onCancel).toHaveBeenCalledOnce();
+  });
+
+  it("keeps checkout open and explains a server rejection", async () => {
+    const user = userEvent.setup();
+    const onSelectPayment = vi.fn().mockRejectedValue(new Error("Selected time is no longer available."));
+    render(<PaymentModal booking={booking} onSelectPayment={onSelectPayment} onCancel={vi.fn()} />);
+
+    await user.click(screen.getByRole("button", { name: /reserve and continue/i }));
+
+    expect(screen.getByRole("alert")).toHaveTextContent("Selected time is no longer available.");
+    expect(screen.getByRole("dialog", { name: "Choose payment" })).toBeInTheDocument();
   });
 });

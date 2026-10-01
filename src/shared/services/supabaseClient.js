@@ -17,6 +17,7 @@ const createMissingQuery = () => {
     delete: () => query,
     eq: () => query,
     neq: () => query,
+    gte: () => query,
     in: () => query,
     is: () => query,
     order: () => query,

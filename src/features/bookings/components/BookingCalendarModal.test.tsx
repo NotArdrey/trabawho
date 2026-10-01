@@ -65,4 +65,20 @@ describe("BookingCalendarModal", () => {
     await user.click(screen.getByRole("button", { name: "Close" }));
     expect(onClose).toHaveBeenCalledOnce();
   });
+
+  it("distinguishes missing availability from fully booked dates", () => {
+    render(
+      <BookingCalendarModal
+        isOpen
+        worker={worker}
+        schedule={{ operatingDays: [], manualScheduling: false, dayBlocks: {} }}
+        onClose={vi.fn()}
+        onConfirmBooking={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText("No booking times are published yet")).toBeInTheDocument();
+    expect(screen.getAllByText("No times").length).toBeGreaterThan(0);
+    expect(screen.queryByText("Full")).not.toBeInTheDocument();
+  });
 });
