@@ -54,6 +54,7 @@ function readJsonBody(request) {
 }
 
 async function mockDiditRoutes(page, finalStatus, createUserPayload = {}) {
+  const signupRequests = [];
   await page.route('**/functions/v1/create-didit-session', async (route) => {
     const request = route.request();
     if (request.method() === 'OPTIONS') {
@@ -89,6 +90,7 @@ async function mockDiditRoutes(page, finalStatus, createUserPayload = {}) {
       return;
     }
 
+    signupRequests.push(readJsonBody(request));
     await fulfillJson(route, {
       success: true,
       userId: '00000000-0000-4000-8000-000000000053',
@@ -98,6 +100,7 @@ async function mockDiditRoutes(page, finalStatus, createUserPayload = {}) {
       ...createUserPayload,
     });
   });
+  return signupRequests;
 }
 
 async function fillDiditSignup(page, email = 'verified-user@example.com') {
@@ -105,13 +108,14 @@ async function fillDiditSignup(page, email = 'verified-user@example.com') {
   await page.getByLabel('Password', { exact: true }).fill('Password123!');
   await page.getByLabel('Confirm password').fill('Password123!');
   await page.getByLabel(/I consent to TrabaWho/i).check();
+  await page.getByLabel(/I agree to TrabaWho collecting/i).check();
   await page.getByRole('button', { name: /Start Didit Verification/i }).click();
 }
 
 test.describe('identity-first registration', () => {
   test('Didit approval creates an unconfirmed account and asks for email confirmation', async ({ page }) => {
     const consoleFailures = collectConsoleFailures(page);
-    await mockDiditRoutes(page, 'APPROVED');
+    const signupRequests = await mockDiditRoutes(page, 'APPROVED');
 
     await page.goto('/#identity-register');
     await expect(page.getByTestId('identity-registration-page')).toBeVisible();
@@ -121,8 +125,8 @@ test.describe('identity-first registration', () => {
     await expect(page.getByRole('link', { name: /Open Didit Verification/i })).toHaveAttribute('href', /verification\.didit\.me/);
 
     await page.getByRole('button', { name: /Check Verification Status/i }).click();
-    await expect(page.getByTestId('identity-outcome')).toContainText('Email confirmation sent');
-    await expect(page.getByTestId('identity-outcome')).toContainText('confirm your email before logging in');
+    await expect(page.getByRole('heading', { name: 'Sign in', exact: true })).toBeVisible();
+    expect(signupRequests).toEqual([expect.objectContaining({ diditStatus: 'APPROVED' })]);
 
     await expectNoHorizontalOverflow(page);
     expect(consoleFailures).toEqual([]);
@@ -130,14 +134,14 @@ test.describe('identity-first registration', () => {
 
   test('Didit pending review creates a gated account without sending login access', async ({ page }) => {
     const consoleFailures = collectConsoleFailures(page);
-    await mockDiditRoutes(page, 'PENDING_REVIEW');
+    const signupRequests = await mockDiditRoutes(page, 'PENDING_REVIEW');
 
     await page.goto('/#identity-register');
     await fillDiditSignup(page, 'pending-review@example.com');
     await page.getByRole('button', { name: /Check Verification Status/i }).click();
 
-    await expect(page.getByTestId('identity-outcome')).toContainText('Identity review pending');
-    await expect(page.getByTestId('identity-outcome')).toContainText('access is held until identity review is approved');
+    await expect(page.getByRole('heading', { name: 'Sign in', exact: true })).toBeVisible();
+    expect(signupRequests).toEqual([expect.objectContaining({ diditStatus: 'PENDING_REVIEW' })]);
 
     await expectNoHorizontalOverflow(page);
     expect(consoleFailures).toEqual([]);
@@ -206,6 +210,7 @@ test.describe('identity-first registration', () => {
       buffer: Buffer.from('selfie-image'),
     });
     await page.getByLabel(/I consent to TrabaWho/i).check();
+    await page.getByLabel(/I agree to TrabaWho collecting/i).check();
     await page.getByRole('button', { name: /Submit Manual Review/i }).click();
 
     await expect(page.getByTestId('identity-outcome')).toContainText('Manual review submitted');
@@ -290,7 +295,7 @@ test.describe('identity-first registration', () => {
     await expect(page.getByRole('option', { name: 'Worker' })).toBeVisible();
     await page.getByRole('option', { name: 'Client' }).click();
     await expect(accountType).not.toContainText(/fan|musician/i);
-    await expect(page.getByRole('link', { name: 'Go to next page' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Go to next page' })).toBeVisible();
     await expectNoHorizontalOverflow(page);
 
     expect(consoleFailures).toEqual([]);

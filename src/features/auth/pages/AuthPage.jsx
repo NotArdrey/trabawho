@@ -1,67 +1,36 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ArrowLeft,
   CalendarCheck,
-  Check,
   CheckCircle2,
   ExternalLink,
-  FileText,
-  Home,
   LogIn,
   Mail,
-  MapPin,
   MessageSquareText,
   RefreshCw,
   ShieldCheck,
   Search,
   Upload,
-  User,
   UserPlus,
   XCircle,
 } from 'lucide-react';
 import {
-  Select,
-  SelectContent,
-  SelectGroup,
-  SelectItem,
-  SelectLabel,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import {
-  Pagination,
-  PaginationContent,
-  PaginationItem,
-  PaginationLink,
-  PaginationNext,
-  PaginationPrevious,
-} from '@/components/ui/pagination';
-import {
   clearIdentitySignupState,
-  DIDIT_DOCUMENT_TYPES,
   fetchDiditIdentitySession,
   finishDiditIdentitySignup,
   getDocumentType,
   isTerminalIdentityFailure,
   loadIdentitySignupState,
-  MANUAL_DOCUMENT_TYPES,
   submitManualIdentityReview,
   startDiditIdentitySession,
-} from '../../../shared/services/identityRegistrationService';
+} from '@/shared/services/identityRegistrationService';
 import {
   getRegistrationFormLogSnapshot,
   logRegistrationDebug,
-} from '../../../shared/services/registrationLogger';
-import BrandWordmark from '../../../shared/components/BrandWordmark';
+} from '@/shared/services/registrationLogger';
+import BrandWordmark from '@/shared/components/BrandWordmark';
 import PasswordField from '../components/PasswordField';
-
-const PSGC_BASE_URL = 'https://psgc.gitlab.io/api';
-const REGISTRATION_STEPS = [
-  { number: 1, label: 'Account' },
-  { number: 2, label: 'Security' },
-  { number: 3, label: 'Location' },
-  { number: 4, label: 'Review' },
-];
+import { RegistrationForm } from '../registration/RegistrationForm';
 
 const EMPTY_AUTH_FORM = {
   email: '',
@@ -106,8 +75,6 @@ const getAuthErrorMessage = (error) => {
   return errorMessage;
 };
 
-const getTodayInputValue = () => new Date().toISOString().slice(0, 10);
-
 function AuthPage({
   mode = 'login',
   onModeChange,
@@ -121,15 +88,6 @@ function AuthPage({
   const isLoginMode = mode === 'login';
 
   const [formData, setFormData] = useState(EMPTY_AUTH_FORM);
-  const [provinces, setProvinces] = useState([]);
-  const [cities, setCities] = useState([]);
-  const [barangays, setBarangays] = useState([]);
-  const [selectedProvinceCode, setSelectedProvinceCode] = useState('');
-  const [selectedCityMunicipalityCode, setSelectedCityMunicipalityCode] = useState('');
-  const [isLoadingProvinces, setIsLoadingProvinces] = useState(false);
-  const [isLoadingCities, setIsLoadingCities] = useState(false);
-  const [isLoadingBarangays, setIsLoadingBarangays] = useState(false);
-  const [apiError, setApiError] = useState('');
   const [submitError, setSubmitError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSignupSuccess, setIsSignupSuccess] = useState(false);
@@ -139,7 +97,6 @@ function AuthPage({
   const [isForgotSubmitting, setIsForgotSubmitting] = useState(false);
   const [isForgotSubmitted, setIsForgotSubmitted] = useState(false);
   const [identityStep, setIdentityStep] = useState('details');
-  const [registrationStep, setRegistrationStep] = useState(1);
   const [identitySession, setIdentitySession] = useState(null);
   const [identityStatusMessage, setIdentityStatusMessage] = useState('');
   const [identityOutcome, setIdentityOutcome] = useState(null);
@@ -175,34 +132,6 @@ function AuthPage({
     };
   }, [isForgotMode, isRegisterMode]);
 
-  const fetchProvinces = useCallback(async () => {
-    setIsLoadingProvinces(true);
-    setApiError('');
-
-    try {
-      const response = await fetch(`${PSGC_BASE_URL}/provinces/`);
-      if (!response.ok) throw new Error('Failed to fetch provinces');
-      const data = await response.json();
-      setProvinces(data);
-    } catch (error) {
-      console.error('Error fetching provinces:', error);
-      setApiError('Could not load provinces. You can still try again in a moment.');
-      setProvinces([
-        { code: 'PHR030000000', name: 'Bulacan' },
-        { code: 'PHR010000000', name: 'Abra' },
-        { code: 'PHR020000000', name: 'Agusan del Norte' },
-      ]);
-    } finally {
-      setIsLoadingProvinces(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    if (isRegisterMode && provinces.length === 0) {
-      fetchProvinces();
-    }
-  }, [fetchProvinces, isRegisterMode, provinces.length]);
-
   useEffect(() => {
     latestEmailRef.current = formData.email;
   }, [formData.email]);
@@ -222,6 +151,10 @@ function AuthPage({
         email: storedState.email || current.email,
         password: storedState.password || current.password,
         confirmPassword: storedState.password || current.confirmPassword,
+        province: storedState.province || current.province,
+        city: storedState.city || current.city,
+        barangay: storedState.barangay || current.barangay,
+        address: storedState.address || current.address,
         accountRole: storedState.appRole || current.accountRole,
         documentTypeKey: storedState.documentTypeKey || current.documentTypeKey,
         acceptedIdentityTerms: true,
@@ -316,7 +249,6 @@ function AuthPage({
     pendingLoginStatusRef.current = '';
     setSubmitError('');
     setForgotError('');
-    setApiError('');
     setLoginStatusMessage(mode === 'login' && pendingLoginStatus ? pendingLoginStatus : '');
     setIsSignupSuccess(false);
     setIsForgotSubmitted(false);
@@ -327,7 +259,6 @@ function AuthPage({
       setIdentityOutcome(null);
     }
 
-    setRegistrationStep(1);
 
     if (mode === 'forgot') {
       setForgotEmail((currentEmail) => currentEmail || latestEmailRef.current);
@@ -338,63 +269,6 @@ function AuthPage({
     }
   }, [mode]);
 
-  const fetchCities = async (provinceCode) => {
-    if (!provinceCode) {
-      setCities([]);
-      setSelectedCityMunicipalityCode('');
-      return;
-    }
-
-    setIsLoadingCities(true);
-    setApiError('');
-
-    try {
-      const response = await fetch(`${PSGC_BASE_URL}/provinces/${provinceCode}/cities-municipalities/`);
-      if (!response.ok) throw new Error('Failed to fetch cities');
-      const data = await response.json();
-      setCities(data);
-      setFormData((current) => ({ ...current, city: '', barangay: '' }));
-      setSelectedCityMunicipalityCode('');
-      setBarangays([]);
-    } catch (error) {
-      console.error('Error fetching cities:', error);
-      setApiError('Could not load cities. Using fallback options for now.');
-      setCities([
-        { code: 'PHM030000000', name: 'Meycauayan' },
-        { code: 'PHM031000000', name: 'Bulacan' },
-      ]);
-    } finally {
-      setIsLoadingCities(false);
-    }
-  };
-
-  const fetchBarangays = async (cityCode) => {
-    if (!cityCode) {
-      setBarangays([]);
-      return;
-    }
-
-    setIsLoadingBarangays(true);
-    setApiError('');
-
-    try {
-      const response = await fetch(`${PSGC_BASE_URL}/cities-municipalities/${cityCode}/barangays/`);
-      if (!response.ok) throw new Error('Failed to fetch barangays');
-      const data = await response.json();
-      setBarangays(data);
-      setFormData((current) => ({ ...current, barangay: '' }));
-    } catch (error) {
-      console.error('Error fetching barangays:', error);
-      setApiError('Could not load barangays. Using fallback options for now.');
-      setBarangays([
-        { code: 'PHB030000000', name: 'Binakayan' },
-        { code: 'PHB030100000', name: 'Canumay' },
-      ]);
-    } finally {
-      setIsLoadingBarangays(false);
-    }
-  };
-
   const handleModeChange = (nextMode) => {
     onModeChange?.(nextMode);
   };
@@ -404,109 +278,6 @@ function AuthPage({
     const nextValue = type === 'checkbox' ? checked : type === 'file' ? files?.[0] || null : value;
     setFormData((current) => ({ ...current, [name]: nextValue }));
     setIdentityStatusMessage('');
-  };
-
-  const handleSelectChange = (name, value) => {
-    setFormData((current) => ({ ...current, [name]: value }));
-    setIdentityStatusMessage('');
-  };
-
-  const handleProvinceChange = (provinceCode) => {
-    const selectedProvince = provinces.find((province) => province.code === provinceCode);
-
-    setSelectedProvinceCode(provinceCode);
-    setSelectedCityMunicipalityCode('');
-    setBarangays([]);
-    setFormData((current) => ({
-      ...current,
-      province: selectedProvince ? selectedProvince.name : '',
-      city: '',
-      barangay: '',
-    }));
-    fetchCities(provinceCode);
-  };
-
-  const handleCityChange = (cityCode) => {
-    const selectedCity = cities.find((city) => city.code === cityCode);
-
-    setSelectedCityMunicipalityCode(cityCode);
-    setFormData((current) => ({
-      ...current,
-      city: selectedCity ? selectedCity.name : '',
-      barangay: '',
-    }));
-    fetchBarangays(cityCode);
-  };
-
-  const handleBarangayChange = (barangayCode) => {
-    const selectedBarangay = barangays.find((barangay) => barangay.code === barangayCode);
-
-    setFormData((current) => ({
-      ...current,
-      barangay: selectedBarangay ? selectedBarangay.name : '',
-    }));
-  };
-
-  const validateRegistrationStep = (step) => {
-    if (step === 1) {
-      if (!formData.accountRole) return 'Choose how you plan to use TrabaWho.';
-      if (!formData.documentTypeKey) return 'Choose an identity document.';
-    }
-
-    if (step === 2) {
-      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email.trim())) {
-        return 'Enter a valid email address.';
-      }
-      if (formData.password.length < 8) return 'Password must be at least 8 characters.';
-      if (formData.password !== formData.confirmPassword) {
-        return 'Password and confirm password do not match.';
-      }
-    }
-
-    if (step === 3 && (!formData.province || !formData.city || !formData.barangay || !formData.address.trim())) {
-      return 'Please complete all service location fields.';
-    }
-
-    if (step === 4) {
-      if (!formData.acceptedIdentityTerms) {
-        return 'Confirm that you consent to identity verification before continuing.';
-      }
-      if (!formData.acceptedRaTerms) {
-        return 'Confirm that you agree to the RA 10173 Terms and Conditions before continuing.';
-      }
-      if (!usesDidit) {
-        if (!formData.manualFullName.trim()) return 'Enter the full name exactly as shown on the ID.';
-        if (!formData.identityDocumentNumber.trim()) return 'Enter the ID number.';
-        if (!formData.idDocumentExpiry) return 'Enter the ID expiry date.';
-        if (formData.idDocumentExpiry < getTodayInputValue()) return 'ID expiry date cannot be in the past.';
-        if (!formData.frontImage || !formData.backImage || !formData.selfieImage) {
-          return 'Upload the front ID image, back ID image, and selfie image.';
-        }
-      }
-    }
-
-    return '';
-  };
-
-  const validateAuthForm = () => {
-    if (!isRegisterMode) return '';
-
-    for (const step of REGISTRATION_STEPS) {
-      const error = validateRegistrationStep(step.number);
-      if (error) return error;
-    }
-
-    return '';
-  };
-
-  const moveToRegistrationStep = (nextStep) => {
-    setRegistrationStep(Math.min(Math.max(nextStep, 1), REGISTRATION_STEPS.length));
-    setSubmitError('');
-    requestAnimationFrame(() => document.getElementById('registration-step-heading')?.focus());
-  };
-
-  const handleRegistrationNext = () => {
-    moveToRegistrationStep(registrationStep + 1);
   };
 
   const handleIdentityRegistrationSubmit = async () => {
@@ -649,32 +420,12 @@ function AuthPage({
     event.preventDefault();
     setSubmitError('');
 
-    if (isRegisterMode && registrationStep < REGISTRATION_STEPS.length) {
-      handleRegistrationNext();
-      return;
-    }
-
     logRegistrationDebug('auth_page:submit_started', {
       mode,
       isRegisterMode,
       identityStep,
       form: isRegisterMode ? getRegistrationFormLogSnapshot(formData) : undefined,
     });
-
-    const validationError = validateAuthForm();
-    if (validationError) {
-      const invalidStep = REGISTRATION_STEPS.find(
-        (step) => validateRegistrationStep(step.number) === validationError
-      );
-      if (invalidStep) moveToRegistrationStep(invalidStep.number);
-      logRegistrationDebug('auth_page:validation_failed', {
-        mode,
-        validationError,
-        form: isRegisterMode ? getRegistrationFormLogSnapshot(formData) : undefined,
-      }, 'warn');
-      setSubmitError(validationError);
-      return;
-    }
 
     try {
       setIsSubmitting(true);
@@ -751,10 +502,6 @@ function AuthPage({
 
   const resetRegisterSuccess = () => {
     setFormData(EMPTY_AUTH_FORM);
-    setSelectedProvinceCode('');
-    setSelectedCityMunicipalityCode('');
-    setCities([]);
-    setBarangays([]);
     setIsSignupSuccess(false);
     handleRestartIdentityRegistration();
     handleModeChange('login');
@@ -941,435 +688,39 @@ function AuthPage({
                 </button>
               )}
             </div>
+          ) : isRegisterMode ? (
+            <RegistrationForm
+              values={formData}
+              onUpdate={(name, value) => setFormData((current) => ({ ...current, [name]: value }))}
+              onSubmit={handleAuthSubmit}
+              submitError={submitError}
+              clearSubmitError={() => setSubmitError('')}
+              isSubmitting={isSubmitting}
+            />
           ) : (
             <form className="auth-form" onSubmit={handleAuthSubmit}>
-              {isRegisterMode && (
-                <div className="auth-registration-progress">
-                  <nav aria-label="Registration progress">
-                  <ol className="auth-progress-track">
-                    {REGISTRATION_STEPS.map((step) => {
-                      const isComplete = step.number !== registrationStep
-                        && validateRegistrationStep(step.number) === '';
-                      const status = step.number === registrationStep
-                        ? 'current'
-                        : isComplete ? 'complete' : 'upcoming';
-
-                      return (
-                        <li key={step.number} data-status={status}>
-                          <button
-                            type="button"
-                            aria-current={step.number === registrationStep ? 'step' : undefined}
-                            aria-label={`${step.label}${isComplete ? ', complete' : ''}`}
-                            disabled={step.number >= registrationStep}
-                            onClick={() => moveToRegistrationStep(step.number)}
-                          >
-                            <span className="auth-progress-marker" aria-hidden="true">
-                              {isComplete ? <Check size={16} /> : <i />}
-                            </span>
-                            <small>{step.label}</small>
-                          </button>
-                        </li>
-                      );
-                    })}
-                  </ol>
-                  </nav>
-                </div>
-              )}
-
-              {isRegisterMode && registrationStep === 1 && (
-                <>
-                  <div className="auth-form-section-title" id="registration-step-heading" tabIndex="-1">
-                    <span>1</span>
-                    <div><strong>Choose your account</strong><small>Select how you plan to use TrabaWho.</small></div>
-                  </div>
-                  <div className="auth-register-grid">
-                    <label className="auth-field" htmlFor="accountRole">
-                      <span>Account Type</span>
-                      <div className="auth-input-wrap">
-                        <UserPlus size={18} aria-hidden="true" />
-                        <Select
-                          name="accountRole"
-                          value={formData.accountRole}
-                          onValueChange={(value) => handleSelectChange('accountRole', value)}
-                          required
-                        >
-                          <SelectTrigger id="accountRole" className="auth-select-trigger">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="client">Client</SelectItem>
-                            <SelectItem value="worker">Worker</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    </label>
-
-                    <label className="auth-field" htmlFor="documentTypeKey">
-                      <span>Identity document</span>
-                      <div className="auth-input-wrap">
-                        <FileText size={18} aria-hidden="true" />
-                        <Select
-                          name="documentTypeKey"
-                          value={formData.documentTypeKey}
-                          onValueChange={(value) => handleSelectChange('documentTypeKey', value)}
-                          required
-                        >
-                          <SelectTrigger id="documentTypeKey" className="auth-select-trigger">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectGroup>
-                              <SelectLabel>Automatic Didit verification</SelectLabel>
-                              {DIDIT_DOCUMENT_TYPES.map((document) => (
-                                <SelectItem key={document.key} value={document.key}>{document.label}</SelectItem>
-                              ))}
-                            </SelectGroup>
-                            <SelectGroup>
-                              <SelectLabel>Manual review</SelectLabel>
-                              {MANUAL_DOCUMENT_TYPES.map((document) => (
-                                <SelectItem key={document.key} value={document.key}>{document.label}</SelectItem>
-                              ))}
-                            </SelectGroup>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    </label>
-                  </div>
-
-                  {usesDidit ? (
-                    <div className="auth-alert info">
-                      <ShieldCheck size={16} aria-hidden="true" />
-                      {selectedDocument.label} uses Didit for ID scan, liveness, and face match before account creation.
-                    </div>
-                  ) : (
-                    <div className="auth-alert info">
-                      <Upload size={16} aria-hidden="true" />
-                      {selectedDocument.label} uses manual review. You will add the document details on the final step.
-                    </div>
-                  )}
-                </>
-              )}
-
-              {(!isRegisterMode || registrationStep === 2) && (
-                <>
-                  {isRegisterMode && (
-                    <div className="auth-form-section-title" id="registration-step-heading" tabIndex="-1">
-                      <span>2</span>
-                      <div><strong>Secure your account</strong><small>Use an email you can access for verification.</small></div>
-                    </div>
-                  )}
-
               <label className="auth-field" htmlFor="email">
                 <span>Email</span>
                 <div className="auth-input-wrap">
                   <Mail size={18} aria-hidden="true" />
-                  <input
-                    id="email"
-                    name="email"
-                    type="email"
-                    value={formData.email}
-                    onChange={handleInputChange}
-                    placeholder="you@example.com"
-                    autoComplete="email"
-                    required
-                  />
+                  <input id="email" name="email" type="email" value={formData.email} onChange={handleInputChange}
+                    placeholder="you@example.com" autoComplete="email" required />
                 </div>
               </label>
-
-              <PasswordField
-                id="password"
-                label="Password"
-                name="password"
-                value={formData.password}
-                onChange={handleInputChange}
-                placeholder="Enter your password"
-                autoComplete={isLoginMode ? 'current-password' : 'new-password'}
-                required
-              />
-
-                  {isRegisterMode && (
-                    <>
-                    <PasswordField
-                      id="confirmPassword"
-                      label="Confirm Password"
-                      name="confirmPassword"
-                      value={formData.confirmPassword}
-                      onChange={handleInputChange}
-                      placeholder="Confirm your password"
-                      autoComplete="new-password"
-                      required
-                    />
-                    </>
-                  )}
-                </>
-              )}
-
-              {isRegisterMode && registrationStep === 3 && (
-                <>
-                  <div className="auth-form-section-title" id="registration-step-heading" tabIndex="-1">
-                    <span>3</span>
-                    <div><strong>Add your service location</strong><small>Used to match you with nearby providers in the Philippines.</small></div>
-                  </div>
-
-                  <label className="auth-field" htmlFor="province">
-                    <span>Province {isLoadingProvinces && <small>(Loading...)</small>}</span>
-                    <div className="auth-input-wrap">
-                      <MapPin size={18} aria-hidden="true" />
-                      <Select
-                        name="province"
-                        value={selectedProvinceCode}
-                        onValueChange={handleProvinceChange}
-                        required
-                        disabled={isLoadingProvinces}
-                      >
-                        <SelectTrigger id="province" className="auth-select-trigger">
-                          <SelectValue placeholder="Select a province" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {provinces.map((province) => (
-                            <SelectItem key={province.code} value={province.code}>{province.name}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </label>
-
-                  <label className="auth-field" htmlFor="city">
-                    <span>City/Municipality {isLoadingCities && <small>(Loading...)</small>}</span>
-                    <div className="auth-input-wrap">
-                      <MapPin size={18} aria-hidden="true" />
-                      <Select
-                        name="city"
-                        value={selectedCityMunicipalityCode}
-                        onValueChange={handleCityChange}
-                        required
-                        disabled={!selectedProvinceCode || isLoadingCities}
-                      >
-                        <SelectTrigger id="city" className="auth-select-trigger">
-                          <SelectValue placeholder={!selectedProvinceCode ? 'Select province first' : 'Select city/municipality'} />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {cities.map((city) => (
-                            <SelectItem key={city.code} value={city.code}>{city.name}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </label>
-
-                  <label className="auth-field" htmlFor="barangay">
-                    <span>Barangay {isLoadingBarangays && <small>(Loading...)</small>}</span>
-                    <div className="auth-input-wrap">
-                      <MapPin size={18} aria-hidden="true" />
-                      <Select
-                        name="barangay"
-                        value={formData.barangay ? (barangays.find((barangay) => barangay.name === formData.barangay)?.code || '') : ''}
-                        onValueChange={handleBarangayChange}
-                        required
-                        disabled={!selectedCityMunicipalityCode || isLoadingBarangays}
-                      >
-                        <SelectTrigger id="barangay" className="auth-select-trigger">
-                          <SelectValue placeholder={!selectedCityMunicipalityCode ? 'Select city first' : 'Select barangay'} />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {barangays.map((barangay) => (
-                            <SelectItem key={barangay.code} value={barangay.code}>{barangay.name}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </label>
-
-                  <label className="auth-field" htmlFor="address">
-                    <span>Specific Address</span>
-                    <div className="auth-input-wrap">
-                      <Home size={18} aria-hidden="true" />
-                      <input
-                        id="address"
-                        name="address"
-                        type="text"
-                        value={formData.address}
-                        onChange={handleInputChange}
-                        placeholder="Block, street, house number"
-                        autoComplete="street-address"
-                        required
-                      />
-                    </div>
-                  </label>
-
-                  {apiError && <div className="auth-alert warning">{apiError}</div>}
-                </>
-              )}
-
-              {isRegisterMode && registrationStep === 4 && (
-                <>
-                  <div className="auth-form-section-title" id="registration-step-heading" tabIndex="-1">
-                    <span>4</span>
-                    <div><strong>Review and consent</strong><small>Confirm how identity and account information will be handled.</small></div>
-                  </div>
-
-                  {!usesDidit && (
-                    <div className="auth-form" data-testid="manual-review-fields">
-                      <div className="auth-alert info">
-                        <Upload size={16} aria-hidden="true" />
-                        Upload clear images for manual review. Your account remains pending until approval.
-                      </div>
-
-                      <label className="auth-field" htmlFor="manualFullName">
-                        <span>Name on ID</span>
-                        <div className="auth-input-wrap">
-                          <User size={18} aria-hidden="true" />
-                          <input id="manualFullName" name="manualFullName" type="text" value={formData.manualFullName} onChange={handleInputChange} placeholder="Juan Santos Dela Cruz" />
-                        </div>
-                      </label>
-
-                      <div className="auth-register-grid">
-                        <label className="auth-field" htmlFor="identityDocumentNumber">
-                          <span>ID number</span>
-                          <div className="auth-input-wrap">
-                            <FileText size={18} aria-hidden="true" />
-                            <input id="identityDocumentNumber" name="identityDocumentNumber" type="text" value={formData.identityDocumentNumber} onChange={handleInputChange} placeholder="ID number" />
-                          </div>
-                        </label>
-                        <label className="auth-field" htmlFor="idDocumentExpiry">
-                          <span>ID expiry date</span>
-                          <div className="auth-input-wrap">
-                            <FileText size={18} aria-hidden="true" />
-                            <input id="idDocumentExpiry" name="idDocumentExpiry" type="date" min={getTodayInputValue()} value={formData.idDocumentExpiry} onChange={handleInputChange} />
-                          </div>
-                        </label>
-                      </div>
-
-                      <div className="auth-register-grid">
-                        <label className="auth-field" htmlFor="manual-front-image">
-                          <span>Front image</span>
-                          <div className="auth-input-wrap">
-                            <Upload size={18} aria-hidden="true" />
-                            <input id="manual-front-image" name="frontImage" type="file" accept="image/*" onChange={handleInputChange} />
-                          </div>
-                        </label>
-                        <label className="auth-field" htmlFor="manual-back-image">
-                          <span>Back image</span>
-                          <div className="auth-input-wrap">
-                            <Upload size={18} aria-hidden="true" />
-                            <input id="manual-back-image" name="backImage" type="file" accept="image/*" onChange={handleInputChange} />
-                          </div>
-                        </label>
-                      </div>
-
-                      <label className="auth-field" htmlFor="manual-selfie-image">
-                        <span>Selfie image</span>
-                        <div className="auth-input-wrap">
-                          <Upload size={18} aria-hidden="true" />
-                          <input id="manual-selfie-image" name="selfieImage" type="file" accept="image/*" onChange={handleInputChange} />
-                        </div>
-                      </label>
-                    </div>
-                  )}
-
-                  <div className="auth-review-summary" aria-label="Registration summary">
-                    <div><span>Account</span><strong>{formData.accountRole === 'worker' ? 'Worker' : 'Client'}</strong></div>
-                    <div><span>Document</span><strong>{selectedDocument.label}</strong></div>
-                    <div><span>Location</span><strong>{[formData.city, formData.province].filter(Boolean).join(', ')}</strong></div>
-                  </div>
-
-                  <label className="auth-field" htmlFor="acceptedIdentityTerms">
-                    <span>Identity consent</span>
-                    <div className="auth-consent-control">
-                      <ShieldCheck size={18} aria-hidden="true" />
-                      <input
-                        id="acceptedIdentityTerms"
-                        name="acceptedIdentityTerms"
-                        type="checkbox"
-                        checked={formData.acceptedIdentityTerms}
-                        onChange={handleInputChange}
-                        required
-                      />
-                      <span>I consent to identity verification before account access.</span>
-                    </div>
-                  </label>
-
-                  <label className="auth-field" htmlFor="acceptedRaTerms">
-                    <span>RA 10173 Terms and Conditions</span>
-                    <div className="auth-consent-control">
-                      <ShieldCheck size={18} aria-hidden="true" />
-                      <input
-                        id="acceptedRaTerms"
-                        name="acceptedRaTerms"
-                        type="checkbox"
-                        checked={formData.acceptedRaTerms}
-                        onChange={handleInputChange}
-                        required
-                      />
-                      <span>I agree to TrabaWho collecting and processing my registration, identity, location, booking, and contact information under Republic Act No. 10173, the Data Privacy Act of 2012.</span>
-                    </div>
-                  </label>
-                </>
-              )}
-
+              <PasswordField id="password" label="Password" name="password" value={formData.password}
+                onChange={handleInputChange} placeholder="Enter your password" autoComplete="current-password" required />
               {submitError && <div className="auth-alert error">{submitError}</div>}
-              {isLoginMode && loginStatusMessage && <div className="auth-alert warning">{loginStatusMessage}</div>}
-
-              {isRegisterMode ? (
-                <Pagination aria-label="Registration step controls" className="auth-step-controls">
-                  <PaginationContent>
-                    {registrationStep > 1 && (
-                      <PaginationItem>
-                        <PaginationPrevious
-                          className="auth-step-previous"
-                          href={`#registration-step-${registrationStep - 1}`}
-                          onClick={(event) => {
-                            event.preventDefault();
-                            moveToRegistrationStep(registrationStep - 1);
-                          }}
-                        />
-                      </PaginationItem>
-                    )}
-                    {registrationStep < REGISTRATION_STEPS.length ? (
-                      <PaginationItem>
-                        <PaginationNext
-                          className="auth-step-next"
-                          href={`#registration-step-${registrationStep + 1}`}
-                          onClick={(event) => {
-                            event.preventDefault();
-                            handleRegistrationNext();
-                          }}
-                        />
-                      </PaginationItem>
-                    ) : (
-                      <PaginationItem className="auth-final-action">
-                        <button type="submit" className="auth-submit" disabled={isSubmitting}>
-                          {isSubmitting ? <RefreshCw className="gl-spin" size={18} aria-hidden="true" /> : usesDidit ? <ShieldCheck size={18} aria-hidden="true" /> : <Upload size={18} aria-hidden="true" />}
-                          {isSubmitting ? 'Submitting...' : usesDidit ? 'Start Didit Verification' : 'Submit Manual Review'}
-                        </button>
-                      </PaginationItem>
-                    )}
-                  </PaginationContent>
-                </Pagination>
-              ) : (
-                <button type="submit" className="auth-submit" disabled={isSubmitting}>
-                  {isSubmitting ? <RefreshCw className="gl-spin" size={18} aria-hidden="true" /> : <LogIn size={18} aria-hidden="true" />}
-                  {isSubmitting ? 'Signing in...' : 'Sign in'}
-                </button>
-              )}
-
-              {isLoginMode && (
-                <div className="auth-form-footer">
-                  <button type="button" className="auth-link-button" onClick={() => handleModeChange('forgot')}>
-                    Forgot Password?
-                  </button>
-                  {shouldShowResend && (
-                    <button
-                      type="button"
-                      className="auth-link-button"
-                      onClick={handleResendVerification}
-                      disabled={isResendingVerification}
-                    >
-                      {isResendingVerification ? 'Resending verification...' : 'Resend verification email'}
-                    </button>
-                  )}
-                </div>
-              )}
+              {loginStatusMessage && <div className="auth-alert warning">{loginStatusMessage}</div>}
+              <button type="submit" className="auth-submit" disabled={isSubmitting}>
+                {isSubmitting ? <RefreshCw className="gl-spin" size={18} aria-hidden="true" /> : <LogIn size={18} aria-hidden="true" />}
+                {isSubmitting ? 'Signing in...' : 'Sign in'}
+              </button>
+              <div className="auth-form-footer">
+                <button type="button" className="auth-link-button" onClick={() => handleModeChange('forgot')}>Forgot Password?</button>
+                {shouldShowResend && <button type="button" className="auth-link-button" onClick={handleResendVerification} disabled={isResendingVerification}>
+                  {isResendingVerification ? 'Resending verification...' : 'Resend verification email'}
+                </button>}
+              </div>
             </form>
           )}
         </section>

@@ -1,9 +1,10 @@
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.104.1";
+import { activeVisionModels, buildVisionRequest, DEFAULT_VISION_MODEL } from "./vision.ts";
 
 const GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions";
 const DEFAULT_GROQ_MODEL = "llama-3.1-8b-instant";
-const DEFAULT_GROQ_VISION_MODEL = "meta-llama/llama-4-scout-17b-16e-instruct";
+const DEFAULT_GROQ_VISION_MODEL = DEFAULT_VISION_MODEL;
 const DEFAULT_GROQ_WEB_SEARCH_MODEL = "groq/compound-mini";
 const DEFAULT_GROQ_CHAT_FALLBACK_MODELS = [
   "llama-3.3-70b-versatile",
@@ -758,8 +759,8 @@ const normalizeAttachment = (attachment: ChatAttachment): NormalizedAttachment |
 };
 
 const normalizeRequestAttachments = (body: ChatRequestBody): NormalizedAttachment[] => {
-  const messageAttachments = (Array.isArray(body.messages) ? body.messages : [])
-    .flatMap((message) => (Array.isArray(message.attachments) ? message.attachments : []));
+  const latestUserMessage = [...(Array.isArray(body.messages) ? body.messages : [])].reverse().find((message) => message.role === "user");
+  const messageAttachments = Array.isArray(latestUserMessage?.attachments) ? latestUserMessage.attachments : [];
 
   return [
     ...(Array.isArray(body.attachments) ? body.attachments : []),
@@ -1359,38 +1360,13 @@ const analyzeProblemImage = async (
   latestUserMessage: string
 ): Promise<ProblemAnalysis | null> => {
   try {
-    const { payload } = await callGroqWithModelFallback(groqApiKey, {
-      messages: [
-        {
-          role: "system",
-          content: [
-            "You identify visible local-service problems from user-uploaded photos for TrabaWho.",
-            "Return JSON only with keys: problemTitle, problemSummary, likelyServiceTypes, materials, urgency, safetyNotes, confidence, searchQuery.",
-            "likelyServiceTypes should be service labels such as Plumber, Electrician, Technician, Cleaner, Carpenter, Appliance Repair, Painter, or General Repair.",
-            "materials must be an array of {name, quantity, searchTerm}. Use visible evidence and uncertainty. Do not infer identities or private details.",
-          ].join(" "),
-        },
-        {
-          role: "user",
-          content: [
-            {
-              type: "text",
-              text: `${latestUserMessage}\nAnalyze the uploaded problem photo for repair/service triage and likely materials.`,
-            },
-            {
-              type: "image_url",
-              image_url: { url: imageAttachment.dataUrl },
-            },
-          ],
-        },
-      ],
-      temperature: 0.1,
-      max_completion_tokens: 650,
-      response_format: { type: "json_object" },
-    }, getGroqVisionModels(), "vision");
+    const { payload } = await callGroqWithModelFallback(groqApiKey,
+      buildVisionRequest(imageAttachment.dataUrl, latestUserMessage), activeVisionModels(getGroqVisionModels()), "vision");
 
     const content = getGroqMessageContent(payload);
-    return normalizeProblemAnalysis(parseJsonObject(content));
+    const analysis = parseJsonObject(content);
+    if (!getText(analysis["problemSummary"] || analysis["problem_summary"])) return null;
+    return normalizeProblemAnalysis(analysis);
   } catch (error) {
     console.error("trabawho-chatbot vision analysis error", {
       message: error instanceof Error ? error.message : String(error),
@@ -2084,6 +2060,9 @@ serve(async (req: Request) => {
       const problemAnalysis = await analyzeProblemImage(groqApiKey, imageAttachment, latestUserMessage);
       if (!problemAnalysis) {
         return jsonResponse({ error: "The assistant could not analyze that photo right now." }, 502);
+      }
+      if (!problemAnalysis.likelyServiceTypes.length && !problemAnalysis.materials.length) {
+        return jsonResponse({ message: problemAnalysis.problemSummary, model: "trabawho-photo-budget-estimator", diagnosis: problemAnalysis, matches: [], sources: [] });
       }
 
       const marketplaceSearch = await fetchMarketplaceSearch(

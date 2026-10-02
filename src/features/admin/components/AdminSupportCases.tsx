@@ -6,13 +6,13 @@ import { Button } from "@/components/ui/button";
 import { SearchFilterBar } from "@/components/ui/search-filter-bar";
 import { WorkflowPanel } from "@/components/ui/workflow-panel";
 import { caseNextActor } from "@/features/admin/domain/caseNextActor";
+import { supportCaseNextStep } from "@/features/admin/domain/supportCaseNextStep";
 import { AdminCaseDetailDialog } from "@/features/admin/components/AdminCaseDetailDialog";
 import { listSupportCases, openSupportEvidence, type SupportCase } from "@/features/admin/services/adminSupportService";
 
 function SupportCaseCard({ item, onViewEvidence, onOpen }: { item: SupportCase; onViewEvidence: (path: string) => void; onOpen: () => void }) {
   const closed = item.status === "closed";
-  const nextStep = closed ? "Case closed" : item.status === "under_review" ? "Support review in progress"
-    : item.policy_route === "rework_request" ? "Provider rework requested" : "Support review needed";
+  const nextStep = supportCaseNextStep(item);
   const action = <Button type="button" variant={closed ? "outline" : "primary"} onClick={onOpen}>{closed ? "View case" : "Review case"}<ArrowRight aria-hidden="true" /></Button>;
   return <WorkflowPanel className="min-w-0 shadow-sm" contentClassName="space-y-4 p-4 sm:p-5"
     title={<span className="capitalize">{item.case_type.replaceAll("_", " ")}</span>}
@@ -56,7 +56,7 @@ export default function AdminSupportCases() {
     void (async () => {
       try {
         const result = await listSupportCases();
-        if (active) { setCases(result); setError(""); }
+        if (active) { setCases(result); setSelected((current) => current ? result.find((item) => item.id === current.id) || null : null); setError(""); }
       } catch (cause) {
         if (active) setError(cause instanceof Error ? cause.message : "Could not load support cases.");
       } finally { if (active) setLoading(false); }

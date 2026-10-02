@@ -1,13 +1,13 @@
 import React, { useMemo, useState, useEffect, useRef } from 'react';
-import { Archive, ArrowLeft, MessageCircle, MoreVertical, Send, Trash2 } from 'lucide-react';
+import { Archive, ArrowLeft, MessageCircle, MoreVertical, Trash2 } from 'lucide-react';
 import { SearchFilterBar } from '@/components/ui/search-filter-bar';
 import { ProviderQuoteComposer } from './ProviderQuoteComposer';
 import { BookingQuoteCard } from './BookingQuoteCard';
 import { getThemeTokens } from '../../../shared/styles/themeTokens';
-import { fetchBookingMessages, sendBookingMessage } from '../services/bookingService';
-
+import { useBookingConversation } from '../hooks/useBookingConversation';
+import { BookingMessageComposer } from './BookingMessageComposer';
+import { ChatArchiveBrowser } from './ChatArchiveBrowser';
 const normalizeChatKeyPart = (value) => String(value || '').trim().toLowerCase();
-
 const getChatListKey = (booking = {}, viewerRole = 'buyer') => {
   const otherParticipantKey = viewerRole === 'seller'
     ? (booking.buyerId || booking.clientId || booking.clientName)
@@ -21,13 +21,8 @@ const getChatListKey = (booking = {}, viewerRole = 'buyer') => {
   ].map(normalizeChatKeyPart).join('|');
 };
 
-const ChatWindow = ({ appTheme = 'light', booking, onApproveQuote, onRejectQuote, onProposeQuote, onStopServiceAccepted, bookings, onSelectBooking, selectedBookingId, onOpenSlotSelection, onOpenPaymentSelection, onRequestRefund, onConfirmRefundReceived, onLeaveRating, onArchiveChat, onDeleteChat, viewerRole = 'buyer', initialMobileListOpen = false }) => {
-  const [messages, setMessages] = useState([]);
-  const [clientMessage, setClientMessage] = useState('');
-  const [isLoading, setIsLoading] = useState(true);
-  const [messageError, setMessageError] = useState('');
-  const [isSendHovered, setIsSendHovered] = useState(false);
-  const [isInputFocused, setIsInputFocused] = useState(false);
+const ChatWindow = ({ appTheme = 'light', booking, onApproveQuote, onRejectQuote, onProposeQuote, onStopServiceAccepted, bookings, onSelectBooking, selectedBookingId, onOpenSlotSelection, onOpenPaymentSelection, onRequestRefund, onConfirmRefundReceived, onLeaveRating, onArchiveChat, onDeleteChat, onChatRestored, viewerRole = 'buyer', initialMobileListOpen = false }) => {
+  const { messages, setMessages, isLoading, isSending, messageError, send } = useBookingConversation(booking);
   const [hoveredChatId, setHoveredChatId] = useState(null);
   const [activeSidebarPanel, setActiveSidebarPanel] = useState(null);
   const [showRefundRequestModal, setShowRefundRequestModal] = useState(false);
@@ -179,8 +174,6 @@ const ChatWindow = ({ appTheme = 'light', booking, onApproveQuote, onRejectQuote
     || shouldShowTransactionAction;
 
   useEffect(() => {
-    let mounted = true;
-
     // sync rating state when booking changes
     setDraftRating(booking?.rating || 0);
     setRatingComment(booking?.review || booking?.ratingComment || '');
@@ -188,28 +181,6 @@ const ChatWindow = ({ appTheme = 'light', booking, onApproveQuote, onRejectQuote
     setIsConversationMenuOpen(false);
     setPendingChatAction(null);
 
-    const loadMessages = async () => {
-      if (!booking?.id) return;
-      setIsLoading(true);
-      setMessageError('');
-
-      try {
-        const dbMessages = await fetchBookingMessages(booking);
-        if (!mounted) return;
-        setMessages(dbMessages);
-      } catch (error) {
-        if (!mounted) return;
-        setMessageError(error?.message || 'Unable to load conversation messages.');
-        setMessages([]);
-      } finally {
-        if (mounted) setIsLoading(false);
-      }
-    };
-
-    loadMessages();
-    return () => {
-      mounted = false;
-    };
   }, [booking]);
 
   useEffect(() => {
@@ -224,19 +195,6 @@ const ChatWindow = ({ appTheme = 'light', booking, onApproveQuote, onRejectQuote
     document.addEventListener('mousedown', handleOutsideClick);
     return () => document.removeEventListener('mousedown', handleOutsideClick);
   }, [isConversationMenuOpen]);
-
-  const handleSendMessage = async () => {
-    if (!clientMessage.trim()) return;
-
-    try {
-      const savedMessage = await sendBookingMessage(booking, clientMessage);
-      setMessages((prevMessages) => [...prevMessages, savedMessage]);
-      setClientMessage('');
-      setMessageError('');
-    } catch (error) {
-      setMessageError(error?.message || 'Unable to send message.');
-    }
-  };
 
   const handleApproveQuoteClick = async () => {
     const approvalMessage = {
@@ -345,9 +303,6 @@ const ChatWindow = ({ appTheme = 'light', booking, onApproveQuote, onRejectQuote
     quoteDelivery: { fontSize: '12px', color: chatTheme.textSecondary, margin: '0 0 8px 0', display: 'flex', justifyContent: 'space-between' },
     label: { fontWeight: 600, color: chatTheme.textPrimary },
     quoteNote: { fontSize: '12px', color: chatTheme.textSecondary, margin: 0, padding: '12px', background: chatTheme.bgTertiary, borderRadius: '6px', borderLeft: `3px solid ${themeTokens.accent}` },
-    inputArea: { display: 'flex', gap: '8px', padding: '12px', borderTop: `1px solid ${chatTheme.border}`, background: chatTheme.bgSecondary, flexShrink: 0 },
-    messageInput: { flex: 1, padding: '10px 12px', border: `1px solid ${isInputFocused ? themeTokens.accent : chatTheme.border}`, borderRadius: '8px', fontSize: '14px', fontFamily: 'inherit', transition: 'all 0.2s ease', outline: 'none', boxShadow: isInputFocused ? `0 0 0 2px ${themeTokens.accentSoft}` : 'none', background: chatTheme.bgTertiary, color: chatTheme.textPrimary },
-    sendBtn: { padding: '10px 20px', background: !clientMessage.trim() ? chatTheme.disabledBg : (isSendHovered ? themeTokens.accentHover : themeTokens.accent), color: 'white', border: 'none', borderRadius: '8px', fontSize: '14px', fontWeight: 600, cursor: !clientMessage.trim() ? 'not-allowed' : 'pointer', transition: 'all 0.2s ease' },
     approvalStatus: { padding: '12px 16px', background: themeTokens.accentSoft, borderTop: `1px solid ${themeTokens.accent}`, textAlign: 'center', flexShrink: 0 },
     approvalStatusText: { fontSize: '13px', color: chatTheme.badgeText, fontWeight: 600, margin: 0 },
     
@@ -462,8 +417,9 @@ const ChatWindow = ({ appTheme = 'light', booking, onApproveQuote, onRejectQuote
       <div className="booking-workspace-grid" style={styles.mainContainer}>
         {/* LEFT COLUMN: Chat List */}
         <div className={`booking-chat-list ${isMobileChatListOpen ? 'mobile-open' : ''}`} style={styles.chatList}>
-          <div style={styles.chatListHeader}>
+          <div className="flex flex-wrap items-center justify-between gap-2" style={styles.chatListHeader}>
             <h3 style={styles.chatListTitle}>Messages</h3>
+            <ChatArchiveBrowser viewerRole={viewerRole} onRestored={onChatRestored} />
           </div>
           <SearchFilterBar
             activeValue={chatFilter}
@@ -695,28 +651,7 @@ const ChatWindow = ({ appTheme = 'light', booking, onApproveQuote, onRejectQuote
           )}
 
           {booking.status !== 'Cancelled (Cash)' && (
-            <div className="booking-input-area" style={styles.inputArea}>
-              <input
-                type="text"
-                placeholder={hasSellerQuote ? 'Ask a question or discuss the quote...' : 'Ask a question or share booking details...'}
-                value={clientMessage}
-                onChange={(e) => setClientMessage(e.target.value)}
-                onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
-                onFocus={() => setIsInputFocused(true)}
-                onBlur={() => setIsInputFocused(false)}
-                style={styles.messageInput}
-              />
-              <button
-                style={styles.sendBtn}
-                onMouseEnter={() => setIsSendHovered(true)}
-                onMouseLeave={() => setIsSendHovered(false)}
-                onClick={handleSendMessage}
-                disabled={!clientMessage.trim()}
-              >
-                <Send className="booking-send-icon" size={18} aria-hidden="true" />
-                <span>Send</span>
-              </button>
-            </div>
+            <BookingMessageComposer key={booking.id} conversationId={booking.id} hasQuote={hasSellerQuote} isSending={isSending} onSend={send} />
           )}
         </div>
 
@@ -781,7 +716,7 @@ const ChatWindow = ({ appTheme = 'light', booking, onApproveQuote, onRejectQuote
               <div style={styles.detailSection}>
                 <p style={styles.detailLabel}>Payment Breakdown</p>
                 <p style={styles.detailValue}>Service cost: {formatPhp(booking.quoteAmount)}</p>
-                <p style={styles.detailValue}>Transaction fee ({booking.transactionFeePercent || '5%'}): {formatPhp(transactionFeeAmount)}</p>
+                <p style={styles.detailValue}>Transaction fee ({booking.transactionFeePercent || '8%'}): {formatPhp(transactionFeeAmount)}</p>
                 <p style={styles.detailValue}>Total payment: {formatPhp(totalChargedAmount)}</p>
                 {booking.paymentPlan === 'downpayment' && (
                   <>

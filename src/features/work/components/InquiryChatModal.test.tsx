@@ -43,11 +43,14 @@ describe("InquiryChatModal", () => {
     const reply = screen.getByLabelText("Reply to Joshua Santos");
     fireEvent.change(reply, { target: { value: "Available tomorrow." } });
     fireEvent.keyDown(reply, { key: "Enter" });
+    fireEvent.keyDown(reply, { key: "Enter" });
+    fireEvent.keyDown(reply, { key: "Enter" });
 
     await waitFor(() => expect(bookingApi.sendBookingMessage).toHaveBeenCalledWith(
       inquiry.booking,
       "Available tomorrow.",
     ));
+    expect(bookingApi.sendBookingMessage).toHaveBeenCalledOnce();
   });
 
   it("prefills the client budget and sends a quote without stacking another dialog", async () => {

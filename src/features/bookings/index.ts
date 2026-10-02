@@ -8,3 +8,6 @@ export { default as BookingTermsModal } from './components/BookingTermsModal';
 export { BookingScopeSwitcher } from './components/BookingScopeSwitcher';
 export type { BookingHubFilter, BookingHubScope, BookingHubSummary, BookingCounterpartPresentation } from './types/booking-hub';
 export { fetchBookingMessages, sendBookingMessage, updateBookingWorkflow } from './services/bookingService';
+export { startServiceConversation } from './services/bookingService';
+export { createPayMongoCheckout, redirectToPayMongo } from './services/paymongoCheckout';
+export type { PaymentSelectionDetails } from './components/PaymentModal';

@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import DashboardNavigation from '../../../shared/components/DashboardNavigation';
 import ChatWindow from '../components/ChatWindow';
+import { ChatArchiveBrowser } from '../components/ChatArchiveBrowser';
 import SlotSelectionModal from '../components/SlotSelectionModal';
 import PaymentModal from '../components/PaymentModal';
 import BookingTermsModal from '../components/BookingTermsModal';
@@ -30,6 +31,7 @@ import { BookingRequestReviewDialog } from '../components/BookingRequestReviewDi
 import { PaymentReturnStatus } from '../components/PaymentReturnStatus';
 import { BookingCardFooter } from '../components/BookingCardFooter';
 import { BookingTransactionActions } from '../components/BookingTransactionActions';
+import { BookingListFeedback } from '@/features/bookings/components/BookingListFeedback';
 import { Button } from '@/components/ui/button';
 import { MetricCard } from '@/components/ui/metric-card';
 import { SearchFilterBar } from '@/components/ui/search-filter-bar';
@@ -884,26 +886,11 @@ const MyBookings = ({
         searchValue={bookingSearch}
       />
 
-      {/* Error Notices */}
-      {(bookingListCtrl.loadError || bookingListCtrl.actionError) && (
-        <div
-          style={{
-            padding: '14px 18px',
-            borderRadius: '8px',
-            background: 'var(--gl-danger-soft)',
-            border: '1px solid var(--gl-danger-border)',
-            color: 'var(--gl-red)',
-            fontWeight: 700,
-            display: 'flex',
-            alignItems: 'center',
-            gap: '10px',
-          }}
-          role="alert"
-        >
-          <AlertCircle size={18} />
-          <span>{bookingListCtrl.loadError || bookingListCtrl.actionError}</span>
-        </div>
-      )}
+      {(bookingListCtrl.loadError || bookingListCtrl.actionError) && <BookingListFeedback
+        error={bookingListCtrl.loadError || bookingListCtrl.actionError}
+        loading={bookingListCtrl.isLoading}
+        onRetry={bookingListCtrl.refreshBookings}
+      />}
 
       {/* Loading State Skeletons */}
       {bookingListCtrl.isLoading && allBookings.length === 0 && (
@@ -924,7 +911,7 @@ const MyBookings = ({
         </div>
       )}
 
-      {!bookingListCtrl.isLoading && allBookings.length === 0 && (
+      {!bookingListCtrl.isLoading && !bookingListCtrl.loadError && allBookings.length === 0 && (
         <WorkflowEmptyState
           className="rounded-xl border bg-card"
           data-testid="bookings-empty-state"
@@ -947,7 +934,7 @@ const MyBookings = ({
         />
       )}
 
-      {!bookingListCtrl.isLoading && displayedBookings.length > 0 && (
+      {displayedBookings.length > 0 && (
         <section className="bookings-list" aria-label="Bookings list">
           {displayedBookings.map((booking) => renderBookingCard(booking))}
         </section>
@@ -982,9 +969,8 @@ const MyBookings = ({
         onToggleAdminView={() => { if (typeof onOpenAdminDashboard === 'function') onOpenAdminDashboard(); }}
       />
       <PaymentReturnStatus onBookingUpdated={bookingListCtrl.replaceBooking} />
-
+      {isChatRoute && !currentBooking && <ChatArchiveBrowser viewerRole={shouldLoadSellerBookings ? 'seller' : 'buyer'} onRestored={bookingListCtrl.refreshBookings} />}
       {!isChatRoute && renderBookingsList()}
-
       {isChatRoute && bookingListCtrl.bookings.length === 0 && !bookingListCtrl.isLoading && (
         <main className="gl-shell gl-page-pad">
           <WorkflowEmptyState
@@ -997,7 +983,6 @@ const MyBookings = ({
           />
         </main>
       )}
-
       {currentBooking && (
         <>
           {isChatRoute && uiState === 'chat' && (
@@ -1020,9 +1005,9 @@ const MyBookings = ({
               onLeaveRating={handleLeaveRating}
               onArchiveChat={handleArchiveChat}
               onDeleteChat={handleDeleteChat}
+              onChatRestored={bookingListCtrl.refreshBookings}
             />
           )}
-
           {uiState === 'slots' && (
             <SlotSelectionModal
               booking={currentBooking}

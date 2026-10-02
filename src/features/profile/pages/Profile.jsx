@@ -2,18 +2,16 @@ import { useEffect, useRef, useState } from 'react';
 import DashboardNavigation from '../../../shared/components/DashboardNavigation';
 import DigitalPortfolioModal from '../components/DigitalPortfolioModal';
 import { ProfilePortfolioSection } from '../components/ProfilePortfolioSection';
-import { BoostActivationDialog } from '../components/BoostActivationDialog';
-import BookingTermsModal from '../../bookings/components/BookingTermsModal';
+import { GigBoostPanel } from '../components/GigBoostPanel';
 import AccountPrivacyPanel from '../components/AccountPrivacyPanel';
 import { ProfilePhotoDialog } from '../components/ProfilePhotoDialog';
 import { ProfileNameDialog } from '../components/ProfileNameDialog';
 import { getThemeTokens } from '../../../shared/styles/themeTokens';
 import { getProfilePhotoUrl, hasUploadedProfilePhoto } from '../../../shared/utils/profilePhoto';
-import { fetchSellerServices, updateServiceAdBoost, uploadPortfolioDocument } from '../../../shared/services/authService';
+import { uploadPortfolioDocument } from '../../../shared/services/authService';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Camera, MapPin, Pencil, Rocket, ShieldCheck, UserRoundCog } from 'lucide-react';
+import { Camera, MapPin, Pencil, ShieldCheck, UserRoundCog } from 'lucide-react';
 
 function Profile({ appTheme = 'light', themeMode = 'system', onThemeChange, currentView, searchQuery, onSearchChange, onLogout, onOpenSellerSetup, onOpenMyBookings, onOpenChatPage, sellerProfile, onOpenMyWork, onOpenProfile, onOpenAccountSettings, onOpenSettings, onOpenDashboard, onOpenBrowseServices, userLocation, onUpdateProfile, onUpdatePassword, onOpenAdminDashboard }) {
   const MAX_PROFILE_PHOTO_BYTES = 2 * 1024 * 1024;
@@ -50,15 +48,6 @@ function Profile({ appTheme = 'light', themeMode = 'system', onThemeChange, curr
   const [isSavingPhoto, setIsSavingPhoto] = useState(false);
   const [isUploadingPortfolioDoc, setIsUploadingPortfolioDoc] = useState(false);
   const [portfolioDocuments, setPortfolioDocuments] = useState([]);
-  const [workerServices, setWorkerServices] = useState([]);
-  const [selectedBoostServiceId, setSelectedBoostServiceId] = useState('');
-  const [boostDays, setBoostDays] = useState('7');
-  const [boostBudget, setBoostBudget] = useState('250');
-  const [isBoostSaving, setIsBoostSaving] = useState(false);
-  const [boostMessage, setBoostMessage] = useState('');
-  const [isBoostTermsOpen, setIsBoostTermsOpen] = useState(false);
-  const [isBoostPaymentOpen, setIsBoostPaymentOpen] = useState(false);
-  const [pendingBoost, setPendingBoost] = useState(null);
   const [saveError, setSaveError] = useState('');
   const [isProfileLoading, setIsProfileLoading] = useState(true);
   const [isMobile, setIsMobile] = useState(() =>
@@ -119,29 +108,6 @@ function Profile({ appTheme = 'light', themeMode = 'system', onThemeChange, curr
       setPortfolioDocuments([]);
     }
   }, [sellerProfile?.userId]);
-
-  useEffect(() => {
-    if (!isWorkerRole || !sellerProfile?.userId) {
-      setWorkerServices([]);
-      setSelectedBoostServiceId('');
-      return;
-    }
-
-    let mounted = true;
-    fetchSellerServices(sellerProfile.userId)
-      .then((rows) => {
-        if (!mounted) return;
-        setWorkerServices(rows || []);
-        setSelectedBoostServiceId((previous) => previous || rows?.[0]?.id || '');
-      })
-      .catch((error) => {
-        if (mounted) setSaveError(error?.message || 'Unable to load services for boosting.');
-      });
-
-    return () => {
-      mounted = false;
-    };
-  }, [isWorkerRole, sellerProfile?.userId]);
 
   const resolvedProvince = userLocation?.province || sellerProfile?.province || '';
   const resolvedCity = userLocation?.city || sellerProfile?.city || '';
@@ -276,115 +242,6 @@ function Profile({ appTheme = 'light', themeMode = 'system', onThemeChange, curr
     persistPortfolioDocuments(portfolioDocuments.filter((document) => document.storagePath !== storagePath));
   };
 
-  const selectedBoostService = workerServices.find((service) => String(service.id) === String(selectedBoostServiceId)) || null;
-  const getServiceAdBooster = (service = {}) => service?.metadata?.ad_booster || service?.metadata?.adBooster || null;
-  const getActiveBoostStatus = (service = {}) => {
-    const adBooster = getServiceAdBooster(service);
-    const boostEndsAt = adBooster?.ends_at || adBooster?.endsAt || null;
-    const boostEndsTime = boostEndsAt ? new Date(boostEndsAt).getTime() : null;
-    const hasValidEnd = boostEndsTime === null || Number.isFinite(boostEndsTime);
-    const isBoosted = Boolean(adBooster?.active)
-      && hasValidEnd
-      && (boostEndsTime === null || boostEndsTime > Date.now());
-
-    return { boostEndsAt, isBoosted };
-  };
-  const formatBoostEndDate = (boostEndsAt) => (
-    boostEndsAt ? new Date(boostEndsAt).toLocaleDateString() : 'manually stopped'
-  );
-  const selectedBoostStatus = getActiveBoostStatus(selectedBoostService);
-  const selectedBoostEndLabel = formatBoostEndDate(selectedBoostStatus.boostEndsAt);
-
-  const buildBoostDraft = () => {
-    if (!selectedBoostServiceId) {
-      setSaveError('Choose a gig/service to boost.');
-      return null;
-    }
-    if (selectedBoostStatus.isBoosted) {
-      setSaveError(`This gig is already boosted until ${selectedBoostEndLabel}.`);
-      return null;
-    }
-
-    const days = Math.max(1, Number(boostDays) || 7);
-    const budget = Math.max(0, Number(boostBudget) || 0);
-    if (budget <= 0) {
-      setSaveError('Enter a demo boost budget before continuing.');
-      return null;
-    }
-
-    const startsAt = new Date();
-    const endsAt = new Date(startsAt);
-    endsAt.setDate(endsAt.getDate() + days);
-    return {
-      serviceId: selectedBoostServiceId,
-      serviceTitle: selectedBoostService?.title || selectedBoostService?.short_description || 'Selected gig',
-      days,
-      budget,
-      boost: {
-        active: true,
-        budget_php: budget,
-        starts_at: startsAt.toISOString(),
-        ends_at: endsAt.toISOString(),
-        label: 'Worker ad booster',
-      },
-    };
-  };
-
-  const handleStartBoostFlow = () => {
-    const draft = buildBoostDraft();
-    if (!draft) return;
-
-    setSaveError('');
-    setBoostMessage('');
-    setPendingBoost(draft);
-    setIsBoostTermsOpen(true);
-  };
-
-  const handleCancelBoostFlow = () => {
-    setIsBoostTermsOpen(false);
-    setIsBoostPaymentOpen(false);
-    setPendingBoost(null);
-  };
-
-  const handleConfirmBoostTerms = () => {
-    setIsBoostTermsOpen(false);
-    setIsBoostPaymentOpen(true);
-  };
-
-  const handleSaveBoost = async () => {
-    const draft = pendingBoost || buildBoostDraft();
-    if (!draft) return;
-
-    const boost = {
-      ...draft.boost,
-      payment: {
-        method: 'demo',
-        amount_php: draft.budget,
-        reference: `DEMO-BOOST-${Date.now()}`,
-        provider: 'TrabaWho demo',
-        status: 'demo-activated',
-        confirmed_at: new Date().toISOString(),
-      },
-    };
-
-    try {
-      setSaveError('');
-      setBoostMessage('');
-      setIsBoostSaving(true);
-      const updated = await updateServiceAdBoost({ serviceId: draft.serviceId, boost });
-      setWorkerServices((services) => services.map((service) => (
-        String(service.id) === String(draft.serviceId) ? (updated || { ...service, metadata: { ...(service.metadata || {}), ad_booster: boost } }) : service
-      )));
-      setIsBoostPaymentOpen(false);
-      setPendingBoost(null);
-      setBoostMessage('Demo boost activated. This gig will be prioritized in marketplace recommendation views while the boost is active.');
-    } catch (error) {
-      setSaveError(error?.message || 'Unable to save this ad boost.');
-    } finally {
-      setIsBoostSaving(false);
-    }
-  };
-
   const styles = {
     page: { minHeight: '100vh', background: themeTokens.pageBg, color: themeTokens.textPrimary, fontFamily: "'Segoe UI', Tahoma, Geneva, Verdana, sans-serif", display: 'flex', flexDirection: 'column', alignItems: 'stretch' },
     header: { width: '100%', boxSizing: 'border-box', backgroundColor: themeTokens.surface, borderBottom: `1px solid ${themeTokens.border}`, padding: isMobile ? '12px 14px' : '16px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', position: 'sticky', top: 0, zIndex: 50, boxShadow: themeTokens.shadowSoft },
@@ -420,19 +277,8 @@ function Profile({ appTheme = 'light', themeMode = 'system', onThemeChange, curr
     portfolioDocItem: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px', padding: '10px', borderRadius: '8px', border: `1px solid ${themeTokens.border}`, background: themeTokens.surface },
     portfolioDocName: { color: themeTokens.textPrimary, fontWeight: 700, textDecoration: 'none', wordBreak: 'break-word' },
     portfolioDocMeta: { margin: '2px 0 0', color: themeTokens.textMuted, fontSize: '12px' },
-    boosterGrid: { display: 'grid', gridTemplateColumns: isMobile ? 'minmax(0, 1fr)' : 'minmax(0, 1.2fr) minmax(0, 0.8fr) minmax(0, 0.8fr)', gap: '10px', marginTop: '12px' },
-    boosterInput: { minHeight: '44px', border: `1px solid ${themeTokens.inputBorder}`, borderRadius: '8px', padding: '9px 10px', background: themeTokens.inputBg, color: themeTokens.inputText, width: '100%', boxSizing: 'border-box' },
-    boosterLabel: { display: 'grid', minWidth: 0, gap: '6px', color: themeTokens.textPrimary, fontSize: '13px', fontWeight: 700 },
-    boosterHint: { margin: '10px 0 0', color: themeTokens.textSecondary, fontSize: '13px', fontWeight: 700 },
-    boosterSuccess: { margin: '10px 0 0', color: themeTokens.successText, background: themeTokens.successBg, border: `1px solid ${themeTokens.successBorder}`, borderRadius: '8px', padding: '9px 10px', fontWeight: 700, fontSize: '13px' },
   };
 
-  const boostTerms = [
-    'You agree that the selected gig, duration, and budget are accurate before the ad boost is activated.',
-    'TrabaWho may use your service title, profile details, location, category, and boost settings to prioritize this gig in marketplace recommendation views.',
-    'This demo boost does not collect a card payment, GCash transfer, or real money.',
-    'Boost placement can improve visibility, but it does not guarantee client inquiries, bookings, or earnings.',
-  ];
   return (
     <div style={styles.page} data-testid="profile-page">
       <DashboardNavigation
@@ -556,70 +402,7 @@ function Profile({ appTheme = 'light', themeMode = 'system', onThemeChange, curr
               />
             </>
           )}
-          {isWorkerRole && (
-            <section className="profile-flat-section" style={styles.profileSection}>
-              <div className="profile-section-title"><Rocket size={18} aria-hidden="true" /><h2 style={styles.h2}>Ad booster</h2></div>
-              <p style={styles.paragraph}>Boost one of your gigs in marketplace recommendation views.</p>
-              <div style={styles.boosterGrid}>
-                <div style={styles.boosterLabel}>
-                  <label htmlFor="boost-service">Gig</label>
-                  <Select
-                    value={selectedBoostServiceId}
-                    onValueChange={setSelectedBoostServiceId}
-                    disabled={workerServices.length === 0}
-                  >
-                    <SelectTrigger id="boost-service" className="min-w-0 overflow-hidden bg-background shadow-none [&>span]:min-w-0 [&>span]:truncate">
-                      <SelectValue placeholder={workerServices.length === 0 ? 'No gigs found' : 'Choose a gig'} />
-                    </SelectTrigger>
-                    <SelectContent>
-                    {workerServices.map((service) => {
-                      const boostStatus = getActiveBoostStatus(service);
-                      return (
-                        <SelectItem key={service.id} value={String(service.id)}>
-                          {service.title || service.short_description || 'Untitled gig'}
-                          {boostStatus.isBoosted ? ` (Boosted until ${formatBoostEndDate(boostStatus.boostEndsAt)})` : ''}
-                        </SelectItem>
-                      );
-                    })}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <label style={styles.boosterLabel}>
-                  Days
-                  <input
-                    type="number"
-                    min="1"
-                    value={boostDays}
-                    onChange={(event) => setBoostDays(event.target.value)}
-                    style={styles.boosterInput}
-                  />
-                </label>
-                <label style={styles.boosterLabel}>
-                  Budget PHP
-                  <input
-                    type="number"
-                    min="0"
-                    step="50"
-                    value={boostBudget}
-                    onChange={(event) => setBoostBudget(event.target.value)}
-                    style={styles.boosterInput}
-                  />
-                </label>
-              </div>
-              {selectedBoostStatus.isBoosted && (
-                <p style={styles.boosterHint}>This gig is already boosted until {selectedBoostEndLabel}.</p>
-              )}
-              <button
-                type="button"
-                style={{ ...styles.generatePortfolioBtn, marginTop: '12px' }}
-                onClick={handleStartBoostFlow}
-                disabled={isBoostSaving || !selectedBoostServiceId || selectedBoostStatus.isBoosted}
-              >
-                {isBoostSaving ? 'Saving Boost...' : selectedBoostStatus.isBoosted ? 'Gig Already Boosted' : 'Boost Selected Gig'}
-              </button>
-              {boostMessage && <p style={styles.boosterSuccess}>{boostMessage}</p>}
-            </section>
-          )}
+          {isWorkerRole && <GigBoostPanel sellerId={sellerProfile?.userId} />}
 
           <div className="mt-1 border-t pt-2">
             <AccountPrivacyPanel
@@ -645,31 +428,6 @@ function Profile({ appTheme = 'light', themeMode = 'system', onThemeChange, curr
             onFirstNameChange={setDraftFirstName} onMiddleNameChange={setDraftMiddleName} onLastNameChange={setDraftLastName}
             onOpenChange={(open) => { setIsEditingName(open); if (!open) { setDraftFirstName(firstName); setDraftMiddleName(middleName); setDraftLastName(lastName); setSaveError(''); } }}
           />
-
-          <BookingTermsModal
-            isOpen={isBoostTermsOpen}
-            appTheme={appTheme}
-            title="Review demo boost terms"
-            subtitle="Please review these TrabaWho ad boost terms before activation."
-            confirmLabel="Agree and continue"
-            terms={boostTerms}
-            agreementLabel="I agree to the TrabaWho ad boost Terms and Conditions for this selected gig."
-            onCancel={handleCancelBoostFlow}
-            onConfirm={handleConfirmBoostTerms}
-          />
-
-          {isBoostPaymentOpen && pendingBoost && (
-            <BoostActivationDialog
-              isOpen={isBoostPaymentOpen}
-              serviceTitle={pendingBoost.serviceTitle}
-              days={pendingBoost.days}
-              budget={pendingBoost.budget}
-              isSaving={isBoostSaving}
-              error={saveError}
-              onConfirm={handleSaveBoost}
-              onCancel={handleCancelBoostFlow}
-            />
-          )}
 
           <DigitalPortfolioModal
             isOpen={isPortfolioModalOpen}

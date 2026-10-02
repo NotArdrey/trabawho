@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState, type ReactNode } from "react";
 import { CalendarClock, Check, ChevronDown, ChevronRight, Copy, FileText, Plus, Trash2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -30,7 +30,7 @@ interface AvailabilitySlot {
 
 type Availability = Record<DayKey, AvailabilitySlot[]>;
 
-interface NewServiceDraft {
+export interface NewServiceDraft {
   availability?: Partial<Availability>;
   basePrice: string | number;
   bookingMode: string;
@@ -44,6 +44,9 @@ interface NewServiceDraft {
 
 interface CreateServiceModalProps {
   appTheme?: string;
+  mode?: "create" | "edit";
+  bookingExtras?: ReactNode;
+  validateBooking?: () => string | null;
   isOpen: boolean;
   newService: NewServiceDraft;
   onChange: (field: string, value: unknown) => void;
@@ -125,11 +128,12 @@ const isValidSlot = (slot: AvailabilitySlot) => Boolean(
   && Number(slot.capacity) > 0
 );
 
-function CreateServiceModal({ isOpen, newService, onChange, onClose, onSubmit }: CreateServiceModalProps) {
+function CreateServiceModal({ isOpen, newService, onChange, onClose, onSubmit, mode = "create", bookingExtras, validateBooking }: CreateServiceModalProps) {
   const [step, setStep] = useState(0);
   const [expandedDays, setExpandedDays] = useState<Partial<Record<DayKey, boolean>>>({ Mon: true });
   const [localError, setLocalError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const returnFocus = useRef<HTMLElement | null>(null);
 
   const availability = useMemo(
     () => getAvailabilitySnapshot(newService.availability),
@@ -138,7 +142,8 @@ function CreateServiceModal({ isOpen, newService, onChange, onClose, onSubmit }:
   const pricingModel = resolvePricingModel(newService.priceType, newService.rateBasis);
   const isQuotePricing = pricingModel === "quote";
   const bookingMode: BookingMode = isQuotePricing || newService.bookingMode === "calendar-only" ? "calendar-only" : "with-slots";
-  const showAvailability = bookingMode === "with-slots";
+  const isEditing = mode === "edit";
+  const showAvailability = bookingMode === "with-slots" && !isEditing;
   const slotCount = DAYS.reduce(
     (total, dayKey) => total + availability[dayKey].filter(isValidSlot).length,
     0,
@@ -212,7 +217,7 @@ function CreateServiceModal({ isOpen, newService, onChange, onClose, onSubmit }:
       setLocalError("Add a short description so clients can understand the service.");
       return false;
     }
-    if (targetStep === 0 && !isQuotePricing && (!newService.basePrice || Number(newService.basePrice) < 0)) {
+    if (targetStep === 0 && !isQuotePricing && (String(newService.basePrice).trim() === "" || !Number.isFinite(Number(newService.basePrice)) || Number(newService.basePrice) < 0)) {
       setLocalError("Enter a valid service price before continuing.");
       return false;
     }
@@ -223,6 +228,14 @@ function CreateServiceModal({ isOpen, newService, onChange, onClose, onSubmit }:
     if (targetStep === 1 && showAvailability && invalidSlotCount > 0) {
       setLocalError("Check the highlighted schedule entries. End time must follow start time and capacity must be at least one.");
       return false;
+    }
+    if (targetStep === 0 && String(newService.durationMinutes).trim() && (!Number.isInteger(Number(newService.durationMinutes)) || Number(newService.durationMinutes) <= 0)) {
+      setLocalError("Enter a duration in whole minutes greater than zero.");
+      return false;
+    }
+    if (targetStep === 1 && validateBooking) {
+      const error = validateBooking();
+      if (error) { setLocalError(error); return false; }
     }
     setLocalError("");
     return true;
@@ -237,7 +250,10 @@ function CreateServiceModal({ isOpen, newService, onChange, onClose, onSubmit }:
     if (!validateStep(0) || !validateStep(1)) return;
     try {
       setIsSubmitting(true);
-      await onSubmit();
+      const result = await onSubmit();
+      if (result === null || result === false) setLocalError("Unable to save this service. Check your connection and try again.");
+    } catch {
+      setLocalError("Unable to save all changes. Check your connection and try again.");
     } finally {
       setIsSubmitting(false);
     }
@@ -246,12 +262,15 @@ function CreateServiceModal({ isOpen, newService, onChange, onClose, onSubmit }:
   return (
     <Dialog open={isOpen} onOpenChange={(open) => { if (!open && !isSubmitting) onClose(); }}>
       <DialogContent
-        data-testid="create-service-modal"
-        className="grid !w-[min(840px,calc(100vw-2rem))] !max-w-[840px] max-h-[calc(100svh-2rem)] grid-rows-[auto_auto_minmax(0,1fr)_auto] gap-0 overflow-hidden p-0 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden max-sm:!w-[calc(100vw-1rem)] max-sm:max-h-[calc(100svh-1rem)] max-sm:rounded-xl"
+        onOpenAutoFocus={() => { returnFocus.current = document.activeElement instanceof HTMLElement ? document.activeElement : null; }}
+        onCloseAutoFocus={(event) => { event.preventDefault(); returnFocus.current?.focus(); }}
+        showClose={!isSubmitting}
+        data-testid={isEditing ? "edit-service-modal" : "create-service-modal"}
+        className="grid !w-[min(840px,calc(100vw-2rem))] !max-w-[840px] max-h-[calc(100svh-2rem)] grid-rows-[auto_auto_minmax(0,1fr)_auto] gap-0 overflow-hidden p-0 max-sm:!w-[calc(100vw-1rem)] max-sm:max-h-[calc(100svh-1rem)] max-sm:rounded-xl"
       >
         <DialogHeader className="px-5 pb-4 pt-5 sm:px-6 sm:pt-6">
-          <DialogTitle>Add a service</DialogTitle>
-          <DialogDescription>Create a clear listing clients can understand and book confidently.</DialogDescription>
+          <DialogTitle>{isEditing ? "Edit service" : "Add a service"}</DialogTitle>
+          <DialogDescription>{isEditing ? "Update your listing, pricing, and booking preferences." : "Create a clear listing clients can understand and book confidently."}</DialogDescription>
         </DialogHeader>
 
         <div className="grid grid-cols-3 border-y border-border" aria-label={`Step ${step + 1} of ${STEPS.length}: ${STEPS[step]}`}>
@@ -263,7 +282,7 @@ function CreateServiceModal({ isOpen, newService, onChange, onClose, onSubmit }:
           ))}
         </div>
 
-        <div className="min-h-0 overflow-y-auto overscroll-contain px-5 py-5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:px-6">
+        <div className="min-h-0 overflow-y-auto overscroll-contain px-5 py-5 sm:px-6">
           {localError ? <div className="mb-5 rounded-lg bg-destructive/10 p-3 text-sm font-medium text-destructive" role="alert">{localError}</div> : null}
 
           {step === 0 ? (
@@ -303,6 +322,8 @@ function CreateServiceModal({ isOpen, newService, onChange, onClose, onSubmit }:
                 </div>
               </section>
 
+              {isEditing && bookingMode === "with-slots" ? <p className="text-sm text-muted-foreground">Manage published times in Service Availability after saving.</p> : null}
+              {bookingExtras}
               {showAvailability ? <><Separator /><section aria-labelledby="availability-title">
                 <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                   <div className="flex items-start gap-3"><CalendarClock className="mt-0.5 size-5 text-primary" aria-hidden="true" /><div><h3 id="availability-title" className="font-semibold">Weekly availability</h3><p className="text-sm text-muted-foreground">{slotCount} valid {slotCount === 1 ? "slot" : "slots"} configured</p></div></div>
@@ -334,7 +355,7 @@ function CreateServiceModal({ isOpen, newService, onChange, onClose, onSubmit }:
 
           {step === 2 ? (
             <section aria-labelledby="service-review-title">
-              <div className="mb-5"><h3 id="service-review-title" className="font-semibold">Review service</h3><p className="text-sm text-muted-foreground">Confirm these details before publishing the listing.</p></div>
+              <div className="mb-5"><h3 id="service-review-title" className="font-semibold">Review service</h3><p className="text-sm text-muted-foreground">{isEditing ? "Confirm these details before saving the listing." : "Confirm these details before publishing the listing."}</p></div>
               <dl className="divide-y divide-border rounded-xl bg-muted/35 px-4">
                 <div className="grid gap-1 py-4 sm:grid-cols-[10rem_1fr]"><dt className="text-sm text-muted-foreground">Service</dt><dd className="font-semibold">{newService.title}</dd></div>
                 <div className="grid gap-1 py-4 sm:grid-cols-[10rem_1fr]"><dt className="text-sm text-muted-foreground">Summary</dt><dd className="text-sm">{newService.shortDescription}</dd></div>
@@ -342,14 +363,14 @@ function CreateServiceModal({ isOpen, newService, onChange, onClose, onSubmit }:
                 <div className="grid gap-1 py-4 sm:grid-cols-[10rem_1fr]"><dt className="text-sm text-muted-foreground">Booking</dt><dd className="font-semibold">{BOOKING_METHODS.find((method) => method.value === bookingMode)?.label}</dd></div>
                 {showAvailability ? <div className="grid gap-1 py-4 sm:grid-cols-[10rem_1fr]"><dt className="text-sm text-muted-foreground">Availability</dt><dd className="font-semibold">{slotCount} weekly {slotCount === 1 ? "slot" : "slots"}</dd></div> : null}
               </dl>
-              <p className="mt-4 text-sm leading-6 text-muted-foreground">Publishing makes this service available in Browse Services. You can update its details later from My Work.</p>
+              <p className="mt-4 text-sm leading-6 text-muted-foreground">{isEditing ? "Saving updates this listing in Browse Services." : "Publishing makes this service available in Browse Services. You can update its details later from My Work."}</p>
             </section>
           ) : null}
         </div>
 
         <DialogFooter className="px-5 pb-5 pt-4 sm:px-6">
-          {step === 0 ? <Button type="button" variant="outline" onClick={onClose}>Cancel</Button> : <Button type="button" variant="outline" onClick={() => { setLocalError(""); setStep((current) => current - 1); }}>Back</Button>}
-          {step < STEPS.length - 1 ? <Button type="button" onClick={handleNext}>Continue</Button> : <Button type="button" onClick={() => void handleSubmit()} isLoading={isSubmitting}>{isSubmitting ? "Publishing…" : "Publish service"}</Button>}
+          {step === 0 ? <Button type="button" variant="outline" disabled={isSubmitting} onClick={onClose}>Cancel</Button> : <Button type="button" variant="outline" disabled={isSubmitting} onClick={() => { setLocalError(""); setStep((current) => current - 1); }}>Back</Button>}
+          {step < STEPS.length - 1 ? <Button type="button" onClick={handleNext}>Continue</Button> : <Button type="button" onClick={() => void handleSubmit()} isLoading={isSubmitting}>{isSubmitting ? (isEditing ? "Saving…" : "Publishing…") : (isEditing ? "Save changes" : "Publish service")}</Button>}
         </DialogFooter>
       </DialogContent>
     </Dialog>

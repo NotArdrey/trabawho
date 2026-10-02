@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import {
   buildDeferredEmailDelivery,
@@ -16,12 +15,12 @@ import {
   normalizeEmail,
   normalizeIdentityRole,
   parseJsonBody,
-  queueManualIdentityReview,
   recordRegistrationAttempt,
   RegistrationRateLimitError,
-  upsertIdentityDocumentClaim,
   updateRegistrationAttempt,
 } from "../_shared/identityRegistration.ts";
+
+import { asRecord, validateSignupDetails } from "../_shared/identityDomain.ts";
 
 const IDENTITY_BUCKET = "identity-manual";
 const MAX_IMAGE_BYTES = 7 * 1024 * 1024;
@@ -46,7 +45,8 @@ const decodeBase64 = (base64Value: string) => {
 const sanitizePathPart = (value: unknown, fallback: string) =>
   cleanString(value).toLowerCase().replace(/[^a-z0-9._-]+/g, "-").replace(/^-+|-+$/g, "") || fallback;
 
-const normalizeImagePayload = (raw: any, label: string) => {
+const normalizeImagePayload = (value: unknown, label: string) => {
+  const raw = asRecord(value);
   const base64 = cleanString(raw?.base64);
   if (!base64) throw new Error(`${label} image is required.`);
 
@@ -56,7 +56,7 @@ const normalizeImagePayload = (raw: any, label: string) => {
   }
 
   const mimeType = cleanString(raw?.mimeType || "image/jpeg").toLowerCase();
-  if (!mimeType.startsWith("image/")) throw new Error(`${label} file must be an image.`);
+  if (!["image/jpeg", "image/png", "image/webp"].includes(mimeType)) throw new Error(`${label} file must be an image.`);
 
   const extension = sanitizePathPart(raw?.extension || mimeType.split("/").pop() || "jpg", "jpg").replace(/^\./, "");
   return {
@@ -67,7 +67,7 @@ const normalizeImagePayload = (raw: any, label: string) => {
   };
 };
 
-const uploadImage = async (supabaseAdmin: any, userId: string, slot: string, rawPayload: any) => {
+const uploadImage = async (supabaseAdmin: ReturnType<typeof createAdminClient>, userId: string, slot: string, rawPayload: unknown) => {
   const payload = normalizeImagePayload(rawPayload, slot);
   const bytes = decodeBase64(payload.base64);
   const path = `${sanitizePathPart(userId, "user")}/${Date.now()}-${slot}-${payload.fileName}`;
@@ -83,7 +83,7 @@ const uploadImage = async (supabaseAdmin: any, userId: string, slot: string, raw
   return path;
 };
 
-const ensureBucket = async (supabaseAdmin: any) => {
+const ensureBucket = async (supabaseAdmin: ReturnType<typeof createAdminClient>) => {
   const { data } = await supabaseAdmin.storage.getBucket(IDENTITY_BUCKET);
   if (data?.id) return;
 
@@ -98,10 +98,10 @@ const ensureBucket = async (supabaseAdmin: any) => {
 };
 
 const ensureManualReviewAuthUser = async (
-  supabaseAdmin: any,
+  supabaseAdmin: ReturnType<typeof createAdminClient>,
   { email, password, role, appRole, fullName, documentType, documentTypeKey, idDocumentExpiry }: Record<string, unknown>,
 ) => {
-  const existingUser = await findAuthUserByEmail(supabaseAdmin, email);
+  const existingUser = await findAuthUserByEmail(supabaseAdmin, normalizeEmail(email));
   const metadata = {
     ...(existingUser?.user_metadata || {}),
     role: normalizeAppRole(appRole),
@@ -117,6 +117,7 @@ const ensureManualReviewAuthUser = async (
   };
 
   if (existingUser) {
+    if (existingUser.email_confirmed_at) throw new Error("This email already has an account. Contact support to retry identity verification.");
     const updatePayload: Record<string, unknown> = { user_metadata: metadata };
     if (cleanString(password).length >= 8) updatePayload.password = password;
     const { data, error } = await supabaseAdmin.auth.admin.updateUserById(existingUser.id, updatePayload);
@@ -159,6 +160,10 @@ serve(async (req: Request) => {
       return jsonResponse({ success: false, error: `Unsupported action: ${action}` });
     }
 
+    const location = validateSignupDetails(body);
+    normalizeImagePayload(body.frontImage, "Front");
+    normalizeImagePayload(body.backImage, "Back");
+    normalizeImagePayload(body.selfieImage, "Selfie");
     const email = normalizeEmail(body?.email);
     const password = cleanString(body?.password);
     const role = normalizeIdentityRole(body?.role);
@@ -224,59 +229,23 @@ serve(async (req: Request) => {
       appRole,
       identityRole: role,
       identityStatus: "PENDING_REVIEW",
+      location,
       idDocumentExpiry,
     });
 
-    const { error: profileError } = await supabaseAdmin
-      .from("profiles")
-      .upsert(profilePayload, { onConflict: "user_id" });
-    if (profileError) throw new Error(`Unable to save profile: ${profileError.message}`);
-
-    const duplicateReason = duplicateIdentity.hasDuplicate
-      ? `This ID appears to match another ${role} account. We will review it manually.`
-      : null;
-
-    const review = await queueManualIdentityReview(supabaseAdmin, {
-      userId: authUser.id,
-      email,
-      role,
-      appRole,
-      documentType,
-      documentTypeKey,
-      documentCountry,
-      source: "MANUAL_UPLOAD",
-      documentFingerprint,
-      duplicateReason,
+    const reviewPayload = {
+      documentType, documentTypeKey, documentCountry, documentFingerprint, source: "MANUAL_UPLOAD",
+      duplicateReason: duplicateIdentity.hasDuplicate ? "Another account has a matching identity document." : null,
       duplicateMatchCount: duplicateIdentity.matches.length,
-      metadata: {
-        identity_document_number_present: true,
-        duplicate_identity_review: duplicateIdentity.hasDuplicate,
-      },
-      verifiedFullLegalName: fullName,
-      normalizedFullLegalName: fullName.toUpperCase(),
-      frontImagePath,
-      backImagePath,
-      selfieImagePath,
+      metadata: { consent: { identity: true, terms: true, accepted_at: new Date().toISOString() } },
+      verifiedFullLegalName: fullName, normalizedFullLegalName: fullName.toUpperCase(),
+      frontImagePath, backImagePath, selfieImagePath,
+    };
+    const { data: saved, error: saveError } = await supabaseAdmin.rpc("save_identity_registration", {
+      p_user_id: authUser.id, p_profile: profilePayload, p_review: reviewPayload, p_claim: reviewPayload,
     });
-
-    await upsertIdentityDocumentClaim(supabaseAdmin, {
-      userId: authUser.id,
-      role,
-      appRole,
-      documentFingerprint,
-      documentType,
-      documentTypeKey,
-      documentCountry,
-      source: "MANUAL_UPLOAD",
-      status: "PENDING_REVIEW",
-      manualReviewId: review?.id || null,
-      email,
-      metadata: {
-        identity_document_number_present: true,
-      },
-      verifiedFullLegalName: fullName,
-      normalizedFullLegalName: fullName.toUpperCase(),
-    });
+    if (saveError) throw new Error("The registration could not be saved. Retry manual registration.");
+    const review = { id: saved?.manualReviewId || null };
 
     await updateRegistrationAttempt(supabaseAdmin, attemptId, {
       success: true,

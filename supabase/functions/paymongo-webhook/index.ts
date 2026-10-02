@@ -16,6 +16,7 @@ interface PaidCheckoutEvent {
   eventType: string;
   livemode: boolean;
   paymentId: string;
+  isBoost: boolean;
 }
 
 const firstRecord = (value: unknown) => asRecord(Array.isArray(value) ? value[0] : value);
@@ -24,7 +25,7 @@ const parsePaidCheckoutEvent = async (payload: unknown, rawBody: string): Promis
   const root = asRecord(payload);
   const envelope = asRecord(root.data);
   const legacyAttributes = asRecord(envelope.attributes);
-  const eventType = cleanPaymentString(envelope.type || legacyAttributes.type);
+  const eventType = cleanPaymentString(legacyAttributes.type || envelope.type);
   const session = asRecord(envelope.data || legacyAttributes.data);
   const sessionAttributes = asRecord(session.attributes);
   const payment = firstRecord(sessionAttributes.payments);
@@ -48,8 +49,9 @@ const parsePaidCheckoutEvent = async (payload: unknown, rawBody: string): Promis
     currency: cleanPaymentString(paymentAttributes.currency).toUpperCase(),
     eventId,
     eventType,
-    livemode: Boolean(envelope.livemode ?? legacyAttributes.livemode),
+    livemode: Boolean(envelope.livemode ?? legacyAttributes.livemode ?? sessionAttributes.livemode),
     paymentId: cleanPaymentString(payment.id),
+    isBoost: Boolean(asRecord(sessionAttributes.metadata).boost_attempt_id),
   };
 };
 
@@ -72,7 +74,7 @@ serve(async (request: Request) => {
     const event = await parsePaidCheckoutEvent(payload, rawBody);
     const payloadHash = await sha256PaymentHex(rawBody);
     const admin = createPaymentAdminClient();
-    const { error } = await admin.rpc("record_paymongo_checkout_payment", {
+    const { error } = await admin.rpc(event.isBoost ? "record_paymongo_boost_payment" : "record_paymongo_checkout_payment", {
       p_event_id: event.eventId,
       p_event_type: event.eventType,
       p_checkout_session_id: event.checkoutSessionId,

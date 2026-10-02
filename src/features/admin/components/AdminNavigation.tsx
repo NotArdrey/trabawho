@@ -20,6 +20,7 @@ interface Props {
 const sections = [
   { key: "overview", label: "Overview", icon: LayoutDashboard },
   { key: "accounts", label: "Account Management", icon: Users },
+  { key: "identity", label: "Identity reviews", icon: Shield },
   { key: "logs", label: "Audit Logs", icon: ClipboardList },
   { key: "comments", label: "Reviews", icon: MessageSquare },
   { key: "cases", label: "Support cases", icon: Inbox },

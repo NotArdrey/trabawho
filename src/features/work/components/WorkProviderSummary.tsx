@@ -1,7 +1,6 @@
-import { CalendarClock, MapPin, Megaphone, Pencil, QrCode, Star } from "lucide-react";
+import { CalendarClock, MapPin, Megaphone, Pencil, Star } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { getProfilePhotoUrl } from "@/shared/utils/profilePhoto";
 
 export interface WorkProviderSummaryProps {
@@ -20,8 +19,6 @@ export interface WorkProviderSummaryProps {
   payment: string;
   booster: string;
   onEditProfile: () => void;
-  onOpenGcashQr: () => void;
-  onOpenCashQr: () => void;
 }
 
 interface DetailProps { label: string; value: string; wide?: boolean }
@@ -51,8 +48,6 @@ export default function WorkProviderSummary({
   payment,
   booster,
   onEditProfile,
-  onOpenGcashQr,
-  onOpenCashQr,
 }: WorkProviderSummaryProps) {
   return (
     <section className="mb-5 rounded-xl border bg-card p-5 shadow-none max-sm:p-4" aria-label="Current service summary">
@@ -60,7 +55,7 @@ export default function WorkProviderSummary({
         <div className="flex min-w-0 items-start gap-4">
           <img className="size-16 shrink-0 rounded-full object-cover ring-1 ring-border sm:size-[72px]" src={getProfilePhotoUrl(profilePhoto)} alt={`${name} profile`} />
           <div className="min-w-0 flex-1">
-            <button type="button" className="group flex max-w-full items-center gap-2 rounded-md text-left text-xl font-bold leading-tight text-foreground hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" onClick={onEditProfile} title="Edit profile details">
+            <button type="button" className="group flex min-h-11 max-w-full items-center gap-2 rounded-md text-left text-xl font-bold leading-tight text-foreground hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" onClick={onEditProfile} title="Edit service">
               <span className="truncate">{name}</span><Pencil className="size-3.5 shrink-0 text-muted-foreground group-hover:text-primary" aria-hidden="true" />
             </button>
             <p className="mt-2 text-sm font-semibold text-primary">{service}</p>
@@ -73,10 +68,6 @@ export default function WorkProviderSummary({
           </div>
         </div>
 
-        <div className="flex flex-wrap gap-2 lg:justify-end">
-          <Button type="button" size="sm" variant="outline" className="shadow-none" onClick={onOpenGcashQr}><QrCode aria-hidden="true" />GCash QR</Button>
-          <Button type="button" size="sm" variant="outline" className="shadow-none" onClick={onOpenCashQr}><QrCode aria-hidden="true" />Cash confirmation</Button>
-        </div>
       </div>
 
       <div className="mt-5 grid grid-cols-3 divide-x rounded-xl bg-muted/45 py-4 text-center">

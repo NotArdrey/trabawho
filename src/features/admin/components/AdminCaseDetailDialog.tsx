@@ -1,19 +1,13 @@
 import { useEffect, useRef, useState } from "react";
 import { AlertCircle, ClipboardList, ExternalLink, RefreshCw, X } from "lucide-react";
 
+import { supportActionLabels as actionLabels, supportTimeline } from "@/features/admin/domain/supportTimeline";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { SelectField } from "@/components/forms";
 import { getSupportCaseDetail, openSupportEvidence, recordSupportFollowup,
   type SupportAction, type SupportCase, type SupportCaseDetail, type TargetParty } from "@/features/admin/services/adminSupportService";
-
-const actionLabels: Record<SupportAction, string> = {
-  request_information: "Record information needed",
-  rework_arranged: "Recommend rework arrangement",
-  reschedule_needed: "Recommend rescheduling",
-  refund_review_needed: "Refer for refund review",
-};
 
 function formatDate(value: string | null) {
   return value ? new Date(value).toLocaleString("en-PH", { dateStyle: "medium", timeStyle: "short" }) : "Not recorded";
@@ -52,11 +46,12 @@ export function AdminCaseDetailDialog({ item, onClose, onSaved }: {
     setError("");
     try {
       await recordSupportFollowup({ caseId: item.id, action, targetParty, reason, operationId: operationId.current });
-      setDetail(await getSupportCaseDetail(item));
       setSuccess("Support follow-up recorded. No payment or refund was changed.");
       setReason("");
       operationId.current = crypto.randomUUID();
       onSaved();
+      try { setDetail(await getSupportCaseDetail(item)); setDetailError(""); }
+      catch { setDetailError("The follow-up was saved, but the updated history could not be loaded. Retry loading details."); }
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Could not save this follow-up.");
     } finally { inFlight.current = false; setPending(false); }
@@ -86,11 +81,7 @@ export function AdminCaseDetailDialog({ item, onClose, onSaved }: {
           <section aria-label="Booking and participants" className="rounded-lg bg-primary/5 p-4"><h3 className="font-semibold text-primary">Booking and participants</h3><p className="mt-1 break-all text-xs text-muted-foreground">Booking reference: {item.booking_id}</p><div className="mt-4 grid gap-4 sm:grid-cols-2"><div><h4 className="font-semibold">Client</h4><p>{client?.full_name || booking?.buyer_id}</p><p className="break-all text-muted-foreground">{client?.email || "Contact not available"}</p></div><div><h4 className="font-semibold">Provider</h4><p>{provider?.full_name || booking?.seller_id}</p><p className="break-all text-muted-foreground">{provider?.email || "Contact not available"}</p></div><div><h4 className="font-semibold">Service and schedule</h4><p>{detail.service?.title || "Service title unavailable"}</p><p>{formatDate(booking?.start_ts || null)} · {booking?.status}</p></div><div><h4 className="font-semibold">Recorded booking amount</h4><p>{booking?.currency || "PHP"} {booking?.total_amount ?? "Not available"}</p><p className="text-muted-foreground">This is not a payout or refund balance.</p></div></div></section>
           <section aria-label="Payment attempts"><h3 className="font-semibold">Payment attempts</h3>{detail.payments.length ? <ul className="mt-2 grid gap-2">{detail.payments.map((payment) => <li key={payment.id} className="rounded-md bg-muted/60 p-2">{payment.purpose}: {payment.currency} {payment.amount} · {payment.status} · {formatDate(payment.paid_at || payment.created_at)}</li>)}</ul> : <p className="mt-1 text-muted-foreground">No payment attempts visible. Do not infer that money was paid.</p>}</section>
           <section aria-label="Delivery evidence"><h3 className="font-semibold">Delivery evidence</h3>{detail.delivery.length ? <ul className="mt-2 grid gap-2">{detail.delivery.map((proof) => <li key={proof.id} className="rounded-md bg-muted/60 p-2"><p>{proof.checklist.join(" · ")}</p>{proof.explanation && <p className="mt-1">{proof.explanation}</p>}{proof.storage_path && <Button type="button" variant="outline" className="mt-2" onClick={() => { void viewEvidence(proof.storage_path || ""); }}>Open delivery image</Button>}</li>)}</ul> : <p className="mt-1 text-muted-foreground">No delivery evidence visible.</p>}</section>
-          <section aria-label="Case and booking timeline"><h3 className="font-semibold">Recorded timeline</h3><ol className="mt-2 grid gap-2 border-l pl-4">{[
-            ...detail.audit.map((entry) => ({ id: `audit-${entry.id}`, at: entry.created_at, label: entry.event_type.replaceAll("_", " "), note: entry.reason })),
-            ...detail.caseActions.map((entry) => ({ id: `case-${entry.id}`, at: entry.created_at, label: entry.action.replaceAll("_", " "), note: entry.note })),
-            ...detail.adminActions.map((entry) => ({ id: `admin-${entry.id}`, at: entry.created_at, label: actionLabels[entry.action], note: entry.reason })),
-          ].sort((a, b) => a.at.localeCompare(b.at)).map((entry) => <li key={entry.id}><p className="font-medium capitalize">{entry.label}</p><p className="text-xs text-muted-foreground">{formatDate(entry.at)}{entry.note ? ` · ${entry.note}` : ""}</p></li>)}</ol></section>
+          <section aria-label="Case and booking timeline"><h3 className="font-semibold">Recorded timeline</h3><ol className="mt-2 grid gap-2 border-l pl-4">{supportTimeline(detail).map((entry) => <li key={entry.id}><p className="font-medium capitalize">{entry.label}</p><p className="text-xs text-muted-foreground">{formatDate(entry.at)}{entry.note ? ` · ${entry.note}` : ""}</p></li>)}</ol></section>
           {item.status !== "closed" && <section className="grid gap-4 rounded-lg bg-primary/5 p-4" aria-label="Record support follow-up"><div><h3 className="font-semibold text-primary">Record a next step</h3><p className="mt-1 text-xs text-muted-foreground">This is an internal case note, not a message to either party.</p></div>
             <SelectField label="Action" value={action} disabled={pending} onValueChange={(value) => { changeForm(); setAction(value as SupportAction); }} options={Object.entries(actionLabels).map(([value, label]) => ({ value, label }))} />
             {action === "request_information" && <SelectField label="Information needed from" value={targetParty} disabled={pending} onValueChange={(value) => { changeForm(); setTargetParty(value as TargetParty); }} options={[{ value: "client", label: "Client" }, { value: "provider", label: "Provider" }, { value: "both", label: "Both parties" }]} />}

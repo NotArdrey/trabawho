@@ -41,7 +41,9 @@ const getPaymentPurpose = (booking: CheckoutBooking) =>
     : "initial";
 
 const getIdempotencyStorageKey = (booking: CheckoutBooking) =>
-  `trabawho:paymongo:${booking.id || `${booking.serviceId}:${getSlotId(booking)}`}:${getPaymentPurpose(booking)}:${booking.paymentPlan || "downpayment"}`;
+  `trabawho:paymongo:${booking.id || booking.serviceId}:${getSlotId(booking)}:${booking.quoteVersion || "listed"}:${getPaymentPurpose(booking)}:${booking.paymentPlan || "downpayment"}`;
+
+const operationCache = new Map<string, { key: string; expiresAt: number }>();
 
 const createOperationId = () => {
   if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
@@ -52,15 +54,28 @@ const createOperationId = () => {
 
 const getStableIdempotencyKey = (booking: CheckoutBooking) => {
   const storageKey = getIdempotencyStorageKey(booking);
+  let operation = operationCache.get(storageKey);
   try {
     const existing = window.sessionStorage.getItem(storageKey);
-    if (existing) return existing;
-    const created = createOperationId();
-    window.sessionStorage.setItem(storageKey, created);
-    return created;
+    if (existing) {
+      const parsed: unknown = JSON.parse(existing);
+      if (parsed && typeof parsed === "object" && "key" in parsed && "expiresAt" in parsed
+        && typeof parsed.key === "string" && typeof parsed.expiresAt === "number") {
+        operation = { key: parsed.key, expiresAt: parsed.expiresAt };
+      }
+    } else {
+      operationCache.delete(storageKey);
+      operation = undefined;
+    }
   } catch {
-    return createOperationId();
+    // Use the in-memory operation when browser storage is unavailable.
   }
+  if (!operation || operation.expiresAt <= Date.now()) {
+    operation = { key: createOperationId(), expiresAt: Date.now() + 15 * 60 * 1000 };
+  }
+  operationCache.set(storageKey, operation);
+  try { window.sessionStorage.setItem(storageKey, JSON.stringify(operation)); } catch { /* Memory cache preserves retries. */ }
+  return operation.key;
 };
 
 const validateCheckoutUrl = (value: unknown) => {
@@ -118,7 +133,15 @@ export async function createPayMongoCheckout(booking: CheckoutBooking): Promise<
     ? response.data as CheckoutFunctionResponse
     : undefined;
 
-  if (response.error) throw new Error(await getCheckoutInvocationError(response.error));
+  if (response.error) {
+    const message = await getCheckoutInvocationError(response.error);
+    if (message === "Payment reservation has expired. Please choose your time again.") {
+      const storageKey = getIdempotencyStorageKey(booking);
+      operationCache.delete(storageKey);
+      try { window.sessionStorage.removeItem(storageKey); } catch { /* Storage can be disabled. */ }
+    }
+    throw new Error(message);
+  }
   if (typeof data?.error === "string" && data.error) throw new Error(data.error);
 
   const paymentAttemptId = typeof data?.paymentAttemptId === "string"

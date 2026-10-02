@@ -1,4 +1,4 @@
-export const BOOKING_TRANSACTION_FEE_RATE = 0.05;
+export const BOOKING_TRANSACTION_FEE_RATE = 0.08;
 
 export interface BookingPricing {
   serviceAmount: number;
@@ -13,7 +13,7 @@ export interface BookingPricing {
 
 type NumericInput = number | string | null | undefined;
 
-const roundCurrency = (value: NumericInput) => Number(Number(value || 0).toFixed(2));
+const roundCurrency = (value: NumericInput) => Math.round((Number(value || 0) + Number.EPSILON) * 100) / 100;
 
 export const calculateBookingPricing = (
   serviceAmount: NumericInput,

@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { authIdentityFallback } from '@/shared/utils/authIdentityFallback';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { supabase } from '../../shared/services/supabaseClient';
 import {
@@ -106,6 +107,7 @@ const buildAuthOnlyProfile = (user, source = {}) => {
     isWorker: false,
     role,
     isAdmin: role === 'admin',
+    ...authIdentityFallback(user),
   };
 };
 
@@ -235,10 +237,8 @@ export const useAppNavigation = () => {
       try {
         profile = await syncAuthenticatedUserProfile(user, source);
       } catch (error) {
-        // Keep login usable even if profile sync fails for this account.
         console.error('Profile sync failed during login, falling back to auth-only profile:', error);
         profile = buildAuthOnlyProfile(user, source);
-        showErrorNotification('Logged in with limited profile mode. Some profile data could not be synced right now.');
       }
     }
 
@@ -487,8 +487,6 @@ export const useAppNavigation = () => {
           email: formData.email,
           password: formData.password,
         });
-        // Only show the loading screen AFTER we know auth succeeded
-        setIsLoadingTransition(true);
         const result = await hydrateAuthenticatedUser(user);
         if (isSafeReturnPath(requestedPath)) navigate(requestedPath, { replace: true });
         showSuccessNotification('Welcome back! You have successfully logged in.');

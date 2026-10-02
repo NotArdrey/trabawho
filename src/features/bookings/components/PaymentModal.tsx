@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import {
   CalendarDays,
   CheckCircle2,
@@ -10,7 +10,6 @@ import {
   WalletCards,
 } from "lucide-react";
 
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -22,6 +21,7 @@ import {
 } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 import { calculateBookingPricing } from "@/features/bookings/utils/bookingPricing";
+import BookingTermsModal from "./BookingTermsModal";
 
 type PaymentPlan = "full" | "downpayment";
 type PaymentMethod = "paymongo-card";
@@ -39,6 +39,7 @@ interface PaymentBooking {
   isRequestBooking?: boolean;
   paymentPlan?: string;
   paymentStatus?: string;
+  transactionFeeRate?: number | string | null;
   rawService?: { service_warranty_policies?: PaymentWarrantyPolicy | PaymentWarrantyPolicy[] | null };
   quoteAmount?: number | string;
   selectedSlot?: { date?: string; timeBlock?: PaymentTimeBlock };
@@ -81,6 +82,7 @@ export interface PaymentModalProps {
   subtitle?: string;
   title?: string;
   transactionFeeRate?: number | string | null;
+  requireBookingTerms?: boolean;
 }
 
 function formatPhp(value: number | string | null | undefined) {
@@ -130,16 +132,19 @@ export default function PaymentModal({
   subtitle,
   title = "Choose payment",
   transactionFeeRate,
+  requireBookingTerms = false,
 }: PaymentModalProps) {
   const allowsPayMongo = true;
   const isRequestBooking = booking.bookingMode === "calendar-only" || booking.isRequestBooking;
   const baseAmount = Number(booking.quoteAmount || 0) || 0;
-  const pricing = calculateBookingPricing(baseAmount, transactionFeeRate);
+  const pricing = calculateBookingPricing(baseAmount, transactionFeeRate ?? booking.transactionFeeRate ?? undefined);
   const isPayingRemainingBalance = booking.paymentStatus === "partially_paid";
   const [selectedMethod, setSelectedMethod] = useState<PaymentMethod | null>(allowsPayMongo ? "paymongo-card" : null);
   const [paymentPlan, setPaymentPlan] = useState<PaymentPlan>(isRequestBooking && booking.paymentPlan !== "downpayment" ? "full" : "downpayment");
+  const processingRef = useRef(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [submitError, setSubmitError] = useState("");
+  const [reviewingTerms, setReviewingTerms] = useState(false);
 
   const amountDueNow = isPayingRemainingBalance
     ? Number(booking.balanceDueAmount || pricing.downpaymentBalanceAmount)
@@ -157,12 +162,14 @@ export default function PaymentModal({
   const warrantySummary = booking.warrantyCoverageSummary || listingPolicy?.coverage_summary;
 
   const handleConfirmPayment = async () => {
+    if (processingRef.current) return;
     if (!selectedMethod) {
       setSubmitError("Select a payment method before continuing.");
       return;
     }
     try {
       setSubmitError("");
+      processingRef.current = true;
       setIsProcessing(true);
       const paymentDetails: PaymentSelectionDetails = {
         serviceAmount: baseAmount,
@@ -182,12 +189,14 @@ export default function PaymentModal({
         ? error.message
         : "We couldn't open secure PayMongo checkout. Please try again.");
     } finally {
+      processingRef.current = false;
       setIsProcessing(false);
     }
   };
 
   return (
-    <Dialog open onOpenChange={(open) => { if (!open && !isProcessing) onCancel(); }}>
+    <>
+    <Dialog open={!reviewingTerms} onOpenChange={(open) => { if (!open && !isProcessing) onCancel(); }}>
       <DialogContent className="max-h-[calc(100svh-1rem)] max-w-3xl gap-0 overflow-y-auto p-0 sm:max-h-[calc(100svh-2rem)]">
         <DialogHeader className="bg-muted/45 px-5 py-5 pr-16 sm:px-6 sm:py-6">
           <div className="flex items-start gap-3">
@@ -269,20 +278,12 @@ export default function PaymentModal({
                 <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground"><CreditCard className="size-5" aria-hidden="true" /></span>
                 <span className="min-w-0 flex-1">
                   <span className="font-bold text-foreground">Pay securely by card with PayMongo</span>
-                  <span className="mt-1 block text-sm leading-5 text-muted-foreground">{advancePaymentDescription || "Your selected time is reserved for 15 minutes while you complete the test checkout."}</span>
+                  <span className="mt-1 block text-sm leading-5 text-muted-foreground">{advancePaymentDescription || "Your selected time is reserved for 15 minutes while you complete checkout."}</span>
                 </span>
               </button>
             ) : (
               <p className="rounded-xl bg-destructive/10 p-4 text-sm font-medium text-destructive">No payment method is available for this booking.</p>
             )}
-
-            <div className="mt-3 flex min-h-20 items-start gap-3 rounded-xl bg-muted/35 p-4 opacity-70" role="radio" aria-checked="false" aria-disabled="true">
-              <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground"><WalletCards className="size-5" aria-hidden="true" /></span>
-              <span className="min-w-0 flex-1">
-                <span className="flex flex-wrap items-center gap-2 font-bold text-foreground">GCash <Badge variant="secondary">Coming soon</Badge></span>
-                <span className="mt-1 block text-sm leading-5 text-muted-foreground">GCash is shown for preview only and cannot be selected yet.</span>
-              </span>
-            </div>
 
           </section>
 
@@ -306,13 +307,13 @@ export default function PaymentModal({
           {submitError ? <p className="rounded-lg bg-destructive/10 px-3 py-2 text-sm font-semibold text-destructive" role="alert">{submitError}</p> : null}
         </div>
 
-        <DialogFooter className="sticky bottom-0 items-center bg-background px-4 py-4 sm:px-6">
-          <div className="mr-auto min-w-0">
+        <DialogFooter className="sticky bottom-0 grid grid-cols-[auto_minmax(0,1fr)] items-center bg-background px-4 py-4 sm:flex sm:px-6">
+          <div className="col-span-2 mr-auto min-w-0">
             <p className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground"><LockKeyhole className="size-3.5" aria-hidden="true" />Due now</p>
             <p className="mt-0.5 text-xl font-extrabold text-emerald-600 dark:text-emerald-400">{formatPhp(amountDueNow)}</p>
           </div>
           <Button type="button" variant="outline" onClick={onCancel} disabled={isProcessing}>Cancel</Button>
-          <Button type="button" onClick={() => { void handleConfirmPayment(); }} disabled={!selectedMethod} isLoading={isProcessing}>
+          <Button type="button" onClick={() => { if (requireBookingTerms) setReviewingTerms(true); else void handleConfirmPayment(); }} disabled={!selectedMethod} isLoading={isProcessing}>
             {isProcessing ? <LoaderCircle className="animate-spin" aria-hidden="true" /> : <Send aria-hidden="true" />}
             {isProcessing ? "Opening checkout..." : confirmLabel}
           </Button>
@@ -321,5 +322,10 @@ export default function PaymentModal({
         )}
       </DialogContent>
     </Dialog>
+    <BookingTermsModal isOpen={reviewingTerms} onCancel={() => setReviewingTerms(false)} onConfirm={() => {
+      setReviewingTerms(false);
+      void handleConfirmPayment();
+    }} />
+    </>
   );
 }

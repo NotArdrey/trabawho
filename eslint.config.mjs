@@ -11,6 +11,7 @@ export default tseslint.config(
     ignores: [
       "build/**",
       "dist/**",
+      ".vercel/**",
       "coverage/**",
       "node_modules/**",
       "playwright-report/**",

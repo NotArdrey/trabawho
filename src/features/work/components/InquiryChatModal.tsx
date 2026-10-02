@@ -58,6 +58,7 @@ function InquiryChatModal({ inquiry, onClose, onBookingUpdated, onError }: Inqui
   const [quoteDescription, setQuoteDescription] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const savingRef = useRef(false);
   const messageListRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -93,7 +94,8 @@ function InquiryChatModal({ inquiry, onClose, onBookingUpdated, onError }: Inqui
   }, [messages]);
 
   const sendReply = async () => {
-    if (!replyText.trim() || !inquiry.booking || isSaving) return;
+    if (!replyText.trim() || !inquiry.booking || savingRef.current) return;
+    savingRef.current = true;
     try {
       setIsSaving(true);
       const saved = await sendMessage(inquiry.booking, replyText.trim());
@@ -102,17 +104,20 @@ function InquiryChatModal({ inquiry, onClose, onBookingUpdated, onError }: Inqui
     } catch (error) {
       onError?.(errorMessage(error, "Unable to send reply."));
     } finally {
+      savingRef.current = false;
       setIsSaving(false);
     }
   };
 
   const sendQuote = async () => {
+    if (savingRef.current) return;
     const amount = Number(quoteAmount);
     if (!Number.isFinite(amount) || amount <= 0 || !inquiry.booking) {
       onError?.("Enter a valid quote amount before sending.");
       return;
     }
     const description = quoteDescription.trim() || `Quote for ${inquiry.service}`;
+    savingRef.current = true;
     try {
       setIsSaving(true);
       const updatedBooking = await updateBookingWorkflow(inquiry.booking, {
@@ -134,6 +139,7 @@ function InquiryChatModal({ inquiry, onClose, onBookingUpdated, onError }: Inqui
     } catch (error) {
       onError?.(errorMessage(error, "Unable to send quote."));
     } finally {
+      savingRef.current = false;
       setIsSaving(false);
     }
   };
@@ -260,7 +266,10 @@ function MessageComposer({ clientName, isSaving, onChange, onOpenQuote, onSend, 
     <div className="flex items-end gap-2">
       <Label htmlFor="inquiry-reply" className="sr-only">Reply to {clientName}</Label>
       <textarea id="inquiry-reply" className="min-h-12 max-h-32 flex-1 resize-y rounded-lg border bg-background p-3 text-sm leading-5 outline-none focus-visible:ring-2 focus-visible:ring-ring" placeholder="Write a reply..." value={replyText} rows={2} onChange={(event) => onChange(event.target.value)} onKeyDown={(event) => {
-        if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); onSend(); }
+        if (event.key === "Enter" && !event.shiftKey) {
+          event.preventDefault();
+          if (!event.repeat && !event.nativeEvent.isComposing && !isSaving) onSend();
+        }
       }} />
       <Button type="button" size="icon" className="size-12" aria-label="Send reply" onClick={onSend} disabled={!replyText.trim()} isLoading={isSaving}><Send aria-hidden="true" /></Button>
     </div>

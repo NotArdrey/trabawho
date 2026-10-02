@@ -39,6 +39,6 @@ describe("BookingTermsModal", () => {
     expect(screen.getByRole("heading", { name: "Review before payment" })).toBeVisible();
     expect(screen.getByText("15-minute reservation")).toBeVisible();
     expect(screen.getByText("Changes and cancellations")).toBeVisible();
-    expect(screen.getByText("Demo payment")).toBeVisible();
+    expect(screen.queryByText("Demo payment")).not.toBeInTheDocument();
   });
 });

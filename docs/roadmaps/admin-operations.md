@@ -11,6 +11,7 @@ The admin experience should prioritize **work requiring a decision** over decora
 | Priority | Capability | Current state | Minimum behavior to build |
 | --- | --- | --- | --- |
 | Demo | Account search, role changes, disable/suspend/restore | **Available** | Keep server-backed feedback, reason capture, and role guard; verify RLS and privileged-action audit before production. |
+| P0 | Identity review queue and decisions | **Implemented and rehearsed on the linked test project** | The portal loads manual/pending/duplicate reviews with protected evidence, address, status filters, email search, and pagination. Authenticated admin approval/rejection requires a reason, evidence acknowledgement, confirmation, and immutable history. Profile, claim, and session updates are atomic; approval retains the email-confirmation gate. See the [Didit integration guide](../integrations/didit.md). |
 | Demo | Review list and deletion | **Partial** | Recent reviews load; deletion is permanent. Add reports, policy reason, non-destructive hide/restore, and audit before operational use. |
 | Demo | Admin audit page | **Not built** | Existing page must say the feed is unavailable; connect actor, target, reason, time, and outcome before claiming to show history. |
 | P0 | Searchable booking/support queue | **Partial** | The latest 50 submitted booking cases can be filtered by status and searched by booking ID, issue type, or reason; the list shows the next actor for rework. This is not a full-database search. Add server-side pagination/search by reference and participants, age and urgency, and payment/cancellation exception filters. |
@@ -22,6 +23,34 @@ The admin experience should prioritize **work requiring a decision** over decora
 | P1 | Refund and payout operations | **Not built** | Use provider-confirmed refund/payout events, reconciliation, failure retries, and clear hold/release rules. No manual balance edits. |
 | P1 | Report and moderation queue | **Not built** | Accept review/profile/chat reports, preserve original evidence, hide content reversibly, document reason, and support appeal. |
 | P2 | Operational analytics | **Not built** | Add trends only after event definitions and reliable queries exist; no illustrative charts masquerading as live data. |
+
+## Registration and identity verification check
+
+The registration UI validates each step before Next or Enter, restores the full
+address after Didit return, and uses explicit checkboxes with a keyboard-accessible
+Terms and Conditions modal. Manual and Didit signup persist province, city,
+barangay, and specific address through a transactional backend registration RPC.
+Client status and auto-approve environment overrides cannot approve identity.
+
+The admin queue and protected evidence endpoints are deployed to the linked
+Supabase test project. Live synthetic manual submissions were approved and
+rejected through the authenticated admin endpoint. Full address persistence,
+private image reads, repeated operations, conflicting decisions, and nonadmin
+denial passed. Synthetic users and images were removed; immutable rehearsal
+history remains. The configured Didit workflow and active V3 webhook destination
+were verified through the provider API. A live session started and polled;
+a forged browser approval was rejected without creating an account.
+
+Rollback-only database tests cover the email-confirmation gate, terminal-session
+races, immutable history, stale/duplicate events, and retryable failed deliveries.
+Registration/admin Playwright journeys pass at 390, 768, 1024, 1280, and 1440px.
+The live browser journey also verifies pending denial, protected admin approval,
+and dashboard access after synthetic email confirmation. Didit delivered a signed
+pending event; polling preserves its metadata and cannot bypass finalized review.
+Browser terminal provider outcomes use mocked APIs. A real camera scan, signed
+approved/declined provider delivery, and inbox receipt are separate release checks. Configuration,
+deployment steps, and the exact test commands are in the
+[Didit integration guide](../integrations/didit.md).
 
 ## Case-handling experience
 

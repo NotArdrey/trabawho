@@ -1,5 +1,5 @@
 import { useEffect, useId, useRef, useState } from "react";
-import { CheckCircle2, FileCheck2, Flag, LoaderCircle, Play } from "lucide-react";
+import { CheckCircle2, FileCheck2, Flag, LoaderCircle, Play, RefreshCw } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -52,6 +52,8 @@ export function BookingTransactionActions({ booking, viewerRole, onUpdated }: Pr
   const [photoError, setPhotoError] = useState("");
   const [evidence, setEvidence] = useState<Awaited<ReturnType<typeof getBookingDeliveryEvidence>>>(null);
   const [caseSummary, setCaseSummary] = useState<{ bookingId: string; data: Awaited<ReturnType<typeof getBookingSupportCase>> } | null>(null);
+  const [caseLoadError, setCaseLoadError] = useState("");
+  const [caseReload, setCaseReload] = useState(0);
   const [now, setNow] = useState(() => Date.now());
   const inFlight = useRef(false);
 
@@ -63,9 +65,15 @@ export function BookingTransactionActions({ booking, viewerRole, onUpdated }: Pr
   useEffect(() => {
     if (booking.disputeStatus !== "open" && booking.disputeStatus !== "closed") return;
     let active = true;
-    void getBookingSupportCase(booking.id).then((value) => { if (active) setCaseSummary({ bookingId: booking.id, data: value }); }).catch(() => { if (active) setCaseSummary(null); });
-    return () => { active = false; };
-  }, [booking.id, booking.disputeStatus]);
+    void getBookingSupportCase(booking.id).then((value) => {
+      if (!active) return;
+      setCaseSummary({ bookingId: booking.id, data: value });
+      setCaseLoadError(value ? "" : "The report is not available yet. Retry loading it.");
+    }).catch(() => { if (active) setCaseLoadError("The booking report could not be loaded. Check your connection and retry."); });
+    const refreshOnFocus = () => setCaseReload((value) => value + 1);
+    window.addEventListener("focus", refreshOnFocus);
+    return () => { active = false; window.removeEventListener("focus", refreshOnFocus); };
+  }, [booking.id, booking.disputeStatus, caseReload]);
 
   const active = ["confirmed", "in_progress"].includes(booking.raw?.booking?.status || "");
   const startAt = booking.appointmentStartAt ? new Date(booking.appointmentStartAt).getTime() : NaN;
@@ -157,6 +165,7 @@ export function BookingTransactionActions({ booking, viewerRole, onUpdated }: Pr
     {canComplete && <Button type="button" disabled={pending} onClick={() => { void run(() => performBookingLifecycleAction("complete", booking.id), "Completion confirmed and saved."); }}><CheckCircle2 aria-hidden="true" />Confirm completion</Button>}
     {viewerRole === "client" && booking.deliveryStatus === "seller_claimed" && <Button type="button" variant="outline" onClick={() => { void viewEvidence(); }}>View delivery proof</Button>}
     {canReport && <Button type="button" variant="outline" disabled={pending} onClick={openCase}><Flag aria-hidden="true" />Report a problem</Button>}
+    {(booking.disputeStatus === "open" || booking.disputeStatus === "closed") && caseLoadError && <div role="alert" className="col-span-2 grid gap-2 text-sm text-destructive sm:basis-full"><p>{caseLoadError}</p><Button type="button" variant="outline" className="w-fit" onClick={() => { setCaseLoadError(""); setCaseReload((value) => value + 1); }}><RefreshCw aria-hidden="true" />Retry loading report</Button></div>}
     {booking.disputeStatus === "open" && <div className="col-span-2 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950 sm:basis-full dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-100"><p className="font-semibold">{currentCase?.policy_route === "rework_request" ? viewerRole === "provider" ? "Client requested repair rework" : "Repair rework requested" : "Support case open"}</p><p className="mt-1">{currentCase?.reason || "Completion is paused while this report is reviewed."}</p>{currentCase?.policy_reason && <p className="mt-1 text-xs">{currentCase.policy_reason}</p>}{currentCase?.provider_response_action && <div className="mt-3 border-t border-amber-300 pt-3 dark:border-amber-800"><p className="font-semibold">{currentCase.provider_response_action === "offer_rework" ? "Provider offered rework" : "Provider requested support review"}</p><p className="mt-1">{currentCase.provider_response_text}</p><p className="mt-1 text-xs">This response does not close the case or change payment.</p></div>}</div>}
     {canRespond && <Button type="button" variant="outline" disabled={pending} onClick={() => { setResponseAction("offer_rework"); setResponseText(""); setError(""); setDialog("response"); }}>Respond to repair claim</Button>}
     {currentCase && <div className="col-span-2 min-w-0 sm:basis-full"><RepairCaseResolution bookingId={booking.id} caseRecord={currentCase} viewerRole={viewerRole} onCaseChanged={(updatedBooking, updatedCase) => { setCaseSummary({ bookingId: booking.id, data: updatedCase }); onUpdated(updatedBooking); }} /></div>}

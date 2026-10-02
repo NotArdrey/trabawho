@@ -6,9 +6,15 @@ Status: active
 
 - Vite, strict TypeScript for migrated files, Tailwind CSS, shadcn/ui configuration, Vitest, linting, file-size enforcement, typed route policy, and Vercel SPA deployment are active.
 - The application shell, public navigation, landing experience, loading state, notifications, shared confirmation dialog, route contracts, Supabase integration contract, pricing utility, profile-photo utility, and feature entry points are typed.
-- The landing page and authentication presentation follow the white-led light theme, blue-led dark theme, image-forward composition, selective orange accent, and no-glow rules. Authentication behavior remains legacy JavaScript pending its full TypeScript conversion.
-- 113 frontend files are TypeScript and 65 JavaScript/JSX files remain at this checkpoint. Sixteen source files exceed 500 lines, including the 6,526-line frozen legacy stylesheet; the machine-readable baselines are authoritative as these totals shrink.
+- The landing page and authentication presentation follow the white-led light theme, blue-led dark theme, image-forward composition, selective orange accent, and no-glow rules. The main registration form, step validation, location lookups, consent dialog, password fields, and identity signup transport are strict TypeScript. The remaining authentication shell and login/identity outcome orchestration remain frozen legacy JavaScript pending conversion.
+- Admin identity queue, evidence dialog, domain contracts, orchestration, and service access are strict TypeScript. Identity backend migrations and function deployment were explicitly authorized; address persistence, admin decisions, and protected evidence were rehearsed on the linked test project. See the [Didit integration guide](../integrations/didit.md).
+- The machine-readable source and file-size allowlists record the remaining legacy paths and their shrinking baselines.
+- Booking conversation loading, refresh, duplicate-send protection, and the message composer are strict TypeScript. The remaining `ChatWindow.jsx` presentation stays on its shrinking baseline. Pricing tests are migrated to TypeScript; payment checkout no longer displays the GCash preview.
+- Marketplace booking and messaging orchestration is extracted into a strict TypeScript hook. Message opens chat directly, Book now opens schedule selection, and terms are reviewed when continuing from payment. The remaining browse page retains its shrinking legacy baseline.
+- Booking-list orchestration and marketplace service normalization are strict TypeScript. Failed booking loads stop their skeletons and offer retry; each gig displays its own title. Support follow-ups show one timeline entry per operation and the latest recorded next step in the admin queue.
 - Static quality gate: Vitest and standards-guard coverage run in `npm run check`. Responsive Playwright coverage targets 390, 768, 1024, 1280, and 1440px, including 200% page scale, URL restoration, and light, dark, and system theme preferences.
+
+- Gig boost presentation, orchestration, validation, and data access are strict TypeScript. PayMongo replaces demo activation; paid campaign validation and marketplace discovery/ranking are extracted into typed slices. The profile legacy file is now below 500 lines. Backend migrations and payment function deployment are explicitly authorized for this task.
 
 ## Checkpoints
 

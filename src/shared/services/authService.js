@@ -1084,54 +1084,6 @@ export const fetchSellerServices = async (sellerId) => {
   return data || [];
 };
 
-export const updateServiceAdBoost = async ({ serviceId, boost }) => {
-  if (!serviceId) throw new Error('Choose a service to boost.');
-
-  const { data: currentService, error: fetchError } = await supabase
-    .from('services')
-    .select('metadata')
-    .eq('id', serviceId)
-    .maybeSingle();
-
-  if (fetchError && fetchError.code !== 'PGRST116') {
-    throw toReadableDatabaseSetupError(fetchError);
-  }
-
-  const currentBoost = currentService?.metadata?.ad_booster || currentService?.metadata?.adBooster || null;
-  const currentBoostEndsAt = currentBoost?.ends_at || currentBoost?.endsAt || null;
-  const currentBoostEndsTime = currentBoostEndsAt ? new Date(currentBoostEndsAt).getTime() : null;
-  const hasValidCurrentBoostEnd = currentBoostEndsTime === null || Number.isFinite(currentBoostEndsTime);
-  const isCurrentlyBoosted = Boolean(currentBoost?.active)
-    && hasValidCurrentBoostEnd
-    && (currentBoostEndsTime === null || currentBoostEndsTime > Date.now());
-
-  if (boost?.active !== false && isCurrentlyBoosted) {
-    const activeUntil = currentBoostEndsAt ? new Date(currentBoostEndsAt).toLocaleDateString() : 'manually stopped';
-    throw new Error(`This gig is already boosted until ${activeUntil}.`);
-  }
-
-  const nextMetadata = {
-    ...(currentService?.metadata || {}),
-    ad_booster: {
-      ...(boost || {}),
-      updated_at: getTimestamp(),
-    },
-  };
-
-  const { data, error } = await supabase
-    .from('services')
-    .update({
-      metadata: nextMetadata,
-      updated_at: getTimestamp(),
-    })
-    .eq('id', serviceId)
-    .select('*')
-    .maybeSingle();
-
-  if (error) throw toReadableDatabaseSetupError(error);
-  return data;
-};
-
 export const fetchAllActiveServices = async (limit = 50) => {
   const { data, error } = await supabase
     .from('services')

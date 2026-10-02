@@ -26,6 +26,19 @@ const emptyRework = {
 describe("BookingTransactionActions", () => {
   beforeEach(() => vi.clearAllMocks());
 
+  it("lets participants retry a failed report fetch without reopening the case", async () => {
+    const report = { id: "case-1", case_type: "provider_no_show", reason: "The provider left before completing the work.",
+      ...emptyRework, policy_route: "support_review" as const, policy_reason: "Support review needed.", status: "under_review" as const,
+      created_at: new Date().toISOString(), provider_response_action: null, provider_response_text: null, provider_responded_at: null };
+    vi.mocked(getBookingSupportCase).mockRejectedValueOnce(new TypeError("Failed to fetch")).mockResolvedValueOnce(report);
+    render(<BookingTransactionActions booking={{ ...booking, disputeStatus: "open" }} viewerRole="client" onUpdated={vi.fn()} />);
+    expect(await screen.findByRole("alert")).toHaveTextContent(/report could not be loaded/i);
+    fireEvent.click(screen.getByRole("button", { name: "Retry loading report" }));
+    expect(await screen.findByText(report.reason)).toBeVisible();
+    expect(screen.queryByRole("button", { name: "Retry loading report" })).not.toBeInTheDocument();
+    expect(openBookingSupportCase).not.toHaveBeenCalled();
+  });
+
   it("blocks work controls while the balance is unpaid", () => {
     render(<BookingTransactionActions booking={{ ...booking, paymentStatus: "partially_paid" }} viewerRole="provider" onUpdated={vi.fn()} />);
     expect(screen.getByText(/waiting for client balance/i)).toBeVisible();

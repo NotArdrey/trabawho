@@ -28,3 +28,9 @@ When the client cannot connect:
 5. Reproduce with the smallest relevant application test. Do not paste credentials into diagnostic scripts or documentation.
 
 Run `npm run check` after code changes and the relevant Playwright journey for affected authentication or data workflows.
+
+## Assistant image analysis
+
+The `trabawho-chatbot` Edge Function uses `GROQ_API_KEY` from Supabase secrets. Its default image model is `qwen/qwen3.8-27b`, which supports image input and JSON mode. Optional `GROQ_VISION_MODEL` and `GROQ_VISION_FALLBACK_MODELS` overrides must support the same request format; retired Llama vision and Qwen 3.6 overrides are replaced with the current default. See [Groq vision documentation](https://console.groq.com/docs/vision) and [model retirements](https://console.groq.com/docs/deprecations).
+
+After changing the function or its local `vision.ts` dependency, redeploy `trabawho-chatbot` to apply the server change. Local frontend tests mock the function and do not verify the deployed provider or its credentials. Test a repair photo, an unrelated logo, and a subsequent text-only message against the deployed function.

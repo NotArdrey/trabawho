@@ -1,15 +1,14 @@
 [
   { "path": "src/shared/styles/modern.css", "baselineLines": 5919 },
-  { "path": "src/features/work/pages/MyWork.jsx", "baselineLines": 1269 },
+  { "path": "src/features/work/pages/MyWork.jsx", "baselineLines": 1220 },
   { "path": "src/features/bookings/services/bookingService.js", "baselineLines": 1529 },
-  { "path": "src/shared/services/authService.js", "baselineLines": 1465 },
-  { "path": "src/features/bookings/pages/MyBookings.jsx", "baselineLines": 1100 },
-  { "path": "src/features/auth/pages/AuthPage.jsx", "baselineLines": 1382 },
-  { "path": "src/features/bookings/components/ChatWindow.jsx", "baselineLines": 1033 },
-  { "path": "src/features/marketplace/pages/BrowseServicesPage.jsx", "baselineLines": 710 },
-  { "path": "src/features/navigation/useAppNavigation.js", "baselineLines": 851 },
+  { "path": "src/shared/services/authService.js", "baselineLines": 1417 },
+  { "path": "src/features/bookings/pages/MyBookings.jsx", "baselineLines": 1085 },
+  { "path": "src/features/auth/pages/AuthPage.jsx", "baselineLines": 733 },
+  { "path": "src/features/bookings/components/ChatWindow.jsx", "baselineLines": 968 },
+  { "path": "src/features/navigation/useAppNavigation.js", "baselineLines": 849 },
   { "path": "src/features/auth/pages/IdentityRegistrationPage.jsx", "baselineLines": 892 },
-  { "path": "src/features/profile/pages/Profile.jsx", "baselineLines": 692 },
-  { "path": "src/shared/components/FloatingChatbot.jsx", "baselineLines": 720 },
-  { "path": "src/features/auth/components/LoginModal.jsx", "baselineLines": 598 }
+  { "path": "src/shared/components/FloatingChatbot.jsx", "baselineLines": 719 },
+  { "path": "src/features/auth/components/LoginModal.jsx", "baselineLines": 598 },
+  { "path": "src/features/marketplace/pages/BrowseServicesPage.jsx", "baselineLines": 540 }
 ]

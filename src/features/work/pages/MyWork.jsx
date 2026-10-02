@@ -1,12 +1,13 @@
 import React, { useEffect, useState } from 'react';
 import DashboardNavigation from '../../../shared/components/DashboardNavigation';
 import WorkProviderSummary from '../components/WorkProviderSummary';
+import { countCompletedBookings } from '../utils/bookingSummary';
 import WorkSectionFilter from '../components/WorkSectionFilter';
 import WorkPaymentQueues from '../components/WorkPaymentQueues';
 import SlotEditModal from '../components/SlotEditModal';
 import ProfileEditModal from '../components/ProfileEditModal';
+import { useServiceEditing } from '../hooks/useServiceEditing';
 import { ConfirmActionModal } from '@/shared/components';
-import QrPreviewModal from '../components/modals/QrPreviewModal';
 import CreateServiceModal from '../components/CreateServiceModal';
 import SuccessNotification from '../../../shared/components/SuccessNotification';
 import ErrorNotification from '../../../shared/components/ErrorNotification';
@@ -151,8 +152,6 @@ const MyWork = ({ appTheme = 'light', themeMode = 'system', onThemeChange, curre
 
   const [doneConfirmTarget, setDoneConfirmTarget] = useState(null);
   const [profileEditModalOpen, setProfileEditModalOpen] = useState(false);
-  const [isGcashPreviewOpen, setIsGcashPreviewOpen] = useState(false);
-  const [isCashQrPreviewOpen, setIsCashQrPreviewOpen] = useState(false);
   const [hoverKey, setHoverKey] = useState('');
   const [workSectionFilter, setWorkSectionFilter] = useState('all'); // all | inquiries | cash-approvals | refunds | cancelled
   const [isMobile, setIsMobile] = useState(() =>
@@ -164,8 +163,7 @@ const MyWork = ({ appTheme = 'light', themeMode = 'system', onThemeChange, curre
     closeCreateService,
     currentProfile,
     handleCreateServiceChange,
-    handleCreateServiceSubmit,
-    handleSaveProfileEdit,
+    handleCreateServiceSubmit, refreshWorkData,
     hasSellerRecord,
     isCreateServiceOpen,
     isLoadingSellerData,
@@ -363,26 +361,10 @@ const MyWork = ({ appTheme = 'light', themeMode = 'system', onThemeChange, curre
     setProfileEditModalOpen(true);
   };
 
-  const handleProfileEditSave = async (updatedData) => {
-    await handleSaveProfileEdit(updatedData);
-    setProfileEditModalOpen(false);
-  };
-
-  const handleOpenGcashPreview = () => {
-    setIsGcashPreviewOpen(true);
-  };
-
-  const handleCloseGcashPreview = () => {
-    setIsGcashPreviewOpen(false);
-  };
-
-  const handleOpenCashQrPreview = () => {
-    setIsCashQrPreviewOpen(true);
-  };
-
-  const handleCloseCashQrPreview = () => {
-    setIsCashQrPreviewOpen(false);
-  };
+  const handleProfileEditSave = useServiceEditing({
+    serviceId: currentProfile?.raw?.id, sellerId, refresh: refreshWorkData,
+    onSaved: () => { setProfileEditModalOpen(false); setSuccessMessage('Service updated'); window.setTimeout(() => setSuccessMessage(''), 3000); },
+  });
 
   const themeTokens = getThemeTokens(appTheme);
   const isDarkMode = themeTokens.isDarkMode;
@@ -595,7 +577,6 @@ const MyWork = ({ appTheme = 'light', themeMode = 'system', onThemeChange, curre
   const modalMetaTextStyle = { margin: '8px 0 0', color: themeTokens.textSecondary, fontSize: '13px' };
   const modalDangerTextStyle = { margin: '8px 0 0', color: isDarkMode ? '#fca5a5' : '#b91c1c', fontSize: '13px', fontWeight: 600 };
 
-  const gcashNumber = currentProfile?.gcashNumber || '09054891105';
   const currentRateBasis = normalizeRateBasis(
     currentProfile?.raw?.metadata?.rate_basis ||
     currentProfile?.raw?.rate_basis ||
@@ -649,9 +630,6 @@ const MyWork = ({ appTheme = 'light', themeMode = 'system', onThemeChange, curre
     : '0';
   const normalizedSellerRole = String(sellerProfile?.role || '').trim().toLowerCase();
   const canShowAddServiceButton = normalizedSellerRole === 'worker';
-  const cashQrId = currentProfile?.cashQrId || `CASHQR-${(currentProfile?.fullName || 'WORKER').replace(/\s+/g, '-').toUpperCase()}`;
-  const gcashQrImageUrl = `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(`GCash-${gcashNumber}`)}`;
-  const cashConfirmQrImageUrl = `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(`CASH-CONFIRM-${currentProfile?.fullName || 'Worker'}-${gcashNumber}`)}`;
   
   const showCashApprovalSection = workSectionFilter === 'all' || workSectionFilter === 'cash-approvals';
   const showRefundSection = workSectionFilter === 'all' || workSectionFilter === 'refunds';
@@ -839,18 +817,15 @@ const MyWork = ({ appTheme = 'light', themeMode = 'system', onThemeChange, curre
               isBoosted={currentProfile?.isBoosted}
               activeBookings={activeBookingsCount}
               averageRating={avgRatingLabel}
-              completed={0}
+              completed={countCompletedBookings(transactions)}
               description={currentServiceDescription}
               duration={currentDurationLabel}
               payment={currentPaymentLabel}
               booster={currentBoostLabel}
               onEditProfile={handleOpenProfileEdit}
-              onOpenGcashQr={handleOpenGcashPreview}
-              onOpenCashQr={handleOpenCashQrPreview}
             />
 
             <WorkSectionFilter value={workSectionFilter} options={workSectionOptions} onValueChange={setWorkSectionFilter} />
-            
 
             <WorkPaymentQueues
               cancelledTransactions={cancelledCashTransactions}
@@ -1176,30 +1151,6 @@ const MyWork = ({ appTheme = 'light', themeMode = 'system', onThemeChange, curre
       >
         <p className="m-0">You are about to remove <strong>{deleteConfirmTarget?.label}</strong>.</p>
       </ConfirmActionModal>
-
-      <QrPreviewModal
-        isOpen={isGcashPreviewOpen}
-        title="GCash Face-to-Face Payment"
-        subtitle="Show this QR to your client during meetup."
-        imageSrc={gcashQrImageUrl}
-        imageAlt="GCash QR"
-        primaryLabel="GCash Number"
-        primaryValue={gcashNumber}
-        note="Ask your client to scan this QR or send payment to the number above."
-        onClose={handleCloseGcashPreview}
-      />
-
-      <QrPreviewModal
-        isOpen={isCashQrPreviewOpen}
-        title="Cash Confirmation QR"
-        subtitle="Let the client scan this QR after handing over cash to submit payment details for your approval."
-        imageSrc={cashConfirmQrImageUrl}
-        imageAlt="Cash Confirmation QR"
-        primaryLabel="Cash QR ID"
-        primaryValue={cashQrId}
-        note="Client submits amount using this QR, then you approve or deny inside Payment Confirmations."
-        onClose={handleCloseCashQrPreview}
-      />
 
       <ConfirmActionModal
         isOpen={Boolean(cashDecisionTarget)}

@@ -56,9 +56,11 @@ async function loginAsClient(page) {
   await page.getByRole('button', { name: /^Sign in$/ }).first().click();
   await expect(page.getByRole('heading', { name: 'Sign in' })).toBeVisible();
   await page.getByLabel('Email').fill(DEMO_CLIENT_EMAIL);
-  await page.getByLabel('Password').fill(DEMO_PASSWORD);
+  await page.getByLabel('Password', { exact: true }).fill(DEMO_PASSWORD);
   await page.locator('form').getByRole('button', { name: /^Sign in$/ }).click();
   await expect(page.getByTestId('client-home-dashboard')).toBeVisible({ timeout: 20_000 });
+  const revealLauncher = page.getByRole('button', { name: /show trabawho assistant button/i });
+  if (await revealLauncher.isVisible()) await revealLauncher.click();
 }
 
 test.describe('floating TrabaWho chatbot', () => {

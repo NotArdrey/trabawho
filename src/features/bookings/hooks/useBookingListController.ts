@@ -4,14 +4,36 @@ import {
   fetchSellerBookings,
   submitBookingReview,
   updateBookingWorkflow,
-} from '../services/bookingService';
-import { isSupabaseConfigured, supabase } from '../../../shared/services/supabaseClient';
+} from '@/features/bookings/services/bookingService';
+import { isSupabaseConfigured, supabase } from '@/integrations/supabase';
 
 const COMPLETED_STATUSES = ['Completed Service', 'Service Stopped'];
 const TERMINAL_STATUSES = [...COMPLETED_STATUSES, 'Cancelled', 'Cancelled (Cash)', 'Refunded'];
 const PAYMENT_PENDING_STATUSES = ['Payment Pending', 'Slot Selected - Payment Pending', 'Downpayment Paid'];
 
-export function useBookingListController(initialBookings = [], options = {}) {
+export interface BookingListItem {
+  id: string;
+  status: string;
+  paymentStatus?: string;
+  paymentMethod?: string | null;
+  refundStatus?: string | null;
+  bookingMode?: string;
+  isRequestBooking?: boolean;
+}
+interface Options {
+  autoLoad?: boolean;
+  includeStandaloneChats?: boolean;
+  listRole?: "buyer" | "seller";
+  sellerId?: string | null;
+}
+type BookingUpdates = Record<string, unknown> & { rating?: number; review?: string; reviewImage?: File | null };
+const saveReview = submitBookingReview as unknown as (booking: BookingListItem, rating: number, review: string, image: File | null) => Promise<BookingListItem>;
+function loadErrorMessage(error: unknown) {
+  if (error instanceof Error && /sign in/i.test(error.message)) return "Please sign in again to load your bookings.";
+  return "Bookings could not be loaded. Check your connection and retry.";
+}
+
+export function useBookingListController(initialBookings: BookingListItem[] = [], options: Options = {}) {
   const { autoLoad = true, includeStandaloneChats = false, listRole = 'buyer', sellerId = null } = options;
   const sourceKey = `${listRole}:${sellerId || 'current'}:${includeStandaloneChats ? 'chats' : 'bookings'}`;
   const [bookings, setBookings] = useState(Array.isArray(initialBookings) ? initialBookings : []);
@@ -41,7 +63,7 @@ export function useBookingListController(initialBookings = [], options = {}) {
       return rows;
     } catch (error) {
       if (isLatestRequest()) {
-        setLoadError(error?.message || 'Unable to load bookings.');
+        setLoadError(loadErrorMessage(error));
       }
       return [];
     } finally {
@@ -53,8 +75,10 @@ export function useBookingListController(initialBookings = [], options = {}) {
 
   useEffect(() => {
     if (!autoLoad) return undefined;
-    refreshBookings();
+    let active = true;
+    queueMicrotask(() => { if (active) void refreshBookings(); });
     return () => {
+      active = false;
       activeRequestRef.current += 1;
     };
   }, [autoLoad, refreshBookings]);
@@ -62,7 +86,7 @@ export function useBookingListController(initialBookings = [], options = {}) {
   useEffect(() => {
     if (!autoLoad || !isSupabaseConfigured) return undefined;
 
-    let refreshTimer = null;
+    let refreshTimer: number | undefined;
     const queueRefresh = () => {
       window.clearTimeout(refreshTimer);
       refreshTimer = window.setTimeout(() => void refreshBookings(), 250);
@@ -80,9 +104,9 @@ export function useBookingListController(initialBookings = [], options = {}) {
     };
   }, [autoLoad, listRole, refreshBookings, sellerId]);
 
-  const visibleBookings = loadedSourceKey === sourceKey ? bookings : [];
+  const visibleBookings = useMemo(() => loadedSourceKey === sourceKey ? bookings : [], [bookings, loadedSourceKey, sourceKey]);
 
-  const replaceBooking = useCallback((updatedBooking) => {
+  const replaceBooking = useCallback((updatedBooking: BookingListItem) => {
     if (!updatedBooking?.id) return;
     setBookings((prevBookings) => {
       const exists = prevBookings.some((booking) => booking.id === updatedBooking.id);
@@ -93,28 +117,28 @@ export function useBookingListController(initialBookings = [], options = {}) {
     });
   }, []);
 
-  const getBooking = useCallback((bookingId) => (
+  const getBooking = useCallback((bookingId: string) => (
     visibleBookings.find((booking) => String(booking.id) === String(bookingId)) || null
   ), [visibleBookings]);
 
-  const persistBookingUpdate = useCallback(async (bookingId, updates) => {
+  const persistBookingUpdate = useCallback(async (bookingId: string, updates: BookingUpdates) => {
     const current = getBooking(bookingId);
     if (!current) return null;
 
     try {
       setActionError('');
       const updated = updates.rating !== undefined
-        ? await submitBookingReview(current, updates.rating, updates.review || '', updates.reviewImage || null)
+        ? await saveReview(current, updates.rating, updates.review || '', updates.reviewImage || null)
         : await updateBookingWorkflow(current, updates);
-      replaceBooking(updated);
+      replaceBooking({ ...current, ...updated });
       return updated;
     } catch (error) {
-      setActionError(error?.message || 'Unable to update booking.');
+      setActionError(error instanceof Error ? error.message : 'Unable to update booking.');
       throw error;
     }
   }, [getBooking, replaceBooking]);
 
-  const handleApproveQuote = useCallback((bookingId) => {
+  const handleApproveQuote = useCallback((bookingId: string) => {
     const booking = getBooking(bookingId);
     const isRequestBooking = booking?.bookingMode === 'calendar-only' || booking?.isRequestBooking;
 
@@ -126,7 +150,7 @@ export function useBookingListController(initialBookings = [], options = {}) {
     });
   }, [getBooking, persistBookingUpdate]);
 
-  const handleRejectQuote = useCallback((bookingId, reason) => (
+  const handleRejectQuote = useCallback((bookingId: string, reason: string) => (
     persistBookingUpdate(bookingId, {
       quoteApproved: false,
       quoteRejectionReason: reason,
@@ -135,7 +159,7 @@ export function useBookingListController(initialBookings = [], options = {}) {
     })
   ), [persistBookingUpdate]);
 
-  const handleStopServiceAccepted = useCallback((bookingId) => (
+  const handleStopServiceAccepted = useCallback((bookingId: string) => (
     persistBookingUpdate(bookingId, {
       status: 'Service Stopped',
       serviceActive: false,
@@ -147,7 +171,7 @@ export function useBookingListController(initialBookings = [], options = {}) {
     })
   ), [persistBookingUpdate]);
 
-  const updateBooking = useCallback((bookingId, updates) => (
+  const updateBooking = useCallback((bookingId: string, updates: BookingUpdates) => (
     persistBookingUpdate(bookingId, updates)
   ), [persistBookingUpdate]);
 
@@ -170,7 +194,7 @@ export function useBookingListController(initialBookings = [], options = {}) {
       }
       if (displayFilter === 'payment-pending') {
         return PAYMENT_PENDING_STATUSES.includes(booking.status)
-          || ['pending_provider', 'partially_paid'].includes(booking.paymentStatus);
+          || ['pending_provider', 'partially_paid'].includes(booking.paymentStatus || '');
       }
       if (displayFilter === 'paid') {
         return booking.paymentStatus === 'paid';
@@ -198,7 +222,7 @@ export function useBookingListController(initialBookings = [], options = {}) {
     handleApproveQuote,
     handleRejectQuote,
     handleStopServiceAccepted,
-    isLoading: isLoading || loadedSourceKey !== sourceKey,
+    isLoading: isLoading || (loadedSourceKey !== sourceKey && !loadError),
     loadError,
     refreshBookings,
     replaceBooking,

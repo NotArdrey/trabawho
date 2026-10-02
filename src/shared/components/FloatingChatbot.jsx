@@ -3,6 +3,7 @@ import { BotMessageSquare, Loader2, Paperclip, RotateCcw, Send, X } from 'lucide
 import { sendChatbotMessage } from '../services/chatbotService';
 import { startServiceConversationByServiceId } from '../../features/bookings/services/bookingService';
 import MobileChatbotLauncher from './MobileChatbotLauncher';
+import { AssistantReply } from '@/features/assistant';
 
 const MAX_IMAGE_BYTES = 2_900_000;
 const PHOTO_HELP_PROMPT = 'Please identify the problem in this photo, estimate the likely budget, and find a qualified TrabaWho worker.';
@@ -22,13 +23,11 @@ const CHATBOT_RESIZE_CURSOR = {
   nw: 'nwse-resize',
   se: 'nwse-resize',
 };
-
 const createWelcomeMessage = () => ({
   id: 'assistant-welcome',
   role: 'assistant',
   content: WELCOME_MESSAGE,
 });
-
 const createMessage = (role, content, extras = {}) => ({
   id: `${role}-${Date.now()}-${Math.random().toString(16).slice(2)}`,
   role,
@@ -622,7 +621,7 @@ function FloatingChatbot({
                     {renderAttachmentPreview(attachment, true)}
                   </div>
                 ))}
-                {message.content}
+                {message.role === 'assistant' ? <AssistantReply content={message.content} /> : message.content}
                 {message.role === 'assistant' && renderEstimate(message.estimate)}
                 {message.role === 'assistant' && renderMatches(message)}
                 {message.role === 'assistant' && renderSources(message.sources)}

@@ -47,6 +47,8 @@ export interface Database {
       }>;
       sellers: Table<TimestampColumns & {
         user_id: string;
+        profile_photo: string | null;
+        avatar_url: string | null;
         display_name: string | null;
         headline: string | null;
         tagline: string | null;
@@ -56,6 +58,10 @@ export interface Database {
         response_time_minutes: number | null;
         languages: string[] | null;
         default_currency: string | null;
+        payment_advance: boolean;
+        payment_after_service: boolean;
+        after_service_payment_type: "both" | "cash-only" | "gcash-only";
+        gcash_number: string | null;
         business_hours: Json | null;
         search_meta: Json | null;
       }>;

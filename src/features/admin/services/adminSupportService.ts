@@ -1,24 +1,31 @@
 import { supabase } from "@/integrations/supabase";
 import type { Database } from "@/integrations/supabase/database.types";
 
-export type SupportCase = Database["public"]["Tables"]["booking_support_cases"]["Row"];
 export type SupportAction = Database["public"]["Tables"]["booking_support_admin_actions"]["Row"]["action"];
+export type SupportCase = Database["public"]["Tables"]["booking_support_cases"]["Row"] & {
+  latestFollowup?: { action: SupportAction; created_at: string };
+};
 export type TargetParty = "client" | "provider" | "both";
 
 export async function listSupportCases(): Promise<SupportCase[]> {
   const { data, error } = await supabase.from("booking_support_cases")
     .select("*").order("created_at", { ascending: false }).limit(50);
   if (error) throw new Error("Support cases could not be loaded. Try refreshing.");
-  return data;
+  if (!data.length) return [];
+  const followups = await supabase.from("booking_support_admin_actions")
+    .select("case_id, action, created_at").in("case_id", data.map((item) => item.id))
+    .order("created_at", { ascending: false });
+  if (followups.error) throw new Error("Support follow-up history could not be loaded. Try refreshing.");
+  return data.map((item) => ({ ...item, latestFollowup: followups.data.find((action) => action.case_id === item.id) }));
 }
 
 export async function getSupportCaseDetail(item: SupportCase) {
   const [bookingResult, paymentsResult, auditResult, caseActionsResult, adminActionsResult, deliveryResult] = await Promise.all([
     supabase.from("bookings").select("id, buyer_id, seller_id, service_id, status, start_ts, end_ts, total_amount, currency, payment_reference, schedule_status, work_started_at").eq("id", item.booking_id).single(),
     supabase.from("payment_attempts").select("id, purpose, status, amount, currency, created_at, paid_at").eq("booking_id", item.booking_id).order("created_at", { ascending: true }),
-    supabase.from("booking_audit_events").select("id, event_type, actor_role, reason, created_at").eq("booking_id", item.booking_id).order("created_at", { ascending: true }).limit(100),
+    supabase.from("booking_audit_events").select("id, event_type, actor_role, reason, idempotency_key, created_at").eq("booking_id", item.booking_id).order("created_at", { ascending: true }).limit(100),
     supabase.from("booking_case_actions").select("id, action, note, appointment_at, created_at").eq("case_id", item.id).order("created_at", { ascending: true }),
-    supabase.from("booking_support_admin_actions").select("id, action, target_party, reason, created_at").eq("case_id", item.id).order("created_at", { ascending: true }),
+    supabase.from("booking_support_admin_actions").select("id, action, target_party, reason, operation_id, created_at").eq("case_id", item.id).order("created_at", { ascending: true }),
     supabase.from("booking_delivery_evidence").select("id, checklist, explanation, storage_path, created_at").eq("booking_id", item.booking_id).order("created_at", { ascending: true }),
   ]);
   if (bookingResult.error || !bookingResult.data) throw new Error("The booking for this case could not be loaded.");

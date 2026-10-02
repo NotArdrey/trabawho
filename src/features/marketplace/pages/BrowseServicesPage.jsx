@@ -14,23 +14,22 @@ import {
 } from '@/components/ui/pagination';
 import SuccessNotification from '../../../shared/components/SuccessNotification';
 import ErrorNotification from '../../../shared/components/ErrorNotification';
-import { startServiceConversation } from '../../bookings/services/bookingService';
-import { createPayMongoCheckout, redirectToPayMongo } from '../../bookings/services/paymongoCheckout';
-import { fetchAllActiveServices } from '../../../shared/services/authService';
+import { fetchMarketplaceServices } from "../services/marketplaceServices";
+import { compareMarketplaceServices } from "../utils/marketplaceRanking";
+import { getActiveAdBooster } from "@/shared/utils/serviceBoost";
 import { supabase } from '../../../shared/services/supabaseClient';
 import BookingCalendarModal from '../../bookings/components/BookingCalendarModal';
 import PaymentModal from '../../bookings/components/PaymentModal';
-import BookingTermsModal from '../../bookings/components/BookingTermsModal';
 import ServiceCard from '../components/ServiceCard';
 import WorkerDetailModal from '../components/WorkerDetailModal';
 import ReviewsModal from '../components/ReviewsModal';
 import { MarketplaceFilterPanel } from '../components/MarketplaceFilterPanel';
 import { MarketplaceSearchToolbar } from '../components/MarketplaceSearchToolbar';
 import { useMarketplaceSchedules } from '../hooks/useMarketplaceSchedules';
+import { useMarketplaceBookingFlow } from '../hooks/useMarketplaceBookingFlow';
 import {
   createScheduleForProvider,
   getDisplayServiceType,
-  getProviderQuoteAmount,
   normalizeServiceRecord,
 } from '../utils/serviceNormalizer';
 import { createServiceSearchParams, parseServiceSearchParams } from '../../../lib/service-search';
@@ -52,18 +51,6 @@ const getProviderSellerId = (provider) => {
     || provider.rawService?.seller?.user_id
     || provider.sellerId
     || null;
-};
-
-const compareBoostPriority = (a, b) => {
-  if (a.isBoosted !== b.isBoosted) return a.isBoosted ? -1 : 1;
-  if (!a.isBoosted || !b.isBoosted) return 0;
-
-  const budgetDelta = (b.boostBudget || 0) - (a.boostBudget || 0);
-  if (budgetDelta !== 0) return budgetDelta;
-
-  const aStartedAt = new Date(a.adBooster?.starts_at || a.adBooster?.startsAt || 0).getTime() || 0;
-  const bStartedAt = new Date(b.adBooster?.starts_at || b.adBooster?.startsAt || 0).getTime() || 0;
-  return bStartedAt - aStartedAt;
 };
 
 function BrowseServicesPage({
@@ -102,21 +89,23 @@ function BrowseServicesPage({
   });
   const [showMobileFilters, setShowMobileFilters] = useState(false);
   const [services, setServices] = useState([]);
+  const [boostClock, setBoostClock] = useState(Date.now);
+  useEffect(() => {
+    const timer = window.setInterval(() => setBoostClock(Date.now()), 30000);
+    return () => window.clearInterval(timer);
+  }, []);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
-  const [selectedWorker, setSelectedWorker] = useState(null);
-  const [isWorkerModalOpen, setIsWorkerModalOpen] = useState(false);
-  const [isBookingCalendarOpen, setIsBookingCalendarOpen] = useState(false);
-  const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
-  const [pendingBooking, setPendingBooking] = useState(null);
-  const [bookingMessage, setBookingMessage] = useState('');
-  const [bookingError, setBookingError] = useState('');
-  const [isBookingSubmitting, setIsBookingSubmitting] = useState(false);
-  const [pendingTermsAction, setPendingTermsAction] = useState(null);
   const [reviewsTarget, setReviewsTarget] = useState(null);
   const [reviewsBySeller, setReviewsBySeller] = useState({});
   const [isReviewsLoading, setIsReviewsLoading] = useState(false);
   const { refreshSchedules, schedulesByProvider } = useMarketplaceSchedules(services);
+  const {
+    selectedWorker, setSelectedWorker, isWorkerModalOpen, setIsWorkerModalOpen,
+    isBookingCalendarOpen, setIsBookingCalendarOpen, isPaymentModalOpen, setIsPaymentModalOpen,
+    pendingBooking, setPendingBooking, bookingMessage, setBookingMessage, bookingError, setBookingError, isBookingSubmitting,
+    handleViewProfile, handleBookNow, handleStartChat, handleConfirmBooking, handleSelectPayment,
+  } = useMarketplaceBookingFlow({ isPublic, services, schedulesByProvider, refreshSchedules, onRequireLogin, onOpenChatPage });
 
   const searchQuery = isPublic ? localSearchQuery : externalSearchQuery;
   const locationQuery = isPublic ? localLocationQuery : '';
@@ -142,7 +131,7 @@ function BrowseServicesPage({
       try {
         setIsLoading(true);
         setLoadError('');
-        const rows = await fetchAllActiveServices(80);
+        const rows = await fetchMarketplaceServices();
         if (!mounted) return;
         setServices((rows || []).map((row) => normalizeServiceRecord(row, sellerProfile || {})));
       } catch (error) {
@@ -251,15 +240,9 @@ function BrowseServicesPage({
       return matchesSearch && matchesCategory && matchesDistrict;
     });
 
-    return filtered.sort((a, b) => {
-      const boostOrder = compareBoostPriority(a, b);
-      if (boostOrder !== 0) return boostOrder;
-      if (sortMode === 'price-low') return getProviderQuoteAmount(a) - getProviderQuoteAmount(b);
-      if (sortMode === 'rating') return (b.rating || 0) - (a.rating || 0);
-      if (sortMode === 'newest') return new Date(b.rawService?.created_at || 0) - new Date(a.rawService?.created_at || 0);
-      return (b.reviews || 0) - (a.reviews || 0);
-    });
-  }, [activeCategory, isPublic, locationQuery, searchQuery, selectedDistrict, services, sortMode]);
+    return filtered.map((provider) => ({ ...provider, ...getActiveAdBooster(provider.rawService, boostClock) }))
+      .sort((a, b) => compareMarketplaceServices(a, b, sortMode, boostClock));
+  }, [activeCategory, isPublic, locationQuery, searchQuery, selectedDistrict, services, sortMode, boostClock]);
 
   const totalPages = Math.max(1, Math.ceil(filteredServices.length / SERVICES_PER_PAGE));
   const activePage = Math.min(currentPage, totalPages);
@@ -329,151 +312,6 @@ function BrowseServicesPage({
     const nextLocation = event.target.value;
     setLocalLocationQuery(nextLocation);
     updatePublicSearch({ query: localSearchQuery, location: nextLocation });
-  };
-
-  const handleViewProfile = (provider) => {
-    setSelectedWorker(provider);
-    setIsWorkerModalOpen(true);
-  };
-
-  const executeBookNow = async (worker) => {
-    if (isPublic) {
-      setIsWorkerModalOpen(false);
-      onRequireLogin?.();
-      return;
-    }
-
-    if (worker.actionType === 'inquire') {
-      try {
-        setIsBookingSubmitting(true);
-        setBookingError('');
-        const conversation = await startServiceConversation({ provider: worker });
-        setIsWorkerModalOpen(false);
-        setSelectedWorker(null);
-        setBookingMessage(`Chat started with ${worker.name}.`);
-        onOpenChatPage?.(conversation?.id);
-      } catch (error) {
-        setBookingError(error?.message || 'Unable to start chat with this worker.');
-      } finally {
-        setIsBookingSubmitting(false);
-      }
-      return;
-    }
-
-    setIsWorkerModalOpen(false);
-    setIsBookingCalendarOpen(true);
-  };
-
-  const handleBookNow = (worker) => {
-    if (isPublic) {
-      executeBookNow(worker);
-      return;
-    }
-
-    setPendingTermsAction({ type: 'book', worker });
-  };
-
-  const executeStartChat = async (provider) => {
-    if (isPublic) {
-      onRequireLogin?.();
-      return;
-    }
-
-    try {
-      setIsBookingSubmitting(true);
-      setBookingError('');
-      const conversation = await startServiceConversation({ provider });
-      setBookingMessage(`Chat started with ${provider.name}.`);
-      onOpenChatPage?.(conversation?.id);
-    } catch (error) {
-      setBookingError(error?.message || 'Unable to start chat with this worker.');
-    } finally {
-      setIsBookingSubmitting(false);
-    }
-  };
-
-  const handleStartChat = (provider) => {
-    executeStartChat(provider);
-  };
-
-  const handleConfirmTermsAction = async () => {
-    const action = pendingTermsAction;
-    setPendingTermsAction(null);
-    if (!action) return;
-
-    if (action.type === 'chat') {
-      await executeStartChat(action.provider);
-      return;
-    }
-
-    await executeBookNow(action.worker);
-  };
-
-  const handleConfirmBooking = ({ workerId, date, dayKey, blockId, manualScheduling }) => {
-    const worker = services.find((item) => item.id === workerId) || selectedWorker;
-    if (!worker) return;
-
-    const schedule = schedulesByProvider[workerId] || createScheduleForProvider(worker);
-    const selectedBlock = manualScheduling
-      ? { id: `manual-${workerId}-${date}`, startTime: 'Manual', endTime: 'Schedule', capacity: 1, slotsLeft: 1 }
-      : ((schedule.dayBlocks?.[date] || schedule.dayBlocks?.[dayKey] || []).find((block) => block.id === blockId));
-
-    setPendingBooking({
-      workerId,
-      serviceId: worker.rawService?.id,
-      sellerId: worker.rawService?.seller_id,
-      rawService: worker.rawService,
-      workerName: worker.name,
-      serviceType: getDisplayServiceType(worker),
-      quoteAmount: getProviderQuoteAmount(worker),
-      bookingMode: worker.bookingMode,
-      selectedSlot: {
-        date,
-        dateKey: date,
-        dayKey,
-        blockId: selectedBlock?.id || blockId,
-        slotId: selectedBlock?.rawSlot?.id || null,
-        rawSlot: selectedBlock?.rawSlot || null,
-        timeBlock: selectedBlock,
-      },
-      allowGcashAdvance: true,
-      allowAfterService: false,
-      afterServicePaymentType: 'gcash-only',
-    });
-
-    setIsBookingCalendarOpen(false);
-    setIsPaymentModalOpen(true);
-  };
-
-  const handleSelectPayment = async (selectedPaymentMethod, mockPayment) => {
-    if (!pendingBooking) return;
-    if (selectedPaymentMethod !== 'paymongo-card') {
-      setBookingError('GCash is coming soon. Choose PayMongo card checkout to continue.');
-      return;
-    }
-
-    try {
-      setIsBookingSubmitting(true);
-      setBookingError('');
-      const checkout = await createPayMongoCheckout({
-        ...pendingBooking,
-        paymentPlan: mockPayment?.paymentPlan || 'full',
-      });
-      redirectToPayMongo(checkout);
-    } catch (error) {
-      setIsBookingSubmitting(false);
-      const message = error?.message || 'Unable to reserve this booking.';
-      if (/time (?:is|was).*(?:unavailable|booked)|slot.*(?:unavailable|full)/i.test(message)) {
-        setIsPaymentModalOpen(false);
-        setPendingBooking(null);
-        refreshSchedules();
-        setIsBookingCalendarOpen(true);
-        setBookingError('That time is no longer available. Availability has been refreshed—choose another time.');
-        return;
-      }
-      setBookingError(message);
-      throw error;
-    }
   };
 
   return (
@@ -662,6 +500,7 @@ function BrowseServicesPage({
       {isPaymentModalOpen && pendingBooking && (
         <PaymentModal
           booking={pendingBooking}
+          requireBookingTerms
           onSelectPayment={handleSelectPayment}
           onCancel={() => {
             if (isBookingSubmitting) return;
@@ -670,15 +509,6 @@ function BrowseServicesPage({
           }}
         />
       )}
-
-      <BookingTermsModal
-        isOpen={Boolean(pendingTermsAction)}
-        appTheme={appTheme}
-        title="Agree Before Booking"
-        confirmLabel="Agree and Continue"
-        onCancel={() => setPendingTermsAction(null)}
-        onConfirm={handleConfirmTermsAction}
-      />
 
       <ReviewsModal
         isOpen={Boolean(reviewsTarget)}

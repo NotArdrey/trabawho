@@ -1,7 +1,7 @@
-// @ts-nocheck
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import {
   appRoleFromIdentityRole,
+  assertPublicSignupAllowed,
   buildDeferredEmailDelivery,
   buildIdentityDocumentFingerprint,
   buildProfilePayload,
@@ -21,16 +21,16 @@ import {
   normalizeIdentityRole,
   normalizeStatus,
   parseJsonBody,
-  queueManualIdentityReview,
   recordRegistrationAttempt,
   RegistrationRateLimitError,
   resolveDiditDecisionStatus,
   sanitizeIdentityVerificationData,
   sendEmailConfirmation,
-  upsertIdentityDocumentClaim,
   updateRegistrationAttempt,
   verifySessionNonce,
 } from "../_shared/identityRegistration.ts";
+
+import { validateSignupDetails } from "../_shared/identityDomain.ts";
 
 const fetchLiveDiditDecision = async (sessionId: string) => {
   const diditApiKey = Deno.env.get("DIDIT_API_KEY") || "";
@@ -48,6 +48,7 @@ const fetchLiveDiditDecision = async (sessionId: string) => {
           "Content-Type": "application/json",
           "x-api-key": diditApiKey,
         },
+        signal: AbortSignal.timeout(8000),
       });
       if (!response.ok) continue;
       const payload = await response.json();
@@ -63,16 +64,11 @@ const fetchLiveDiditDecision = async (sessionId: string) => {
   return merged;
 };
 
-const isDiditAutoApproveEnabled = () => {
-  const value = cleanString(Deno.env.get("TRABAWHO_DIDIT_AUTO_APPROVE") || Deno.env.get("DIDIT_AUTO_APPROVE"));
-  return ["1", "true", "yes", "on"].includes(value.toLowerCase());
-};
-
 const ensureSignupAuthUser = async (
-  supabaseAdmin: any,
+  supabaseAdmin: ReturnType<typeof createAdminClient>,
   { email, password, identityRole, appRole, fullName, identityStatus, diditSessionId, documentType, documentTypeKey }: Record<string, unknown>,
 ) => {
-  const existingUser = await findAuthUserByEmail(supabaseAdmin, email);
+  const existingUser = await findAuthUserByEmail(supabaseAdmin, normalizeEmail(email));
   const metadata = {
     ...(existingUser?.user_metadata || {}),
     role: normalizeAppRole(appRole),
@@ -88,6 +84,7 @@ const ensureSignupAuthUser = async (
   };
 
   if (existingUser) {
+    if (existingUser.email_confirmed_at) throw new Error("This email already has an account. Contact support to retry identity verification.");
     const updatePayload: Record<string, unknown> = { user_metadata: metadata };
     if (cleanString(password).length >= 8) updatePayload.password = password;
 
@@ -113,6 +110,7 @@ serve(async (req: Request) => {
 
   try {
     const body = await parseJsonBody(req);
+    const location = validateSignupDetails(body);
     const email = normalizeEmail(body?.email);
     const password = cleanString(body?.password);
     const identityRole = normalizeIdentityRole(body?.role || body?.identityRole);
@@ -130,18 +128,6 @@ serve(async (req: Request) => {
 
     const supabaseAdmin = createAdminClient();
     const existingProfile = await findProfileByEmail(supabaseAdmin, email);
-    if (existingProfile) {
-      const existingStatus = normalizeStatus(existingProfile.verification_status || (existingProfile.identity_required ? "PENDING" : "LEGACY"));
-      const existingRole = cleanString(existingProfile.role).toLowerCase();
-      if (existingRole === "admin") throw new Error("Admin accounts cannot use public registration.");
-      if (existingProfile.is_verified || existingStatus === "APPROVED") {
-        throw new Error("This email is already registered and verified. Please log in.");
-      }
-      if (!["DECLINED", "ABANDONED", "EXPIRED", "SUPERSEDED"].includes(existingStatus)) {
-        throw new Error("This email already has an active registration or review.");
-      }
-    }
-
     const attemptId = await recordRegistrationAttempt(supabaseAdmin, req, {
       action: "create_unverified_user",
       email,
@@ -161,16 +147,23 @@ serve(async (req: Request) => {
     }
 
     const nonceHash = localSession?.verification_data?.session_nonce_hash;
-    if (nonceHash && !(await verifySessionNonce(diditSessionId, sessionNonce, nonceHash))) {
+    if (!nonceHash || !(await verifySessionNonce(diditSessionId, sessionNonce, nonceHash))) {
       await updateRegistrationAttempt(supabaseAdmin, attemptId, { success: false, reason: "invalid_session_nonce" });
       return jsonResponse({ success: false, error: "Didit session could not be validated. Please restart identity verification." });
     }
 
     const storedEmail = normalizeEmail(localSession?.verification_data?.email);
-    if (storedEmail && storedEmail !== email) {
+    if (!storedEmail || storedEmail !== email) {
       return jsonResponse({ success: false, error: "Didit session email does not match this signup." });
     }
 
+    if (normalizeStatus(localSession.status) === "SUPERSEDED") throw new Error("This session was replaced. Restart verification.");
+    if (existingProfile?.didit_session_id === diditSessionId && localSession.verification_data?.finalized_at) {
+      return jsonResponse({ success: true, userId: existingProfile.user_id, identityStatus: existingProfile.verification_status,
+        message: "Registration is already saved. Confirm your email after identity approval." });
+    }
+    assertPublicSignupAllowed(existingProfile, appRole);
+    if (localSession.verification_data?.app_role !== appRole) throw new Error("The account type must match the verification session.");
     const liveDidit = await fetchLiveDiditDecision(diditSessionId);
     const localPayload = {
       ...localSession.verification_data,
@@ -178,8 +171,7 @@ serve(async (req: Request) => {
     };
     const liveStatus = resolveDiditDecisionStatus(liveDidit);
     const localStatus = resolveDiditDecisionStatus(localPayload);
-    const requestedStatus = normalizeStatus(body?.diditStatus);
-    const resolvedStatus = liveStatus || localStatus || requestedStatus;
+    const resolvedStatus = liveStatus || localStatus;
 
     if (!isApprovedOrReviewStatus(resolvedStatus)) {
       await updateRegistrationAttempt(supabaseAdmin, attemptId, {
@@ -193,19 +185,20 @@ serve(async (req: Request) => {
       ...localPayload,
       liveDecision: findDecisionObject(liveDidit),
     });
-    const document = extractIdentityDocument(liveDidit || localPayload, {
+    const document = extractIdentityDocument(Object.keys(liveDidit).length ? liveDidit : localPayload, {
       documentType,
       documentTypeKey,
       fullName,
     });
-    const documentFingerprint = await buildIdentityDocumentFingerprint(liveDidit || localPayload, {
+    const documentFingerprint = await buildIdentityDocumentFingerprint(Object.keys(liveDidit).length ? liveDidit : localPayload, {
       documentType,
       documentTypeKey,
       fullName,
     });
 
-    const autoApproveDidit = isDiditAutoApproveEnabled();
-    let finalIdentityStatus = resolvedStatus === "APPROVED" || autoApproveDidit ? "APPROVED" : "PENDING_REVIEW";
+    if (document.expiry && document.expiry < new Date().toISOString().slice(0, 10))
+      throw new Error("Your identity document has expired. Register again using a current document.");
+    let finalIdentityStatus = resolvedStatus === "APPROVED" ? "APPROVED" : "PENDING_REVIEW";
     let duplicateIdentity = { hasDuplicate: false, matches: [] };
     if (documentFingerprint) {
       duplicateIdentity = await findDuplicateIdentityClaim(supabaseAdmin, {
@@ -213,7 +206,7 @@ serve(async (req: Request) => {
         role: identityRole,
         email,
       });
-      if (duplicateIdentity.hasDuplicate && !autoApproveDidit) finalIdentityStatus = "PENDING_REVIEW";
+      if (duplicateIdentity.hasDuplicate) finalIdentityStatus = "PENDING_REVIEW";
     }
 
     const authUser = await ensureSignupAuthUser(supabaseAdmin, {
@@ -237,69 +230,24 @@ serve(async (req: Request) => {
       identityStatus: finalIdentityStatus,
       diditSessionId,
       idDocumentExpiry: document.expiry || null,
+      location,
     });
 
-    const { error: profileError } = await supabaseAdmin
-      .from("profiles")
-      .upsert(profilePayload, { onConflict: "user_id" });
-    if (profileError) throw new Error(`Unable to save profile: ${profileError.message}`);
-
-    await supabaseAdmin
-      .from("verification_sessions")
-      .update({
-        user_id: authUser.id,
-        status: finalIdentityStatus,
-        verification_data: {
-          ...(localSession.verification_data || {}),
-          status: finalIdentityStatus,
-          account_user_id: authUser.id,
-          verification_data: diditVerificationData,
-          finalized_at: new Date().toISOString(),
-        },
-      })
-      .eq("session_ref", diditSessionId);
-
-    let manualReview = null;
-    if (finalIdentityStatus === "PENDING_REVIEW") {
-      const duplicateReason = duplicateIdentity.hasDuplicate
-        ? `This ID appears to match another ${identityRole} account. We will review it manually.`
-        : null;
-      manualReview = await queueManualIdentityReview(supabaseAdmin, {
-        userId: authUser.id,
-        email,
-        role: identityRole,
-        appRole,
-        documentType,
-        documentTypeKey,
-        source: duplicateIdentity.hasDuplicate ? "DIDIT_DUPLICATE" : "DIDIT_PENDING",
-        diditSessionId,
-        documentFingerprint,
-        duplicateReason,
-        duplicateMatchCount: duplicateIdentity.matches.length,
-        metadata: { diditVerificationData },
-        verifiedFullLegalName: document.fullName,
-        normalizedFullLegalName: document.normalizedFullName,
-        birthDate: document.birthDate,
-      });
-    }
-
-    await upsertIdentityDocumentClaim(supabaseAdmin, {
-      userId: authUser.id,
-      role: identityRole,
-      appRole,
-      documentFingerprint,
-      documentType,
-      documentTypeKey,
-      source: finalIdentityStatus === "APPROVED" ? "DIDIT" : "DIDIT_PENDING",
-      status: finalIdentityStatus,
-      diditSessionId,
-      manualReviewId: manualReview?.id || null,
-      email,
-      metadata: { diditVerificationData },
-      verifiedFullLegalName: document.fullName,
-      normalizedFullLegalName: document.normalizedFullName,
-      birthDate: document.birthDate,
+    const reviewPayload = {
+      documentType, documentTypeKey, documentFingerprint,
+      source: duplicateIdentity.hasDuplicate ? "DIDIT_DUPLICATE" : "DIDIT_PENDING",
+      duplicateReason: duplicateIdentity.hasDuplicate ? "Another account has a matching identity document." : null,
+      duplicateMatchCount: duplicateIdentity.matches.length,
+      metadata: { diditVerificationData, consent: { identity: true, terms: true, accepted_at: new Date().toISOString() } },
+      verifiedFullLegalName: document.fullName, normalizedFullLegalName: document.normalizedFullName, birthDate: document.birthDate,
+    };
+    const { data: saved, error: saveError } = await supabaseAdmin.rpc("save_identity_registration", {
+      p_user_id: authUser.id, p_profile: profilePayload, p_review: reviewPayload,
+      p_claim: { ...reviewPayload, source: finalIdentityStatus === "APPROVED" ? "DIDIT" : reviewPayload.source },
+      p_session_id: diditSessionId, p_session_data: { verification_data: diditVerificationData },
     });
+    if (saveError) throw new Error("The registration could not be saved. Retry verification status.");
+    const manualReview = { id: saved?.manualReviewId || null };
 
     const emailDelivery = finalIdentityStatus === "APPROVED"
       ? await sendEmailConfirmation(email, redirectTo)
@@ -309,7 +257,7 @@ serve(async (req: Request) => {
       success: true,
       user_id: authUser.id,
       didit_session_id: diditSessionId,
-      metadata: { identityRole, appRole, identityStatus: finalIdentityStatus, autoApproveDidit },
+      metadata: { identityRole, appRole, identityStatus: finalIdentityStatus },
     });
 
     return jsonResponse({
@@ -321,7 +269,7 @@ serve(async (req: Request) => {
       emailConfirmationDeferred: finalIdentityStatus !== "APPROVED",
       emailDelivery,
       manualReviewId: manualReview?.id || null,
-      autoApproved: autoApproveDidit,
+      autoApproved: false,
       message: finalIdentityStatus === "APPROVED"
         ? "Identity approved. Confirm your email before logging in."
         : "Your account was created and is waiting for identity review.",

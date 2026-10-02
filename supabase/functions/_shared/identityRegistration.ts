@@ -1,5 +1,7 @@
 // @ts-nocheck
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.104.1";
+import { normalizeStatus, extractIdentityDocument } from "./identityDomain.ts";
+export { normalizeStatus, findDecisionObject, resolveDiditDecisionStatus, extractIdentityDocument, buildProfilePayload } from "./identityDomain.ts";
 
 export const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -55,21 +57,6 @@ export const appRoleFromIdentityRole = (value: unknown) =>
 
 export const identityRoleFromAppRole = (value: unknown) =>
   normalizeAppRole(value) === "worker" ? "musician" : "fan";
-
-export const normalizeStatus = (value: unknown) => {
-  const normalized = cleanString(value).replace(/[\s-]+/g, "_").toUpperCase();
-  if (!normalized) return "";
-  if (normalized === "APPROVED") return "APPROVED";
-  if (["DECLINED", "REJECTED", "DENIED"].includes(normalized)) return "DECLINED";
-  if (["ABANDONED", "EXPIRED", "CANCELLED", "CANCELED", "KYC_EXPIRED"].includes(normalized)) {
-    return normalized === "EXPIRED" ? "EXPIRED" : "ABANDONED";
-  }
-  if (["IN_REVIEW", "PENDING_REVIEW", "PENDING_REVIEW_REQUIRED", "MANUAL_REVIEW", "PENDING_MANUAL_REVIEW", "REVIEW"].includes(normalized)) {
-    return "PENDING_REVIEW";
-  }
-  if (ACTIVE_STATUSES.has(normalized)) return "PENDING";
-  return normalized;
-};
 
 export const isTerminalStatus = (value: unknown) => TERMINAL_STATUSES.has(normalizeStatus(value));
 
@@ -209,56 +196,6 @@ const firstPathValue = (source: any, paths: string[][]) => {
   return "";
 };
 
-export const findDecisionObject = (source: any) => {
-  const candidates = [
-    source?.decision,
-    source?.verification_data?.decision,
-    source?.details?.decision,
-    source?.result?.decision,
-    source,
-  ];
-
-  return candidates.find((candidate) => (
-    candidate
-    && typeof candidate === "object"
-    && (Array.isArray(candidate.id_verifications) || Array.isArray(candidate.face_matches))
-  )) || null;
-};
-
-export const resolveSourceStatus = (source: any) => {
-  if (!source || typeof source !== "object") return "";
-  return normalizeStatus(
-    source.status
-    || source.verification_status
-    || source.businessStatus
-    || source.verification_data?.status
-    || source.session?.status
-    || source.result?.status
-    || source.decision?.status,
-  );
-};
-
-export const resolveDiditDecisionStatus = (source: any) => {
-  const sourceStatus = resolveSourceStatus(source);
-  const decision = findDecisionObject(source);
-  if (!decision) return sourceStatus;
-
-  const idVerification = decision.id_verifications?.[0];
-  const faceMatch = decision.face_matches?.[0];
-  const idStatus = normalizeStatus(idVerification?.status);
-  const faceStatus = normalizeStatus(faceMatch?.status);
-
-  if (idStatus === "DECLINED" || faceStatus === "DECLINED") return "DECLINED";
-  if (idStatus === "ABANDONED" || faceStatus === "ABANDONED") return "ABANDONED";
-  if (idStatus === "PENDING_REVIEW" || faceStatus === "PENDING_REVIEW") return "PENDING_REVIEW";
-  if (idStatus === "APPROVED" && !faceMatch) {
-    return sourceStatus === "PENDING_REVIEW" ? "PENDING_REVIEW" : "PENDING";
-  }
-  if (idStatus === "APPROVED" && faceStatus === "APPROVED") return "APPROVED";
-
-  return normalizeStatus(decision.status) || sourceStatus || "PENDING";
-};
-
 const normalizeDocumentToken = (value: unknown) =>
   cleanString(value).toUpperCase().replace(/[^A-Z0-9]/g, "");
 
@@ -282,82 +219,6 @@ const normalizeDateToken = (value: unknown) => {
 
   const parsed = new Date(text);
   return Number.isNaN(parsed.getTime()) ? "" : parsed.toISOString().slice(0, 10);
-};
-
-export const extractIdentityDocument = (source: any, fallback: Record<string, unknown> = {}) => {
-  const decision = findDecisionObject(source) || source;
-  const idVerification = decision?.id_verifications?.[0] || source?.id_verification || source?.idVerification || source;
-  const raw = idVerification?.ocr_data || idVerification?.extracted_data || idVerification?.document || idVerification?.document_details || idVerification || source;
-
-  const documentNumber = firstString([
-    fallback.documentNumber,
-    firstPathValue(raw, [
-      ["document_number"],
-      ["documentNumber"],
-      ["id_number"],
-      ["idNumber"],
-      ["personal_number"],
-      ["passport_number"],
-      ["license_number"],
-      ["national_id_number"],
-      ["extra_fields", "document_number"],
-      ["extra_fields", "id_number"],
-    ]),
-  ]);
-
-  const documentType = firstString([
-    fallback.documentTypeKey,
-    fallback.documentType,
-    idVerification?.document_type,
-    raw?.document_type,
-    raw?.documentType,
-    raw?.type,
-  ]).toLowerCase().replace(/[^a-z0-9_-]/g, "_");
-
-  const documentCountry = firstString([
-    fallback.documentCountry,
-    idVerification?.issuing_country,
-    raw?.issuing_country,
-    raw?.issuingCountry,
-    raw?.country,
-  ]).toUpperCase().replace(/[^A-Z]/g, "").slice(0, 3) || "PHL";
-
-  const expiry = normalizeDateToken(firstString([
-    fallback.idDocumentExpiry,
-    idVerification?.expiration_date,
-    idVerification?.expiry_date,
-    idVerification?.date_of_expiry,
-    raw?.expiration_date,
-    raw?.expiry_date,
-    raw?.date_of_expiry,
-    raw?.valid_until,
-  ]));
-
-  const fullName = firstString([
-    fallback.fullName,
-    raw?.full_name,
-    raw?.fullName,
-    raw?.name,
-    [raw?.first_name || raw?.firstName, raw?.middle_name || raw?.middleName, raw?.last_name || raw?.lastName].filter(Boolean).join(" "),
-  ]);
-
-  const birthDate = normalizeDateToken(firstString([
-    raw?.date_of_birth,
-    raw?.dateOfBirth,
-    raw?.birth_date,
-    raw?.birthDate,
-    raw?.dob,
-  ]));
-
-  return {
-    documentNumber,
-    documentType,
-    documentCountry,
-    expiry,
-    fullName,
-    normalizedFullName: normalizeIdentityNameToken(fullName),
-    birthDate,
-  };
 };
 
 export const buildIdentityDocumentFingerprint = async (source: any, fallback: Record<string, unknown> = {}) => {
@@ -418,7 +279,7 @@ export const findProfileByEmail = async (supabaseAdmin: any, email: string) => {
   return data || null;
 };
 
-export const assertPublicSignupAllowed = (profile: any, requestedAppRole = "client") => {
+export const assertPublicSignupAllowed = (profile: Record<string, unknown> | null, requestedAppRole = "client") => {
   if (!profile) return;
 
   const profileRole = cleanString(profile.role).toLowerCase();
@@ -441,7 +302,7 @@ export const assertPublicSignupAllowed = (profile: any, requestedAppRole = "clie
     throw new Error("This email is already registered and verified. Please log in.");
   }
 
-  if (!TERMINAL_STATUSES.has(verificationStatus)) {
+  if (verificationStatus !== "UNVERIFIED" && !TERMINAL_STATUSES.has(verificationStatus)) {
     throw new Error("This email already has an active registration or review.");
   }
 };
@@ -473,148 +334,6 @@ export const findDuplicateIdentityClaim = async (
   });
 
   return { hasDuplicate: matches.length > 0, matches };
-};
-
-export const upsertIdentityDocumentClaim = async (
-  supabaseAdmin: any,
-  {
-    userId,
-    role,
-    appRole,
-    documentFingerprint,
-    documentType,
-    documentTypeKey,
-    documentCountry = "PHL",
-    source = "DIDIT",
-    status = "APPROVED",
-    diditSessionId = null,
-    manualReviewId = null,
-    email = null,
-    metadata = {},
-    verifiedFullLegalName = null,
-    normalizedFullLegalName = null,
-    birthDate = null,
-  }: Record<string, unknown>,
-) => {
-  if (!isUuid(userId)) return null;
-
-  const payload = {
-    user_id: userId,
-    role: normalizeIdentityRole(role),
-    app_role: normalizeAppRole(appRole),
-    document_fingerprint: cleanString(documentFingerprint) || null,
-    original_user_id: userId,
-    normalized_email: normalizeEmail(email),
-    document_type: cleanString(documentType) || "Government ID",
-    document_type_key: cleanString(documentTypeKey) || null,
-    document_country: cleanString(documentCountry).toUpperCase() || "PHL",
-    source,
-    status,
-    didit_session_id: cleanString(diditSessionId) || null,
-    manual_review_id: cleanString(manualReviewId) || null,
-    claim_metadata: metadata && typeof metadata === "object" ? metadata : {},
-    verified_full_legal_name: cleanString(verifiedFullLegalName) || null,
-    normalized_full_legal_name: cleanString(normalizedFullLegalName) || null,
-    birth_date: cleanString(birthDate) || null,
-    updated_at: new Date().toISOString(),
-    last_seen_at: new Date().toISOString(),
-  };
-
-  let existingClaim = null;
-  if (cleanString(documentFingerprint)) {
-    const { data: existing, error: existingError } = await supabaseAdmin
-      .from("identity_document_claims")
-      .select("id")
-      .eq("user_id", userId)
-      .eq("document_fingerprint", cleanString(documentFingerprint))
-      .eq("role", normalizeIdentityRole(role))
-      .maybeSingle();
-    if (existingError && existingError.code !== "PGRST116") throw existingError;
-    existingClaim = existing;
-  }
-
-  const query = existingClaim?.id
-    ? supabaseAdmin.from("identity_document_claims").update(payload).eq("id", existingClaim.id)
-    : supabaseAdmin.from("identity_document_claims").insert(payload);
-
-  const { data, error } = await query.select("id").maybeSingle();
-  if (error) throw error;
-  return data;
-};
-
-export const queueManualIdentityReview = async (
-  supabaseAdmin: any,
-  {
-    userId,
-    email,
-    role,
-    appRole,
-    documentType,
-    documentTypeKey,
-    documentCountry = "PHL",
-    source = "DIDIT_PENDING",
-    diditSessionId = null,
-    documentFingerprint = null,
-    duplicateReason = null,
-    duplicateMatchCount = 0,
-    metadata = {},
-    verifiedFullLegalName = null,
-    normalizedFullLegalName = null,
-    birthDate = null,
-    frontImagePath = null,
-    backImagePath = null,
-    selfieImagePath = null,
-  }: Record<string, unknown>,
-) => {
-  if (!isUuid(userId)) return null;
-
-  const normalizedSource = cleanString(source).toUpperCase() || "DIDIT_PENDING";
-  const nowIso = new Date().toISOString();
-  const payload = {
-    user_id: userId,
-    submitted_by_email: normalizeEmail(email),
-    submitted_role: normalizeIdentityRole(role),
-    submitted_app_role: normalizeAppRole(appRole),
-    document_type: cleanString(documentType) || "Government ID",
-    document_type_key: cleanString(documentTypeKey) || null,
-    document_country: cleanString(documentCountry).toUpperCase() || "PHL",
-    source: normalizedSource,
-    status: "PENDING_REVIEW",
-    didit_session_id: cleanString(diditSessionId) || null,
-    document_fingerprint: cleanString(documentFingerprint) || null,
-    duplicate_reason: cleanString(duplicateReason) || null,
-    duplicate_match_count: Number(duplicateMatchCount || 0),
-    review_notes: cleanString(duplicateReason) || null,
-    metadata: metadata && typeof metadata === "object" ? metadata : {},
-    verified_full_legal_name: cleanString(verifiedFullLegalName) || null,
-    normalized_full_legal_name: cleanString(normalizedFullLegalName) || null,
-    birth_date: cleanString(birthDate) || null,
-    front_image_path: cleanString(frontImagePath) || null,
-    back_image_path: cleanString(backImagePath) || null,
-    selfie_image_path: cleanString(selfieImagePath) || null,
-    expected_decision_by: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
-    updated_at: nowIso,
-  };
-
-  const { data: existing, error: existingError } = await supabaseAdmin
-    .from("manual_identity_reviews")
-    .select("id")
-    .eq("user_id", userId)
-    .eq("status", "PENDING_REVIEW")
-    .eq("source", normalizedSource)
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-
-  if (existingError && existingError.code !== "PGRST116") throw existingError;
-
-  const query = existing?.id
-    ? supabaseAdmin.from("manual_identity_reviews").update(payload).eq("id", existing.id)
-    : supabaseAdmin.from("manual_identity_reviews").insert(payload);
-
-  const { data, error } = await query.select("id").maybeSingle();
-  if (error) throw error;
-  return data;
 };
 
 export const recordRegistrationAttempt = async (
@@ -707,38 +426,6 @@ export const updateRegistrationAttempt = async (supabaseAdmin: any, attemptId: u
     .update(updates)
     .eq("id", id);
   if (error) console.error("registration_attempt_update_failed", { message: error.message });
-};
-
-export const buildProfilePayload = ({
-  user,
-  email,
-  fullName,
-  appRole,
-  identityRole,
-  identityStatus,
-  diditSessionId = null,
-  idDocumentExpiry = null,
-}: Record<string, unknown>) => {
-  const resolvedAppRole = normalizeAppRole(appRole);
-  const resolvedIdentityStatus = normalizeStatus(identityStatus) || "PENDING_REVIEW";
-  const isApproved = resolvedIdentityStatus === "APPROVED";
-  return {
-    user_id: user?.id || user,
-    email: normalizeEmail(email || user?.email),
-    full_name: cleanString(fullName) || normalizeEmail(email || user?.email).split("@")[0] || "TrabaWho User",
-    is_client: true,
-    is_worker: resolvedAppRole === "worker",
-    role: resolvedAppRole,
-    account_status: "active",
-    identity_required: true,
-    identity_role: normalizeIdentityRole(identityRole),
-    is_verified: isApproved,
-    verification_status: resolvedIdentityStatus,
-    didit_session_id: cleanString(diditSessionId) || null,
-    id_document_expiry: cleanString(idDocumentExpiry) || null,
-    id_verified_at: isApproved ? new Date().toISOString() : null,
-    updated_at: new Date().toISOString(),
-  };
 };
 
 export const sendEmailConfirmation = async (email: string, redirectTo = "") => {

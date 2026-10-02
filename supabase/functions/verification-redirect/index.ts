@@ -1,34 +1,16 @@
-// @ts-nocheck
-Deno.serve(async (req: Request) => {
-  const url = new URL(req.url);
-  const redirectTo = url.searchParams.get("redirect_to");
-  const params = new URLSearchParams(url.searchParams);
-  params.delete("redirect_to");
-  params.delete("apikey");
-
-  if (redirectTo) {
-    const target = decodeURIComponent(redirectTo);
-    const suffix = params.toString();
-    const [baseTarget, hashFragment] = target.split("#", 2);
-    const separator = baseTarget.includes("?") ? "&" : "?";
-    const nextTarget = suffix ? `${baseTarget}${separator}${suffix}` : baseTarget;
-
-    return new Response(null, {
-      status: 302,
-      headers: {
-        Location: hashFragment ? `${nextTarget}#${hashFragment}` : nextTarget,
-      },
-    });
+import { identityReturnUrl } from "../_shared/identityRedirect.ts";
+Deno.serve((req: Request) => {
+  try {
+    const url = new URL(req.url);
+    const target = identityReturnUrl(url.searchParams.get("redirect_to"), Deno.env.get("TRABAWHO_APP_URL") || "", Deno.env.get("IDENTITY_ALLOWED_ORIGINS") || "");
+    // Provider query parameters are informational. Signup always checks its
+    // nonce-bound session on the server; the return status cannot approve it.
+    for (const key of ["verificationSessionId", "status"]) {
+      const value = url.searchParams.get(key);
+      if (value) target.searchParams.set(key, value);
+    }
+    return new Response(null, { status: 302, headers: { Location: target.toString(), "Cache-Control": "no-store" } });
+  } catch {
+    return new Response("The application return URL is not allowed.", { status: 400 });
   }
-
-  return new Response(
-    "<!doctype html><html><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\"><title>Verification Complete</title></head><body><main style=\"font-family:system-ui,sans-serif;max-width:640px;margin:12vh auto;padding:24px;\"><h1>Verification complete</h1><p>You can return to TrabaWho and log in.</p></main></body></html>",
-    {
-      headers: {
-        "Content-Type": "text/html; charset=utf-8",
-        "Cache-Control": "no-store",
-      },
-    },
-  );
 });
-

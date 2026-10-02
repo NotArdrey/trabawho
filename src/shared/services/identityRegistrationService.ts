@@ -1,9 +1,33 @@
-import { supabase } from './supabaseClient';
+import { supabase } from '@/integrations/supabase';
+import type { IdentitySignupInput, IdentitySignupSession, IdentityFunctionResponse } from './identity-registration-types';
 import {
   getRegistrationFormLogSnapshot,
   logRegistrationDebug,
   sanitizeRegistrationLogValue,
 } from './registrationLogger';
+
+
+const getServiceLocation = (value: IdentitySignupInput | IdentitySignupSession) => ({
+  province: cleanString(value.province),
+  city: cleanString(value.city),
+  barangay: cleanString(value.barangay),
+  address: cleanString(value.address),
+});
+
+const readFunctionResponse = (value: unknown): IdentityFunctionResponse => {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
+  const record = { ...value } as Record<string, unknown>;
+  const stringFields = ['error', 'message', 'sessionId', 'session_id', 'verificationUrl', 'verification_url', 'url', 'sessionNonce', 'session_nonce', 'workflowId', 'workflow_id', 'identityStatus', 'businessStatus', 'diditResolvedStatus', 'status', 'rawDiditStatus'];
+  for (const key of stringFields) {
+    if (record[key] === null) delete record[key];
+    if (record[key] !== undefined && typeof record[key] !== 'string') throw new Error('The verification service returned an unexpected response. Please try again.');
+  }
+  if (record.verification_data !== undefined) {
+    const verification = record.verification_data;
+    if (!verification || typeof verification !== 'object' || ('status' in verification && typeof verification.status !== 'string')) throw new Error('The verification service returned an unexpected status. Please try again.');
+  }
+  return record;
+};
 
 const STORAGE_KEY = 'trabawho.identitySignup.v1';
 
@@ -31,18 +55,18 @@ export const IDENTITY_STATUS = {
   TERMINAL_FAILURE: ['DECLINED', 'REJECTED', 'DENIED', 'ABANDONED', 'EXPIRED', 'CANCELLED', 'CANCELED', 'KYC_EXPIRED'],
 };
 
-const cleanString = (value) => (typeof value === 'string' ? value.trim() : '');
+const cleanString = (value: unknown) => (typeof value === 'string' ? value.trim() : '');
 
-export const normalizeEmail = (value) => cleanString(value).toLowerCase();
+export const normalizeEmail = (value: unknown) => cleanString(value).toLowerCase();
 
-export const getDocumentType = (key) =>
+export const getDocumentType = (key: string) =>
   IDENTITY_DOCUMENT_TYPES.find((item) => item.key === key) || IDENTITY_DOCUMENT_TYPES[0];
 
-export const getIdentityRoleFromAppRole = (role) => (role === 'worker' ? 'musician' : 'fan');
+export const getIdentityRoleFromAppRole = (role: string) => (role === 'worker' ? 'musician' : 'fan');
 
-export const getAppRoleFromIdentityRole = (role) => (role === 'musician' ? 'worker' : 'client');
+export const getAppRoleFromIdentityRole = (role: string) => (role === 'musician' ? 'worker' : 'client');
 
-export const normalizeIdentityStatus = (value) => {
+export const normalizeIdentityStatus = (value: unknown) => {
   const normalized = cleanString(value).replace(/[\s-]+/g, '_').toUpperCase();
   if (!normalized) return 'PENDING';
   if (['APPROVED'].includes(normalized)) return 'APPROVED';
@@ -59,10 +83,10 @@ export const normalizeIdentityStatus = (value) => {
   return normalized;
 };
 
-export const isTerminalIdentityFailure = (status) =>
+export const isTerminalIdentityFailure = (status: unknown) =>
   IDENTITY_STATUS.TERMINAL_FAILURE.includes(normalizeIdentityStatus(status));
 
-export const isActiveIdentityStatus = (status) =>
+export const isActiveIdentityStatus = (status: unknown) =>
   IDENTITY_STATUS.ACTIVE.includes(normalizeIdentityStatus(status));
 
 const getWindowOrigin = () => (typeof window === 'undefined' ? '' : window.location.origin);
@@ -76,7 +100,7 @@ const buildTempSignupRef = () => {
   return `TEMP_WEB_SIGNUP_${suffix}`;
 };
 
-export const saveIdentitySignupState = (state) => {
+export const saveIdentitySignupState = (state: IdentitySignupSession) => {
   if (typeof window === 'undefined') return;
   window.sessionStorage.setItem(STORAGE_KEY, JSON.stringify({
     ...state,
@@ -89,7 +113,14 @@ export const loadIdentitySignupState = () => {
 
   try {
     const raw = window.sessionStorage.getItem(STORAGE_KEY);
-    return raw ? JSON.parse(raw) : null;
+    const parsed: unknown = raw ? JSON.parse(raw) : null;
+    if (!parsed || typeof parsed !== 'object') return null;
+    const data = parsed as Record<string, unknown>;
+    const required = ['tempUserRef', 'email', 'password', 'appRole', 'identityRole', 'documentTypeKey', 'documentTypeLabel', 'diditSessionId', 'sessionNonce', 'verificationUrl'];
+    if (!required.every((key) => typeof data[key] === 'string')) return null;
+    if (['province', 'city', 'barangay', 'address', 'fullName'].some((key) => data[key] !== undefined && typeof data[key] !== 'string')) return null;
+    if (data.workflowId !== null && typeof data.workflowId !== 'string') return null;
+    return data as unknown as IdentitySignupSession;
   } catch (error) {
     console.warn('Unable to read identity signup state:', error);
     return null;
@@ -101,7 +132,7 @@ export const clearIdentitySignupState = () => {
   window.sessionStorage.removeItem(STORAGE_KEY);
 };
 
-const formatEdgeFunctionDetails = (details) => {
+const formatEdgeFunctionDetails = (details: unknown): string => {
   if (!details) return '';
 
   if (typeof details === 'string') {
@@ -118,37 +149,40 @@ const formatEdgeFunctionDetails = (details) => {
       .join('; ');
   }
 
-  return String(details);
+  return typeof details === 'number' || typeof details === 'boolean' || typeof details === 'bigint' ? String(details) : '';
 };
 
-const createEdgeFunctionError = (functionName, data) => {
+const createEdgeFunctionError = (functionName: string, data: IdentityFunctionResponse) => {
   const baseMessage = data?.error || `Unable to complete ${functionName}.`;
   const detailMessage = formatEdgeFunctionDetails(data?.details);
   const message = detailMessage ? `${baseMessage} Details: ${detailMessage}` : baseMessage;
-  const error = new Error(message);
+  const error = Object.assign(new Error(message), { functionName, details: data.details, response: data });
   error.functionName = functionName;
   error.details = data?.details;
   error.response = data;
   return error;
 };
 
-const invokeFunction = async (functionName, body) => {
+const invokeFunction = async (functionName: string, body: Record<string, unknown>): Promise<IdentityFunctionResponse> => {
   const startedAt = Date.now();
   logRegistrationDebug('edge_function:start', {
     functionName,
     request: body,
   });
 
-  const { data, error } = await supabase.functions.invoke(functionName, { body });
+  const response = await supabase.functions.invoke<unknown>(functionName, { body });
+  const error: unknown = response.error;
+  const data = readFunctionResponse(response.data);
 
   if (error) {
+    const message = error instanceof Error ? error.message : `Unable to call ${functionName}.`;
     logRegistrationDebug('edge_function:error', {
       functionName,
       durationMs: Date.now() - startedAt,
-      message: error.message,
+      message,
       error,
     }, 'error');
-    throw new Error(error.message || `Unable to call ${functionName}.`);
+    throw new Error(message);
   }
 
   if (data?.success === false || data?.error) {
@@ -168,7 +202,7 @@ const invokeFunction = async (functionName, body) => {
   return data || {};
 };
 
-export const startDiditIdentitySession = async (formData) => {
+export const startDiditIdentitySession = async (formData: IdentitySignupInput) => {
   const normalizedEmail = normalizeEmail(formData.email);
   const appRole = formData.accountRole === 'worker' ? 'worker' : 'client';
   const identityRole = getIdentityRoleFromAppRole(appRole);
@@ -176,7 +210,7 @@ export const startDiditIdentitySession = async (formData) => {
   const tempUserRef = formData.tempUserRef || buildTempSignupRef();
 
   logRegistrationDebug('didit_session:create_requested', {
-    form: getRegistrationFormLogSnapshot({ ...formData, email: normalizedEmail }),
+    form: getRegistrationFormLogSnapshot({ ...formData, email: normalizedEmail }) as unknown,
     appRole,
     identityRole,
     documentType,
@@ -192,6 +226,7 @@ export const startDiditIdentitySession = async (formData) => {
     redirect_url: getIdentityRedirectUrl(),
     callback: getIdentityRedirectUrl(),
     existing_session_id: formData.existingSessionId || undefined,
+    existing_session_nonce: loadIdentitySignupState()?.sessionNonce,
   });
 
   const sessionId = data.sessionId || data.session_id;
@@ -211,6 +246,9 @@ export const startDiditIdentitySession = async (formData) => {
     email: normalizedEmail,
     password: formData.password,
     fullName: formData.fullName,
+    acceptedIdentityTerms: formData.acceptedIdentityTerms === true,
+    acceptedRaTerms: formData.acceptedRaTerms === true,
+    ...getServiceLocation(formData),
     appRole,
     identityRole,
     documentTypeKey: documentType.key,
@@ -229,13 +267,14 @@ export const startDiditIdentitySession = async (formData) => {
   return nextState;
 };
 
-export const fetchDiditIdentitySession = async (sessionId) => {
+export const fetchDiditIdentitySession = async (sessionId: string) => {
   if (!sessionId) throw new Error('Missing Didit session.');
 
   logRegistrationDebug('didit_session:status_check_requested', { sessionId });
   const data = await invokeFunction('create-didit-session', {
     action: 'get_session',
     session_id: sessionId,
+    session_nonce: loadIdentitySignupState()?.sessionNonce,
   });
 
   const status = normalizeIdentityStatus(
@@ -254,12 +293,12 @@ export const fetchDiditIdentitySession = async (sessionId) => {
       diditResolvedStatus: data.diditResolvedStatus,
       status: data.status,
       rawDiditStatus: data.rawDiditStatus,
-    }),
+    }) as unknown,
   });
   return { ...data, status };
 };
 
-export const finishDiditIdentitySignup = async (state, status) => {
+export const finishDiditIdentitySignup = async (state: IdentitySignupSession, status: unknown) => {
   if (!state?.diditSessionId) throw new Error('Missing Didit session.');
 
   logRegistrationDebug('didit_signup:finish_requested', {
@@ -273,6 +312,9 @@ export const finishDiditIdentitySignup = async (state, status) => {
     role: state.identityRole,
     appRole: state.appRole || getAppRoleFromIdentityRole(state.identityRole),
     fullName: state.fullName,
+    acceptedIdentityTerms: state.acceptedIdentityTerms === true,
+    acceptedRaTerms: state.acceptedRaTerms === true,
+    ...getServiceLocation(state),
     diditSessionId: state.diditSessionId,
     sessionNonce: state.sessionNonce,
     selectedDocumentType: state.documentTypeLabel,
@@ -290,7 +332,7 @@ export const finishDiditIdentitySignup = async (state, status) => {
   return data;
 };
 
-const fileToImagePayload = (file) => new Promise((resolve, reject) => {
+const fileToImagePayload = (file: File | null | undefined) => new Promise<{ base64: string; mimeType: string; fileName: string; extension: string } | null>((resolve, reject) => {
   if (!file) {
     resolve(null);
     return;
@@ -298,7 +340,7 @@ const fileToImagePayload = (file) => new Promise((resolve, reject) => {
 
   const reader = new FileReader();
   reader.onload = () => {
-    const result = String(reader.result || '');
+    const result = typeof reader.result === 'string' ? reader.result : '';
     const extension = cleanString(file.name).split('.').pop() || 'jpg';
     resolve({
       base64: result,
@@ -311,12 +353,12 @@ const fileToImagePayload = (file) => new Promise((resolve, reject) => {
   reader.readAsDataURL(file);
 });
 
-export const submitManualIdentityReview = async (formData) => {
+export const submitManualIdentityReview = async (formData: IdentitySignupInput) => {
   const appRole = formData.accountRole === 'worker' ? 'worker' : 'client';
   const identityRole = getIdentityRoleFromAppRole(appRole);
   const documentType = getDocumentType(formData.documentTypeKey);
   logRegistrationDebug('manual_review:submit_requested', {
-    form: getRegistrationFormLogSnapshot(formData),
+    form: getRegistrationFormLogSnapshot(formData) as unknown,
     appRole,
     identityRole,
     documentType,
@@ -341,6 +383,8 @@ export const submitManualIdentityReview = async (formData) => {
     role: identityRole,
     appRole,
     fullName: formData.manualFullName || formData.fullName,
+    acceptedIdentityTerms: formData.acceptedIdentityTerms === true,
+    acceptedRaTerms: formData.acceptedRaTerms === true,
     documentType: documentType.label,
     documentTypeKey: documentType.key,
     identityDocumentNumber: formData.identityDocumentNumber,
@@ -349,6 +393,7 @@ export const submitManualIdentityReview = async (formData) => {
     backImage,
     selfieImage,
     source: 'MANUAL_UPLOAD',
+    ...getServiceLocation(formData),
   });
 
   clearIdentitySignupState();

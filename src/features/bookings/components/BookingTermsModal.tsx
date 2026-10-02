@@ -20,7 +20,6 @@ const DEFAULT_TERMS: BookingTerm[] = [
   { title: "Booking details", detail: "Confirm that the provider, service, schedule, and payment amount are correct." },
   { title: "15-minute reservation", detail: "Your chosen time is held while you complete checkout. If it expires, your request remains saved." },
   { title: "Changes and cancellations", detail: "Unpaid bookings cancel immediately. Paid changes require provider review and do not guarantee an automatic refund." },
-  { title: "Demo payment", detail: "PayMongo is in test mode, so no real card charge is made." },
 ];
 
 interface BookingTermsModalProps {

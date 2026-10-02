@@ -169,7 +169,7 @@ test.describe('AI redesign smoke verification', () => {
       await page.getByRole('option', { name: 'Passport' }).click();
       await expect(identityDocument).toContainText('Passport');
       await expect(page.getByRole('navigation', { name: 'Registration progress' })).toBeVisible();
-      await expect(page.getByRole('link', { name: 'Go to next page' })).toBeVisible();
+      await expect(page.getByRole('button', { name: 'Go to next page' })).toBeVisible();
       await expect(page.getByLabel('Email')).toHaveCount(0);
       await expect(page.getByText('80+')).toHaveCount(0);
       if (viewport.visualVisible) {
@@ -198,11 +198,11 @@ test.describe('AI redesign smoke verification', () => {
     await accountType.click();
     await page.getByRole('option', { name: 'Worker' }).click();
 
-    await page.getByRole('link', { name: 'Go to next page' }).click();
+    await page.getByRole('button', { name: 'Go to next page' }).click();
     await expect(page.getByText('Step 2 of 4')).toBeVisible();
     await expect(page.getByLabel('Email')).toBeVisible();
 
-    await page.getByRole('link', { name: 'Go to previous page' }).click();
+    await page.getByRole('button', { name: 'Go to previous page' }).click();
     await expect(page.getByText('Step 1 of 4')).toBeVisible();
     await expect(accountType).toContainText('Worker');
   });

@@ -74,3 +74,31 @@ describe("AdminCaseDetailDialog", () => {
     expect(await screen.findByText("Demo Provider")).toBeVisible();
   });
 });
+
+describe("support follow-up save recovery", () => {
+  beforeEach(() => vi.clearAllMocks());
+  it("keeps a saved follow-up successful when the subsequent history load fails", async () => {
+    vi.mocked(getSupportCaseDetail).mockResolvedValueOnce(detail).mockRejectedValueOnce(new TypeError("Failed to fetch"))
+      .mockResolvedValueOnce(detail);
+    vi.mocked(recordSupportFollowup).mockResolvedValueOnce({ id: 1, case_id: item.id, actor_id: "admin-1",
+      action: "request_information", target_party: "both", reason: "Please provide the booking attendance evidence.",
+      operation_id: "op-1", created_at: "2026-10-02T14:18:00Z" });
+    const onSaved = vi.fn();
+    render(<AdminCaseDetailDialog item={item} onClose={vi.fn()} onSaved={onSaved} />);
+    await screen.findByRole("heading", { name: "Record a next step" });
+    fireEvent.change(screen.getByRole("textbox", { name: "Reason and next step" }), {
+      target: { value: "Please provide the booking attendance evidence." },
+    });
+    const save = screen.getByRole("button", { name: "Record follow-up" });
+    fireEvent.click(save);
+    fireEvent.click(save);
+    expect(await screen.findByText("Support follow-up recorded. No payment or refund was changed.")).toBeVisible();
+    await screen.findByText(/follow-up was saved, but the updated history could not be loaded/i);
+    expect(recordSupportFollowup).toHaveBeenCalledOnce();
+    expect(onSaved).toHaveBeenCalledOnce();
+    expect(screen.getByRole("textbox", { name: "Reason and next step" })).toHaveValue("");
+    fireEvent.click(screen.getByRole("button", { name: "Retry loading details" }));
+    await waitFor(() => expect(screen.queryByRole("button", { name: "Retry loading details" })).not.toBeInTheDocument());
+    expect(recordSupportFollowup).toHaveBeenCalledOnce();
+  });
+});
