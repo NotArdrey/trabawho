@@ -4,6 +4,7 @@ import { CheckCircle2, FileCheck2, Flag, LoaderCircle, Play } from "lucide-react
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { performBookingLifecycleAction } from "@/features/bookings/services/bookingLifecycle";
+import { RepairCaseResolution } from "@/features/bookings/components/RepairCaseResolution";
 import {
   deliverBookingWithEvidence, getBookingDeliveryEvidence, getBookingSupportCase, openBookingSupportCase, respondToRepairClaim, startBookingWork,
   type BookingCaseType, type RepairClaimResponse,
@@ -55,7 +56,7 @@ export function BookingTransactionActions({ booking, viewerRole, onUpdated }: Pr
   }, []);
 
   useEffect(() => {
-    if (booking.disputeStatus !== "open") return;
+    if (booking.disputeStatus !== "open" && booking.disputeStatus !== "closed") return;
     let active = true;
     void getBookingSupportCase(booking.id).then((value) => { if (active) setCaseSummary({ bookingId: booking.id, data: value }); }).catch(() => { if (active) setCaseSummary(null); });
     return () => { active = false; };
@@ -74,7 +75,7 @@ export function BookingTransactionActions({ booking, viewerRole, onUpdated }: Pr
   const canReportCompleted = viewerRole === "client" && Boolean(booking.completedAt);
   const withinRepairWindow = canReportCompleted && booking.warrantyPolicyCode === "repair_workmanship_7d"
     && now <= new Date(booking.completedAt || "").getTime() + (booking.warrantyDurationDays || 7) * 24 * 60 * 60_000;
-  const canReport = booking.disputeStatus !== "open" && (canReportNoShow || canReportDelivery || canReportCompleted);
+  const canReport = booking.disputeStatus === "none" && (canReportNoShow || canReportDelivery || canReportCompleted);
   const currentCase = caseSummary?.bookingId === booking.id ? caseSummary.data : null;
   const canRespond = viewerRole === "provider" && booking.disputeStatus === "open"
     && currentCase?.case_type === "warranty_issue" && currentCase.policy_route === "rework_request"
@@ -142,6 +143,7 @@ export function BookingTransactionActions({ booking, viewerRole, onUpdated }: Pr
     {canReport && <Button type="button" variant="outline" disabled={pending} onClick={openCase}><Flag aria-hidden="true" />Report a problem</Button>}
     {booking.disputeStatus === "open" && <div className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-100"><p className="font-semibold">{currentCase?.policy_route === "rework_request" ? viewerRole === "provider" ? "Client requested repair rework" : "Repair rework requested" : "Support case open"}</p><p className="mt-1">{currentCase?.reason || "Completion is paused while this report is reviewed."}</p>{currentCase?.policy_reason && <p className="mt-1 text-xs">{currentCase.policy_reason}</p>}{currentCase?.provider_response_action && <div className="mt-3 border-t border-amber-300 pt-3 dark:border-amber-800"><p className="font-semibold">{currentCase.provider_response_action === "offer_rework" ? "Provider offered rework" : "Provider requested support review"}</p><p className="mt-1">{currentCase.provider_response_text}</p><p className="mt-1 text-xs">This response does not close the case or change payment.</p></div>}</div>}
     {canRespond && <Button type="button" variant="outline" disabled={pending} onClick={() => { setResponseAction("offer_rework"); setResponseText(""); setError(""); setDialog("response"); }}>Respond to repair claim</Button>}
+    {currentCase && <RepairCaseResolution bookingId={booking.id} caseRecord={currentCase} viewerRole={viewerRole} onCaseChanged={(updatedBooking, updatedCase) => { setCaseSummary({ bookingId: booking.id, data: updatedCase }); onUpdated(updatedBooking); }} />}
     {viewerRole === "provider" && booking.deliveryStatus === "seller_claimed" && <span className="self-center text-sm text-muted-foreground">Waiting for client confirmation</span>}
     {evidence && <div className="rounded-lg border bg-muted/30 p-3 text-sm"><p className="font-semibold">Delivery proof</p><p className="mt-1 text-muted-foreground">{evidence.checklist.join(" · ")}</p>{evidence.explanation && <p className="mt-2">{evidence.explanation}</p>}{evidence.imageUrl && <a className="mt-2 inline-block text-primary underline" href={evidence.imageUrl} target="_blank" rel="noreferrer">Open evidence image</a>}</div>}
     {success && <p role="status" className="text-sm text-emerald-700 dark:text-emerald-300">{success}</p>}

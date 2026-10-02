@@ -331,6 +331,26 @@ Implementation status on October 1, 2026:
   bookings predate the explicit policy snapshot. A fresh paid repair booking,
   in-window claim, provider answer, and client/admin refresh still need a
   two-account rehearsal. No historic booking was relabelled or fabricated.
+- The follow-up rework path is implemented in
+  `20261003110000_repair_rework_resolution.sql` with the immutable-history
+  guard `20261003111000_immutable_rework_case_actions.sql`; both are applied to the confirmed
+  demo/test project. After a provider offers rework, the provider proposes a
+  future return visit, the client accepts or escalates, the provider records
+  rework notes near the accepted appointment, and the client confirms the
+  result or escalates. Case actions are append-only, role-checked, and
+  idempotent. Client confirmation closes the case; escalation leaves it under
+  support review. Neither action changes payment or payout state.
+- Focused unit/component checks cover the visible next actor, duplicate
+  clicks, stable retries, appointment timing, and client confirmation. The
+  admin case queue shows the next actor. `npm run check` passes (188 tests),
+  the queue passed browser checks at 390, 768, 1024, 1280, and 1440 pixels,
+  and the existing admin journey passed on retry after one transient Supabase
+  fetch failure on the client dashboard. A live admin attempt to advance an
+  existing case was rejected as wrong-role. A fresh eligible repair booking is
+  still required to rehearse this
+  *positive* path across two live accounts; historical bookings were not
+  backfilled or used to simulate it. Admin remedy decisions, verified refunds,
+  payouts, notifications, and legally reviewed terms remain out of scope.
 
 ## Phase 1: Payment foundation
 

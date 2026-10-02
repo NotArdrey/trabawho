@@ -4,6 +4,7 @@ import { AlertCircle, Inbox, RefreshCw } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase";
+import { caseNextActor } from "@/features/admin/domain/caseNextActor";
 
 interface SupportCase {
   id: string;
@@ -19,6 +20,37 @@ interface SupportCase {
   provider_response_action: "offer_rework" | "request_support_review" | null;
   provider_response_text: string | null;
   provider_responded_at: string | null;
+  rework_state: "appointment_proposed" | "appointment_accepted" | "rework_delivered" | "resolved_by_client" | "escalated" | null;
+  rework_appointment_at: string | null;
+  rework_evidence_note: string | null;
+}
+
+function SupportCaseCard({ item, onViewEvidence }: { item: SupportCase; onViewEvidence: (path: string) => void }) {
+  return <article className="min-w-0 space-y-3 rounded-xl border bg-card p-4 shadow-sm">
+    <div className="flex flex-wrap items-center justify-between gap-2">
+      <h2 className="font-semibold capitalize">{item.case_type.replaceAll("_", " ")}</h2>
+      <Badge variant={item.status === "open" ? "warning" : "secondary"}>{item.status.replaceAll("_", " ")}</Badge>
+    </div>
+    <p className="text-sm">{item.reason}</p>
+    <div className="flex flex-wrap gap-x-5 gap-y-1 text-sm">
+      <p className="font-medium text-primary">{item.policy_route === "rework_request" ? "Provider rework requested" : "Support review needed"}</p>
+      <p><span className="text-muted-foreground">Next actor:</span> <strong>{caseNextActor(item)}</strong></p>
+    </div>
+    {item.policy_reason && <p className="text-xs text-muted-foreground">{item.policy_reason}</p>}
+    {item.provider_response_action && <div className="rounded-lg bg-muted p-3 text-sm">
+      <p className="font-semibold">{item.provider_response_action === "offer_rework" ? "Provider offered rework" : "Provider requested support review"}</p>
+      <p className="mt-1 whitespace-pre-wrap">{item.provider_response_text}</p>
+      <p className="mt-1 text-xs text-muted-foreground">{item.provider_responded_at ? new Date(item.provider_responded_at).toLocaleString("en-PH") : ""} · No remedy or payment was automatically approved.</p>
+    </div>}
+    {item.rework_appointment_at && <p className="text-sm">Return visit: <strong>{new Date(item.rework_appointment_at).toLocaleString("en-PH")}</strong></p>}
+    {item.rework_evidence_note && <div className="rounded-lg bg-muted p-3 text-sm"><p className="font-semibold">Rework notes</p><p className="mt-1 whitespace-pre-wrap">{item.rework_evidence_note}</p></div>}
+    {item.storage_path && <Button type="button" variant="outline" onClick={() => onViewEvidence(item.storage_path || "")}>View private evidence</Button>}
+    <dl className="grid gap-2 border-t pt-3 text-xs text-muted-foreground sm:grid-cols-3">
+      <div><dt>Booking</dt><dd className="break-all font-medium text-foreground">{item.booking_id}</dd></div>
+      <div><dt>Reporter</dt><dd className="break-all font-medium text-foreground">{item.reporter_id}</dd></div>
+      <div><dt>Reported</dt><dd className="font-medium text-foreground">{new Date(item.created_at).toLocaleString("en-PH")}</dd></div>
+    </dl>
+  </article>;
 }
 
 export default function AdminSupportCases() {
@@ -32,7 +64,7 @@ export default function AdminSupportCases() {
     let active = true;
     void (async () => {
       const result = await supabase.from("booking_support_cases")
-        .select("id, booking_id, reporter_id, case_type, reason, policy_route, policy_reason, storage_path, status, created_at, provider_response_action, provider_response_text, provider_responded_at")
+        .select("id, booking_id, reporter_id, case_type, reason, policy_route, policy_reason, storage_path, status, created_at, provider_response_action, provider_response_text, provider_responded_at, rework_state, rework_appointment_at, rework_evidence_note")
         .order("created_at", { ascending: false }).limit(50);
       if (!active) return;
       setCases(result.data || []);
@@ -55,6 +87,6 @@ export default function AdminSupportCases() {
     {error && <div role="alert" className="flex gap-2 rounded-xl border border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive"><AlertCircle className="size-4 shrink-0" aria-hidden="true" />{error}</div>}
     {evidenceError && <p role="alert" className="text-sm text-destructive">{evidenceError}</p>}
     {!loading && !error && cases.length === 0 && <div className="rounded-xl border bg-card p-8 text-center"><Inbox className="mx-auto size-8 text-muted-foreground" aria-hidden="true" /><p className="mt-2 font-semibold">No support cases yet</p><p className="text-sm text-muted-foreground">Reports submitted from booking cards will appear here.</p></div>}
-    {!loading && !error && cases.length > 0 && <div className="grid gap-3">{cases.map((item) => <article key={item.id} className="rounded-xl border bg-card p-4 shadow-sm"><div className="flex flex-wrap items-center justify-between gap-2"><h2 className="font-semibold capitalize">{item.case_type.replaceAll("_", " ")}</h2><Badge variant={item.status === "open" ? "warning" : "secondary"}>{item.status.replaceAll("_", " ")}</Badge></div><p className="mt-2 text-sm">{item.reason}</p><p className="mt-2 text-sm font-medium text-primary">{item.policy_route === "rework_request" ? "Provider rework requested" : "Support review needed"}</p>{item.policy_reason && <p className="mt-1 text-xs text-muted-foreground">{item.policy_reason}</p>}{item.provider_response_action && <div className="mt-3 rounded-lg bg-muted p-3 text-sm"><p className="font-semibold">{item.provider_response_action === "offer_rework" ? "Provider offered rework" : "Provider requested support review"}</p><p className="mt-1">{item.provider_response_text}</p><p className="mt-1 text-xs text-muted-foreground">{item.provider_responded_at ? new Date(item.provider_responded_at).toLocaleString("en-PH") : ""} · No remedy or payment was automatically approved.</p></div>}{item.storage_path && <Button type="button" variant="outline" className="mt-3" onClick={() => { void openEvidence(item.storage_path || ""); }}>View private evidence</Button>}<dl className="mt-3 grid gap-2 border-t pt-3 text-xs text-muted-foreground sm:grid-cols-3"><div><dt>Booking</dt><dd className="break-all font-medium text-foreground">{item.booking_id}</dd></div><div><dt>Reporter</dt><dd className="break-all font-medium text-foreground">{item.reporter_id}</dd></div><div><dt>Reported</dt><dd className="font-medium text-foreground">{new Date(item.created_at).toLocaleString("en-PH")}</dd></div></dl></article>)}</div>}
+    {!loading && !error && cases.length > 0 && <div className="grid gap-3">{cases.map((item) => <SupportCaseCard key={item.id} item={item} onViewEvidence={(path) => { void openEvidence(path); }} />)}</div>}
   </section>;
 }

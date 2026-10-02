@@ -18,6 +18,10 @@ const booking = {
   appointmentStartAt: "2026-01-01T09:00:00Z", workStartedAt: null,
   raw: { booking: { status: "confirmed" } },
 };
+const emptyRework = {
+  rework_state: null, rework_appointment_at: null, rework_evidence_note: null,
+  rework_delivered_at: null, rework_confirmed_at: null, rework_escalated_at: null,
+};
 
 describe("BookingTransactionActions", () => {
   beforeEach(() => vi.clearAllMocks());
@@ -83,6 +87,7 @@ describe("BookingTransactionActions", () => {
 
   it("shows the provider a client rework request without claiming the defect was accepted", async () => {
     vi.mocked(getBookingSupportCase).mockResolvedValue({
+      ...emptyRework,
       id: "case-1",
       case_type: "warranty_issue", reason: "The repaired printer stopped working again.",
       policy_route: "rework_request", policy_reason: "Provider response is needed.",
@@ -97,6 +102,7 @@ describe("BookingTransactionActions", () => {
 
   it("submits one provider response and shows it to both participants", async () => {
     const report = { id: "case-1", case_type: "warranty_issue", reason: "The repaired printer stopped working again.",
+      ...emptyRework,
       policy_route: "rework_request" as const, policy_reason: "Provider response is needed.", status: "open" as const,
       created_at: new Date().toISOString(), provider_response_action: null, provider_response_text: null, provider_responded_at: null };
     vi.mocked(getBookingSupportCase).mockResolvedValueOnce(report).mockResolvedValue({ ...report,
@@ -119,6 +125,7 @@ describe("BookingTransactionActions", () => {
 
   it("keeps a failed response editable for retry", async () => {
     vi.mocked(getBookingSupportCase).mockResolvedValue({ id: "case-1", case_type: "warranty_issue",
+      ...emptyRework,
       reason: "The repaired printer stopped working again.", policy_route: "rework_request",
       policy_reason: "Provider response is needed.", status: "open", created_at: new Date().toISOString(),
       provider_response_action: null, provider_response_text: null, provider_responded_at: null });
@@ -135,6 +142,7 @@ describe("BookingTransactionActions", () => {
 
   it("shows the saved response to the client without giving them provider controls", async () => {
     vi.mocked(getBookingSupportCase).mockResolvedValue({ id: "case-1", case_type: "warranty_issue",
+      ...emptyRework,
       reason: "The repaired printer stopped working again.", policy_route: "rework_request",
       policy_reason: "Provider response is needed.", status: "under_review", created_at: new Date().toISOString(),
       provider_response_action: "request_support_review",

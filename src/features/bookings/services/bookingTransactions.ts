@@ -64,6 +64,7 @@ export async function reviewBookingReschedule(input: { decision: ReviewDecision;
 
 export type BookingCaseType = "provider_no_show" | "client_no_show" | "delivery_issue" | "warranty_issue" | "service_issue";
 export type RepairClaimResponse = "offer_rework" | "request_support_review";
+export type RepairReworkAction = "propose_appointment" | "accept_appointment" | "escalate" | "submit_rework" | "confirm_rework";
 
 const bucket = "booking-evidence";
 const imageTypes = new Set(["image/jpeg", "image/png", "image/webp"]);
@@ -137,7 +138,7 @@ export async function openBookingSupportCase(
 
 export async function getBookingSupportCase(bookingId: string) {
   const { data, error } = await supabase.from("booking_support_cases")
-    .select("id, case_type, reason, policy_route, policy_reason, status, created_at, provider_response_action, provider_response_text, provider_responded_at")
+    .select("id, case_type, reason, policy_route, policy_reason, status, created_at, provider_response_action, provider_response_text, provider_responded_at, rework_state, rework_appointment_at, rework_evidence_note, rework_delivered_at, rework_confirmed_at, rework_escalated_at")
     .eq("booking_id", bookingId).order("created_at", { ascending: false }).limit(1).maybeSingle();
   if (error) throw new Error("The booking report could not be loaded.");
   return data;
@@ -156,6 +157,37 @@ export async function respondToRepairClaim(
   });
   if (error) throw new Error(error.message);
   return fetchBookingById(bookingId);
+}
+
+export async function advanceRepairRework(input: {
+  bookingId: string;
+  caseId: string;
+  action: RepairReworkAction;
+  note?: string;
+  appointmentAt?: string;
+}): Promise<{ booking: unknown; case: Awaited<ReturnType<typeof getBookingSupportCase>> }> {
+  const note = input.note?.trim() || null;
+  if (["submit_rework", "escalate"].includes(input.action) && (!note || note.length < 20)) {
+    throw new Error("Describe the work or reason in at least 20 characters.");
+  }
+  if (input.action === "propose_appointment" && (!input.appointmentAt || !Number.isFinite(Date.parse(input.appointmentAt)))) {
+    throw new Error("Choose a valid date and time for the return visit.");
+  }
+  const { data, error } = await supabase.rpc("advance_repair_rework", {
+    p_case_id: input.caseId,
+    p_action: input.action,
+    p_note: note,
+    p_appointment_at: input.appointmentAt || null,
+    p_storage_path: null,
+    p_operation_id: `rework:${input.caseId}:${input.action}`,
+  });
+  if (error) {
+    if (error.code === "42501") throw new Error("This action is not available to your account.");
+    if (error.code === "23505") throw new Error("This case has a different saved action. Refresh bookings to see the latest state.");
+    if (error.code === "23514") throw new Error("The case or appointment has changed. Refresh bookings and check the next step.");
+    throw new Error("Could not save this case action. Please try again.");
+  }
+  return { booking: await fetchBookingById(input.bookingId), case: data };
 }
 
 export async function getBookingDeliveryEvidence(bookingId: string, scheduleVersion: number) {
