@@ -39,10 +39,21 @@ interface PaymentBooking {
   isRequestBooking?: boolean;
   paymentPlan?: string;
   paymentStatus?: string;
+  rawService?: { service_warranty_policies?: PaymentWarrantyPolicy | PaymentWarrantyPolicy[] | null };
   quoteAmount?: number | string;
   selectedSlot?: { date?: string; timeBlock?: PaymentTimeBlock };
   serviceType?: string;
+  warrantyEligible?: boolean;
+  warrantyPolicyCode?: string | null;
+  warrantyCoverageSummary?: string | null;
+  warrantyDurationDays?: number | null;
   workerName?: string;
+}
+
+interface PaymentWarrantyPolicy {
+  enabled: boolean;
+  duration_days: number;
+  coverage_summary: string;
 }
 
 export interface PaymentSelectionDetails {
@@ -139,6 +150,11 @@ export default function PaymentModal({
   const resolvedSubtitle = subtitle || `Review the amount and payment option for ${booking.workerName || "this provider"}.`;
   const resolvedScheduleLabel = scheduleLabel?.replace(/:$/, "") || (isRequestBooking ? "Schedule" : "Appointment");
   const resolvedScheduleValue = scheduleValue || formatSchedule(booking);
+  const rawPolicy = booking.rawService?.service_warranty_policies;
+  const listingPolicy = Array.isArray(rawPolicy) ? rawPolicy[0] : rawPolicy;
+  const warrantyDays = booking.warrantyPolicyCode === "repair_workmanship_7d" ? (booking.warrantyDurationDays || 7)
+    : listingPolicy?.enabled ? listingPolicy.duration_days : null;
+  const warrantySummary = booking.warrantyCoverageSummary || listingPolicy?.coverage_summary;
 
   const handleConfirmPayment = async () => {
     if (!selectedMethod) {
@@ -226,6 +242,12 @@ export default function PaymentModal({
               </div>}
             </section>
           ) : null}
+
+          {!isRequestBooking && !isPayingRemainingBalance && <section className="rounded-xl border bg-card p-4" aria-label="After-service issue policy">
+            <h3 className="font-semibold text-foreground">After-service issue policy</h3>
+            {warrantyDays ? <p className="mt-1 text-sm leading-6 text-muted-foreground">This designated repair service has a {warrantyDays}-day workmanship issue-reporting window after completion. {warrantySummary || "An in-window report requests rework; evidence and remedies still need review."} Reports outside the window go to support review. No refund is automatic.</p>
+              : <p className="mt-1 text-sm leading-6 text-muted-foreground">This service does not have the seven-day repair-workmanship route. You can still report a problem for support review; no refund is automatic.</p>}
+          </section>}
 
           <section aria-labelledby="payment-method-heading">
             <div className="mb-3 flex items-center gap-2">

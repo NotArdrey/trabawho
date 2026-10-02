@@ -1,12 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import {
-  Filter,
-  Search,
-} from 'lucide-react';
+import { Search } from 'lucide-react';
 import DashboardNavigation from '../../../shared/components/DashboardNavigation';
 import { Button } from '@/components/ui/button';
-import { SearchFilterBar } from '@/components/ui/search-filter-bar';
 import {
   Pagination,
   PaginationContent,
@@ -16,13 +12,6 @@ import {
   PaginationNext,
   PaginationPrevious,
 } from '@/components/ui/pagination';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import SuccessNotification from '../../../shared/components/SuccessNotification';
 import ErrorNotification from '../../../shared/components/ErrorNotification';
 import { startServiceConversation } from '../../bookings/services/bookingService';
@@ -36,6 +25,7 @@ import ServiceCard from '../components/ServiceCard';
 import WorkerDetailModal from '../components/WorkerDetailModal';
 import ReviewsModal from '../components/ReviewsModal';
 import { MarketplaceFilterPanel } from '../components/MarketplaceFilterPanel';
+import { MarketplaceSearchToolbar } from '../components/MarketplaceSearchToolbar';
 import { useMarketplaceSchedules } from '../hooks/useMarketplaceSchedules';
 import {
   createScheduleForProvider,
@@ -547,44 +537,13 @@ function BrowseServicesPage({
           />
 
           <section className="browse-results-panel">
-            <SearchFilterBar
-              className="browse-search-filter"
-              searchLabel="Search services and providers"
-              searchPlaceholder="Search services, providers, or locations"
-              searchValue={searchQuery}
-              onSearchValueChange={(value) => handleSearchChange({ target: { value } })}
-              endControl={(
-                <div className="browse-search-controls">
-                <Select value={sortMode} onValueChange={(value) => {
-                  setSortMode(value);
-                  resetPage();
-                }}>
-                  <SelectTrigger
-                    className="browse-sort-trigger focus:border-foreground focus:ring-0 focus:ring-offset-0"
-                    aria-label="Sort services"
-                  >
-                    <SelectValue placeholder="Sort services" />
-                  </SelectTrigger>
-                  <SelectContent position="popper">
-                    <SelectItem value="recommended">Recommended</SelectItem>
-                    <SelectItem value="rating">Highest rated</SelectItem>
-                    <SelectItem value="price-low">Lowest price</SelectItem>
-                    <SelectItem value="newest">Newest</SelectItem>
-                  </SelectContent>
-                </Select>
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    className="hidden max-[880px]:col-start-2 max-[880px]:inline-flex"
-                    onClick={() => setShowMobileFilters((open) => !open)}
-                    aria-expanded={showMobileFilters}
-                    aria-controls="browse-filter-options"
-                  >
-                    <Filter size={17} aria-hidden="true" />
-                    {showMobileFilters ? 'Hide filters' : 'Filters'}
-                  </Button>
-                </div>
-              )}
+            <MarketplaceSearchToolbar
+              searchQuery={searchQuery}
+              sortMode={sortMode}
+              filtersOpen={showMobileFilters}
+              onSearchChange={(value) => handleSearchChange({ target: { value } })}
+              onSortChange={(value) => { setSortMode(value); resetPage(); }}
+              onToggleFilters={() => setShowMobileFilters((open) => !open)}
             />
 
             <div className="browse-results-head">

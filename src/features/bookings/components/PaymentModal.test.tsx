@@ -22,6 +22,7 @@ describe("PaymentModal", () => {
     expect(screen.getByText("Mon, Sep 28, 2026 · 9:00 PM")).toBeInTheDocument();
     expect(screen.getAllByText("PHP 522.50").length).toBeGreaterThan(0);
     expect(screen.getByRole("heading", { name: "Payment breakdown" })).toBeVisible();
+    expect(screen.getByText(/does not have the seven-day repair-workmanship route/i)).toBeVisible();
     expect(screen.queryByText("Test payment")).not.toBeInTheDocument();
 
     expect(screen.queryByText("Full payment")).not.toBeInTheDocument();
@@ -61,5 +62,14 @@ describe("PaymentModal", () => {
 
     expect(screen.getByRole("alert")).toHaveTextContent("Selected time is no longer available.");
     expect(screen.getByRole("dialog", { name: "Choose payment" })).toBeInTheDocument();
+  });
+
+  it("discloses an explicitly designated repair policy before checkout", () => {
+    render(<PaymentModal booking={{ ...booking, rawService: { service_warranty_policies: {
+      enabled: true, duration_days: 7,
+      coverage_summary: "Report workmanship issues in the agreed repair scope for rework review.",
+    } } }} onSelectPayment={vi.fn()} onCancel={vi.fn()} />);
+    expect(screen.getByText(/designated repair service has a 7-day/i)).toBeVisible();
+    expect(screen.getByText(/No refund is automatic/i)).toBeVisible();
   });
 });

@@ -350,7 +350,7 @@ export const mapBookingRowToUiBooking = (booking = {}, context = {}) => {
     upfrontRequiredAmount: getNumberOrNull(booking.upfront_required_amount) ?? totalChargedAmount,
     amountPaid: getNumberOrNull(booking.amount_paid) ?? (booking.payment_status === 'paid' ? totalChargedAmount : 0),
     balanceDueAmount: getNumberOrNull(booking.balance_due_amount) ?? 0,
-    balanceDueAt: booking.balance_due_at || booking.start_ts || null, workStartedAt: booking.work_started_at || null, appointmentStartAt: booking.start_ts || null, warrantyEligible: Boolean(booking.warranty_eligible),
+    balanceDueAt: booking.balance_due_at || booking.start_ts || null, workStartedAt: booking.work_started_at || null, appointmentStartAt: booking.start_ts || null, warrantyEligible: Boolean(booking.warranty_eligible), warrantyPolicyCode: booking.warranty_policy_code || null, warrantyDurationDays: booking.warranty_duration_days || null, warrantyCoverageSummary: booking.warranty_coverage_summary || null,
     cashCollectionStatus: booking.cash_collection_status || 'not_applicable',
     disputeStatus: booking.dispute_status || 'none',
     scheduleVersion: booking.schedule_version || 1,

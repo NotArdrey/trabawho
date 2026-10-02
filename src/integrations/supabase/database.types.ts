@@ -75,6 +75,7 @@ export interface Database {
         metadata: Json | null;
       }>;
       service_categories: Table<{ id: number; name: string; slug: string; parent_id: number | null }>;
+      service_warranty_policies: Table<{ service_id: number; policy_code: "repair_workmanship_7d"; version: string; duration_days: number; coverage_summary: string; enabled: boolean; updated_at: string }>;
       service_photos: Table<{ id: number; service_id: number; storage_path: string | null; public_url: string | null; caption: string | null; sort_order: number | null; created_at: string }>;
       portfolio_items: Table<{ id: number; seller_id: string; title: string | null; description: string | null; media: Json | null; created_at: string }>;
       seller_certifications: Table<{ id: number; seller_id: string; name: string; issuing_organization: string | null; issue_date: string | null; expiry_date: string | null; document_path: string | null; verified: boolean | null; created_at: string }>;
@@ -99,6 +100,10 @@ export interface Database {
         balance_due_at: string | null;
         work_started_at: string | null;
         warranty_eligible: boolean;
+        warranty_policy_code: string | null;
+        warranty_policy_version: string | null;
+        warranty_duration_days: number | null;
+        warranty_coverage_summary: string | null;
         cancellation_status: "none" | "requested" | "approved" | "declined";
         cancellation_reason: string | null;
         cancellation_requested_at: string | null;
@@ -108,7 +113,7 @@ export interface Database {
       booking_reschedule_requests: Table<TimestampColumns & { id: string; booking_id: string; requested_by: string; requested_slot_id: number; previous_slot_id: number | null; status: "pending" | "approved" | "declined" | "cancelled"; reason: string | null; reviewer_id: string | null; review_reason: string | null; reviewed_at: string | null; operation_id: string }>;
       payment_attempts: Table<{ id: string; booking_id: string; buyer_id: string; purpose: "initial" | "balance"; status: string; amount: number; currency: string; created_at: string; paid_at: string | null }>;
       booking_delivery_evidence: Table<{ id: string; booking_id: string; schedule_version: number; provider_id: string; checklist: string[]; explanation: string | null; storage_path: string | null; created_at: string }>;
-      booking_support_cases: Table<{ id: string; booking_id: string; reporter_id: string; case_type: string; reason: string; storage_path: string | null; status: "open" | "under_review" | "closed"; created_at: string; closed_at: string | null }>;
+      booking_support_cases: Table<{ id: string; booking_id: string; reporter_id: string; case_type: string; reason: string; storage_path: string | null; policy_route: "rework_request" | "support_review"; policy_reason: string | null; status: "open" | "under_review" | "closed"; created_at: string; closed_at: string | null }>;
       conversations: Table<{ id: string; booking_id: string | null; seller_id: string | null; buyer_id: string | null; metadata: Json | null; created_at: string }>;
       messages: Table<{ id: string; conversation_id: string; sender_id: string; body: string | null; attachments: Json | null; read_by: Json | null; created_at: string }>;
       reviews: Table<TimestampColumns & { id: number; seller_id: string; reviewer_id: string; booking_id: string | null; rating: number; title: string | null; body: string | null; helpful_count: number | null; published: boolean | null }>;

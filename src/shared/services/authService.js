@@ -1136,7 +1136,7 @@ export const fetchAllActiveServices = async (limit = 50) => {
   const { data, error } = await supabase
     .from('services')
     // include related seller row so UI can render provider details
-    .select('*, sellers(*)')
+    .select('*, sellers(*), service_warranty_policies(*)')
     .eq('active', true)
     .order('created_at', { ascending: false })
     .limit(limit);

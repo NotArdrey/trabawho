@@ -2,13 +2,13 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { performBookingLifecycleAction } from "@/features/bookings/services/bookingLifecycle";
-import { startBookingWork } from "@/features/bookings/services/bookingTransactions";
+import { getBookingSupportCase, openBookingSupportCase, startBookingWork } from "@/features/bookings/services/bookingTransactions";
 import { BookingTransactionActions } from "./BookingTransactionActions";
 
 vi.mock("@/features/bookings/services/bookingLifecycle", () => ({ performBookingLifecycleAction: vi.fn() }));
 vi.mock("@/features/bookings/services/bookingTransactions", () => ({
   startBookingWork: vi.fn(), deliverBookingWithEvidence: vi.fn(),
-  openBookingSupportCase: vi.fn(), getBookingDeliveryEvidence: vi.fn(),
+  openBookingSupportCase: vi.fn(), getBookingDeliveryEvidence: vi.fn(), getBookingSupportCase: vi.fn(),
 }));
 
 const booking = {
@@ -60,5 +60,46 @@ describe("BookingTransactionActions", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent("Network unavailable");
     fireEvent.click(screen.getByRole("button", { name: "Confirm completion" }));
     await waitFor(() => expect(onUpdated).toHaveBeenCalledOnce());
+  });
+
+  it("routes an in-window designated repair report to rework", () => {
+    render(<BookingTransactionActions booking={{ ...booking, raw: { booking: { status: "completed" } },
+      completedAt: new Date().toISOString(), warrantyEligible: true,
+      warrantyPolicyCode: "repair_workmanship_7d", warrantyDurationDays: 7 }} viewerRole="client" onUpdated={vi.fn()} />);
+    fireEvent.click(screen.getByRole("button", { name: "Report a problem" }));
+    expect(screen.getByText(/within the seven-day repair window/i)).toBeVisible();
+    expect(screen.getByRole("option", { name: "Repair workmanship issue" })).toBeInTheDocument();
+  });
+
+  it("sends an out-of-window repair issue to support review", () => {
+    const completedAt = new Date(Date.now() - 8 * 24 * 60 * 60_000).toISOString();
+    render(<BookingTransactionActions booking={{ ...booking, raw: { booking: { status: "completed" } },
+      completedAt, warrantyEligible: true, warrantyPolicyCode: "repair_workmanship_7d",
+      warrantyDurationDays: 7 }} viewerRole="client" onUpdated={vi.fn()} />);
+    fireEvent.click(screen.getByRole("button", { name: "Report a problem" }));
+    expect(screen.getByText(/outside the automatic repair route/i)).toBeVisible();
+  });
+
+  it("shows the provider a client rework request without claiming the defect was accepted", async () => {
+    vi.mocked(getBookingSupportCase).mockResolvedValue({
+      case_type: "warranty_issue", reason: "The repaired printer stopped working again.",
+      policy_route: "rework_request", policy_reason: "Provider response is needed.",
+      status: "open", created_at: new Date().toISOString(),
+    });
+    render(<BookingTransactionActions booking={{ ...booking, disputeStatus: "open" }} viewerRole="provider" onUpdated={vi.fn()} />);
+    expect(await screen.findByText("Client requested repair rework")).toBeVisible();
+    expect(screen.getByText("The repaired printer stopped working again.")).toBeVisible();
+  });
+
+  it("uses the server route instead of the client's clock for the result message", async () => {
+    vi.mocked(openBookingSupportCase).mockResolvedValue({ booking, policyRoute: "support_review" });
+    render(<BookingTransactionActions booking={{ ...booking, raw: { booking: { status: "completed" } },
+      completedAt: new Date().toISOString(), warrantyEligible: true,
+      warrantyPolicyCode: "repair_workmanship_7d", warrantyDurationDays: 7 }} viewerRole="client" onUpdated={vi.fn()} />);
+    fireEvent.click(screen.getByRole("button", { name: "Report a problem" }));
+    fireEvent.change(screen.getByRole("textbox", { name: "What happened?" }), { target: { value: "The repair stopped working after handover." } });
+    fireEvent.click(screen.getByRole("button", { name: "Open support case" }));
+    expect(await screen.findByText(/Support case saved for review/i)).toBeVisible();
+    expect(screen.queryByText(/Rework request saved/i)).not.toBeInTheDocument();
   });
 });

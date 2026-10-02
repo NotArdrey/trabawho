@@ -62,7 +62,7 @@ export async function reviewBookingReschedule(input: { decision: ReviewDecision;
   return data;
 }
 
-export type BookingCaseType = "provider_no_show" | "client_no_show" | "delivery_issue" | "warranty_issue";
+export type BookingCaseType = "provider_no_show" | "client_no_show" | "delivery_issue" | "warranty_issue" | "service_issue";
 
 const bucket = "booking-evidence";
 const imageTypes = new Set(["image/jpeg", "image/png", "image/webp"]);
@@ -120,10 +120,10 @@ export async function openBookingSupportCase(
   caseType: BookingCaseType,
   reason: string,
   image?: File | null,
-): Promise<unknown> {
+): Promise<{ booking: unknown; policyRoute: "rework_request" | "support_review" }> {
   if (reason.trim().length < 20) throw new Error("Describe the issue in at least 20 characters.");
   const path = await uploadEvidenceImage(bookingId, image);
-  const { error } = await supabase.rpc("open_booking_support_case", {
+  const { data, error } = await supabase.rpc("open_booking_support_case", {
     p_booking_id: bookingId,
     p_case_type: caseType,
     p_reason: reason.trim(),
@@ -131,7 +131,15 @@ export async function openBookingSupportCase(
     p_idempotency_key: `case:${bookingId}:${caseType}`,
   });
   if (error) throw new Error(error.message);
-  return fetchBookingById(bookingId);
+  return { booking: await fetchBookingById(bookingId), policyRoute: data.policy_route };
+}
+
+export async function getBookingSupportCase(bookingId: string) {
+  const { data, error } = await supabase.from("booking_support_cases")
+    .select("case_type, reason, policy_route, policy_reason, status, created_at")
+    .eq("booking_id", bookingId).order("created_at", { ascending: false }).limit(1).maybeSingle();
+  if (error) throw new Error("The booking report could not be loaded.");
+  return data;
 }
 
 export async function getBookingDeliveryEvidence(bookingId: string, scheduleVersion: number) {

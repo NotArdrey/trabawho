@@ -284,9 +284,38 @@ Implementation status on October 1, 2026:
   booking was **not** confirmed and asks the client not to pay again. This
   branch has a focused UI test, but has not been live-rehearsed through the
   deployed frontend. It is not a refund integration.
-- The repair warranty snapshot is a provisional service-title classification;
-  product-approved category/policy configuration, support ownership, no-show
-  remedies, cancellation terms, verified refunds, and payouts remain open.
+- That rehearsal used a provisional service-title classification for repair
+  eligibility. The explicit service policy below replaces it for new bookings;
+  support ownership, no-show remedies, cancellation terms, verified refunds,
+  and payouts remain open.
+
+### Explicit repair-workmanship policy (demo/test implementation)
+
+- Applied `20261003100000_explicit_repair_workmanship_policy.sql` only to the
+  confirmed demo/test project. A public read verified that only the four
+  designated listing IDs expose `repair_workmanship_7d`. Focused UI tests and
+  the project check pass; a new in-window/out-of-window case has **not** yet
+  been rehearsed across separate accounts after this migration.
+- New direct-slot bookings now snapshot a versioned, admin-controlled service
+  policy at checkout. Listing titles no longer decide coverage. The designated
+  demo listings are Computer & Printer Repair, Plumbing Leak Repair, Appliance
+  Installation & Repair, and Handyman Home Repairs. Furniture Assembly & Minor
+  Repairs, cleaning, garden, laundry, painting, and events are not designated.
+  Future listings have no automatic repair policy until explicitly configured.
+- The `demo-v1` policy offers a **seven-day (168-hour) issue-reporting window**
+  measured from server-recorded completion for possible problems with the
+  original repair workmanship. The checkout and booking details disclose the
+  snapshot. A timely report on a designated booking is automatically routed
+  as a provider **rework request**. That route is not a finding that the defect
+  is covered; the provider must review the report and evidence.
+- A late report, a non-designated service issue, or an earlier booking without
+  the explicit snapshot is routed to **support review**. Older provisional
+  eligibility flags are not silently erased, but do not gain automatic rework.
+  Cases remain visible to both booking participants and the admin queue.
+- Neither route automatically refunds, pays out, closes a case, or decides
+  liability. A structured provider response, evidence standard, escalation
+  owner, final remedy authority, and legally reviewed customer terms are still
+  required before this can be represented as a production warranty.
 
 ## Phase 1: Payment foundation
 

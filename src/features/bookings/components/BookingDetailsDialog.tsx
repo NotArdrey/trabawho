@@ -37,6 +37,9 @@ export interface BookingDetails {
   balanceDueAt?: string;
   workStartedAt?: string;
   warrantyEligible?: boolean;
+  warrantyPolicyCode?: string | null;
+  warrantyDurationDays?: number | null;
+  warrantyCoverageSummary?: string | null;
   disputeStatus?: string;
   paymentReference?: string;
   quoteAmount?: number | string;
@@ -207,7 +210,8 @@ export function BookingDetailsDialog({ booking, isProviderView, onClose, onMessa
           {booking.completedAt ? <p className="text-sm text-muted-foreground">Completed on <strong className="text-foreground">{new Date(booking.completedAt).toLocaleDateString("en-PH")}</strong></p> : null}
           {booking.paymentPlan === "downpayment" && booking.balanceDueAt && Number(booking.balanceDueAmount || 0) > 0 && <p className="text-sm text-muted-foreground">Balance due before <strong className="text-foreground">{new Date(booking.balanceDueAt).toLocaleString("en-PH")}</strong>.</p>}
           {booking.completionDueAt && booking.deliveryStatus === "seller_claimed" && <p className="text-sm text-muted-foreground">Client review ends {new Date(booking.completionDueAt).toLocaleString("en-PH")} if no case is open.</p>}
-          {booking.warrantyEligible && booking.completedAt && <p className="text-sm text-muted-foreground">Repair issue reporting is available through <strong className="text-foreground">{new Date(new Date(booking.completedAt).getTime() + 7 * 24 * 60 * 60_000).toLocaleString("en-PH")}</strong>.</p>}
+          {booking.warrantyPolicyCode === "repair_workmanship_7d" && <p className="text-sm text-muted-foreground">Designated repair-workmanship reporting: <strong className="text-foreground">{booking.warrantyDurationDays || 7} days after completion</strong>{booking.completedAt ? `, through ${new Date(new Date(booking.completedAt).getTime() + (booking.warrantyDurationDays || 7) * 24 * 60 * 60_000).toLocaleString("en-PH")}` : ""}. {booking.warrantyCoverageSummary || "In-window reports request rework; exceptions receive support review."} No refund is automatic.</p>}
+          {booking.warrantyEligible && !booking.warrantyPolicyCode && <p className="text-sm text-muted-foreground">This earlier booking has a legacy repair-issue report flag. Any report will receive support review; no automatic rework or refund is promised.</p>}
           {isProviderView && <p className="rounded-lg bg-muted/40 p-3 text-sm text-muted-foreground">Provider payout: not processed in this test flow.</p>}
           {booking.description ? <section className="rounded-xl bg-muted/40 p-4"><h3 className="font-bold text-foreground">Service notes</h3><p className="mt-2 text-sm leading-6 text-muted-foreground">{booking.description}</p></section> : null}
           {booking.rating || booking.review ? <section className="rounded-xl bg-brand-highlight-soft/50 p-4"><h3 className="flex items-center gap-2 font-bold text-foreground"><Star className="size-4 fill-brand-highlight text-brand-highlight" aria-hidden="true" />Customer review{booking.rating ? ` · ${booking.rating}/5` : ""}</h3>{booking.review ? <p className="mt-2 text-sm leading-6 text-muted-foreground">{booking.review}</p> : null}{booking.reviewImageUrl ? <img className="mt-3 max-h-56 rounded-lg object-cover" src={booking.reviewImageUrl} alt="Customer review" /> : null}</section> : null}
