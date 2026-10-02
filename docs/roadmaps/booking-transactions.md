@@ -238,6 +238,56 @@ Implementation status on October 1, 2026:
 - The fresh-booking path is **not yet presentation-ready** until its webhook
   confirms payment and the full journey is repeated on that new booking.
 
+### October 2, 2026 transaction-flow rehearsal (demo/test only)
+
+- Applied `20261003090000_demo_booking_transaction_flow.sql` and
+  `20261003093000_enforce_new_direct_slot_deposits.sql` to the confirmed
+  demo/test project, not production. New direct-slot checkouts require the
+  50% service-price deposit plus the platform fee; a separate attempt collects
+  the other 50%. Historical full-payment bookings remain valid.
+- A fresh Garden Cleanup & Yard Work booking
+  `ca3d0be9-1458-46a6-a404-2992d8314ffe` completed the direct-slot journey
+  across separate client and provider accounts. PayMongo test checkout showed
+  receipt of the PHP 522.50 deposit and PHP 475 balance. Neither payment was
+  recorded automatically by the webhook. The authenticated server-side
+  reconciliation function independently retrieved each checkout from PayMongo,
+  checked the booking/attempt reference, test environment, amount, currency,
+  and paid payment ID, then recorded it through the existing idempotent payment
+  RPC. Only then did the booking become partially paid, then fully paid.
+- The recovery endpoint was exercised directly with authenticated test-account
+  sessions. The updated browser return polling passed unit tests but has not
+  yet been re-rehearsed through the deployed frontend. This remains a
+  presentation check, not a completed browser journey.
+- The provider started work in the allowed appointment window, submitted the
+  checklist and written delivery proof, and marked delivery. The client read
+  the proof and confirmed completion. Refreshes and separate-account reads
+  retained `completed`, `buyer_confirmed`, and `paid`; a same-operation retry
+  did not create another completion. Wrong-role work start, ineligible garden
+  warranty claim, and unrelated-provider evidence access were rejected.
+- A no-show report was saved on a separate existing test booking and was
+  visible to the admin's read-only case queue. No refund or payout occurred.
+  An older paid, undelivered booking remains available for the delivery and
+  completion fallback; it was not consumed by this rehearsal.
+- **Known P0 gap:** the PayMongo webhook still did not automatically confirm
+  either fresh test checkout. The server-side PayMongo API recovery path makes
+  the browser return recoverable, but this is not proof that webhook delivery
+  works. Inspect test-mode webhook event deliveries and Edge Function logs,
+  repair the failing registration/delivery/processing step, and test duplicate
+  and delayed events before claiming webhook reliability or a real-money launch.
+  An earlier payment after an expired hold correctly stayed unconfirmed and
+  needs support review; the UI must not treat a PayMongo success screen alone
+  as a reserved slot.
+- The return screen now asks the payment server to check PayMongo even when an
+  attempt is locally expired or failed. If the provider confirms a charge
+  after the slot hold expired, the existing payment RPC records `late_paid`
+  and `refund_pending` for support review; the screen explicitly says the
+  booking was **not** confirmed and asks the client not to pay again. This
+  branch has a focused UI test, but has not been live-rehearsed through the
+  deployed frontend. It is not a refund integration.
+- The repair warranty snapshot is a provisional service-title classification;
+  product-approved category/policy configuration, support ownership, no-show
+  remedies, cancellation terms, verified refunds, and payouts remain open.
+
 ## Phase 1: Payment foundation
 
 Priority: P0 -- required before any real-money demo

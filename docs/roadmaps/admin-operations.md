@@ -13,10 +13,10 @@ The admin experience should prioritize **work requiring a decision** over decora
 | Demo | Account search, role changes, disable/suspend/restore | **Available** | Keep server-backed feedback, reason capture, and role guard; verify RLS and privileged-action audit before production. |
 | Demo | Review list and deletion | **Partial** | Recent reviews load; deletion is permanent. Add reports, policy reason, non-destructive hide/restore, and audit before operational use. |
 | Demo | Admin audit page | **Not built** | Existing page must say the feed is unavailable; connect actor, target, reason, time, and outcome before claiming to show history. |
-| P0 | Searchable booking/support queue | **Not built** | Search by booking reference, client, provider, and status; show the next actor, age, and urgency; filter payment, delivery, dispute, and cancellation issues. |
-| P0 | Booking case detail | **Partial** | Join booking timeline, participants, schedule, chat/evidence references, payment attempts and provider events; distinguish reported, verified, and disputed facts. |
+| P0 | Searchable booking/support queue | **Partial** | A read-only queue lists the latest 50 submitted booking cases and can open private image evidence. Add search by booking reference, client, provider, and status; show the next actor, age, and urgency; filter payment, delivery, dispute, and cancellation issues. |
+| P0 | Booking case detail | **Partial** | Case reason and evidence are available, but join booking timeline, participants, schedule, chat/evidence references, payment attempts and provider events; distinguish reported, verified, and disputed facts. |
 | P0 | Payment exception queue | **Not built** | Surface expired holds, failed or ambiguous checkout, mismatched webhooks, unpaid balance, refund failure, and chargebacks without manually changing money state. |
-| P0 | Dispute intake and triage | **Partial** | A dispute RPC/fields exist, but no complete case workflow. Require category, statement, evidence, response opportunity, owner, deadlines, and status history. |
+| P0 | Dispute intake and triage | **Partial** | Booking-scoped no-show, delivery-issue, and eligible repair-warranty reports now persist with optional private evidence and block completion while open. There is no decision workflow yet. Add response opportunity, owner, deadlines, and status history. |
 | P0 | Immutable admin activity | **Partial** | Booking audit events exist; platform-wide admin actions are not exposed as a verified feed. Record reason, actor, target, before/after, and operation ID server-side. |
 | P1 | Resolution and appeals | **Not built** | Record a policy-backed outcome, notify both parties, preserve evidence, and allow a controlled appeal/review path. Never directly set paid/refunded from the UI. |
 | P1 | Refund and payout operations | **Not built** | Use provider-confirmed refund/payout events, reconciliation, failure retries, and clear hold/release rules. No manual balance edits. |
@@ -24,6 +24,13 @@ The admin experience should prioritize **work requiring a decision** over decora
 | P2 | Operational analytics | **Not built** | Add trends only after event definitions and reliable queries exist; no illustrative charts masquerading as live data. |
 
 ## Case-handling experience
+
+The October 2 demo/test implementation adds the read-only case queue and
+private evidence access. It does **not** grant admins a refund, payout, or
+payment-override action. A test no-show report was visible to the admin after
+submission. PayMongo test checkout was recoverable through server-side API
+verification, but the webhook still did not automatically record two fresh
+payments; a payment exception/reconciliation queue remains P0.
 
 Use one queue with status and owner, then a case detail with a chronological, source-labelled timeline. Admins need clear **review**, **request evidence**, **contact parties**, and **resolve/escalate** actions, each with a reason and a visible result. Do not expose raw card data or private files beyond the assigned case. Prevent duplicate submissions and require server authorization and immutable history for exceptional actions.
 
