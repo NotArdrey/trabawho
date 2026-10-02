@@ -12,6 +12,8 @@ vi.mock("@/features/bookings/services/bookingTransactions", () => ({
   respondToRepairClaim: vi.fn(),
 }));
 
+vi.mock("./BookingRefundProgress", () => ({ BookingRefundProgress: () => null }));
+
 const booking = {
   id: "booking-1", paymentStatus: "paid", scheduleStatus: "confirmed",
   deliveryStatus: "not_delivered", disputeStatus: "none", scheduleVersion: 2,
@@ -19,6 +21,7 @@ const booking = {
   raw: { booking: { status: "confirmed" } },
 };
 const emptyRework = {
+  refund_requested_at: null, latest_support_action: null, latest_support_target: null, latest_support_at: null,
   rework_state: null, rework_appointment_at: null, rework_evidence_note: null,
   rework_delivered_at: null, rework_confirmed_at: null, rework_escalated_at: null,
 };
@@ -44,6 +47,12 @@ describe("BookingTransactionActions", () => {
     expect(screen.getByText(/waiting for client balance/i)).toBeVisible();
     expect(screen.queryByRole("button", { name: "Start work" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Submit delivery" })).not.toBeInTheDocument();
+  });
+
+  it("blocks a stale paid label when the numeric balance remains due", () => {
+    render(<BookingTransactionActions booking={{ ...booking, balanceDueAmount: 400, amountPaid: 464, totalChargedAmount: 864 }} viewerRole="provider" onUpdated={vi.fn()} />);
+    expect(screen.getByText(/Do not begin until full payment is verified/)).toBeVisible();
+    expect(screen.queryByRole("button", { name: "Start work" })).not.toBeInTheDocument();
   });
 
   it("keeps provider workflow and report actions in the same responsive action group", () => {

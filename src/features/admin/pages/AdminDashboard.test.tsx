@@ -1,6 +1,9 @@
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import AdminDashboard from "./AdminDashboard";
 
+vi.mock("../components/AdminAnalytics", () => ({ default: () => <section aria-label="Analytics">Live analytics</section> }));
+vi.mock("../services/adminAuditService", () => ({ fetchAdminAuditFeed: vi.fn().mockResolvedValue({ entries: [], unavailable: [], cappedSources: [] }) }));
+
 const openAccessAction = vi.fn();
 const updateRole = vi.fn();
 const restoreAccount = vi.fn();
@@ -35,17 +38,17 @@ describe("AdminDashboard", () => {
     expect(screen.getByText("Disabled accounts")).toBeInTheDocument();
     expect(screen.queryByText("Admin Live")).not.toBeInTheDocument();
     expect(screen.queryByText("Flagged Comments")).not.toBeInTheDocument();
-    expect(screen.getByText(/audit feed is not connected/i)).toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "Analytics" })).toBeInTheDocument();
   });
 
-  test("navigates existing screens and explains unavailable audit feed", () => {
+  test("navigates existing screens and loads audit history", () => {
     render(<AdminDashboard />);
     const navigation = within(screen.getByRole("complementary", { name: /admin navigation sidebar/i }));
     fireEvent.click(navigation.getByRole("button", { name: /account management/i }));
     expect(screen.getByLabelText("Search accounts")).toBeInTheDocument();
     expect(screen.getByText("Alice Admin")).toBeInTheDocument();
     fireEvent.click(navigation.getByRole("button", { name: /audit logs/i }));
-    expect(screen.getByText("Audit feed not available")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Audit logs" })).toBeInTheDocument();
     fireEvent.click(navigation.getByRole("button", { name: /^reviews$/i }));
     expect(screen.getByText("Great job!")).toBeInTheDocument();
   });

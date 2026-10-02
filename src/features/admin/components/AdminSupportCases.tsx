@@ -78,7 +78,7 @@ export default function AdminSupportCases() {
   });
 
   return <section className="space-y-4" aria-labelledby="support-cases-title">
-    <div className="flex flex-wrap items-start justify-between gap-3"><div><h1 id="support-cases-title" className="text-2xl font-bold">Booking support cases</h1><p className="mt-1 text-sm text-muted-foreground">Review booking history and record support follow-up. Refunds and payouts are not executed here.</p></div><Button variant="outline" onClick={() => { setLoading(true); setRefresh((value) => value + 1); }}><RefreshCw aria-hidden="true" />Refresh</Button></div>
+    <div className="flex flex-wrap items-start justify-between gap-3"><div><h1 id="support-cases-title" className="text-2xl font-bold">Booking support cases</h1><p className="mt-1 text-sm text-muted-foreground">Review booking history, record support follow-up, and approve verified booking refunds.</p></div><Button variant="outline" onClick={() => { setLoading(true); setRefresh((value) => value + 1); }}><RefreshCw aria-hidden="true" />Refresh</Button></div>
     {loading && <p role="status" className="rounded-xl border bg-card p-6 text-sm text-muted-foreground">Loading support cases…</p>}
     {error && <div role="alert" className="flex gap-2 rounded-xl border border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive"><AlertCircle className="size-4 shrink-0" aria-hidden="true" />{error}</div>}
     {evidenceError && <p role="alert" className="text-sm text-destructive">{evidenceError}</p>}

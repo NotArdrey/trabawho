@@ -2,7 +2,7 @@ import { useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 
 import Navigation from "@/shared/components/Navigation";
-import { AuthPage, IdentityRegistrationPage } from "@/features/auth";
+import { AuthPage } from "@/features/auth";
 import { BrowseServicesPage } from "@/features/marketplace";
 
 import FeaturedServices from "../components/FeaturedServices";
@@ -31,7 +31,7 @@ const modeForPath = (pathname: string): AuthMode | null => {
 
 const legacyModeForHash = (hash: string): AuthMode | null => {
   if (hash === "#login") return "login";
-  if (hash === "#register") return "register";
+  if (hash === "#register" || hash === "#identity-register") return "register";
   if (hash === "#forgot-password") return "forgot";
   return null;
 };
@@ -45,7 +45,6 @@ export default function LandingPage({
   const location = useLocation();
   const navigate = useNavigate();
   const authMode = modeForPath(location.pathname) ?? legacyModeForHash(location.hash);
-  const isIdentityRegisterOpen = location.hash === "#identity-register";
   const isPublicBrowseOpen = location.pathname === "/services" || location.hash === "#browse-services";
 
   useEffect(() => {
@@ -84,10 +83,6 @@ export default function LandingPage({
         onResendVerification={onResendVerification}
       />
     );
-  }
-
-  if (isIdentityRegisterOpen) {
-    return <IdentityRegistrationPage onBack={() => goTo("/")} onLogin={() => openAuthMode("login")} />;
   }
 
   if (isPublicBrowseOpen) {

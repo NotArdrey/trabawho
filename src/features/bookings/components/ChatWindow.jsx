@@ -1,3 +1,4 @@
+import { matchesBookingSearch } from '@/features/bookings/utils/bookingSearch';
 import React, { useMemo, useState, useEffect, useRef } from 'react';
 import { Archive, ArrowLeft, MessageCircle, MoreVertical, Trash2 } from 'lucide-react';
 import { SearchFilterBar } from '@/components/ui/search-filter-bar';
@@ -13,7 +14,6 @@ const getChatListKey = (booking = {}, viewerRole = 'buyer') => {
     ? (booking.buyerId || booking.clientId || booking.clientName)
     : (booking.workerId || booking.sellerId || booking.workerName);
   const serviceKey = booking.serviceId || booking.serviceType || booking.description;
-
   return [
     viewerRole,
     otherParticipantKey,
@@ -120,11 +120,7 @@ const ChatWindow = ({ appTheme = 'light', booking, onApproveQuote, onRejectQuote
       const closed = isClosedChat(item);
       const matchesFilter = chatFilter === 'all'
         || (chatFilter === 'closed' ? closed : !closed);
-      const matchesSearch = !normalizedSearch || [
-        getChatDisplayName(item),
-        item.serviceType,
-        item.status,
-      ].filter(Boolean).join(' ').toLowerCase().includes(normalizedSearch);
+      const matchesSearch = matchesBookingSearch(item, normalizedSearch);
       return matchesFilter && matchesSearch;
     });
   }, [chatFilter, chatSearch, uniqueChatBookings]);

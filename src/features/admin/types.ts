@@ -1,4 +1,4 @@
-export type AdminSection = "overview" | "accounts" | "identity" | "logs" | "comments" | "cases" | "settings";
+export type AdminSection = "overview" | "analytics" | "accounts" | "identity" | "logs" | "comments" | "cases" | "settings";
 export type AccountRole = "client" | "worker" | "admin";
 export type AccountStatus = "active" | "disabled" | "suspended";
 

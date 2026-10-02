@@ -8,6 +8,8 @@ vi.mock("@/features/admin/services/adminSupportService", () => ({
   getSupportCaseDetail: vi.fn(), recordSupportFollowup: vi.fn(), openSupportEvidence: vi.fn(),
 }));
 
+vi.mock("./AdminRefundDecision", () => ({ AdminRefundDecision: () => null }));
+
 const item = {
   id: "case-1", booking_id: "booking-1", reporter_id: "client-1",
   case_type: "provider_no_show", reason: "Provider did not arrive at our scheduled appointment.",
@@ -37,7 +39,7 @@ describe("AdminCaseDetailDialog", () => {
     render(<AdminCaseDetailDialog item={item} onClose={vi.fn()} onSaved={vi.fn()} />);
     expect(await screen.findByText("Demo Provider")).toBeVisible();
     expect(screen.getByText(/initial: PHP 495 · paid/i)).toBeVisible();
-    expect(screen.getByText(/No action here moves money/)).toBeVisible();
+    expect(screen.getByText(/Approved refunds are submitted to PayMongo and remain pending until verified/)).toBeVisible();
   });
 
   it("records a support referral once and keeps money unchanged", async () => {

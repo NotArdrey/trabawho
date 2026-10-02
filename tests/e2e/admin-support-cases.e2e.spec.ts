@@ -26,7 +26,7 @@ for (const width of [390, 768, 1024, 1280, 1440]) {
     });
     expect(rail.scroll, `Sidebar overflows at ${width}px: ${JSON.stringify(rail)}`).toBeLessThanOrEqual(rail.client);
     if (width < 881) await page.getByRole("button", { name: "Support cases" }).click();
-    await expect(page.getByText(/Refunds and payouts are not executed here/i)).toBeVisible();
+    await expect(page.getByText(/approve verified booking refunds/i)).toBeVisible();
     await expect(page.locator("main [role=alert]")).toHaveCount(0);
     const review = page.getByRole("button", { name: "Review case" }).first();
     if (await review.count()) {

@@ -139,7 +139,7 @@ export function BookingDetailsDialog({ booking, isProviderView, onClose, onMessa
   const cancelled = normalizedStatus.includes("cancel") || normalizedStatus.includes("refund");
   const completed = normalizedStatus.includes("complete") || clientComplete;
   const nextStep = booking.disputeStatus === "open"
-    ? { title: "Support case open", detail: "Completion is paused while the case is reviewed. No refund or payout has been processed.", complete: false }
+    ? { title: "Support case open", detail: "Completion is paused while the case is reviewed. View the dispute refund section on your booking card to request review or check refund progress.", complete: false }
     : cancelled
     ? { title: "This booking is no longer active", detail: "Review the payment and reference details below for your records.", complete: false }
     : completed

@@ -41,8 +41,6 @@ export async function createBoostCheckout(sellerId: string, draft: BoostDraft) {
   });
   const { data, error } = record(rawResponse);
   if (error) {
-    memory.delete(key);
-    try { window.sessionStorage.removeItem(key); } catch { /* Storage unavailable. */ }
     throw await invocationError(error);
   }
   const response = record(data);

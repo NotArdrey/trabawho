@@ -14,6 +14,7 @@ import {
   mapServiceRowToWorkerService,
   subscribeToWorkProfileChanges,
   updateWorkerProfile,
+  withWorkerPreferences,
 } from '../services/workerService';
 
 const createDefaultNewService = () => ({
@@ -343,7 +344,7 @@ export const useWorkProfileServices = ({ sellerProfile } = {}) => {
     activeServiceIndex,
     authUser,
     closeCreateService,
-    currentProfile,
+    currentProfile: withWorkerPreferences(currentProfile, sellerUiProfile),
     handleCreateServiceChange,
     handleCreateServiceSubmit,
     handleSaveProfileEdit,

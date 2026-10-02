@@ -361,6 +361,23 @@ Implementation status on October 1, 2026:
   and the admin case browser journey were verified; a positive live admin
   follow-up/retry on real demo case data remains untested.
 
+### Dispute refund and balance protection follow-up (sandbox backend deployed)
+
+The change adds participant refund-review requests and visible case progress,
+admin-confirmed full sandbox refunds tied to verified payment attempts, server-side
+PayMongo submission/reconciliation, and protected refund status/reference displays.
+Numeric funding guards cover work start, delivery, and completion across historical
+bookings; browser inserts cannot fabricate paid completion by omitting metadata.
+Booster input feedback and retry operation retention are also corrected.
+
+The two `20261005` migrations are applied to the `.env` TrabaWho demo/test project,
+and `process-booking-refunds` version 1 is active with JWT verification. Deployed
+permission and participant status-check probes passed, along with all 36 relevant
+browser journeys. See deployment verification in [the PayMongo integration guide](../integrations/paymongo.md).
+Isolated PostgreSQL and mocked provider tests verify the money transitions; actual
+PayMongo sandbox refund issuance remains untested. Partial refund policy, production activation, failed
+refund recovery, background refund reconciliation, and payouts remain open.
+
 ## Phase 1: Payment foundation
 
 Priority: P0 -- required before any real-money demo

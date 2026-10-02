@@ -139,7 +139,7 @@ function useRealtimeNotifications(providedUserId?: string) {
     });
 
     const channel = supabase
-      .channel(`app-notifications-${userId}`)
+      .channel(`app-notifications-${userId}-${crypto.randomUUID()}`)
       .on("postgres_changes", { event: "*", schema: "public", table: "bookings", filter: `buyer_id=eq.${userId}` }, (payload) => {
         if (payload.eventType !== "DELETE") pushNotification(bookingNotification(payload.new as BookingRow, readIds.current));
       })

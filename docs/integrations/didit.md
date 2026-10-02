@@ -31,6 +31,11 @@ writes use one database transaction. Identity approval and email confirmation ar
 separate requirements; `is_verified` requires both. Account suspension/disable
 status remains independent. Profile-load failure blocks access.
 
+The `/register`, `#register`, and legacy `#identity-register` entry points share
+the same registration steps, including the complete service address and both
+consents. The legacy identity link must not open the retired form that omitted
+location fields and used a different identity-consent property.
+
 The provider's overall status covers every workflow check. Approved ID and face
 nodes must not override an overall decline or review, for example an AML warning.
 V3 reports use plural arrays such as `id_verifications`, `liveness_checks`, and
@@ -114,7 +119,7 @@ Run `npm run check`, registration/admin identity Playwright journeys, and
 
 ```sh
 npm run check
-npx playwright test tests/e2e/registration-validation.e2e.spec.ts tests/e2e/identity-registration.e2e.spec.js tests/e2e/identity-login-gate.e2e.spec.ts tests/e2e/admin-identity-review.e2e.spec.ts
+npx playwright test tests/e2e/registration-validation.e2e.spec.ts tests/e2e/identity-registration.e2e.spec.ts tests/e2e/identity-login-gate.e2e.spec.ts tests/e2e/admin-identity-review.e2e.spec.ts
 npx deno test supabase/functions/_shared/identityDomain_test.ts
 ```
 

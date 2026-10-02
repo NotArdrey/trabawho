@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState, type ChangeEvent } from "react";
+import { useBookingActivity } from "@/features/bookings/activity";
+import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
 import {
   ArrowRight,
   BellRing,
@@ -89,26 +90,25 @@ export default function Dashboard({
     actions: () => onOpenMyBookings?.(),
   };
 
+  const requestId = useRef(0);
+  const refresh = useCallback(async () => {
+    const id = ++requestId.current;
+    try {
+      const snapshot = await fetchClientDashboardSnapshot() as DashboardSnapshot | null;
+      if (requestId.current === id) { setDashboardData(snapshot || emptyDashboardData); setDashboardError(""); }
+    } catch {
+      if (requestId.current === id) setDashboardError("Dashboard activity could not be loaded. Check your connection and retry.");
+    } finally {
+      if (requestId.current === id) setIsDashboardLoading(false);
+    }
+  }, []);
+  const invalidate = useCallback(() => { requestId.current++; }, []);
   useEffect(() => {
-    let isMounted = true;
-    const loadDashboardData = async () => {
-      try {
-        setIsDashboardLoading(true);
-        setDashboardError("");
-        const snapshot = await fetchClientDashboardSnapshot() as DashboardSnapshot | null;
-        if (isMounted) setDashboardData(snapshot || emptyDashboardData);
-      } catch (error) {
-        if (isMounted) {
-          setDashboardError(error instanceof Error ? error.message : "Unable to load dashboard activity.");
-          setDashboardData(emptyDashboardData);
-        }
-      } finally {
-        if (isMounted) setIsDashboardLoading(false);
-      }
-    };
-    void loadDashboardData();
-    return () => { isMounted = false; };
-  }, [sellerProfile?.userId]);
+    let active = true;
+    queueMicrotask(() => { if (active) { setDashboardData(emptyDashboardData); setIsDashboardLoading(true); void refresh(); } });
+    return () => { active = false; invalidate(); };
+  }, [refresh, invalidate, sellerProfile?.userId]);
+  useBookingActivity(refresh);
 
   return (
     <div className="gl-page" data-testid="client-home-dashboard">

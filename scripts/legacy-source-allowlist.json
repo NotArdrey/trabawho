@@ -35,7 +35,6 @@
   "src/features/work/pages/MyWork.jsx",
   "src/features/work/services/paymentService.js",
   "src/features/work/services/scheduleService.js",
-  "src/features/work/services/workerService.js",
   "src/shared/components/FloatingChatbot.jsx",
   "src/shared/components/FloatingChatbot.test.jsx",
   "src/shared/components/Header.jsx",
@@ -47,6 +46,5 @@
   "tests/e2e/floating-chatbot.e2e.spec.js",
   "tests/e2e/helpers/env.js",
   "tests/e2e/helpers/supabase.js",
-  "tests/e2e/identity-registration.e2e.spec.js",
   "tests/e2e/work.e2e.spec.js"
 ]

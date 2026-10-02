@@ -32,7 +32,7 @@ import {
   getDisplayServiceType,
   normalizeServiceRecord,
 } from '../utils/serviceNormalizer';
-import { createServiceSearchParams, parseServiceSearchParams } from '../../../lib/service-search';
+import { useMarketplaceSearch } from '../hooks/useMarketplaceSearch';
 
 const DEFAULT_CATEGORIES = ['All', 'Tutor', 'Technician', 'Cleaner', 'More Services'];
 const SERVICES_PER_PAGE = 6;
@@ -59,7 +59,6 @@ function BrowseServicesPage({
   themeMode = 'system',
   onThemeChange,
   currentView = 'browse-services',
-  searchQuery: externalSearchQuery = '',
   onSearchChange,
   onRequireLogin,
   onLogout,
@@ -77,9 +76,7 @@ function BrowseServicesPage({
 }) {
   const isPublic = mode === 'public';
   const [urlSearchParams, setUrlSearchParams] = useSearchParams();
-  const initialPublicSearch = parseServiceSearchParams(urlSearchParams);
-  const [localSearchQuery, setLocalSearchQuery] = useState(initialPublicSearch.query || '');
-  const [localLocationQuery, setLocalLocationQuery] = useState(initialPublicSearch.location || '');
+  const { searchQuery, locationQuery, handleSearchChange, handleLocationChange, clearSearch } = useMarketplaceSearch(onSearchChange);
   const [activeCategory, setActiveCategory] = useState('All');
   const [selectedDistrict, setSelectedDistrict] = useState('All Districts');
   const [sortMode, setSortMode] = useState('recommended');
@@ -107,17 +104,8 @@ function BrowseServicesPage({
     handleViewProfile, handleBookNow, handleStartChat, handleConfirmBooking, handleSelectPayment,
   } = useMarketplaceBookingFlow({ isPublic, services, schedulesByProvider, refreshSchedules, onRequireLogin, onOpenChatPage });
 
-  const searchQuery = isPublic ? localSearchQuery : externalSearchQuery;
-  const locationQuery = isPublic ? localLocationQuery : '';
   const reviewsSellerId = getProviderSellerId(reviewsTarget);
   const reviewsForTarget = reviewsSellerId ? (reviewsBySeller[reviewsSellerId] || []) : [];
-
-  useEffect(() => {
-    if (!isPublic) return;
-    const nextSearch = parseServiceSearchParams(urlSearchParams);
-    setLocalSearchQuery(nextSearch.query || '');
-    setLocalLocationQuery(nextSearch.location || '');
-  }, [isPublic, urlSearchParams]);
 
   useEffect(() => {
     const requestedPage = Number(urlSearchParams.get('page'));
@@ -283,35 +271,7 @@ function BrowseServicesPage({
     setActiveCategory('All');
     setSelectedDistrict('All Districts');
     setSortMode('recommended');
-    if (isPublic) {
-      setLocalSearchQuery('');
-      setLocalLocationQuery('');
-      updatePublicSearch({});
-    } else {
-      onSearchChange?.({ target: { value: '' } });
-    }
-  };
-
-  const updatePublicSearch = (nextSearch, replace = true) => {
-    setUrlSearchParams(createServiceSearchParams(nextSearch), { replace });
-  };
-
-  const handleSearchChange = (event) => {
-    resetPage();
-    if (isPublic) {
-      const nextQuery = event.target.value;
-      setLocalSearchQuery(nextQuery);
-      updatePublicSearch({ query: nextQuery, location: localLocationQuery });
-      return;
-    }
-    onSearchChange?.(event);
-  };
-
-  const handleLocationChange = (event) => {
-    resetPage();
-    const nextLocation = event.target.value;
-    setLocalLocationQuery(nextLocation);
-    updatePublicSearch({ query: localSearchQuery, location: nextLocation });
+    clearSearch();
   };
 
   return (
@@ -359,7 +319,7 @@ function BrowseServicesPage({
             hasActiveFilters={hasActiveFilters}
             isOpen={showMobileFilters}
             isPublic={isPublic}
-            locationQuery={localLocationQuery}
+            locationQuery={locationQuery}
             onCategoryChange={(category) => {
               setActiveCategory(category);
               resetPage();

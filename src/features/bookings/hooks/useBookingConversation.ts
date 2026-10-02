@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { fetchBookingMessages, sendBookingMessage } from "@/features/bookings/services/bookingService";
+import { actionErrorMessage } from "@/shared/utils/actionError";
 
 interface ChatBooking extends Record<string, unknown> { id?: string }
 export interface ConversationMessage {
@@ -79,8 +80,8 @@ export function useBookingConversation(booking: ChatBooking) {
       if (generation !== generationRef.current) return false;
       setMessages((current) => mergeMessages(current, [saved]));
       return true;
-    } catch {
-      if (generation === generationRef.current) setMessageError("Unable to send your message. Your draft is saved here; check your connection and try again.");
+    } catch (error) {
+      if (generation === generationRef.current) setMessageError(actionErrorMessage(error, "Unable to send your message. Your draft is saved here; try again."));
       return false;
     } finally {
       sendingRef.current = false;

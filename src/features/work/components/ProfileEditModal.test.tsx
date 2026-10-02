@@ -2,6 +2,7 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 
 import ProfileEditModal, { type ServiceProfileDraft } from "./ProfileEditModal";
 import type { ServiceRow } from "../utils/serviceDraft";
+import { ActionError } from "@/shared/utils/actionError";
 
 const profileData: ServiceProfileDraft = {
   afterServicePaymentType: "both",
@@ -16,6 +17,16 @@ const profileData: ServiceProfileDraft = {
 };
 
 describe("ProfileEditModal", () => {
+  it("shows safe partial-save feedback without discarding edits", async () => {
+    const message = "Your listing was saved, but payment preferences could not be saved. Your edits are still here; try again.";
+    const onSave = vi.fn().mockRejectedValue(new ActionError(message));
+    render(<ProfileEditModal isOpen profileData={profileData} onClose={vi.fn()} onSave={onSave} />);
+    fireEvent.click(screen.getByRole("button", { name: "Continue" }));
+    fireEvent.click(screen.getByRole("button", { name: "Continue" }));
+    fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
+    await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent(message));
+    expect(screen.getByRole("dialog")).toBeVisible();
+  });
   it("keeps the original service identity when the selected listing changes during editing", async () => {
     const raw: ServiceRow = { id: 7, seller_id: "worker-1", title: "Repair", short_description: "Appliance repair", description: "Appliance repair", base_price: 850, price_type: "fixed", duration_minutes: 45, metadata: {}, active: true, category_id: null, created_at: "", updated_at: "", currency: "PHP", slug: "repair" };
     const onSave = vi.fn();

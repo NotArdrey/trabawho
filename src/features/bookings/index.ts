@@ -11,3 +11,10 @@ export { fetchBookingMessages, sendBookingMessage, updateBookingWorkflow } from 
 export { startServiceConversation } from './services/bookingService';
 export { createPayMongoCheckout, redirectToPayMongo } from './services/paymongoCheckout';
 export type { PaymentSelectionDetails } from './components/PaymentModal';
+
+export { useBookingActivity } from "./hooks/useBookingActivity";
+
+export { getBookingRefunds, processCaseRefunds } from "./services/bookingRefunds";
+export type { BookingRefund } from "./services/bookingRefunds";
+export { useBookingRefunds } from "./hooks/useBookingRefunds";
+export { refundStatusLabels } from "./components/BookingRefundProgress";

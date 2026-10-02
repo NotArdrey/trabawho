@@ -10,11 +10,14 @@ Status: active
 - Admin identity queue, evidence dialog, domain contracts, orchestration, and service access are strict TypeScript. Identity backend migrations and function deployment were explicitly authorized; address persistence, admin decisions, and protected evidence were rehearsed on the linked test project. See the [Didit integration guide](../integrations/didit.md).
 - The machine-readable source and file-size allowlists record the remaining legacy paths and their shrinking baselines.
 - Booking conversation loading, refresh, duplicate-send protection, and the message composer are strict TypeScript. The remaining `ChatWindow.jsx` presentation stays on its shrinking baseline. Pricing tests are migrated to TypeScript; payment checkout no longer displays the GCash preview.
+- Worker profile/service mapping and message persistence are strict TypeScript. Payment preferences use `worker_profiles`; service editing preserves safe partial-save feedback. The optional schema audit checks browser and Edge Function contracts with read-only requests; see the [Supabase guide](../integrations/supabase.md).
 - Marketplace booking and messaging orchestration is extracted into a strict TypeScript hook. Message opens chat directly, Book now opens schedule selection, and terms are reviewed when continuing from payment. The remaining browse page retains its shrinking legacy baseline.
 - Booking-list orchestration and marketplace service normalization are strict TypeScript. Failed booking loads stop their skeletons and offer retry; each gig displays its own title. Support follow-ups show one timeline entry per operation and the latest recorded next step in the admin queue.
 - Static quality gate: Vitest and standards-guard coverage run in `npm run check`. Responsive Playwright coverage targets 390, 768, 1024, 1280, and 1440px, including 200% page scale, URL restoration, and light, dark, and system theme preferences.
 
 - Gig boost presentation, orchestration, validation, and data access are strict TypeScript. PayMongo replaces demo activation; paid campaign validation and marketplace discovery/ranking are extracted into typed slices. The profile legacy file is now below 500 lines. Backend migrations and payment function deployment are explicitly authorized for this task.
+
+- Booking review persistence, booking/chat search matching, marketplace URL search, and activity refresh recovery are extracted into strict TypeScript. Legacy pages only wire these slices. Client and provider dashboards reconcile on realtime events, focus/connection recovery, and a 15-second visible-page interval. Admin analytics and searchable recorded audit sources use typed services with partial-failure feedback; no backend migration is required.
 
 ## Checkpoints
 

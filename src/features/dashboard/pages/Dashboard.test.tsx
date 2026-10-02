@@ -10,6 +10,8 @@ vi.mock("@/features/bookings/services/bookingService", () => ({
   fetchClientDashboardSnapshot: fetchSnapshot,
 }));
 
+vi.mock("@/features/bookings/activity", () => ({ useBookingActivity: vi.fn() }));
+
 vi.mock("@/shared/components/DashboardNavigation", () => ({
   default: () => <nav aria-label="Dashboard navigation" />,
 }));

@@ -14,6 +14,15 @@ const row: ServiceRow = {
 describe("service editing", () => {
   beforeEach(() => vi.clearAllMocks());
 
+  it("reports a saved listing when only the refresh fails", async () => {
+    const refresh = vi.fn().mockRejectedValue(new Error("Offline"));
+    const onSaved = vi.fn();
+    vi.mocked(saveServiceEdit).mockResolvedValue(row);
+    const { result } = renderHook(() => useServiceEditing({ serviceId: 7, sellerId: "worker-1", refresh, onSaved }));
+    await expect(result.current(serviceDraftToProfileUpdate(serviceProfileToDraft({ raw: row })))).rejects.toThrow("Your changes were saved, but the page could not refresh");
+    expect(onSaved).not.toHaveBeenCalled();
+  });
+
   it("saves the opened listing after live updates change the active service", async () => {
     const refresh = vi.fn().mockResolvedValue(undefined);
     const onSaved = vi.fn();

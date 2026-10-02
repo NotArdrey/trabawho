@@ -13,9 +13,9 @@ function ImageField({ id, name, label, file, error, update }: { id: string; name
     <Label htmlFor={name}>{label}</Label>
     <input ref={input} id={id} name={name} type="file" accept="image/jpeg,image/png,image/webp" hidden aria-label={label}
       onChange={(event) => update(name, event.target.files?.[0] ?? null)} />
-    <Button id={name} type="button" variant="outline" className="h-auto min-h-12 min-w-0 justify-start gap-3 rounded-lg py-2 text-left"
+    <Button id={name} type="button" variant="outline" className="flex h-auto min-h-12 w-full min-w-0 items-center justify-start gap-3 rounded-lg py-3 text-left"
       aria-invalid={Boolean(error)} aria-describedby={[file ? `${name}-file` : '', error ? `${name}-error` : ''].filter(Boolean).join(' ') || undefined} onClick={() => input.current?.click()}>
-      <Upload aria-hidden="true" className="shrink-0 text-muted-foreground" /><span id={`${name}-file`} className="min-w-0 whitespace-normal break-all font-normal">{file ? file.name : 'Choose image'}</span>
+      <Upload aria-hidden="true" className="shrink-0 self-center text-muted-foreground" /><span id={`${name}-file`} className="min-w-0 whitespace-normal break-all font-normal leading-6">{file ? file.name : 'Choose image'}</span>
     </Button>
     <FieldError id={name} error={error} />
   </div>;

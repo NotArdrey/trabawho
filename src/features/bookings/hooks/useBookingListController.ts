@@ -5,7 +5,7 @@ import {
   submitBookingReview,
   updateBookingWorkflow,
 } from '@/features/bookings/services/bookingService';
-import { isSupabaseConfigured, supabase } from '@/integrations/supabase';
+import { useBookingActivity } from './useBookingActivity';
 
 const COMPLETED_STATUSES = ['Completed Service', 'Service Stopped'];
 const TERMINAL_STATUSES = [...COMPLETED_STATUSES, 'Cancelled', 'Cancelled (Cash)', 'Refunded'];
@@ -53,6 +53,7 @@ export function useBookingListController(initialBookings: BookingListItem[] = []
     try {
       setIsLoading(true);
       setLoadError('');
+      setActionError('');
       const rows = listRole === 'seller'
         ? await fetchSellerBookings(sellerId, { includeStandaloneChats })
         : await fetchClientBookings({ includeStandaloneChats });
@@ -83,26 +84,7 @@ export function useBookingListController(initialBookings: BookingListItem[] = []
     };
   }, [autoLoad, refreshBookings]);
 
-  useEffect(() => {
-    if (!autoLoad || !isSupabaseConfigured) return undefined;
-
-    let refreshTimer: number | undefined;
-    const queueRefresh = () => {
-      window.clearTimeout(refreshTimer);
-      refreshTimer = window.setTimeout(() => void refreshBookings(), 250);
-    };
-    const channel = supabase
-      .channel(`booking-hub-${listRole}-${sellerId || 'current'}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'bookings' }, queueRefresh)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'conversations' }, queueRefresh)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'messages' }, queueRefresh)
-      .subscribe();
-
-    return () => {
-      window.clearTimeout(refreshTimer);
-      void supabase.removeChannel(channel);
-    };
-  }, [autoLoad, listRole, refreshBookings, sellerId]);
+  useBookingActivity(refreshBookings, autoLoad);
 
   const visibleBookings = useMemo(() => loadedSourceKey === sourceKey ? bookings : [], [bookings, loadedSourceKey, sourceKey]);
 

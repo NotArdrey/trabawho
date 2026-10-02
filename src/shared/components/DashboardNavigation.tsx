@@ -26,6 +26,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import LogoutConfirmModal from "@/features/auth/components/LogoutConfirmModal";
 import { cn } from "@/lib/utils";
+import { buildServicesUrl } from "@/lib/service-search";
 import { getProfilePhotoUrl } from "@/shared/utils/profilePhoto";
 import BrandWordmark from "./BrandWordmark";
 import { desktopWorkspaceSidebarClass, WorkspaceSidebarAccount, WorkspaceSidebarBrand, WorkspaceSidebarIdentity, WorkspaceSidebarNavItem } from "./WorkspaceSidebar";
@@ -131,7 +132,14 @@ export default function DashboardNavigation({
   const routeWorkspace = PROVIDER_VIEWS.has(currentView) ? "provider" : CLIENT_VIEWS.has(currentView) ? "client" : null;
   const resolvedWorkspace = routeWorkspace || localStorage.getItem(workspaceStorageKey) || "provider";
   const isProviderWorkspace = isWorkerAccount && resolvedWorkspace === "provider";
-  const showGlobalSearch = currentView !== "browse-services";
+  const showGlobalSearch = !["browse-services", "client-dashboard"].includes(currentView);
+  const submitSearch = (event: React.KeyboardEvent<HTMLInputElement>) => {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      void navigate(buildServicesUrl({ query: event.currentTarget.value }));
+      setShowMobileSearch(false);
+    }
+  };
   const profilePhotoUrl = getProfilePhotoUrl(sellerProfile?.profilePhoto);
   const displayName = sellerProfile?.fullName || [sellerProfile?.firstName, sellerProfile?.lastName].filter(Boolean).join(" ") || "TrabaWho member";
   const workspaceLabel = isProviderWorkspace ? "Provider workspace" : "Client workspace";
@@ -237,7 +245,7 @@ export default function DashboardNavigation({
 
       <header className="fixed left-0 right-0 top-0 z-[130] flex min-h-16 items-center justify-between gap-3.5 border-b bg-background/95 px-3 backdrop-blur min-[881px]:left-[248px] min-[881px]:px-6">
         <button type="button" className="flex min-w-0 items-center gap-2 text-left min-[881px]:hidden" onClick={openWorkspaceHome} aria-label="Open home"><img className="size-9 object-contain" src="/trabawho-logo.svg" alt="" aria-hidden /><BrandWordmark className="text-[22px]" /></button>
-        {showGlobalSearch && <label className="relative hidden w-[min(560px,44vw)] items-center min-[881px]:flex"><span className="sr-only">Search</span><Search className="pointer-events-none absolute left-3 size-4 text-muted-foreground" aria-hidden /><input className="min-h-10 w-full rounded-lg border bg-background py-2 pl-9 pr-3 text-sm outline-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring" value={searchQuery} onChange={onSearchChange} placeholder="Search services, providers, locations" /></label>}
+        {showGlobalSearch && <label className="relative hidden w-[min(560px,44vw)] items-center min-[881px]:flex"><span className="sr-only">Search</span><Search className="pointer-events-none absolute left-3 size-4 text-muted-foreground" aria-hidden /><input className="min-h-11 w-full rounded-lg border bg-background py-2 pl-9 pr-3 text-sm outline-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring" value={searchQuery} onChange={onSearchChange} onKeyDown={submitSearch} type="search" aria-label="Search services, providers, locations" placeholder="Search services, providers, locations" /></label>}
         <div className="ml-auto flex items-center gap-1">
           {showGlobalSearch && <Button type="button" variant="ghost" size="icon" className="min-[881px]:hidden" aria-label="Open search" aria-pressed={showMobileSearch} onClick={() => setShowMobileSearch((value) => !value)}><Search aria-hidden /></Button>}
           <NotificationCenter notifications={notifications} open={isNotificationOpen} onOpenChange={(open) => { if (open) setIsProfileMenuOpen(false); setIsNotificationOpen(open); }} onMarkAllRead={markAllRead} onNotificationClick={handleNotificationClick} isLoading={isLoading} error={error} onRetry={retry} />
@@ -248,7 +256,7 @@ export default function DashboardNavigation({
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
-        {showGlobalSearch && showMobileSearch && <div className="absolute inset-x-0 top-16 border-b bg-background p-3 shadow-sm min-[881px]:hidden"><label className="relative flex items-center"><span className="sr-only">Search</span><Search className="pointer-events-none absolute left-3 size-4 text-muted-foreground" aria-hidden /><input className="min-h-11 w-full rounded-lg border bg-background py-2 pl-9 pr-3 outline-none focus-visible:ring-2 focus-visible:ring-ring" value={searchQuery} onChange={onSearchChange} placeholder="Search services, providers, locations" /></label></div>}
+        {showGlobalSearch && showMobileSearch && <div className="absolute inset-x-0 top-16 border-b bg-background p-3 shadow-sm min-[881px]:hidden"><label className="relative flex items-center"><span className="sr-only">Search</span><Search className="pointer-events-none absolute left-3 size-4 text-muted-foreground" aria-hidden /><input className="min-h-11 w-full rounded-lg border bg-background py-2 pl-9 pr-3 outline-none focus-visible:ring-2 focus-visible:ring-ring" value={searchQuery} onChange={onSearchChange} onKeyDown={submitSearch} type="search" aria-label="Search services, providers, locations" placeholder="Search services, providers, locations" /></label></div>}
       </header>
 
       <div className="fixed inset-x-0 bottom-0 z-[140] border-t bg-background/95 px-2 pb-[calc(0.25rem+env(safe-area-inset-bottom))] pt-1 backdrop-blur min-[881px]:hidden">{renderNavButtons(true)}</div>

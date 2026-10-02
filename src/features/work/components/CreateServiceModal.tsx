@@ -15,6 +15,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
+import { actionErrorMessage } from "@/shared/utils/actionError";
 import { DAY_ORDER, WEEKDAY_ORDER } from "@/features/work/services/scheduleService";
 
 type DayKey = "Mon" | "Tue" | "Wed" | "Thu" | "Fri" | "Sat" | "Sun";
@@ -251,9 +252,9 @@ function CreateServiceModal({ isOpen, newService, onChange, onClose, onSubmit, m
     try {
       setIsSubmitting(true);
       const result = await onSubmit();
-      if (result === null || result === false) setLocalError("Unable to save this service. Check your connection and try again.");
-    } catch {
-      setLocalError("Unable to save all changes. Check your connection and try again.");
+      if (result === null || result === false) setLocalError("Unable to save this service. Your edits are still here; try again.");
+    } catch (error) {
+      setLocalError(actionErrorMessage(error, "Unable to save all changes. Your edits are still here; try again."));
     } finally {
       setIsSubmitting(false);
     }

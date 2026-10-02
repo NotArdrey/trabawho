@@ -223,8 +223,25 @@ test('a declined Didit return does not create an account', async ({ page }) => {
 for (const width of [390, 768, 1024, 1280, 1440]) {
   test(`registration fields and terms fit at ${width}px`, async ({ page }, testInfo) => {
     await page.setViewportSize({ width, height: 1000 });
+    await page.addInitScript(() => localStorage.setItem('trabawho-theme-mode', 'dark'));
     await security(page, true);
     await fillLocation(page);
+    for (const part of ['front', 'back', 'selfie']) {
+      const name = `${part}-1530d0be-8d55-41ac-8134-d4099e503249.jpg`;
+      await page.locator(`#manual-${part}-image`).setInputFiles({ name, mimeType: 'image/jpeg', buffer: Buffer.from('image') });
+      const upload = page.getByRole('button', { name: `${part === 'selfie' ? 'Selfie' : part === 'front' ? 'Front' : 'Back'} image`, exact: true });
+      await expect(upload).toContainText(name);
+      const alignment = await upload.evaluate((node) => {
+        const button = node.getBoundingClientRect();
+        const icon = node.querySelector('svg')?.getBoundingClientRect();
+        const filename = node.querySelector('span')?.getBoundingClientRect();
+        const center = button.y + button.height / 2;
+        return { height: button.height, iconOffset: icon ? Math.abs(icon.y + icon.height / 2 - center) : 99, textOffset: filename ? Math.abs(filename.y + filename.height / 2 - center) : 99 };
+      });
+      expect(alignment.height).toBeGreaterThanOrEqual(48);
+      expect(alignment.iconOffset).toBeLessThan(1);
+      expect(alignment.textOffset).toBeLessThan(1);
+    }
     await page.screenshot({ path: testInfo.outputPath('review.png'), fullPage: true });
     expect(await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)).toBeLessThanOrEqual(1);
     const input = page.getByLabel('Name on ID', { exact: true });

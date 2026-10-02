@@ -2,12 +2,13 @@ import { useRef, useState } from "react";
 import { CheckCircle2, LoaderCircle } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { isBookingFullyFunded, type BookingFunding } from "../utils/bookingPaymentGuard";
 import {
   performBookingLifecycleAction,
   type BookingLifecycleAction as LifecycleAction,
 } from "@/features/bookings/services/bookingLifecycle";
 
-interface BookingRecord {
+interface BookingRecord extends BookingFunding {
   id: string;
   status?: string;
   scheduleStatus?: string;
@@ -30,7 +31,7 @@ function getAvailableAction(booking: BookingRecord, role: "client" | "provider")
   const active = rawStatus
     ? rawStatus === "confirmed" || rawStatus === "in_progress"
     : ["Payment Confirmed", "Service Scheduled", "Active Service", "Service Delivered"].includes(booking.status ?? "");
-  if (!active || booking.paymentStatus !== "paid" || booking.disputeStatus === "open") return null;
+  if (!active || !isBookingFullyFunded(booking) || booking.disputeStatus === "open") return null;
   if (booking.scheduleStatus && booking.scheduleStatus !== "confirmed") return null;
   if (role === "provider" && booking.deliveryStatus === "not_delivered") return "deliver";
   if (role === "client" && booking.deliveryStatus === "seller_claimed") return "complete";

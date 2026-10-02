@@ -1,7 +1,8 @@
 import { supabase } from '../../../shared/services/supabaseClient';
 import { getProfilePhotoUrl } from '../../../shared/utils/profilePhoto';
 import { calculateBookingPricing } from '../utils/bookingPricing';
-
+import { insertBookingMessage } from './messagePersistence';
+import { persistBookingReview } from './reviewPersistence';
 const getCleanString = (value) => (typeof value === 'string' ? value.trim() : '');
 const getNullableString = (value) => {
   const clean = getCleanString(value);
@@ -943,39 +944,7 @@ export const sendBookingMessage = async (bookingOrId, body, attachments = null) 
   if (!cleanBody && !attachments) throw new Error('Enter a message before sending.');
 
   const { conversation, booking, user } = await ensureBookingConversation(bookingOrId);
-  const insertPayload = {
-    conversation_id: conversation.id,
-    sender_id: user.id,
-    body: cleanBody,
-    attachments,
-  };
-
-  let { data, error } = await supabase
-    .from('messages')
-    .insert([insertPayload])
-    .select('*')
-    .single();
-
-  if (error && /body|attachments|Could not find.*column|schema cache/i.test(String(error.message || ''))) {
-    const fallbackPayload = {
-      conversation_id: conversation.id,
-      sender_id: user.id,
-      content: cleanBody || attachments?.description || '',
-      message_type: attachments?.type === 'quote' ? 'quote' : 'text',
-      attachment_url: attachments?.public_url || attachments?.url || null,
-    };
-
-    const fallbackResult = await supabase
-      .from('messages')
-      .insert([fallbackPayload])
-      .select('*')
-      .single();
-
-    data = fallbackResult.data;
-    error = fallbackResult.error;
-  }
-
-  if (error) throw mapDatabaseError(error);
+  const data = await insertBookingMessage({ conversationId: conversation.id, senderId: user.id, body: cleanBody, attachments });
   return mapMessageRowToUiMessage(data, booking);
 };
 
@@ -1242,73 +1211,12 @@ export const createClientBookingRequestByServiceId = async ({
   return createClientBookingRequest({ provider, assistantContext });
 };
 
-const uploadReviewImage = async ({ file, userId, bookingId }) => {
-  if (!file) return '';
-
-  const allowedTypes = new Set(['image/jpeg', 'image/png', 'image/webp']);
-  if (!allowedTypes.has(file.type)) {
-    throw new Error('Review photo must be a JPG, PNG, or WebP image.');
-  }
-  if (file.size > 5 * 1024 * 1024) {
-    throw new Error('Review photo must be 5 MB or smaller.');
-  }
-
-  const extension = file.type === 'image/png' ? 'png' : file.type === 'image/webp' ? 'webp' : 'jpg';
-  const objectPath = `${userId}/${bookingId}/${Date.now()}-review.${extension}`;
-  const { error } = await supabase.storage
-    .from('review-images')
-    .upload(objectPath, file, { cacheControl: '3600', contentType: file.type, upsert: false });
-
-  if (error) throw mapDatabaseError(error);
-
-  const { data } = supabase.storage.from('review-images').getPublicUrl(objectPath);
-  return data?.publicUrl || '';
-};
-
 export const submitBookingReview = async (bookingOrId, ratingValue, ratingComment = '', ratingImageFile = null) => {
-  const current = typeof bookingOrId === 'object' ? bookingOrId : await fetchBookingById(bookingOrId);
-  if (!current?.id) throw new Error('Missing booking to review.');
-
-  const user = await getAuthUser();
-  if (!user?.id) throw new Error('Please sign in before leaving a review.');
-
-  const rating = Number(ratingValue);
-  if (!Number.isInteger(rating) || rating < 1 || rating > 5) {
-    throw new Error('Rating must be between 1 and 5.');
-  }
-
-  const existingReview = current.raw?.review || null;
-  const imageUrl = ratingImageFile
-    ? await uploadReviewImage({ file: ratingImageFile, userId: user.id, bookingId: current.id })
-    : existingReview?.image_url || '';
-  const payload = {
-    seller_id: current.workerId,
-    reviewer_id: user.id,
-    booking_id: current.id,
-    rating,
-    body: getNullableString(ratingComment),
-    image_url: getNullableString(imageUrl),
-    published: true,
-    updated_at: nowIso(),
-  };
-
-  if (existingReview?.id) {
-    const { error } = await supabase
-      .from('reviews')
-      .update(payload)
-      .eq('id', existingReview.id);
-
-    if (error) throw mapDatabaseError(error);
-  } else {
-    const { error } = await supabase
-      .from('reviews')
-      .insert([{ ...payload, title: null }]);
-
-    if (error) throw mapDatabaseError(error);
-  }
-
-  const refreshed = await fetchBookingById(current.id);
-  return { ...refreshed, rating, review: ratingComment, reviewImageUrl: imageUrl, canRate: false };
+  const bookingId = typeof bookingOrId === 'object' ? bookingOrId?.id : bookingOrId;
+  if (!bookingId) throw new Error('Missing booking to review.');
+  const saved = await persistBookingReview(bookingId, Number(ratingValue), ratingComment, ratingImageFile);
+  const refreshed = await fetchBookingById(bookingId);
+  return { ...refreshed, ...saved };
 };
 
 const buildWorkflowIdempotencyKey = (action, bookingId) => (

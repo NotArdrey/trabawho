@@ -1,3 +1,4 @@
+import AdminAnalytics from "../components/AdminAnalytics";
 import { useState } from "react";
 import AdminIdentityReviews from "@/features/admin/identity/AdminIdentityReviews";
 import { Menu } from "lucide-react";
@@ -16,7 +17,7 @@ import { useAdminAccounts } from "../hooks/useAdminAccounts";
 import type { AdminSection } from "../types";
 
 interface Props { appTheme?: string; themeMode?: "light" | "dark" | "system"; onThemeChange?: (mode: "light" | "dark" | "system") => void; onLogout?: () => void; onOpenDashboard?: () => void; onOpenAccountSettings?: () => void; adminIdentity?: { fullName?: string; email?: string } | null }
-const labels: Record<AdminSection, string> = { overview: "Overview", accounts: "Account management", identity: "Identity reviews", logs: "Audit logs", comments: "Reviews", cases: "Support cases", settings: "Settings" };
+const labels: Record<AdminSection, string> = { overview: "Overview", analytics: "Analytics", accounts: "Account management", identity: "Identity reviews", logs: "Audit logs", comments: "Reviews", cases: "Support cases", settings: "Settings" };
 
 export default function AdminDashboard({ appTheme = "light", themeMode = "system", onThemeChange, onLogout, onOpenDashboard, onOpenAccountSettings, adminIdentity }: Props) {
   const [activeSection, setActiveSection] = useState<AdminSection>("overview");
@@ -30,6 +31,7 @@ export default function AdminDashboard({ appTheme = "light", themeMode = "system
       <main className="mx-auto w-full max-w-7xl space-y-6 px-4 py-6 sm:px-6 lg:px-8">
         {activeSection === "overview" && <AdminOverview stats={state.stats} totalAccounts={state.accounts.length} isLoading={state.isAccountsLoading} error={state.accountsError} onSectionChange={setActiveSection} />}
         {activeSection === "accounts" && <AdminAccountsTable accounts={state.normalizedAccounts} isLoading={state.isAccountsLoading} error={state.accountsError} onRetry={() => void state.refreshAccounts()} searchQuery={state.searchQuery} onSearchChange={state.setSearchQuery} selectedRole={state.selectedRole} onRoleFilterChange={state.setSelectedRole} roleSavingId={state.roleSavingId} accessSaving={state.accessSaving} onUpdateRole={(account, role) => void state.handleUpdateRole(account, role)} onOpenAccessAction={state.openAccessAction} onRestoreAccount={(account) => void state.handleRestoreAccount(account)} />}
+        {activeSection === "analytics" && <AdminAnalytics />}
         {activeSection === "logs" && <AdminLogsSection />}
         {activeSection === "identity" && <AdminIdentityReviews />}
         {activeSection === "comments" && <AdminCommentsSection comments={state.comments} isLoading={state.isCommentsLoading} error={state.commentsError} total={state.reviewTotal} page={state.reviewPage} pageSize={state.reviewPageSize} search={state.reviewQuery} status={state.reviewStatus} rating={state.reviewRating} onSearchChange={state.setReviewQuery} onStatusChange={state.setReviewStatus} onRatingChange={state.setReviewRating} onPageChange={state.setReviewPage} onRetry={() => void state.refreshComments()} onOpenDeleteComment={state.setCommentDeleteTarget} />}

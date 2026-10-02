@@ -1,4 +1,4 @@
-import { ArrowLeft, ClipboardList, Inbox, LayoutDashboard, LogOut, MessageSquare, Settings2, Shield, Users } from "lucide-react";
+import { ChartNoAxesCombined, ArrowLeft, ClipboardList, Inbox, LayoutDashboard, LogOut, MessageSquare, Settings2, Shield, Users } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
@@ -19,6 +19,7 @@ interface Props {
 
 const sections = [
   { key: "overview", label: "Overview", icon: LayoutDashboard },
+  { key: "analytics", label: "Analytics", icon: ChartNoAxesCombined },
   { key: "accounts", label: "Account Management", icon: Users },
   { key: "identity", label: "Identity reviews", icon: Shield },
   { key: "logs", label: "Audit Logs", icon: ClipboardList },

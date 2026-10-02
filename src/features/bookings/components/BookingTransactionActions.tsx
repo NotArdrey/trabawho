@@ -8,12 +8,14 @@ import { FilePicker } from "@/components/ui/file-picker";
 import { SelectField } from "@/components/forms";
 import { performBookingLifecycleAction } from "@/features/bookings/services/bookingLifecycle";
 import { RepairCaseResolution } from "@/features/bookings/components/RepairCaseResolution";
+import { BookingRefundProgress } from "./BookingRefundProgress";
+import { isBookingFullyFunded, type BookingFunding } from "../utils/bookingPaymentGuard";
 import {
   deliverBookingWithEvidence, getBookingDeliveryEvidence, getBookingSupportCase, openBookingSupportCase, respondToRepairClaim, startBookingWork,
   type BookingCaseType, type RepairClaimResponse,
 } from "@/features/bookings/services/bookingTransactions";
 
-interface BookingRecord {
+interface BookingRecord extends BookingFunding {
   id: string;
   paymentStatus?: string;
   deliveryStatus?: string;
@@ -71,13 +73,14 @@ export function BookingTransactionActions({ booking, viewerRole, onUpdated }: Pr
       setCaseLoadError(value ? "" : "The report is not available yet. Retry loading it.");
     }).catch(() => { if (active) setCaseLoadError("The booking report could not be loaded. Check your connection and retry."); });
     const refreshOnFocus = () => setCaseReload((value) => value + 1);
+    const timer = window.setInterval(refreshOnFocus, 30_000);
     window.addEventListener("focus", refreshOnFocus);
-    return () => { active = false; window.removeEventListener("focus", refreshOnFocus); };
+    return () => { active = false; window.clearInterval(timer); window.removeEventListener("focus", refreshOnFocus); };
   }, [booking.id, booking.disputeStatus, caseReload]);
 
   const active = ["confirmed", "in_progress"].includes(booking.raw?.booking?.status || "");
   const startAt = booking.appointmentStartAt ? new Date(booking.appointmentStartAt).getTime() : NaN;
-  const ready = active && booking.paymentStatus === "paid" && booking.scheduleStatus === "confirmed" && booking.disputeStatus !== "open";
+  const ready = active && isBookingFullyFunded(booking) && booking.scheduleStatus === "confirmed" && booking.disputeStatus !== "open";
   const canStart = viewerRole === "provider" && ready && booking.deliveryStatus === "not_delivered"
     && !booking.workStartedAt && Number.isFinite(startAt) && now >= startAt - 30 * 60_000;
   const canDeliver = viewerRole === "provider" && ready && Boolean(booking.workStartedAt)
@@ -159,7 +162,7 @@ export function BookingTransactionActions({ booking, viewerRole, onUpdated }: Pr
   };
 
   return <div className="col-span-2 grid min-w-0 grid-cols-2 gap-2 sm:col-auto sm:flex sm:flex-wrap sm:items-center" data-testid="booking-transaction-actions">
-    {viewerRole === "provider" && booking.paymentStatus === "partially_paid" && <span className="self-center text-sm font-medium text-amber-700 dark:text-amber-300">Waiting for client balance before work</span>}
+    {viewerRole === "provider" && active && !isBookingFullyFunded(booking) && ["paid", "partially_paid"].includes(booking.paymentStatus || "") && <span className="self-center text-sm font-medium text-amber-700 dark:text-amber-300">Waiting for client balance before work. Do not begin until full payment is verified.</span>}
     {canStart && <Button type="button" disabled={pending} onClick={() => { setError(""); setDialog("start"); }}><Play aria-hidden="true" />Start work</Button>}
     {canDeliver && <Button type="button" disabled={pending} onClick={() => { setImage(null); setPhotoError(""); setError(""); setDialog("delivery"); }}><FileCheck2 aria-hidden="true" />Submit delivery</Button>}
     {canComplete && <Button type="button" disabled={pending} onClick={() => { void run(() => performBookingLifecycleAction("complete", booking.id), "Completion confirmed and saved."); }}><CheckCircle2 aria-hidden="true" />Confirm completion</Button>}
@@ -168,8 +171,10 @@ export function BookingTransactionActions({ booking, viewerRole, onUpdated }: Pr
     {(booking.disputeStatus === "open" || booking.disputeStatus === "closed") && caseLoadError && <div role="alert" className="col-span-2 grid gap-2 text-sm text-destructive sm:basis-full"><p>{caseLoadError}</p><Button type="button" variant="outline" className="w-fit" onClick={() => { setCaseLoadError(""); setCaseReload((value) => value + 1); }}><RefreshCw aria-hidden="true" />Retry loading report</Button></div>}
     {booking.disputeStatus === "open" && <div className="col-span-2 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950 sm:basis-full dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-100"><p className="font-semibold">{currentCase?.policy_route === "rework_request" ? viewerRole === "provider" ? "Client requested repair rework" : "Repair rework requested" : "Support case open"}</p><p className="mt-1">{currentCase?.reason || "Completion is paused while this report is reviewed."}</p>{currentCase?.policy_reason && <p className="mt-1 text-xs">{currentCase.policy_reason}</p>}{currentCase?.provider_response_action && <div className="mt-3 border-t border-amber-300 pt-3 dark:border-amber-800"><p className="font-semibold">{currentCase.provider_response_action === "offer_rework" ? "Provider offered rework" : "Provider requested support review"}</p><p className="mt-1">{currentCase.provider_response_text}</p><p className="mt-1 text-xs">This response does not close the case or change payment.</p></div>}</div>}
     {canRespond && <Button type="button" variant="outline" disabled={pending} onClick={() => { setResponseAction("offer_rework"); setResponseText(""); setError(""); setDialog("response"); }}>Respond to repair claim</Button>}
-    {currentCase && <div className="col-span-2 min-w-0 sm:basis-full"><RepairCaseResolution bookingId={booking.id} caseRecord={currentCase} viewerRole={viewerRole} onCaseChanged={(updatedBooking, updatedCase) => { setCaseSummary({ bookingId: booking.id, data: updatedCase }); onUpdated(updatedBooking); }} /></div>}
-    {viewerRole === "provider" && booking.deliveryStatus === "seller_claimed" && <span className="self-center text-sm text-muted-foreground">Waiting for client confirmation</span>}
+    {currentCase && currentCase.status !== "closed" && <div className="col-span-2 min-w-0 sm:basis-full"><RepairCaseResolution bookingId={booking.id} caseRecord={currentCase} viewerRole={viewerRole} onCaseChanged={(updatedBooking, updatedCase) => { setCaseSummary({ bookingId: booking.id, data: updatedCase }); onUpdated(updatedBooking); }} /></div>}
+    {currentCase?.latest_support_action && <p className="col-span-2 text-sm sm:basis-full">Support update: {currentCase.latest_support_action === "refund_review_needed" ? "Referred for refund review" : currentCase.latest_support_action === "request_information" ? `Information needed from ${currentCase.latest_support_target === "both" ? "both parties" : currentCase.latest_support_target || "the booking participants"}` : currentCase.latest_support_action === "rework_arranged" ? "Rework arranged" : "Reschedule review needed"}.</p>}
+    {currentCase && <div className="col-span-2 min-w-0 sm:basis-full"><BookingRefundProgress key={currentCase.id} bookingId={booking.id} caseId={currentCase.id} requestedAt={currentCase.refund_requested_at} canRequest={viewerRole === "client" && currentCase.status !== "closed" && ["paid", "partially_paid", "refund_pending"].includes(booking.paymentStatus || "")} onChanged={() => setCaseReload((value) => value + 1)} /></div>}
+    {viewerRole === "provider" && ready && booking.deliveryStatus === "seller_claimed" && <span className="self-center text-sm text-muted-foreground">Waiting for client confirmation</span>}
     {evidence && <div className="col-span-2 rounded-lg border bg-muted/30 p-3 text-sm sm:basis-full"><p className="font-semibold">Delivery proof</p><p className="mt-1 text-muted-foreground">{evidence.checklist.join(" · ")}</p>{evidence.explanation && <p className="mt-2">{evidence.explanation}</p>}{evidence.imageUrl && <a className="mt-2 inline-block text-primary underline" href={evidence.imageUrl} target="_blank" rel="noreferrer">Open evidence image</a>}</div>}
     {success && <p role="status" className="col-span-2 text-sm text-emerald-700 sm:basis-full dark:text-emerald-300">{success}</p>}
     {error && !dialog && <p role="alert" className="col-span-2 text-sm text-destructive sm:basis-full">{error}</p>}

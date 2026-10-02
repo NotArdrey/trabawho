@@ -1,3 +1,4 @@
+import { matchesBookingSearch } from '@/features/bookings/utils/bookingSearch';
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import {
@@ -38,7 +39,6 @@ import { SearchFilterBar } from '@/components/ui/search-filter-bar';
 import { WorkflowEmptyState } from '@/components/ui/workflow-panel';
 import { paths } from '@/app/router/routes';
 import { hasPastUnpaidSchedule } from '@/features/bookings/utils/bookingSchedule';
-
 import {
   useBookingListController,
   usePaymentController,
@@ -631,22 +631,7 @@ const MyBookings = ({
   const displayedBookings = useMemo(() => {
     let list = allBookings.filter((booking) => matchesBookingHubFilter(booking, selectedDisplayFilter, activeScope));
     if (activeSearch) {
-      list = list.filter((b) => {
-        const workerName = String(b.workerName || '').toLowerCase();
-        const serviceType = String(b.serviceType || '').toLowerCase();
-        const desc = String(b.description || '').toLowerCase();
-        const status = String(b.status || '').toLowerCase();
-        const paymentRef = String(b.paymentReference || '').toLowerCase();
-        const date = String(b.selectedSlot?.date || b.requestDate || '').toLowerCase();
-        return (
-          workerName.includes(activeSearch) ||
-          serviceType.includes(activeSearch) ||
-          desc.includes(activeSearch) ||
-          status.includes(activeSearch) ||
-          paymentRef.includes(activeSearch) ||
-          date.includes(activeSearch)
-        );
-      });
+      list = list.filter((booking) => matchesBookingSearch(booking, activeSearch));
     }
     return list;
   }, [activeScope, activeSearch, allBookings, selectedDisplayFilter]);

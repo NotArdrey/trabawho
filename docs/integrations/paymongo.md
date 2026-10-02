@@ -157,6 +157,71 @@ responsive widths. `tests/integration/payment-boost.sql` runs database security,
 amount, retry, duration, legacy commission, and 8% deposit assertions inside a
 rolled-back transaction.
 
+## Dispute refunds and payment protection (sandbox backend deployed)
+
+The implementation includes two migrations, applied in order:
+
+- `20261005100000_booking_case_refunds.sql`: client refund-review requests,
+  participant-visible support progress, admin approvals, protected refund records,
+  serialized submissions, and verified provider results.
+- `20261005101000_guard_funded_work_and_verified_refunds.sql`: full numeric funding
+  checks for work start, delivery, and completion, insert-time protection against
+  fabricated financial state, and the verified refund transition.
+
+Both migrations are applied to the TrabaWho demo/test project configured in `.env`
+(`dczhfpcfqlygpbqjctwf`), and `process-booking-refunds` version 1 is active with JWT
+verification enabled. The CLI dry run confirmed these were the only pending
+migrations; no unrelated migrations were applied. The function uses the existing
+server-only `PAYMONGO_SECRET_KEY` and intentionally accepts only a test secret.
+No live refunds are enabled. Existing case history remains readable during staged
+rollouts through the legacy-column fallback.
+
+Clients request review from the booking card's **Dispute refund** section. Both
+participants see the support next step, approved amounts, provider references,
+and pending, sent, failed, or review-required states. Private admin reasons are
+excluded from participant column grants. A referral still does not issue money.
+Administrators use **Approve full refund** with a required reason and confirmation.
+The server calculates each amount from verified payment attempts and rejects a
+changed total after the admin confirmation, including any
+collected platform fee. This is a discretionary sandbox remedy, not a production
+cancellation or fee-refund policy. No unpaid balance is refunded.
+
+Each payment attempt has one refund record and a stable PayMongo idempotency key.
+Uncertain submissions retain that key; a 60-second lease prevents concurrent
+submissions. An unknown submission older than 23 hours requires manual provider
+review instead of risking a duplicate after the provider's key retention window.
+Known refunds are retrieved through the provider API using **Check refund status**.
+Failed refunds require support/provider investigation; no new charge or replacement
+refund is created automatically. The UI refreshes saved progress every 30 seconds
+and on focus. There is no refund webhook or background provider reconciliation in
+this change. A booking closes only when every recorded refund succeeds and no
+verified payment remains unrefunded. PayMongo's succeeded state means the refund
+was sent to its payment partner, not that the client has already seen the credit;
+see [PayMongo refund states](https://docs.paymongo.com/reference/refund-resource).
+
+Work controls also check numeric amounts rather than trusting a `paid` label.
+The database rejects work, delivery, or completion while a balance is outstanding,
+including historical bookings without a balance deadline. Browser inserts cannot
+fabricate a paid or completed booking by omitting payment-method metadata.
+
+Booster fields now show duration and budget feedback alongside a total charge
+summary. Checkout retries retain their operation ID after a network error so an
+uncertain response does not start a second operation.
+
+Validation: `npm run check`; booking/payment, boost, dispute/refund, dispute recovery,
+and admin support Playwright journeys; five Deno function tests with mocked provider
+responses; and the refund SQL workflow against an isolated PostgreSQL fixture.
+Post-deployment verification confirmed both migration versions, active JWT-protected
+function status, participant reads of case/refund progress, private reason protection,
+non-admin approval rejection, unauthenticated rejection, unavailable-case protection,
+and a successful participant status check without issuing a refund. All 36 relevant
+Playwright journeys passed after deployment. Actual refund issuance has not yet been
+rehearsed against PayMongo's sandbox. Run the Edge Function tests with
+`deno test --allow-env supabase/functions/process-booking-refunds/handler.deno.ts`.
+The SQL fixture in `tests/integration/fixtures/refund-schema.sql` is only for an
+empty disposable test database; load it, the two migrations, then
+`tests/integration/refund-workflow.sql`. Never apply the fixture to the app database.
+
 ## References
 
 - [PayMongo Hosted Checkout](https://docs.paymongo.com/docs/payment-channels-hosted-checkout)

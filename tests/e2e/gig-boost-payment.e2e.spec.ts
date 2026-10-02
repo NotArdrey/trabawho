@@ -42,6 +42,21 @@ test("cancelled checkout leaves the gig inactive", async ({ page }) => {
   await expect(page.getByRole("button", { name: "Gig already boosted" })).toHaveCount(0);
 });
 
+test("invalid boost values show field feedback and preserve the entered values", async ({ page }) => {
+  await page.goto("/__boost-journey");
+  await page.getByLabel("Days", { exact: true }).fill("7.5");
+  await page.getByLabel("Budget PHP").fill("250.001");
+  await page.getByRole("button", { name: "Review boost payment" }).click();
+  await expect(page.getByLabel("Days", { exact: true })).toHaveAttribute("aria-invalid", "true");
+  await expect(page.getByLabel("Budget PHP")).toHaveAttribute("aria-invalid", "true");
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  await page.getByLabel("Days", { exact: true }).fill("14");
+  await page.getByLabel("Budget PHP").fill("250");
+  await page.getByRole("button", { name: "Review boost payment" }).click();
+  await expect(page.getByRole("dialog")).toContainText("14 days");
+  await expect(page.getByRole("dialog")).toContainText("PHP 250");
+});
+
 test("paid return refreshes the gig only after verification", async ({ page }) => {
   let paid = false;
   await page.route("**/rest/v1/services?*", (route) => route.fulfill({ json: [{ ...gig, metadata: paid ? { ad_booster: {

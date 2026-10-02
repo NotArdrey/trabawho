@@ -83,7 +83,7 @@ export function useAdminAccounts() {
     return () => { reviewRequestId.current += 1; };
   }, [refreshComments]);
   useEffect(() => {
-    const channel = supabase.channel("admin-accounts-watch")
+    const channel = supabase.channel(`admin-accounts-watch-${crypto.randomUUID()}`)
       .on("postgres_changes", { event: "*", schema: "public", table: "profiles" }, () => { void refreshAccounts(); })
       .subscribe();
     return () => { void supabase.removeChannel(channel); };
