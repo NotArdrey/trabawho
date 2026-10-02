@@ -45,14 +45,15 @@ export function WorkspaceSidebarNavItem({ label, icon: Icon, active, onClick, tr
   </button>;
 }
 
-export function WorkspaceSidebarAccount({ name, subtitle, imageUrl, onClick, actionLabel }: {
+export function WorkspaceSidebarAccount({ name, subtitle, imageUrl, active = false, onClick, actionLabel }: {
   name: string;
   subtitle: string;
   imageUrl?: string;
+  active?: boolean;
   onClick: () => void;
   actionLabel: string;
 }) {
-  return <button type="button" className="grid min-h-[58px] w-full grid-cols-[38px_minmax(0,1fr)_20px] items-center gap-2 rounded-lg bg-muted/50 p-2 text-left hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" onClick={onClick} aria-label={actionLabel}>
+  return <button type="button" className={cn("grid min-h-[58px] w-full grid-cols-[38px_minmax(0,1fr)_20px] items-center gap-2 rounded-lg bg-muted/50 p-2 text-left hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring", active && "bg-accent text-foreground")} onClick={onClick} aria-label={actionLabel} aria-current={active ? "page" : undefined}>
     {imageUrl ? <img className="size-[38px] rounded-lg object-cover" src={imageUrl} alt="" /> : <span className="flex size-[38px] items-center justify-center rounded-lg bg-primary/10 text-sm font-bold text-primary" aria-hidden="true">{name.trim().slice(0, 1).toUpperCase()}</span>}
     <span className="min-w-0"><strong className="block truncate text-xs">{name}</strong><small className="mt-1 block truncate text-[10px] text-muted-foreground">{subtitle}</small></span>
     <ChevronRight className="size-4 text-muted-foreground" aria-hidden />

@@ -1,7 +1,6 @@
 import { useEffect, useState, type ChangeEvent, type ComponentType } from "react";
 import { useNavigate } from "react-router-dom";
 import {
-  ArrowLeftRight,
   BriefcaseBusiness,
   CalendarCheck,
   Home,
@@ -30,7 +29,7 @@ import { cn } from "@/lib/utils";
 import { buildServicesUrl } from "@/lib/service-search";
 import { getProfilePhotoUrl } from "@/shared/utils/profilePhoto";
 import BrandWordmark from "./BrandWordmark";
-import { desktopWorkspaceSidebarClass, WorkspaceSidebarAccount, WorkspaceSidebarBrand, WorkspaceSidebarIdentity, WorkspaceSidebarNavItem } from "./WorkspaceSidebar";
+import { desktopWorkspaceSidebarClass, WorkspaceSidebarAccount, WorkspaceSidebarBrand, WorkspaceSidebarNavItem } from "./WorkspaceSidebar";
 
 const WORKER_ROLES = new Set(["worker", "workers", "seller", "sellers"]);
 const CLIENT_ROLES = new Set(["client", "clients", "buyer", "buyers", "customer", "customers"]);
@@ -145,7 +144,6 @@ export default function DashboardNavigation({
   const profilePhotoUrl = getProfilePhotoUrl(sellerProfile?.profilePhoto);
   const displayName = sellerProfile?.fullName || [sellerProfile?.firstName, sellerProfile?.lastName].filter(Boolean).join(" ") || "TrabaWho member";
   const workspaceLabel = isProviderWorkspace ? "Provider workspace" : "Client workspace";
-  const workspaceDescription = isProviderWorkspace ? "Manage jobs and services" : "Book trusted local help";
 
   useEffect(() => {
     if (!isWorkerAccount) return;
@@ -227,7 +225,6 @@ export default function DashboardNavigation({
     <>
       <aside className={desktopWorkspaceSidebarClass}>
         <WorkspaceSidebarBrand onClick={openWorkspaceHome} />
-        <WorkspaceSidebarIdentity label={workspaceLabel} description={workspaceDescription} icon={isProviderWorkspace ? BriefcaseBusiness : Home} actionIcon={isWorkerAccount ? ArrowLeftRight : undefined} onClick={isWorkerAccount ? switchWorkerWorkspace : openWorkspaceHome} actionLabel={isWorkerAccount ? `Switch to ${isProviderWorkspace ? "client" : "provider"} workspace` : workspaceLabel} />
 
         <section className="grid gap-2" aria-labelledby="workspace-navigation-label">
           <p id="workspace-navigation-label" className="px-2.5 text-[10px] font-bold uppercase tracking-[0.1em] text-muted-foreground">Workspace</p>
@@ -236,10 +233,9 @@ export default function DashboardNavigation({
 
         <div className="mt-auto grid gap-2.5 border-t pt-3">
           <div className="grid gap-1" aria-label="Account shortcuts">
-            <Button type="button" variant="ghost" className={cn("justify-start px-2.5 text-muted-foreground", activeKey === "profile" && "bg-accent text-foreground")} onClick={onOpenProfile}><UserRound />Profile</Button>
             <Button type="button" variant="ghost" className={cn("justify-start px-2.5 text-muted-foreground", activeKey === "settings" && "bg-accent text-foreground")} onClick={onOpenSettings}><Settings />Settings</Button>
           </div>
-          <WorkspaceSidebarAccount name={displayName} subtitle={workspaceLabel} imageUrl={profilePhotoUrl} onClick={() => onOpenProfile?.()} actionLabel="Open profile" />
+          <WorkspaceSidebarAccount name={displayName} subtitle={workspaceLabel} imageUrl={profilePhotoUrl} active={activeKey === "profile"} onClick={() => onOpenProfile?.()} actionLabel="Open profile" />
           <Button type="button" variant="outline" className="w-full justify-start border-destructive/30 px-3 text-destructive hover:bg-destructive/10 hover:text-destructive" onClick={() => setIsLogoutModalOpen(true)}>
             <LogOut aria-hidden />
             Log out

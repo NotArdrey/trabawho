@@ -98,7 +98,7 @@ test('client demo account logs in through the public login modal', async ({ page
   const consoleFailures = collectConsoleFailures(page);
 
   await loginAs(page, BOOKING_DEMO_CLIENT_EMAIL);
-  await expect(page.getByRole('button', { name: 'Client workspace' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Open profile', exact: true })).toBeVisible();
   await expect(page.getByText(/Welcome back/i)).toBeVisible();
 
   expect(consoleFailures).toEqual([]);
