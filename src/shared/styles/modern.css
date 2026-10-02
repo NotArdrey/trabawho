@@ -689,28 +689,6 @@ select:not([multiple]) {
   scroll-margin-top: 86px;
 }
 
-.gl-admin-page {
-  background:
-    linear-gradient(180deg, color-mix(in srgb, var(--gl-blue) 5%, transparent), transparent 320px),
-    var(--gl-page) !important;
-  color: var(--gl-text) !important;
-}
-
-.gl-admin-page :where(nav, article, section, table, input, select, button) {
-  border-radius: min(8px, var(--gl-radius)) !important;
-}
-
-.gl-admin-page :where(input:not([type="checkbox"]):not([type="radio"]), textarea) {
-  padding-left: 14px !important;
-  padding-right: 14px !important;
-}
-
-.gl-admin-page :where(article, section) {
-  border-color: var(--gl-border) !important;
-  background: var(--gl-surface) !important;
-  box-shadow: var(--gl-shadow-soft) !important;
-}
-
 .gl-page {
   min-height: 100vh;
   background:
@@ -3427,15 +3405,15 @@ textarea {
   max-width: 100%;
 }
 
-:where(.gl-page, .gl-admin-page, .auth-page, [data-testid]) {
+:where(.gl-page, .auth-page, [data-testid]) {
   overflow-x: hidden;
 }
 
-:where(.gl-page, .gl-admin-page, [data-testid]) :where(main, section, article, aside, header, footer, form, div) {
+:where(.gl-page, [data-testid]) :where(main, section, article, aside, header, footer, form, div) {
   min-width: 0;
 }
 
-:where(.gl-page, .gl-admin-page, [data-testid]) :where(h1, h2, h3, p, span, strong, small, a, button, label) {
+:where(.gl-page, [data-testid]) :where(h1, h2, h3, p, span, strong, small, a, button, label) {
   overflow-wrap: break-word;
 }
 
@@ -3482,58 +3460,6 @@ textarea {
 }
 
 @media (max-width: 1024px) {
-  .gl-admin-sidebar {
-    transform: translateX(-100%) !important;
-  }
-
-  .gl-admin-sidebar.open {
-    transform: translateX(0) !important;
-    box-shadow: var(--gl-shadow) !important;
-  }
-
-  .gl-admin-sidebar-overlay {
-    display: block !important;
-    position: fixed !important;
-    inset: 0 !important;
-    z-index: 145 !important;
-    background: rgba(15, 23, 42, 0.45) !important;
-    backdrop-filter: blur(2px) !important;
-  }
-
-  .gl-admin-mobile-close,
-  .gl-admin-mobile-toggle {
-    display: inline-flex !important;
-  }
-
-  .gl-admin-main-wrapper {
-    margin-left: 0 !important;
-    width: 100% !important;
-  }
-
-  .gl-admin-topbar {
-    padding: 0 16px !important;
-  }
-
-  .gl-admin-shell {
-    padding: 16px !important;
-  }
-
-  .gl-admin-stats-grid,
-  .gl-admin-overview-grid,
-  .gl-admin-summary-row,
-  .gl-admin-content-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
-  }
-
-  .gl-admin-filter-bar {
-    width: 100% !important;
-  }
-
-  .gl-admin-filter-bar input,
-  .gl-admin-filter-bar select {
-    min-width: min(100%, 220px) !important;
-    flex: 1 1 220px !important;
-  }
 }
 
 @media (max-width: 880px) {
@@ -3669,36 +3595,6 @@ textarea {
     width: 100% !important;
   }
 
-  .gl-admin-shell {
-    padding: 12px !important;
-  }
-
-  .gl-admin-nav-inner {
-    padding: 12px !important;
-  }
-
-  .gl-admin-nav-brand,
-  .gl-admin-nav-tabs,
-  .gl-admin-nav-actions {
-    width: 100% !important;
-  }
-
-  .gl-admin-nav-tabs button,
-  .gl-admin-nav-actions button {
-    flex: 1 1 auto !important;
-  }
-
-  .gl-admin-stats-grid,
-  .gl-admin-overview-grid,
-  .gl-admin-summary-row,
-  .gl-admin-content-grid {
-    grid-template-columns: 1fr !important;
-  }
-
-  .gl-admin-header-panel,
-  .gl-admin-panel {
-    padding: 14px !important;
-  }
 }
 
 @media (max-width: 520px) {
@@ -3899,8 +3795,7 @@ textarea {
 [data-testid="my-bookings-page"] :where(div, section, article)[style*="box-shadow"],
 [data-testid="my-work-page"] :where(div, section, article)[style*="box-shadow"],
 [data-testid="profile-page"] :where(div, section, article)[style*="box-shadow"],
-[data-testid="settings-page"] :where(div, section, article)[style*="box-shadow"],
-.gl-admin-page :where(article, section)[style*="box-shadow"] {
+[data-testid="settings-page"] :where(div, section, article)[style*="box-shadow"] {
   box-shadow: none !important;
 }
 
@@ -3909,8 +3804,7 @@ textarea {
 [data-testid="my-work-page"] :where(div, section, article, button)[style*="border-radius: 12px"],
 [data-testid="my-work-page"] :where(div, section, article, button)[style*="border-radius: 16px"],
 [data-testid="profile-page"] :where(div, section, article, button)[style*="border-radius: 12px"],
-[data-testid="settings-page"] :where(div, section, article, button)[style*="border-radius: 12px"],
-.gl-admin-page :where(article, section, button, input, select) {
+[data-testid="settings-page"] :where(div, section, article, button)[style*="border-radius: 12px"] {
   border-radius: 8px !important;
 }
 
@@ -3925,16 +3819,14 @@ textarea {
 [data-testid="my-work-page"] button,
 [data-testid="my-bookings-page"] button,
 [data-testid="profile-page"] button,
-[data-testid="settings-page"] button,
-.gl-admin-page button {
+[data-testid="settings-page"] button {
   letter-spacing: 0 !important;
 }
 
 [data-testid="my-work-page"] :where(h1, h2, h3, h4),
 [data-testid="my-bookings-page"] :where(h1, h2, h3, h4),
 [data-testid="profile-page"] :where(h1, h2, h3, h4),
-[data-testid="settings-page"] :where(h1, h2, h3, h4),
-.gl-admin-page :where(h1, h2, h3, h4) {
+[data-testid="settings-page"] :where(h1, h2, h3, h4) {
   color: var(--gl-text) !important;
   letter-spacing: 0 !important;
 }

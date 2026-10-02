@@ -7,6 +7,11 @@ import { fetchBookingById } from "@/features/bookings/services/bookingService";
 import { PaymentReturnStatus } from "./PaymentReturnStatus";
 
 vi.mock("@/features/bookings/services/bookingService", () => ({ fetchBookingById: vi.fn() }));
+const { paymentAttemptQuery, reconcileCheckout } = vi.hoisted(() => ({ paymentAttemptQuery: vi.fn(), reconcileCheckout: vi.fn() }));
+vi.mock("@/integrations/supabase", () => ({ supabase: {
+  from: () => ({ select: () => ({ eq: () => ({ eq: () => ({ maybeSingle: paymentAttemptQuery }) }) }) }),
+  functions: { invoke: reconcileCheckout },
+} }));
 
 describe("PaymentReturnStatus", () => {
   it("keeps a cancelled checkout recoverable", async () => {
@@ -20,10 +25,22 @@ describe("PaymentReturnStatus", () => {
 
   it("shows confirmation only after the server reports payment", async () => {
     vi.mocked(fetchBookingById).mockResolvedValue({ paymentStatus: "paid" } as never);
+    paymentAttemptQuery.mockResolvedValue({ data: { status: "paid" }, error: null });
     const onBookingUpdated = vi.fn();
-    render(<MemoryRouter initialEntries={["/bookings?payment=verifying&booking=booking-1"]}><PaymentReturnStatus onBookingUpdated={onBookingUpdated} /></MemoryRouter>);
+    render(<MemoryRouter initialEntries={["/bookings?payment=verifying&booking=booking-1&attempt=attempt-1"]}><PaymentReturnStatus onBookingUpdated={onBookingUpdated} /></MemoryRouter>);
     expect(screen.getByText("Verifying your payment")).toBeVisible();
     await waitFor(() => expect(screen.getByText("Payment confirmed")).toBeVisible());
     expect(onBookingUpdated).toHaveBeenCalledWith(expect.objectContaining({ paymentStatus: "paid" }));
+  });
+
+  it("checks an expired checkout for a late charge without confirming the reservation", async () => {
+    paymentAttemptQuery.mockResolvedValue({ data: { status: "expired" }, error: null });
+    reconcileCheckout.mockResolvedValue({ data: { verified: false, latePaid: true }, error: null });
+    const onBookingUpdated = vi.fn();
+    render(<MemoryRouter initialEntries={["/bookings?payment=verifying&booking=booking-1&attempt=attempt-1"]}><PaymentReturnStatus onBookingUpdated={onBookingUpdated} /></MemoryRouter>);
+    await waitFor(() => expect(screen.getByText("Payment needs support review")).toBeVisible());
+    expect(reconcileCheckout).toHaveBeenCalledWith("reconcile-paymongo-checkout", { body: { attemptId: "attempt-1" } });
+    expect(onBookingUpdated).not.toHaveBeenCalled();
+    expect(screen.getByText(/booking was not confirmed/i)).toBeVisible();
   });
 });

@@ -1,8 +1,10 @@
+import { useState } from "react";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { fetchPublicServiceSlots } from "@/features/bookings/services/bookingAvailability";
+import BookingTermsModal from "./BookingTermsModal";
 import SlotSelectionModal from "./SlotSelectionModal";
 
 vi.mock("@/features/bookings/services/bookingAvailability", () => ({
@@ -10,6 +12,15 @@ vi.mock("@/features/bookings/services/bookingAvailability", () => ({
 }));
 
 const mockedFetchSlots = vi.mocked(fetchPublicServiceSlots);
+
+function BookingFlowHarness() {
+  const [step, setStep] = useState<"slots" | "terms" | "payment">("slots");
+  return <>
+    {step === "slots" ? <SlotSelectionModal booking={{ serviceId: 7, workerName: "Nina Flores" }} onCancel={() => setStep("payment")} onConfirmSlot={() => setStep("terms")} /> : null}
+    <BookingTermsModal isOpen={step === "terms"} onCancel={() => setStep("slots")} onConfirm={() => setStep("payment")} />
+    {step === "payment" ? <div role="status">Payment step ready</div> : null}
+  </>;
+}
 
 describe("SlotSelectionModal", () => {
   beforeEach(() => {
@@ -26,7 +37,7 @@ describe("SlotSelectionModal", () => {
   it("requires an explicit date and time before continuing", async () => {
     const user = userEvent.setup();
     const onConfirmSlot = vi.fn();
-    render(<SlotSelectionModal booking={{ serviceId: 7, workerName: "Nina Flores" }} onCancel={vi.fn()} onConfirmSlot={onConfirmSlot} />);
+    render(<SlotSelectionModal booking={{ serviceId: 7, serviceType: "Home cleaning", workerName: "Nina Flores", quoteAmount: 600 }} onCancel={vi.fn()} onConfirmSlot={onConfirmSlot} />);
 
     const reviewButton = await screen.findByRole("button", { name: "Review booking" });
     expect(reviewButton).toBeDisabled();
@@ -37,6 +48,15 @@ describe("SlotSelectionModal", () => {
     await user.click(screen.getByRole("button", { name: /9:00 AM–10:00 AM/i }));
     expect(reviewButton).toBeEnabled();
     await user.click(reviewButton);
+
+    expect(screen.getByRole("heading", { name: "Review your booking" })).toBeVisible();
+    expect(screen.getByRole("region", { name: "Booking review" })).toHaveTextContent("Home cleaning");
+    expect(screen.getByRole("region", { name: "Booking review" })).toHaveTextContent("PHP 600");
+    expect(onConfirmSlot).not.toHaveBeenCalled();
+    await user.click(screen.getByRole("button", { name: "Change time" }));
+    expect(screen.getByRole("heading", { name: "Choose a booking schedule" })).toBeVisible();
+    await user.click(reviewButton);
+    await user.click(screen.getByRole("button", { name: "Continue to terms" }));
 
     expect(onConfirmSlot).toHaveBeenCalledWith(expect.objectContaining({ slotId: 42, date: "2026-10-10" }));
   });
@@ -60,5 +80,31 @@ describe("SlotSelectionModal", () => {
     expect(screen.getByText("Showing 7–8 of 8 available dates")).toBeVisible();
     expect(screen.getByRole("button", { name: /Sat, Oct 17/i })).toBeVisible();
     expect(screen.getByRole("button", { name: "Review booking" })).toBeDisabled();
+  });
+
+  it("opens terms after review and reaches payment", async () => {
+    const user = userEvent.setup();
+    render(<BookingFlowHarness />);
+
+    await user.click(await screen.findByRole("button", { name: /Sat, Oct 10/i }));
+    await user.click(screen.getByRole("button", { name: /9:00 AM–10:00 AM/i }));
+    await user.click(screen.getByRole("button", { name: "Review booking" }));
+    expect(screen.getByRole("heading", { name: "Review your booking" })).toBeVisible();
+    await user.click(screen.getByRole("button", { name: "Continue to terms" }));
+    expect(screen.getByRole("heading", { name: "Review before payment" })).toBeVisible();
+    await user.click(screen.getByRole("checkbox"));
+    await user.click(screen.getByRole("button", { name: "Agree and open checkout" }));
+    expect(screen.getByRole("status", { name: "" })).toHaveTextContent("Payment step ready");
+  });
+
+  it("labels rescheduling accurately and keeps a backend failure visible", async () => {
+    const user = userEvent.setup();
+    render(<SlotSelectionModal action="reschedule" booking={{ serviceId: 7 }} onCancel={vi.fn()} onConfirmSlot={vi.fn().mockRejectedValue(new Error("This booking can no longer be rescheduled"))} />);
+
+    await user.click(await screen.findByRole("button", { name: /Sat, Oct 10/i }));
+    await user.click(screen.getByRole("button", { name: /9:00 AM–10:00 AM/i }));
+    await user.click(screen.getByRole("button", { name: "Review booking" }));
+    await user.click(screen.getByRole("button", { name: "Request reschedule" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("This booking can no longer be rescheduled");
   });
 });

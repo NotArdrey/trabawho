@@ -23,5 +23,6 @@ When documents disagree, follow the highest applicable document and update the l
 ## Active roadmaps
 
 - [`roadmaps/booking-transactions.md`](roadmaps/booking-transactions.md) — booking lifecycle, PayMongo integration, refunds, disputes, and provider payouts.
+- [`roadmaps/admin-operations.md`](roadmaps/admin-operations.md) — admin support workflows, exception handling, moderation, and launch gates.
 
 Superseded plans, temporary fixes, generated logs, and one-off diagnostic notes do not belong in the repository. Record active work in the migration ledger or the applicable maintained standard.

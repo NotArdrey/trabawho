@@ -122,7 +122,7 @@ serve(async (request: Request) => {
     const serviceId = Number(body.serviceId) || null;
     const slotId = Number(body.slotId) || null;
     const quoteVersion = Number(body.quoteVersion) || null;
-    const paymentPlan = cleanPaymentString(body.paymentPlan) || "full";
+    const paymentPlan = cleanPaymentString(body.paymentPlan) || "downpayment";
     const idempotencyKey = cleanPaymentString(body.idempotencyKey);
     if ((!bookingId && (!serviceId || !slotId)) || !idempotencyKey) {
       throw new PaymentFunctionError("Choose a booking time before starting payment.");

@@ -10,7 +10,7 @@ import QrPreviewModal from '../components/modals/QrPreviewModal';
 import CreateServiceModal from '../components/CreateServiceModal';
 import SuccessNotification from '../../../shared/components/SuccessNotification';
 import ErrorNotification from '../../../shared/components/ErrorNotification';
-import { markBookingDelivered } from '../../bookings/services/bookingService';
+import { performBookingLifecycleAction } from '@/features/bookings/services/bookingLifecycle';
 import { getThemeTokens } from '../../../shared/styles/themeTokens';
 import { useWorkPayments, useWorkProfileServices, useWorkSchedule } from '../hooks';
 import {
@@ -311,7 +311,7 @@ const MyWork = ({ appTheme = 'light', themeMode = 'system', onThemeChange, curre
 
     try {
       setPaymentError('');
-      await markBookingDelivered(doneConfirmTarget.sourceBookingId);
+      await performBookingLifecycleAction('deliver', doneConfirmTarget.sourceBookingId);
     } catch (error) {
       setPaymentError(error?.message || 'Unable to record service delivery.');
       return;

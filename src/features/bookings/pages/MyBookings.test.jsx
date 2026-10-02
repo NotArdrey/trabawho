@@ -254,6 +254,10 @@ describe('MyBookings Redesign Component', () => {
     expect(screen.getByRole('heading', { name: 'Scheduled time has passed' })).toBeVisible();
     fireEvent.click(screen.getByRole('button', { name: 'Choose another time' }));
     expect(screen.getByTestId('mock-slot-modal')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Review booking' }));
+    expect(screen.getByTestId('mock-terms-modal')).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId('mock-terms-modal'));
+    expect(screen.getByTestId('mock-payment-modal')).toBeInTheDocument();
   });
 
   test('shows the provider confirmation action before client completion', () => {
@@ -262,6 +266,9 @@ describe('MyBookings Redesign Component', () => {
       status: 'Payment Confirmed',
       paymentStatus: 'paid',
       deliveryStatus: 'not_delivered',
+      workStartedAt: '2026-10-02T00:00:00Z',
+      scheduleStatus: 'confirmed',
+      raw: { booking: { status: 'in_progress' } },
     }];
 
     renderBookings(
@@ -269,7 +276,7 @@ describe('MyBookings Redesign Component', () => {
       '/worker/bookings?scope=incoming',
     );
 
-    expect(screen.getByRole('button', { name: /Mark Delivered/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Submit delivery/i })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Confirm Completion/i })).not.toBeInTheDocument();
   });
 

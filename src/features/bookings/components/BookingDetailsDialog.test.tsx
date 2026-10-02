@@ -28,7 +28,7 @@ describe("BookingDetailsDialog", () => {
     expect(screen.getByRole("heading", { name: "Payment reference" })).toBeVisible();
     expect(screen.getByText("Monday, September 28, 2026")).toBeVisible();
     expect(screen.getByText("PHP 997.50")).toBeVisible();
-    expect(screen.getByRole("heading", { name: "Payment required to confirm" })).toBeVisible();
+    expect(screen.getByRole("heading", { name: "Deposit required to confirm" })).toBeVisible();
   });
 
   it("opens the booking conversation", async () => {

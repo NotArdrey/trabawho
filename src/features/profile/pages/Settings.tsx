@@ -1,18 +1,14 @@
 import { useEffect, useState, type ChangeEvent, type ComponentType } from "react";
 import {
   BellRing,
-  Check,
   CheckCircle2,
   Globe2,
-  Laptop,
   Mail,
   MessageSquareText,
-  Moon,
   Save,
-  Sun,
 } from "lucide-react";
 
-import { SelectField } from "@/components/forms";
+import { AppearancePicker, SelectField, type AppearanceChoice, type ThemeMode } from "@/components/forms";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
@@ -21,7 +17,6 @@ import DashboardNavigation, {
 } from "@/shared/components/DashboardNavigation";
 
 type NavigationHandler = () => void;
-type ThemeMode = "light" | "dark" | "system";
 type AppLanguage = "en" | "fil";
 
 export interface SettingsProps {
@@ -108,13 +103,6 @@ const translations = {
     saved: "Na-save na ang iyong preferences.",
   },
 } as const;
-
-interface ThemeChoice {
-  value: ThemeMode;
-  label: string;
-  description: string;
-  icon: ComponentType<{ className?: string; "aria-hidden"?: boolean }>;
-}
 
 interface PreferenceSwitchProps {
   checked: boolean;
@@ -208,10 +196,10 @@ function Settings({
     return () => window.clearTimeout(timer);
   }, [saveMessage]);
 
-  const themeChoices: ThemeChoice[] = [
-    { value: "system", label: t.system, description: t.systemDescription, icon: Laptop },
-    { value: "light", label: t.light, description: t.lightDescription, icon: Sun },
-    { value: "dark", label: t.dark, description: t.darkDescription, icon: Moon },
+  const themeChoices: AppearanceChoice[] = [
+    { value: "system", label: t.system, description: t.systemDescription },
+    { value: "light", label: t.light, description: t.lightDescription },
+    { value: "dark", label: t.dark, description: t.darkDescription },
   ];
 
   const handleSave = () => {
@@ -281,39 +269,7 @@ function Settings({
                 ]}
               />
 
-              <section aria-labelledby="appearance-heading">
-                <h2 id="appearance-heading" className="text-sm font-semibold text-foreground">
-                  {t.appearance}
-                </h2>
-                <p className="mt-1 text-sm leading-5 text-muted-foreground">{t.appearanceDescription}</p>
-                <div className="mt-3 grid gap-2 sm:grid-cols-3" role="radiogroup" aria-label={t.appearance}>
-                  {themeChoices.map(({ value, label, description, icon: Icon }) => {
-                    const isSelected = selectedTheme === value;
-                    return (
-                      <button
-                        key={value}
-                        type="button"
-                        role="radio"
-                        aria-checked={isSelected}
-                        onClick={() => onThemeChange?.(value)}
-                        className={cn(
-                          "relative min-h-[92px] rounded-lg bg-muted/50 p-3 text-left transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                          isSelected && "bg-primary text-primary-foreground hover:bg-primary/90",
-                        )}
-                      >
-                        <div className="flex items-center justify-between gap-2">
-                          <Icon className="size-5" aria-hidden={true} />
-                          {isSelected ? <Check className="size-4" aria-hidden="true" /> : null}
-                        </div>
-                        <p className="mt-3 text-sm font-semibold">{label}</p>
-                        <p className={cn("mt-0.5 text-xs", isSelected ? "text-primary-foreground/80" : "text-muted-foreground")}>
-                          {description}{value === "system" ? ` · ${appTheme === "dark" ? t.dark : t.light}` : ""}
-                        </p>
-                      </button>
-                    );
-                  })}
-                </div>
-              </section>
+              <AppearancePicker appTheme={appTheme} choices={themeChoices} description={t.appearanceDescription} label={t.appearance} onThemeChange={onThemeChange} themeMode={selectedTheme} />
             </CardContent>
           </Card>
 

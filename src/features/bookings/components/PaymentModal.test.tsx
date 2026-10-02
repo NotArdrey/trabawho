@@ -20,11 +20,11 @@ describe("PaymentModal", () => {
 
     expect(screen.getByRole("dialog", { name: "Choose payment" })).toBeInTheDocument();
     expect(screen.getByText("Mon, Sep 28, 2026 · 9:00 PM")).toBeInTheDocument();
-    expect(screen.getAllByText("PHP 997.50").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("PHP 522.50").length).toBeGreaterThan(0);
     expect(screen.getByRole("heading", { name: "Payment breakdown" })).toBeVisible();
     expect(screen.queryByText("Test payment")).not.toBeInTheDocument();
 
-    await user.click(screen.getByRole("radio", { name: /50% downpayment/i }));
+    expect(screen.queryByText("Full payment")).not.toBeInTheDocument();
     expect(screen.getAllByText("PHP 522.50").length).toBeGreaterThan(0);
     expect(screen.getByText("GCash")).toBeVisible();
     expect(screen.getByText("Coming soon")).toBeVisible();
