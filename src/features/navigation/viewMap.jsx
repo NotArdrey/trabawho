@@ -16,6 +16,13 @@ export const viewMap = {
     component: AdminDashboard,
     propsBuilder: (context) => ({
       appTheme: context.appTheme,
+      themeMode: context.themeMode,
+      onThemeChange: context.handleThemeChange,
+      adminIdentity: {
+        fullName: context.sellerProfile?.fullName,
+        email: context.authUser?.email || context.sellerProfile?.email,
+      },
+      onOpenAccountSettings: context.handleOpenAccountSettings,
       currentView: context.currentView,
       onLogout: context.handleLogout,
       onOpenDashboard: context.handleBackToClientDashboard,

@@ -126,7 +126,7 @@ export default function PaymentModal({
   const pricing = calculateBookingPricing(baseAmount, transactionFeeRate);
   const isPayingRemainingBalance = booking.paymentStatus === "partially_paid";
   const [selectedMethod, setSelectedMethod] = useState<PaymentMethod | null>(allowsPayMongo ? "paymongo-card" : null);
-  const [paymentPlan, setPaymentPlan] = useState<PaymentPlan>(booking.paymentPlan === "downpayment" ? "downpayment" : "full");
+  const [paymentPlan, setPaymentPlan] = useState<PaymentPlan>(isRequestBooking && booking.paymentPlan !== "downpayment" ? "full" : "downpayment");
   const [isProcessing, setIsProcessing] = useState(false);
   const [submitError, setSubmitError] = useState("");
 
@@ -208,7 +208,7 @@ export default function PaymentModal({
             <div className="rounded-lg bg-background px-4 py-3 sm:min-w-48 sm:text-right">
               <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground">Amount due now</p>
               <p className="mt-1 text-2xl font-extrabold text-emerald-600 dark:text-emerald-400">{formatPhp(amountDueNow)}</p>
-              {remainingBalance > 0 ? <p className="mt-1 text-xs text-muted-foreground">{formatPhp(remainingBalance)} due after service</p> : null}
+              {remainingBalance > 0 ? <p className="mt-1 text-xs text-muted-foreground">{formatPhp(remainingBalance)} due before work starts</p> : null}
             </div>
           </section>
 
@@ -216,36 +216,14 @@ export default function PaymentModal({
             <section aria-labelledby="payment-plan-heading">
               <div className="mb-3 flex items-center gap-2">
                 <span className="flex size-7 items-center justify-center rounded-full bg-primary text-sm font-bold text-primary-foreground" aria-hidden="true">1</span>
-                <h3 id="payment-plan-heading" className="font-semibold text-foreground">Choose how much to pay now</h3>
+                <h3 id="payment-plan-heading" className="font-semibold text-foreground">{isRequestBooking ? "Choose how much to pay now" : "50% deposit secures your schedule"}</h3>
               </div>
-              <div className="grid gap-3 sm:grid-cols-2" role="radiogroup" aria-label="Payment amount">
-                {([
-                  { value: "full" as const, label: "Full payment", due: pricing.totalChargedAmount, description: "Pay the service price and platform fee now." },
-                  { value: "downpayment" as const, label: "50% downpayment", due: pricing.downpaymentUpfrontAmount, description: `${formatPhp(pricing.downpaymentBalanceAmount)} remains after service.` },
-                ]).map((option) => {
-                  const selected = paymentPlan === option.value;
-                  return (
-                    <button
-                      key={option.value}
-                      type="button"
-                      role="radio"
-                      aria-checked={selected}
-                      onClick={() => setPaymentPlan(option.value)}
-                      className={cn(
-                        "min-h-28 rounded-xl bg-muted/45 p-4 text-left transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                        selected && "bg-primary text-primary-foreground hover:bg-primary/90",
-                      )}
-                    >
-                      <span className="flex items-center justify-between gap-3 font-bold">
-                        {option.label}
-                        {selected ? <CheckCircle2 className="size-5" aria-hidden="true" /> : <span className="size-5 rounded-full border-2 border-muted-foreground/40" aria-hidden="true" />}
-                      </span>
-                      <span className="mt-2 block text-xl font-extrabold">{formatPhp(option.due)}</span>
-                      <span className={cn("mt-1 block text-xs leading-5", selected ? "text-primary-foreground/80" : "text-muted-foreground")}>{option.description}</span>
-                    </button>
-                  );
-                })}
-              </div>
+              {isRequestBooking ? <div className="grid gap-3 sm:grid-cols-2" role="radiogroup" aria-label="Payment amount">{(["full", "downpayment"] as const).map((option) => <button type="button" role="radio" aria-checked={paymentPlan === option} key={option} onClick={() => setPaymentPlan(option)} className={cn("min-h-24 rounded-xl border p-4 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring", paymentPlan === option && "border-primary bg-primary/10")}><span className="block font-bold">{option === "full" ? "Full payment" : "50% downpayment"}</span><span className="mt-2 block font-semibold">{formatPhp(option === "full" ? pricing.totalChargedAmount : pricing.downpaymentUpfrontAmount)}</span></button>)}</div> :
+              <div className="rounded-xl border border-primary/30 bg-primary/5 p-4">
+                <p className="flex items-center gap-2 font-bold text-foreground"><CheckCircle2 className="size-5 text-primary" aria-hidden="true" />Deposit and platform fee</p>
+                <p className="mt-2 text-xl font-extrabold text-foreground">{formatPhp(pricing.downpaymentUpfrontAmount)}</p>
+                <p className="mt-1 text-sm text-muted-foreground">Pay {formatPhp(pricing.downpaymentBalanceAmount)} before the appointment starts. Your provider cannot begin work until the balance is verified.</p>
+              </div>}
             </section>
           ) : null}
 

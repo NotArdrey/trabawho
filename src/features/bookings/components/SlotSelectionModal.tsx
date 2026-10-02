@@ -18,7 +18,9 @@ import {
 
 interface BookingSummary {
   id?: number | string;
+  quoteAmount?: number | string;
   serviceId?: number | string;
+  serviceType?: string;
   workerName?: string;
 }
 
@@ -44,9 +46,10 @@ interface SelectedSlot {
 }
 
 interface SlotSelectionModalProps {
+  action?: "checkout" | "reschedule";
   booking: BookingSummary;
   onCancel: () => void;
-  onConfirmSlot: (slot: SelectedSlot) => void;
+  onConfirmSlot: (slot: SelectedSlot) => Promise<void> | void;
 }
 
 const dateKey = (value: string | Date) => {
@@ -73,13 +76,16 @@ const timeLabel = (value: string) => new Date(value).toLocaleTimeString("en-PH",
 
 const DATES_PER_PAGE = 6;
 
-export default function SlotSelectionModal({ booking, onCancel, onConfirmSlot }: SlotSelectionModalProps) {
+export default function SlotSelectionModal({ action = "checkout", booking, onCancel, onConfirmSlot }: SlotSelectionModalProps) {
   const [slots, setSlots] = useState<AvailableServiceSlot[]>([]);
   const [selectedDate, setSelectedDate] = useState("");
   const [selectedSlotId, setSelectedSlotId] = useState<number | null>(null);
   const [datePage, setDatePage] = useState(0);
   const [error, setError] = useState("");
+  const [submitError, setSubmitError] = useState("");
   const [isLoading, setIsLoading] = useState(true);
+  const [isReviewing, setIsReviewing] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const timesHeadingRef = useRef<HTMLHeadingElement>(null);
 
   useEffect(() => {
@@ -116,6 +122,8 @@ export default function SlotSelectionModal({ booking, onCancel, onConfirmSlot }:
   const selectedSlot = slots.find((slot) => slot.id === selectedSlotId);
 
   const chooseDate = (value: string) => {
+    setIsReviewing(false);
+    setSubmitError("");
     setSelectedDate(value);
     setSelectedSlotId(null);
     setError("");
@@ -123,13 +131,16 @@ export default function SlotSelectionModal({ booking, onCancel, onConfirmSlot }:
   };
 
   const changeDatePage = (nextPage: number) => {
+    setIsReviewing(false);
+    setSubmitError("");
     setDatePage(nextPage);
     setSelectedDate("");
     setSelectedSlotId(null);
     setError("");
   };
 
-  const confirm = () => {
+  const confirm = async () => {
+    if (isSubmitting) return;
     if (!selectedSlot) {
       setError("Choose one of the available times to continue.");
       return;
@@ -138,7 +149,7 @@ export default function SlotSelectionModal({ booking, onCancel, onConfirmSlot }:
     const startTime = timeLabel(selectedSlot.start_ts);
     const endTime = timeLabel(selectedSlot.end_ts);
     const dayName = new Date(`${key}T00:00:00`).toLocaleDateString("en-PH", { weekday: "short" });
-    onConfirmSlot({
+    const selection: SelectedSlot = {
       blockId: selectedSlot.id,
       date: key,
       dateKey: key,
@@ -157,7 +168,16 @@ export default function SlotSelectionModal({ booking, onCancel, onConfirmSlot }:
         slotsLeft: Math.max(0, selectedSlot.capacity - selectedSlot.booked_count),
         startTime,
       },
-    });
+    };
+    setSubmitError("");
+    setIsSubmitting(true);
+    try {
+      await onConfirmSlot(selection);
+    } catch (caught) {
+      setSubmitError(caught instanceof Error ? caught.message : "Unable to continue with this booking. Please try again.");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -167,14 +187,37 @@ export default function SlotSelectionModal({ booking, onCancel, onConfirmSlot }:
           <div className="flex items-start gap-3">
             <span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary"><CalendarDays className="size-5" aria-hidden="true" /></span>
             <div>
-              <DialogTitle>Choose a booking schedule</DialogTitle>
-              <DialogDescription className="mt-1">Select a date, then choose an exact time with {booking.workerName || "this provider"}.</DialogDescription>
+              <DialogTitle>{isReviewing ? "Review your booking" : "Choose a booking schedule"}</DialogTitle>
+              <DialogDescription className="mt-1">{isReviewing ? action === "reschedule" ? "Check the new time before requesting a schedule change." : "Check the service and appointment before continuing to payment terms." : `Select a date, then choose an exact time with ${booking.workerName || "this provider"}.`}</DialogDescription>
             </div>
           </div>
         </DialogHeader>
 
         <div className="min-h-0 flex-1 overflow-y-auto px-4 py-5 sm:px-6">
-          {isLoading ? (
+          {isReviewing && selectedSlot ? (
+            <section aria-label="Booking review" className="space-y-4">
+              <div className="rounded-xl border bg-background p-5">
+                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Service</p>
+                <h3 className="mt-1 text-lg font-bold text-foreground">{booking.serviceType || "Booked service"}</h3>
+                <p className="mt-1 text-sm text-muted-foreground">With {booking.workerName || "your provider"}</p>
+              </div>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="rounded-xl border bg-muted/35 p-4">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Appointment</p>
+                  <p className="mt-2 font-semibold text-foreground">{dateLabel(dateKey(selectedSlot.start_ts))}</p>
+                  <p className="text-sm text-muted-foreground">{timeLabel(selectedSlot.start_ts)}–{timeLabel(selectedSlot.end_ts)}</p>
+                </div>
+                {Number(booking.quoteAmount) > 0 ? (
+                  <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 dark:border-emerald-900 dark:bg-emerald-950/30">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Service price</p>
+                    <p className="mt-2 text-lg font-bold text-emerald-700 dark:text-emerald-400">PHP {Number(booking.quoteAmount).toLocaleString("en-PH")}</p>
+                    <p className="text-xs text-muted-foreground">Any platform fee is shown at checkout.</p>
+                  </div>
+                ) : null}
+              </div>
+              <p className="text-sm text-muted-foreground">{action === "reschedule" ? "Your current booking time stays in place until the change is processed." : "Your time is not reserved yet. You can still change the schedule before continuing."}</p>
+            </section>
+          ) : isLoading ? (
             <div className="flex min-h-56 items-center justify-center gap-3 text-muted-foreground" role="status"><LoaderCircle className="size-5 animate-spin" aria-hidden="true" />Loading available times…</div>
           ) : dates.length === 0 ? (
             <div className="rounded-xl bg-muted/55 p-6 text-center"><p className="font-semibold text-foreground">No times are available right now</p><p className="mt-1 text-sm text-muted-foreground">Close this window and message the provider to coordinate another schedule.</p></div>
@@ -214,12 +257,15 @@ export default function SlotSelectionModal({ booking, onCancel, onConfirmSlot }:
               </section>
             </div>
           )}
-          {error ? <p className="mt-4 rounded-lg bg-destructive/10 px-4 py-3 text-sm font-semibold text-destructive" role="alert">{error}</p> : null}
+          {error || submitError ? <p className="mt-4 rounded-lg bg-destructive/10 px-4 py-3 text-sm font-semibold text-destructive" role="alert">{submitError || error}</p> : null}
         </div>
 
         <DialogFooter className="shrink-0 border-t bg-background px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
           <p className="text-sm text-muted-foreground">{selectedSlot ? `${dateLabel(dateKey(selectedSlot.start_ts))}, ${timeLabel(selectedSlot.start_ts)}–${timeLabel(selectedSlot.end_ts)}` : "Select a date and time to continue."}</p>
-          <div className="flex gap-2"><Button type="button" variant="outline" onClick={onCancel}>Cancel</Button><Button type="button" disabled={!selectedSlot} onClick={confirm}>Review booking</Button></div>
+          <div className="flex gap-2">
+            <Button type="button" variant="outline" disabled={isSubmitting} onClick={isReviewing ? () => setIsReviewing(false) : onCancel}>{isReviewing ? "Change time" : "Cancel"}</Button>
+            <Button type="button" disabled={!selectedSlot || isSubmitting} onClick={isReviewing ? confirm : () => setIsReviewing(true)}>{isSubmitting ? "Updating schedule…" : isReviewing ? action === "reschedule" ? "Request reschedule" : "Continue to terms" : "Review booking"}</Button>
+          </div>
         </DialogFooter>
       </DialogContent>
     </Dialog>

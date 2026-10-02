@@ -11,6 +11,9 @@ production payment launch. Production activation requires payment-provider
 onboarding, legal and accounting review, operational ownership, and successful
 end-to-end verification.
 
+The admin-facing support queue, exception matrix, and moderation requirements
+are tracked in the [admin operations roadmap](admin-operations.md).
+
 ## Current assessment
 
 The database already has useful foundations:
@@ -40,6 +43,99 @@ provider payouts, and production operations remain incomplete.
 6. A booking must always show the next required actor and action.
 7. Cancellation, refund, dispute, and payout rules are visible before payment.
 
+## Recommended service transaction policy
+
+**Product direction, not implemented or legally approved.** For direct-slot
+bookings, paying **50% of the service price** is required to confirm the
+schedule; do not offer full payment at booking. The current full-payment UI and
+backend option conflict with this rule and must be changed together. The
+platform fee, provider processing fees, refundability, and final settlement
+model still require explicit policy and accounting decisions. Until they are
+approved, PayMongo remains test-only and this section is a panel-ready design,
+not a claim that TrabaWho already holds or releases real funds.
+
+### Client and provider journey
+
+1. **Reserve:** Show the agreed scope, service price, 50% deposit, platform fee,
+   remaining balance, appointment, cancellation terms, and claim route before
+   checkout. Collect the deposit through a separate payment attempt. Confirm
+   the slot only after a verified provider event; an abandoned or failed
+   checkout leaves a recoverable request and releases an expired hold.
+   For a PHP 900 service with a PHP 45 platform fee, the proposed display is
+   PHP 495 due at booking (PHP 450 deposit + PHP 45 fee), then PHP 450 balance.
+   Whether the fee is refundable is **not decided**.
+2. **Fund the balance before work:** Offer a second checkout and send reminders
+   before a clearly disclosed due time, proposed as before the appointment
+   starts. The provider sees whether both payments are verified and is told
+   **not to begin** while the balance is due. An overdue balance pauses the
+   job and opens a reschedule/cancellation case; it never becomes "paid" just
+   because the client promises to pay. Collecting only after work would leave
+   the provider exposed if the client refuses; a handover code cannot collect
+   money. A narrow, audited exception policy would be needed for emergencies.
+3. **Record delivery:** The provider submits a service-specific checklist and
+   appropriate before/after evidence, with timestamps and a privacy/retention
+   policy. Notify the client to confirm the agreed work or report a problem.
+   An optional short-lived in-app PIN/QR can corroborate an in-person handover,
+   but is neither required in a dispute nor sufficient proof by itself. Never
+   treat a screenshot alone as conclusive evidence.
+4. **Confirm or dispute:** Client confirmation completes the delivery step. If
+   the client contests quality, scope, or attendance, create a case, preserve
+   both parties' evidence and messages, and pause auto-completion and payout.
+   If the client does not respond, a disclosed, notified review timer may
+   auto-confirm only when full payment and adequate delivery evidence are
+   verified and no case is open. An administrator cannot invent a payment or
+   dismiss a dispute by changing a display label.
+5. **Settle and support workmanship:** Calculate provider payable, platform
+   fee, processor fee, refund, and adjustments from an append-only ledger.
+   Payout eligibility follows verified payment, completion, and the initial
+   dispute window; actual release depends on an approved provider settlement
+   arrangement. Offer a proposed seven-day, scope-specific workmanship claim
+   window after completion: assess in-scope defects, offer rework where
+   appropriate, then a policy-backed partial/full refund if justified. The
+   claim window need not withhold every provider payout for seven days, but
+   post-payout remedies require an agreed financial reserve/recoupment model.
+   Cleaning, events, and repairs need different evidence and claim terms.
+
+### Exception paths that must be visible to both parties
+
+| Event | Safe next step | Money and booking state |
+| --- | --- | --- |
+| Provider no-show | Client reports it; provider responds; support reviews the appointment, messages, and attendance evidence. | Do not mark delivered or pay out. Apply a published reschedule/refund decision. |
+| Client no-show | Provider reports it; client responds; support reviews evidence. | Do not automatically charge the balance or award the full price. Apply the published deposit/cancellation rule. |
+| Cancellation before payment | Release the slot and close the request. | No refund claim because no verified payment occurred. |
+| Cancellation after deposit or full funding | Show the applicable policy and estimate before confirmation; allow support review for exceptions. | Keep cancellation and refund states separate; mark refunded only after verified provider evidence. |
+| Balance overdue | Remind the client, then pause the appointment and route to reschedule/cancellation support. | Keep the balance due; provider must not start work by default. |
+| Delivery or seven-day workmanship claim disputed | Let both parties submit evidence; assign an owner and record a reasoned outcome. | Pause payout where possible; use rework or provider-confirmed refund rather than a fabricated completion/refund. |
+| Payment, refund, or payout event missing/duplicated | Reconcile against provider records using immutable IDs and retry safely. | Keep the last verified state and show "verifying" or "needs review," never a guessed success. |
+
+### Provider, legal, and implementation gates
+
+- The current PayMongo hosted checkout supports separate charges, but its
+  [hold-then-capture feature](https://docs.paymongo.com/docs/payment-acceptance-hold-then-capture)
+  is restricted to eligible activated merchants, card payments, and holds of
+  up to seven days. Do not rely on it to secure every future balance payment.
+- [PayMongo split payments](https://developers.paymongo.com/docs/seeds-payment-splitting)
+  require account configuration and allocate funds at checkout; they do not
+  automatically provide dispute-aware escrow or delayed provider release.
+  Confirm merchant-of-record, provider onboarding, payout timing, liability,
+  and reconciliation with the payment partner and legal/accounting advisers
+  before promising automatic provider settlement.
+- [PayMongo's refund documentation](https://developers.paymongo.com/v1/docs/refunding-transactions)
+  describes provider refunds for live payments. A test-mode refund screen may
+  rehearse case decisions but must not claim that a real refund was executed.
+- A seven-day TrabaWho claim promise cannot be worded as the end of statutory
+  consumer remedies. The [Philippine Consumer Act](https://standardsph.dti.gov.ph/upload/upload/download?file=e4f8n8H2Sa3uc20230927651374470a596.pdf&path=storage%2Fuploads%2Fsdac%2Fpns%2Flaws_issuances%2F)
+  addresses warranties in consumer services; obtain local legal review for
+  category-specific scope, exclusions, and remedies.
+- Implement the deposit-only rule in the payment RPC as well as the UI;
+  create separate deposit and balance attempts, immutable event/audit IDs,
+  reminders and deadlines, completion evidence, case intake, provider-confirmed
+  refunds, and a payout ledger. Do not mark these delivered from a UI demo.
+- Reviews already have a completed-booking/participant database check, but
+  anti-spam remains a later requirement: enforce one review per booking,
+  server-side rate limits, report/moderation and appeal, and label seeded demo
+  reviews separately from verified customer reviews.
+
 ## Target lifecycle
 
 ```text
@@ -67,10 +163,14 @@ Eligible non-terminal states
 Payment and payout states remain separate from booking delivery state. A booking
 must not be described as paid, refunded, or paid out solely because its display
 status changed.
+For the proposed direct-slot deposit policy, `CONFIRMED` requires the verified
+deposit, `IN_PROGRESS` requires a verified balance or a documented exception,
+and a later workmanship claim is a separate case rather than silently undoing
+the completion or payout state.
 
 ## Phase 0: Product and payment decisions
 
-Status: Not started
+Status: Product direction drafted; operational and legal decisions pending
 
 Before implementation, record these decisions:
 
@@ -84,7 +184,10 @@ Before implementation, record these decisions:
 - [ ] Define cancellation windows, late-cancellation fees, no-show handling, and
       provider-cancellation consequences.
 - [ ] Define refund eligibility and whether the platform fee is refundable.
-- [ ] Define the downpayment balance deadline and failed-payment behavior.
+- [ ] Approve the mandatory 50% direct-slot deposit, balance-before-work
+      deadline, fee allocation, and failed/overdue-payment behavior.
+- [ ] Define the evidence threshold, client response timer, no-show policy,
+      seven-day category-specific claim scope, and post-payout remedy funding.
 - [ ] Obtain legal and accounting review before representing held funds as
       escrow or custody.
 
@@ -107,6 +210,33 @@ Implementation status on October 1, 2026:
 - The PayMongo test API secret, paid-checkout webhook registration, and webhook
   signing secret are configured. Signed endpoint verification passes; a full
   sandbox checkout using an authenticated test booking remains pending.
+
+### October 2, 2026 demo rehearsal
+
+- Applied `20261002090000_guard_paid_booking_delivery.sql` to the confirmed
+  demo/test Supabase project after a dry run showed it was the only pending
+  migration. Remote migration history confirms it is applied. Production was
+  not changed.
+- Live RPC checks rejected delivery of a partially paid booking and delivery
+  by a client; neither booking changed. Focused lifecycle tests cover stable
+  operation IDs, duplicate clicks, retries, and visible next actions.
+- A fresh direct-slot booking reached PayMongo hosted test checkout and its
+  success screen showed the test payment received. **The associated booking
+  and payment attempt remained pending afterward.** The signed webhook path
+  has not been verified end to end; do not treat the provider success screen
+  or browser return as payment confirmation. Inspect the PayMongo test-mode
+  Webhooks → Event Deliveries entry for reference
+  `TW-6687B37C21B84425AE07` and the Supabase webhook function logs, then
+  resolve the delivery/processing failure and retry the original event if
+  appropriate. Do not manually mark this booking paid.
+- Separately, an existing paid demo booking was delivered by the provider and
+  completed by the client through their booking screens. The completed booking
+  remained visible after refresh and switching back to the provider account.
+  The final database state and audit events survived refresh; same-operation RPC retries returned
+  the completed booking without duplicate events. Three paid, undelivered
+  bookings remained available for the presentation fallback at verification.
+- The fresh-booking path is **not yet presentation-ready** until its webhook
+  confirms payment and the full journey is repeated on that new booking.
 
 ## Phase 1: Payment foundation
 
@@ -244,11 +374,16 @@ Priority: P1
 
 - [ ] Add `balance_due_at`.
 - [ ] Show the full payment schedule before confirmation.
-- [ ] Restrict downpayment eligibility based on lead time and booking value.
+- [ ] Make the 50% service-price deposit the only direct-slot booking checkout
+      option; remove full payment at reservation in both UI and server rules.
+- [ ] Decide whether any service category needs different deposit terms before
+      enabling that category.
 - [ ] Notify the buyer before the due date.
 - [ ] Create a separate payment attempt for the remaining balance.
-- [ ] Define retry, grace-period, cancellation, and provider-waiver behavior.
-- [ ] Prevent service delivery when policy requires full payment first.
+- [ ] Set a disclosed balance deadline before work starts and define retry,
+      grace-period, reschedule/cancellation, and audited exception behavior.
+- [ ] Prevent work-start and service delivery when full payment is required but
+      the balance is not verified.
 
 ## Phase 6: Cancellation and refunds
 

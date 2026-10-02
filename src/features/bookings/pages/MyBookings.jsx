@@ -29,6 +29,7 @@ import { CancelBookingDialog } from '../components/CancelBookingDialog';
 import { BookingRequestReviewDialog } from '../components/BookingRequestReviewDialog';
 import { PaymentReturnStatus } from '../components/PaymentReturnStatus';
 import { BookingCardFooter } from '../components/BookingCardFooter';
+import { BookingTransactionActions } from '../components/BookingTransactionActions';
 import { Button } from '@/components/ui/button';
 import { MetricCard } from '@/components/ui/metric-card';
 import { SearchFilterBar } from '@/components/ui/search-filter-bar';
@@ -45,9 +46,7 @@ import {
 import {
   acknowledgeCashPayment,
   archiveConversationThread,
-  confirmBookingCompletion,
   fetchBookingById,
-  markBookingDelivered,
 } from '../services/bookingService';
 import {
   cancelBooking,
@@ -320,7 +319,6 @@ const MyBookings = ({
   const handleOpenSlotSelection = useCallback(() => {
     setPendingCheckoutSlot(null); setScheduleAction('checkout'); setUiState('slots');
   }, []);
-
   const handleLeaveRating = useCallback(async (payload) => {
     try {
       await ratingCtrl.handleLeaveRating(payload);
@@ -401,6 +399,7 @@ const MyBookings = ({
         setUiState(isChatRoute ? 'chat' : 'list');
       } catch (error) {
         pushHeaderNotification('Reschedule Failed', error?.message || 'Unable to change this booking time.');
+        throw error;
       }
       return;
     }
@@ -481,29 +480,6 @@ const MyBookings = ({
       pushHeaderNotification('Cash Payment Confirmed', 'Your cash-payment acknowledgement was recorded.');
     } catch (error) {
       pushHeaderNotification('Cash Confirmation Failed', error?.message || 'Unable to acknowledge cash payment.');
-    }
-  }, [bookingListCtrl, pushHeaderNotification]);
-
-  const handleConfirmCompletion = useCallback(async (bookingId) => {
-    try {
-      const updated = await confirmBookingCompletion(bookingId);
-      bookingListCtrl.replaceBooking(updated);
-      pushHeaderNotification('Booking Completed', 'The completed service was recorded and can now be rated.');
-    } catch (error) {
-      pushHeaderNotification('Completion Failed', error?.message || 'Unable to confirm service completion.');
-    }
-  }, [bookingListCtrl, pushHeaderNotification]);
-
-  const handleMarkDelivered = useCallback(async (bookingId) => {
-    try {
-      const updated = await markBookingDelivered(bookingId);
-      bookingListCtrl.replaceBooking(updated);
-      pushHeaderNotification(
-        'Delivery Confirmed by Provider',
-        'The client can now confirm completion from their booking.'
-      );
-    } catch (error) {
-      pushHeaderNotification('Delivery Confirmation Failed', error?.message || 'Unable to mark the service delivered.');
     }
   }, [bookingListCtrl, pushHeaderNotification]);
 
@@ -727,9 +703,9 @@ const MyBookings = ({
             actionLabel={booking.quoteVersion ? 'Retry saved quote' : undefined}
             onChooseAnotherTime={!shouldLoadSellerBookings ? () => {
               setSelectedBookingId(booking.id);
-              if (scheduleHasPassed) { setScheduleAction('reschedule'); setUiState('slots'); }
+              if (scheduleHasPassed) { setScheduleAction('checkout'); setUiState('slots'); }
               else if (booking.quoteVersion) setIsTermsModalOpen(true);
-              else setUiState('slots');
+              else { setScheduleAction('checkout'); setUiState('slots'); }
             } : undefined}
           />
 
@@ -800,8 +776,7 @@ const MyBookings = ({
           onMessage={() => handleOpenChat(booking.id)}
           onReschedule={!shouldLoadSellerBookings && !['Completed Service', 'Cancelled', 'Cancelled (Cash)', 'Refunded'].includes(booking.status) && booking.selectedSlot ? () => {
             setSelectedBookingId(booking.id);
-            setScheduleAction('reschedule');
-            setUiState('slots');
+            setScheduleAction(scheduleHasPassed ? 'checkout' : 'reschedule'); setUiState('slots');
           } : undefined}
           onCancel={!shouldLoadSellerBookings && !['Completed Service', 'Cancelled', 'Cancelled (Cash)', 'Refunded'].includes(booking.status) ? () => setCancelBookingId(booking.id) : undefined}
         >
@@ -840,30 +815,11 @@ const MyBookings = ({
               </Button>
             )}
 
-            {!shouldLoadSellerBookings && booking.deliveryStatus === 'seller_claimed' && (
-              <Button
-                type="button"
-                disabled={booking.paymentStatus !== 'paid'}
-                title={booking.paymentStatus === 'paid' ? 'Confirm that the service was delivered' : 'Payment confirmation is required first'}
-                onClick={() => handleConfirmCompletion(booking.id)}
-              >
-                <CheckCircle2 size={16} aria-hidden="true" />
-                Confirm Completion
-              </Button>
-            )}
-
-            {shouldLoadSellerBookings
-              && booking.deliveryStatus === 'not_delivered'
-              && booking.paymentStatus === 'paid'
-              && ['Payment Confirmed', 'Service Scheduled', 'Active Service'].includes(booking.status) && (
-              <Button
-                type="button"
-                onClick={() => handleMarkDelivered(booking.id)}
-              >
-                <CheckCircle2 size={16} aria-hidden="true" />
-                Mark Delivered
-              </Button>
-            )}
+            <BookingTransactionActions
+              booking={booking}
+              viewerRole={shouldLoadSellerBookings ? 'provider' : 'client'}
+              onUpdated={bookingListCtrl.replaceBooking}
+            />
 
             {booking.canRate && (
               <Button
@@ -1070,6 +1026,7 @@ const MyBookings = ({
           {uiState === 'slots' && (
             <SlotSelectionModal
               booking={currentBooking}
+              action={scheduleAction}
               onConfirmSlot={(slotInfo) => handleConfirmSlot(currentBooking.id, slotInfo)}
               onCancel={handleBackToList}
             />

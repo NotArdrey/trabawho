@@ -350,6 +350,7 @@ export const mapBookingRowToUiBooking = (booking = {}, context = {}) => {
     upfrontRequiredAmount: getNumberOrNull(booking.upfront_required_amount) ?? totalChargedAmount,
     amountPaid: getNumberOrNull(booking.amount_paid) ?? (booking.payment_status === 'paid' ? totalChargedAmount : 0),
     balanceDueAmount: getNumberOrNull(booking.balance_due_amount) ?? 0,
+    balanceDueAt: booking.balance_due_at || booking.start_ts || null, workStartedAt: booking.work_started_at || null, appointmentStartAt: booking.start_ts || null, warrantyEligible: Boolean(booking.warranty_eligible),
     cashCollectionStatus: booking.cash_collection_status || 'not_applicable',
     disputeStatus: booking.dispute_status || 'none',
     scheduleVersion: booking.schedule_version || 1,
@@ -1402,9 +1403,8 @@ export const reviewCashConfirmation = async (bookingOrId, decision) => {
 };
 
 export const requestBookingRefund = async (bookingOrId, reason) => {
-  const current = typeof bookingOrId === 'object' ? bookingOrId : await fetchBookingById(bookingOrId);
+  const current = typeof bookingOrId === 'object' ? bookingOrId : await fetchBookingById(bookingOrId); if (current.paymentMethod === 'paymongo-card') throw new Error('Online-payment refunds require support review. No refund has been issued.');
   const refundReference = `REFUND-REQ-${String(current.id).slice(0, 8).toUpperCase()}-${Date.now().toString().slice(-4)}`;
-
   return updateBookingWorkflow(current, {
     status: 'Refund Processing',
     refundStatus: 'requested',
@@ -1416,7 +1416,7 @@ export const requestBookingRefund = async (bookingOrId, reason) => {
 };
 
 export const approveBookingRefund = async (bookingOrId) => {
-  const current = typeof bookingOrId === 'object' ? bookingOrId : await fetchBookingById(bookingOrId);
+  const current = typeof bookingOrId === 'object' ? bookingOrId : await fetchBookingById(bookingOrId); if (current.paymentMethod === 'paymongo-card') throw new Error('PayMongo refunds cannot be approved through the legacy mock flow.');
   return updateBookingWorkflow(current, {
     status: 'Refund Processing',
     refundStatus: 'approved-awaiting-client-confirmation',
@@ -1427,7 +1427,7 @@ export const approveBookingRefund = async (bookingOrId) => {
 };
 
 export const confirmBookingRefundReceived = async (bookingOrId) => {
-  const current = typeof bookingOrId === 'object' ? bookingOrId : await fetchBookingById(bookingOrId);
+  const current = typeof bookingOrId === 'object' ? bookingOrId : await fetchBookingById(bookingOrId); if (current.paymentMethod === 'paymongo-card') throw new Error('A verified provider refund event is required before marking this booking refunded.');
   return updateBookingWorkflow(current, {
     status: 'Refunded',
     refundStatus: 'approved',

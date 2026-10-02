@@ -4,7 +4,6 @@ import {
   ArrowLeftRight,
   BriefcaseBusiness,
   CalendarCheck,
-  ChevronRight,
   Home,
   LogOut,
   MessageCircle,
@@ -29,6 +28,7 @@ import LogoutConfirmModal from "@/features/auth/components/LogoutConfirmModal";
 import { cn } from "@/lib/utils";
 import { getProfilePhotoUrl } from "@/shared/utils/profilePhoto";
 import BrandWordmark from "./BrandWordmark";
+import { desktopWorkspaceSidebarClass, WorkspaceSidebarAccount, WorkspaceSidebarBrand, WorkspaceSidebarIdentity, WorkspaceSidebarNavItem } from "./WorkspaceSidebar";
 
 const WORKER_ROLES = new Set(["worker", "workers", "seller", "sellers"]);
 const CLIENT_ROLES = new Set(["client", "clients", "buyer", "buyers", "customer", "customers"]);
@@ -79,7 +79,6 @@ function isWorkerProfile(profile?: DashboardProfile | null) {
   return !role && Boolean(profile?.isWorker || profile?.is_worker || profile?.sellerId || profile?.workerProfileId);
 }
 
-const desktopNavClass = "group relative flex min-h-12 w-full items-center gap-3 rounded-lg px-2.5 text-left text-sm font-semibold text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
 const mobileNavClass = "group flex min-h-[58px] min-w-0 flex-col items-center justify-center gap-0.5 rounded-md px-1 py-1 text-[11px] font-medium text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring";
 
 export default function DashboardNavigation({
@@ -180,20 +179,14 @@ export default function DashboardNavigation({
     <nav className={cn("grid gap-1", mobile && "grid-cols-4")} aria-label={mobile ? "Mobile dashboard navigation" : "Dashboard navigation"}>
       {navItems.map(({ key, label, icon: Icon, onClick }) => {
         const active = activeKey === key;
-        return (
-          <button key={key} type="button" className={cn(mobile ? mobileNavClass : desktopNavClass, active && !mobile && "bg-primary/10 text-primary", active && mobile && "font-semibold text-primary")} aria-current={active ? "page" : undefined} aria-label={mobile ? `${label} tab` : label} title={label} onClick={() => onClick?.()}>
-            {!mobile && <span className={cn("absolute inset-y-3 left-0 w-0.5 rounded-r bg-transparent", active && "bg-primary")} />}
-            {mobile ? (
-              <span className={cn("relative flex h-7 min-w-12 items-center justify-center rounded-full transition-colors group-hover:bg-muted", active && "bg-primary/10 group-hover:bg-primary/15")}>
-                {active ? <span className="absolute -top-1 h-0.5 w-5 rounded-full bg-brand-highlight" aria-hidden="true" /> : null}
-                <Icon className="size-5" aria-hidden />
-              </span>
-            ) : (
-              <Icon className={cn("size-8 rounded-lg bg-muted p-2", active && "bg-primary text-primary-foreground")} aria-hidden />
-            )}
-            <span className="max-w-full truncate">{label}</span>
-          </button>
-        );
+        if (!mobile) return <WorkspaceSidebarNavItem key={key} label={label} icon={Icon} active={active} onClick={onClick} />;
+        return <button key={key} type="button" className={cn(mobileNavClass, active && "font-semibold text-primary")} aria-current={active ? "page" : undefined} aria-label={`${label} tab`} title={label} onClick={() => onClick?.()}>
+          <span className={cn("relative flex h-7 min-w-12 items-center justify-center rounded-full transition-colors group-hover:bg-muted", active && "bg-primary/10 group-hover:bg-primary/15")}>
+            {active ? <span className="absolute -top-1 h-0.5 w-5 rounded-full bg-brand-highlight" aria-hidden="true" /> : null}
+            <Icon className="size-5" aria-hidden />
+          </span>
+          <span className="max-w-full truncate">{label}</span>
+        </button>;
       })}
     </nav>
   );
@@ -220,17 +213,9 @@ export default function DashboardNavigation({
 
   return (
     <>
-      <aside className="fixed inset-y-0 left-0 z-[140] hidden w-[248px] flex-col gap-[18px] border-r bg-background/95 px-3.5 pb-3.5 pt-[18px] shadow-[10px_0_30px_rgba(15,23,42,0.04)] backdrop-blur min-[881px]:flex">
-        <button type="button" className="flex min-h-[54px] w-full items-center gap-2.5 rounded-lg px-1.5 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" onClick={openWorkspaceHome} aria-label="Open home">
-          <img className="size-10 shrink-0 object-contain" src="/trabawho-logo.svg" alt="" aria-hidden />
-          <span className="min-w-0"><BrandWordmark className="block text-xl leading-none" /><small className="mt-1 block truncate text-[10px] font-semibold text-muted-foreground">Local services marketplace</small></span>
-        </button>
-
-        <button type="button" className="grid min-h-[72px] grid-cols-[38px_minmax(0,1fr)_18px] items-center gap-2.5 rounded-lg bg-primary/10 p-2.5 text-left text-foreground hover:bg-primary/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" onClick={isWorkerAccount ? switchWorkerWorkspace : openWorkspaceHome} aria-label={isWorkerAccount ? `Switch to ${isProviderWorkspace ? "client" : "provider"} workspace` : workspaceLabel}>
-          <span className="flex size-[38px] items-center justify-center rounded-lg bg-primary text-primary-foreground">{isProviderWorkspace ? <BriefcaseBusiness className="size-[18px]" aria-hidden /> : <Home className="size-[18px]" aria-hidden />}</span>
-          <span className="min-w-0"><strong className="block text-[13px] leading-tight">{workspaceLabel}</strong><small className="mt-1 block truncate text-[10px] text-muted-foreground">{workspaceDescription}</small></span>
-          {isWorkerAccount ? <ArrowLeftRight className="size-4 text-primary" aria-hidden /> : <ChevronRight className="size-4 text-primary" aria-hidden />}
-        </button>
+      <aside className={desktopWorkspaceSidebarClass}>
+        <WorkspaceSidebarBrand onClick={openWorkspaceHome} />
+        <WorkspaceSidebarIdentity label={workspaceLabel} description={workspaceDescription} icon={isProviderWorkspace ? BriefcaseBusiness : Home} actionIcon={isWorkerAccount ? ArrowLeftRight : undefined} onClick={isWorkerAccount ? switchWorkerWorkspace : openWorkspaceHome} actionLabel={isWorkerAccount ? `Switch to ${isProviderWorkspace ? "client" : "provider"} workspace` : workspaceLabel} />
 
         <section className="grid gap-2" aria-labelledby="workspace-navigation-label">
           <p id="workspace-navigation-label" className="px-2.5 text-[10px] font-bold uppercase tracking-[0.1em] text-muted-foreground">Workspace</p>
@@ -242,11 +227,7 @@ export default function DashboardNavigation({
             <Button type="button" variant="ghost" className={cn("justify-start px-2.5 text-muted-foreground", activeKey === "profile" && "bg-accent text-foreground")} onClick={onOpenProfile}><UserRound />Profile</Button>
             <Button type="button" variant="ghost" className={cn("justify-start px-2.5 text-muted-foreground", activeKey === "settings" && "bg-accent text-foreground")} onClick={onOpenSettings}><Settings />Settings</Button>
           </div>
-          <button type="button" className="grid min-h-[58px] w-full grid-cols-[38px_minmax(0,1fr)_20px] items-center gap-2 rounded-lg bg-muted/50 p-2 text-left hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" onClick={onOpenProfile} aria-label="Open profile">
-            <img className="size-[38px] rounded-lg object-cover" src={profilePhotoUrl} alt="" />
-            <span className="min-w-0"><strong className="block truncate text-xs">{displayName}</strong><small className="mt-1 block truncate text-[10px] text-muted-foreground">{workspaceLabel}</small></span>
-            <ChevronRight className="size-4 text-muted-foreground" aria-hidden />
-          </button>
+          <WorkspaceSidebarAccount name={displayName} subtitle={workspaceLabel} imageUrl={profilePhotoUrl} onClick={() => onOpenProfile?.()} actionLabel="Open profile" />
           <Button type="button" variant="outline" className="w-full justify-start border-destructive/30 px-3 text-destructive hover:bg-destructive/10 hover:text-destructive" onClick={() => setIsLogoutModalOpen(true)}>
             <LogOut aria-hidden />
             Log out

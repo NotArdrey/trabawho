@@ -24,11 +24,20 @@ import {
 export interface BookingDetails {
   clientName?: string;
   completedAt?: string;
+  completionDueAt?: string;
   deliveryStatus?: string;
   description?: string;
   id: string | number;
   paymentMethod?: string;
   paymentStatus?: string;
+  paymentPlan?: string;
+  amountPaid?: number | string;
+  upfrontRequiredAmount?: number | string;
+  balanceDueAmount?: number | string;
+  balanceDueAt?: string;
+  workStartedAt?: string;
+  warrantyEligible?: boolean;
+  disputeStatus?: string;
   paymentReference?: string;
   quoteAmount?: number | string;
   rating?: number | string;
@@ -126,12 +135,14 @@ export function BookingDetailsDialog({ booking, isProviderView, onClose, onMessa
     || normalizedStatus.includes("payment pending");
   const cancelled = normalizedStatus.includes("cancel") || normalizedStatus.includes("refund");
   const completed = normalizedStatus.includes("complete") || clientComplete;
-  const nextStep = cancelled
+  const nextStep = booking.disputeStatus === "open"
+    ? { title: "Support case open", detail: "Completion is paused while the case is reviewed. No refund or payout has been processed.", complete: false }
+    : cancelled
     ? { title: "This booking is no longer active", detail: "Review the payment and reference details below for your records.", complete: false }
     : completed
       ? { title: "Service completed", detail: "The appointment and payment details below are your booking record.", complete: true }
       : paymentDue
-        ? { title: isProviderView ? "Waiting for client payment" : "Payment required to confirm", detail: isProviderView ? "The client must complete checkout before this schedule is confirmed." : "Complete secure checkout to keep this appointment reserved.", complete: false }
+        ? { title: isProviderView ? "Waiting for client payment" : booking.paymentStatus === "partially_paid" ? "Pay the balance before work" : "Deposit required to confirm", detail: isProviderView ? "The client must complete the balance checkout before work can begin." : booking.paymentStatus === "partially_paid" ? "Your schedule is confirmed; pay the remaining balance before the appointment starts." : "Pay the 50% deposit to keep this appointment reserved.", complete: false }
         : { title: isProviderView ? "Prepare for the appointment" : "Your appointment is confirmed", detail: isProviderView ? "Use the schedule below and message the client if coordination is needed." : "Review the schedule below and message the provider if anything changes.", complete: true };
   const NextStepIcon = nextStep.complete ? CheckCircle2 : Clock3;
 
@@ -176,6 +187,7 @@ export function BookingDetailsDialog({ booking, isProviderView, onClose, onMessa
                 <div className="flex justify-between gap-3 py-2.5"><dt className="text-sm text-muted-foreground">Method</dt><dd className="text-right text-sm font-bold text-foreground">{paymentLabel(booking.paymentMethod)}</dd></div>
                 <div className="flex justify-between gap-3 py-2.5"><dt className="text-sm text-muted-foreground">{isProviderView ? "Booking amount" : "Service price"}</dt><dd className="font-bold text-foreground">{formatPhp(booking.quoteAmount)}</dd></div>
                 {!isProviderView && Number(booking.transactionFeeAmount || 0) > 0 ? <div className="flex justify-between gap-3 py-2.5"><dt className="text-sm text-muted-foreground">Platform fee</dt><dd className="font-bold text-foreground">{formatPhp(booking.transactionFeeAmount)}</dd></div> : null}
+                {booking.paymentPlan === "downpayment" && <><div className="flex justify-between gap-3 py-2.5"><dt className="text-sm text-muted-foreground">Deposit + platform fee</dt><dd className="font-bold text-foreground">{formatPhp(booking.upfrontRequiredAmount)}</dd></div><div className="flex justify-between gap-3 py-2.5"><dt className="text-sm text-muted-foreground">Verified paid</dt><dd className="font-bold text-emerald-700 dark:text-emerald-300">{formatPhp(booking.amountPaid)}</dd></div><div className="flex justify-between gap-3 py-2.5"><dt className="text-sm text-muted-foreground">Balance before work</dt><dd className="font-bold text-foreground">{formatPhp(booking.balanceDueAmount)}</dd></div></>}
                 {!isProviderView ? <div className="flex items-end justify-between gap-3 py-3"><dt className="text-sm font-semibold text-foreground">{paymentDue ? "Total payment" : "Total charged"}</dt><dd className="text-lg font-extrabold text-emerald-700 dark:text-emerald-300">{formatPhp(total)}</dd></div> : null}
               </dl>
             </section>
@@ -183,6 +195,8 @@ export function BookingDetailsDialog({ booking, isProviderView, onClose, onMessa
             <section className="rounded-xl border bg-card px-4 py-3" aria-labelledby="booking-progress-heading">
               <h3 id="booking-progress-heading" className="pt-1 font-bold text-foreground">Service progress</h3>
               <div className="mt-1 divide-y">
+              {booking.paymentPlan === "downpayment" && <ProgressStep label="Verified payment" complete={booking.paymentStatus === "paid"} detail={booking.paymentStatus === "paid" ? "Balance fully paid" : booking.paymentStatus === "partially_paid" ? "Deposit paid; balance due" : "Awaiting deposit"} />}
+              {booking.paymentPlan === "downpayment" && <ProgressStep label="Work started" complete={Boolean(booking.workStartedAt)} detail={booking.workStartedAt ? "Provider started work" : "Waiting for full payment and appointment"} />}
               <ProgressStep label="Provider confirmation" complete={providerComplete} detail={providerComplete ? "Delivery confirmed" : "Awaiting provider"} />
                 <ProgressStep label="Client confirmation" complete={clientComplete} detail={clientDetail} />
               </div>
@@ -191,6 +205,10 @@ export function BookingDetailsDialog({ booking, isProviderView, onClose, onMessa
 
           {booking.paymentReference ? <section className="flex gap-3 rounded-xl bg-primary/5 p-4" aria-labelledby="booking-reference-heading"><FileText className="mt-0.5 size-5 shrink-0 text-primary" aria-hidden="true" /><div className="min-w-0"><h3 id="booking-reference-heading" className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Payment reference</h3><p className="mt-1 break-all font-mono text-sm font-bold text-foreground">{booking.paymentReference}</p></div></section> : null}
           {booking.completedAt ? <p className="text-sm text-muted-foreground">Completed on <strong className="text-foreground">{new Date(booking.completedAt).toLocaleDateString("en-PH")}</strong></p> : null}
+          {booking.paymentPlan === "downpayment" && booking.balanceDueAt && Number(booking.balanceDueAmount || 0) > 0 && <p className="text-sm text-muted-foreground">Balance due before <strong className="text-foreground">{new Date(booking.balanceDueAt).toLocaleString("en-PH")}</strong>.</p>}
+          {booking.completionDueAt && booking.deliveryStatus === "seller_claimed" && <p className="text-sm text-muted-foreground">Client review ends {new Date(booking.completionDueAt).toLocaleString("en-PH")} if no case is open.</p>}
+          {booking.warrantyEligible && booking.completedAt && <p className="text-sm text-muted-foreground">Repair issue reporting is available through <strong className="text-foreground">{new Date(new Date(booking.completedAt).getTime() + 7 * 24 * 60 * 60_000).toLocaleString("en-PH")}</strong>.</p>}
+          {isProviderView && <p className="rounded-lg bg-muted/40 p-3 text-sm text-muted-foreground">Provider payout: not processed in this test flow.</p>}
           {booking.description ? <section className="rounded-xl bg-muted/40 p-4"><h3 className="font-bold text-foreground">Service notes</h3><p className="mt-2 text-sm leading-6 text-muted-foreground">{booking.description}</p></section> : null}
           {booking.rating || booking.review ? <section className="rounded-xl bg-brand-highlight-soft/50 p-4"><h3 className="flex items-center gap-2 font-bold text-foreground"><Star className="size-4 fill-brand-highlight text-brand-highlight" aria-hidden="true" />Customer review{booking.rating ? ` · ${booking.rating}/5` : ""}</h3>{booking.review ? <p className="mt-2 text-sm leading-6 text-muted-foreground">{booking.review}</p> : null}{booking.reviewImageUrl ? <img className="mt-3 max-h-56 rounded-lg object-cover" src={booking.reviewImageUrl} alt="Customer review" /> : null}</section> : null}
         </div>

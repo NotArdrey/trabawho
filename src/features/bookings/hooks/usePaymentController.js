@@ -112,7 +112,9 @@ export function usePaymentController(onPaymentProofSubmit, onPaymentMethodSelect
     if (paymentMethod === 'paymongo-card') {
       const checkoutBooking = {
         ...booking,
-        paymentPlan: mockPayment?.paymentPlan === 'downpayment' ? 'downpayment' : 'full',
+        paymentPlan: booking?.bookingMode === 'with-slots' && booking?.paymentStatus !== 'partially_paid'
+          ? 'downpayment'
+          : mockPayment?.paymentPlan === 'downpayment' ? 'downpayment' : 'full',
       };
       onPaymentMethodSelect?.(booking.id, paymentMethod, mockPayment);
       const checkout = await createPayMongoCheckout(checkoutBooking);

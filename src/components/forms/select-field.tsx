@@ -21,6 +21,7 @@ interface SelectFieldProps {
   onValueChange: (value: string) => void;
   options: readonly SelectFieldOption[];
   label: string;
+  labelClassName?: string;
   placeholder?: string;
   description?: ReactNode;
   error?: string;
@@ -37,6 +38,7 @@ function SelectField({
   onValueChange,
   options,
   label,
+  labelClassName,
   placeholder = "Select an option",
   description,
   error,
@@ -55,7 +57,7 @@ function SelectField({
 
   return (
     <div className={cn("grid gap-2", className)}>
-      <Label htmlFor={fieldId}>
+      <Label htmlFor={fieldId} className={labelClassName}>
         {label}
         {required ? (
           <span className="ml-1 text-brand-highlight-foreground" aria-hidden="true">

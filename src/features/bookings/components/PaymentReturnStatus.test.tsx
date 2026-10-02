@@ -7,6 +7,8 @@ import { fetchBookingById } from "@/features/bookings/services/bookingService";
 import { PaymentReturnStatus } from "./PaymentReturnStatus";
 
 vi.mock("@/features/bookings/services/bookingService", () => ({ fetchBookingById: vi.fn() }));
+const { paymentAttemptQuery } = vi.hoisted(() => ({ paymentAttemptQuery: vi.fn() }));
+vi.mock("@/integrations/supabase", () => ({ supabase: { from: () => ({ select: () => ({ eq: () => ({ eq: () => ({ maybeSingle: paymentAttemptQuery }) }) }) }) } }));
 
 describe("PaymentReturnStatus", () => {
   it("keeps a cancelled checkout recoverable", async () => {
@@ -20,8 +22,9 @@ describe("PaymentReturnStatus", () => {
 
   it("shows confirmation only after the server reports payment", async () => {
     vi.mocked(fetchBookingById).mockResolvedValue({ paymentStatus: "paid" } as never);
+    paymentAttemptQuery.mockResolvedValue({ data: { status: "paid" }, error: null });
     const onBookingUpdated = vi.fn();
-    render(<MemoryRouter initialEntries={["/bookings?payment=verifying&booking=booking-1"]}><PaymentReturnStatus onBookingUpdated={onBookingUpdated} /></MemoryRouter>);
+    render(<MemoryRouter initialEntries={["/bookings?payment=verifying&booking=booking-1&attempt=attempt-1"]}><PaymentReturnStatus onBookingUpdated={onBookingUpdated} /></MemoryRouter>);
     expect(screen.getByText("Verifying your payment")).toBeVisible();
     await waitFor(() => expect(screen.getByText("Payment confirmed")).toBeVisible());
     expect(onBookingUpdated).toHaveBeenCalledWith(expect.objectContaining({ paymentStatus: "paid" }));

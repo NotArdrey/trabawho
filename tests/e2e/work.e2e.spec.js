@@ -8,6 +8,7 @@ const {
 
 const CASH_KEY = 'trabawho_cash_confirmation_requests';
 const REFUND_KEY = 'trabawho_refund_requests';
+const BOOKING_DEMO_CLIENT_EMAIL = 'demo.user@giglink.test';
 
 function collectConsoleFailures(page) {
   const failures = [];
@@ -96,8 +97,8 @@ async function expectPrimarySectionsUsable(page) {
 test('client demo account logs in through the public login modal', async ({ page }) => {
   const consoleFailures = collectConsoleFailures(page);
 
-  await loginAs(page, DEMO_CLIENT_EMAIL);
-  await expect(page.getByLabel('My Work')).toBeVisible();
+  await loginAs(page, BOOKING_DEMO_CLIENT_EMAIL);
+  await expect(page.getByRole('button', { name: 'Client workspace' })).toBeVisible();
   await expect(page.getByText(/Welcome back/i)).toBeVisible();
 
   expect(consoleFailures).toEqual([]);
@@ -107,10 +108,63 @@ test('admin demo account logs in and can access the admin dashboard', async ({ p
   const consoleFailures = collectConsoleFailures(page);
 
   await loginAs(page, DEMO_ADMIN_EMAIL);
-  await expect(page.getByRole('heading', { name: 'TrabaWho Admin Dashboard' })).toBeVisible({ timeout: 20_000 });
-  await expect(page.getByText('Admin Portal UI')).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Overview' })).toBeVisible({ timeout: 20_000 });
+  const sidebar = page.getByRole('complementary', { name: /admin navigation sidebar/i });
+  await expect(sidebar).toBeVisible();
+  await sidebar.getByRole('button', { name: 'Settings', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Settings' })).toBeVisible();
+  await expect(page.getByRole('button', { name: /Manage account & privacy/i })).toBeEnabled();
+  await page.getByRole('radio', { name: /^Dark/i }).click();
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
+  await page.getByRole('radio', { name: /^Light/i }).click();
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'light');
+  await page.getByRole('radio', { name: /^Device/i }).click();
+  await page.getByRole('button', { name: /Manage account & privacy/i }).click();
+  await expect(page.getByTestId('account-settings-page')).toBeVisible();
+  await page.goto('/admin');
+  await expect(page.getByRole('heading', { name: 'Overview' })).toBeVisible();
+  await sidebar.getByRole('button', { name: /Account Management/i }).click();
+  await expect(page.getByRole('heading', { name: 'Account management' })).toBeVisible();
+  await expect(page.getByText(/^Showing \d+–\d+ of \d+ accounts$/)).toBeVisible();
+  const nextAccountsPage = page.getByRole('button', { name: 'Next' });
+  if (await nextAccountsPage.count()) {
+    await nextAccountsPage.click();
+    await expect(page.getByText(/^Page 2 of \d+$/)).toBeVisible();
+  }
+  await page.locator('main button:not([disabled])', { hasText: 'Set admin' }).first().click();
+  await expect(page.getByRole('heading', { name: 'Grant admin access?' })).toBeVisible();
+  await page.getByRole('button', { name: 'Cancel' }).click();
+  await sidebar.getByRole('button', { name: /Audit Logs/i }).click();
+  await expect(page.getByText('Audit feed not available')).toBeVisible();
+  await sidebar.getByRole('button', { name: /^Reviews$/i }).click();
+  await expect(page.getByRole('heading', { name: 'Reviews' })).toBeVisible();
+  await expect(page.getByRole('searchbox', { name: 'Search written review comments' })).toBeVisible();
+  await page.getByRole('button', { name: 'Unpublished' }).click();
+  await expect(page.getByRole('button', { name: 'Unpublished' })).toHaveAttribute('aria-pressed', 'true');
+  await page.getByRole('button', { name: 'All', exact: true }).click();
+  await sidebar.getByRole('button', { name: /^Overview$/i }).click();
+  for (const width of [390, 768, 1024, 1280, 1440]) {
+    await page.setViewportSize({ width, height: 900 });
+    await expect(page.getByRole('heading', { name: 'Overview' })).toBeVisible();
+    if (width >= 881) {
+      await expect(sidebar).toBeVisible();
+      expect(Math.round((await sidebar.boundingBox()).width)).toBe(248);
+      await expect(page.getByRole('button', { name: 'Open navigation menu' })).toBeHidden();
+    } else {
+      await expect(sidebar).toBeHidden();
+      await expect(page.getByRole('button', { name: 'Open navigation menu' })).toBeVisible();
+    }
+    const scrollWidth = await page.evaluate(() => document.documentElement.scrollWidth);
+    expect(scrollWidth).toBeLessThanOrEqual(width + 2);
+  }
+  await page.setViewportSize({ width: 390, height: 900 });
+  await page.getByRole('button', { name: 'Open navigation menu' }).click();
+  await expect(page.getByRole('dialog', { name: 'Admin navigation' })).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('dialog', { name: 'Admin navigation' })).toHaveCount(0);
+  await page.setViewportSize({ width: 1280, height: 900 });
   await page.getByRole('button', { name: 'Back to App' }).click();
-  await expect(page.getByLabel('My Work')).toBeVisible();
+  await expect(page.getByTestId('client-home-dashboard')).toBeVisible();
 
   expect(consoleFailures).toEqual([]);
 });

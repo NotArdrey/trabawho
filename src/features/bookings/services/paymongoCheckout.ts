@@ -41,7 +41,7 @@ const getPaymentPurpose = (booking: CheckoutBooking) =>
     : "initial";
 
 const getIdempotencyStorageKey = (booking: CheckoutBooking) =>
-  `trabawho:paymongo:${booking.id || `${booking.serviceId}:${getSlotId(booking)}`}:${getPaymentPurpose(booking)}:${booking.paymentPlan || "full"}`;
+  `trabawho:paymongo:${booking.id || `${booking.serviceId}:${getSlotId(booking)}`}:${getPaymentPurpose(booking)}:${booking.paymentPlan || "downpayment"}`;
 
 const createOperationId = () => {
   if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
@@ -106,7 +106,7 @@ export async function createPayMongoCheckout(booking: CheckoutBooking): Promise<
         serviceId: booking.serviceId || null,
         slotId,
         quoteVersion: booking.quoteVersion || null,
-        paymentPlan: booking.paymentPlan || "full",
+        paymentPlan: booking.paymentPlan || "downpayment",
         idempotencyKey: getStableIdempotencyKey(booking),
       },
     },
