@@ -2,6 +2,7 @@ import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { asRecord, cleanPaymentString, createPaymentAdminClient, createPaymentUserClient, paymentCorsHeaders,
   PaymentFunctionError, paymentJsonResponse, parsePaymentJson, safePaymentError } from "../_shared/paymongo.ts";
 import { boostSecret, boostAppOrigin, boostCheckoutRecord, validBoostCheckoutUrl } from "../_shared/gigBoost.ts";
+import { boostCheckoutAmount } from "../_shared/boostPricing.ts";
 
 serve(async (request: Request) => {
   if (request.method === "OPTIONS") return new Response("ok", { headers: paymentCorsHeaders });
@@ -11,7 +12,12 @@ serve(async (request: Request) => {
     const body = await parsePaymentJson(request);
     const serviceId = Number(body.serviceId);
     const days = Number(body.days);
-    const amount = Number(body.amount);
+    let amount: number;
+    try { amount = boostCheckoutAmount(days, Deno.env.get("AD_BOOST_DAILY_RATE_PHP")); }
+    catch (error) { throw new PaymentFunctionError(error instanceof Error ? error.message : "Check your boost settings."); }
+    if (typeof body.amount !== "number" || body.amount !== amount) {
+      throw new PaymentFunctionError("The boost price has changed. Refresh the page and review your total again.", 409);
+    }
     const operation = cleanPaymentString(body.operationId);
     if (!Number.isSafeInteger(serviceId) || !Number.isInteger(days) || !Number.isFinite(amount) || !operation) {
       throw new PaymentFunctionError("Choose a gig and valid boost settings.");
@@ -25,6 +31,9 @@ serve(async (request: Request) => {
       throw new PaymentFunctionError(safeCodes.includes(error.code) ? String(error.message).slice(0, 240) : "Unable to start this gig boost checkout.", 409);
     }
     const attempt = boostCheckoutRecord(data);
+    if (attempt.amount !== amount || Number(attempt.duration_days) !== days) {
+      throw new PaymentFunctionError("This pending checkout has different pricing. Wait for it to expire, then review a new boost.", 409);
+    }
     const response = (url: string) => paymentJsonResponse({ checkoutUrl: url, attemptId: attempt.id, expiresAt: attempt.expires_at });
     if (attempt.checkout_url) return response(validBoostCheckoutUrl(attempt.checkout_url));
     const app = boostAppOrigin(request);

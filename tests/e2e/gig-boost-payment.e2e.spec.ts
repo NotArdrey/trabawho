@@ -21,7 +21,8 @@ for (const width of [390, 768, 1024, 1280, 1440]) {
     await page.goto("/__boost-journey");
     await page.getByRole("button", { name: "Review boost payment" }).click();
     await expect(page.getByRole("dialog", { name: "Review gig boost payment" })).toBeVisible();
-    await expect(page.getByText("PHP 250", { exact: true })).toBeVisible();
+    await expect(page.getByText("PHP 350", { exact: true })).toBeVisible();
+    await expect(page.getByRole("dialog")).toContainText("PHP 50 per day");
     await expect(page.getByText("7 days", { exact: true })).toBeVisible();
     await expect(page.getByRole("button", { name: "Continue to PayMongo" })).toBeDisabled();
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
@@ -29,7 +30,7 @@ for (const width of [390, 768, 1024, 1280, 1440]) {
     await page.getByRole("button", { name: "Continue to PayMongo" }).click();
     await expect(page.getByRole("heading", { name: "PayMongo boost checkout" })).toBeVisible();
     expect(calls).toHaveLength(1);
-    expect(calls[0]).toMatchObject({ serviceId: 83, days: 7, amount: 250 });
+    expect(calls[0]).toMatchObject({ serviceId: 83, days: 7, amount: 350 });
     expect(calls[0]).not.toHaveProperty("active");
   });
 }
@@ -37,7 +38,7 @@ for (const width of [390, 768, 1024, 1280, 1440]) {
 test("cancelled checkout leaves the gig inactive", async ({ page }) => {
   await page.route("**/functions/v1/reconcile-paymongo-boost-checkout", (route) => route.fulfill({ json: { status: "awaiting_payment", verified: false, requiresReview: false, serviceId: 83, endsAt: null } }));
   await page.goto(`/__boost-journey?boostPayment=cancelled&boostAttempt=${attempt}`);
-  await expect(page.getByRole("status")).toContainText("Your gig boost is inactive");
+  await expect(page.getByRole("status").filter({ hasText: "Your gig boost is inactive" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Review boost payment" })).toBeEnabled();
   await expect(page.getByRole("button", { name: "Gig already boosted" })).toHaveCount(0);
 });
@@ -45,16 +46,16 @@ test("cancelled checkout leaves the gig inactive", async ({ page }) => {
 test("invalid boost values show field feedback and preserve the entered values", async ({ page }) => {
   await page.goto("/__boost-journey");
   await page.getByLabel("Days", { exact: true }).fill("7.5");
-  await page.getByLabel("Budget PHP").fill("250.001");
   await page.getByRole("button", { name: "Review boost payment" }).click();
   await expect(page.getByLabel("Days", { exact: true })).toHaveAttribute("aria-invalid", "true");
-  await expect(page.getByLabel("Budget PHP")).toHaveAttribute("aria-invalid", "true");
+  await expect(page.getByLabel("Days", { exact: true })).toHaveValue("7.5");
+  await expect(page.getByLabel("Budget PHP")).toHaveCount(0);
   await expect(page.getByRole("dialog")).toHaveCount(0);
   await page.getByLabel("Days", { exact: true }).fill("14");
-  await page.getByLabel("Budget PHP").fill("250");
+  await expect(page.getByRole("status")).toContainText("PHP 700 total for 14 days");
   await page.getByRole("button", { name: "Review boost payment" }).click();
   await expect(page.getByRole("dialog")).toContainText("14 days");
-  await expect(page.getByRole("dialog")).toContainText("PHP 250");
+  await expect(page.getByRole("dialog")).toContainText("PHP 700");
 });
 
 test("paid return refreshes the gig only after verification", async ({ page }) => {
@@ -68,7 +69,7 @@ test("paid return refreshes the gig only after verification", async ({ page }) =
     await route.fulfill({ json: { status: "paid", verified: true, requiresReview: false, serviceId: 83, endsAt: new Date(Date.now() + 7 * 86400_000).toISOString() } });
   });
   await page.goto(`/__boost-journey?boostPayment=verifying&boostAttempt=${attempt}`);
-  await expect(page.getByRole("status")).toContainText("Payment verified");
+  await expect(page.getByRole("status").filter({ hasText: "Payment verified" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Gig already boosted" })).toBeDisabled();
   await expect(page).not.toHaveURL(/boostAttempt=/);
 });
@@ -78,7 +79,7 @@ test("an old paid return does not claim an expired boost is active", async ({ pa
     status: "paid", verified: true, requiresReview: false, serviceId: 83, endsAt: new Date(Date.now() - 1000).toISOString(),
   } }));
   await page.goto(`/__boost-journey?boostPayment=verifying&boostAttempt=${attempt}`);
-  await expect(page.getByRole("status")).toContainText("This boost has ended");
+  await expect(page.getByRole("status").filter({ hasText: "This boost has ended" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Review boost payment" })).toBeEnabled();
   await expect(page).not.toHaveURL(/boostAttempt=/);
 });

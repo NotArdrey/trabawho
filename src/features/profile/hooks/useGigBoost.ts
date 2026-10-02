@@ -2,14 +2,18 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { getActiveAdBooster } from "@/shared/utils/serviceBoost";
 import { createBoostCheckout, fetchBoostServices, verifyBoostCheckout, type BoostService } from "../services/gigBoostService";
-import { buildBoostDraft, type BoostDraft } from "../utils/gigBoost";
+import { buildBoostDraft, calculateBoostTotal, getBoostDailyRate, validateBoostSettings, type BoostDraft } from "../utils/gigBoost";
 
 export function useGigBoost(sellerId?: string) {
   const [params, setParams] = useSearchParams();
   const [services, setServices] = useState<BoostService[]>([]);
   const [selectedId, setSelectedId] = useState("");
   const [days, setDays] = useState("7");
-  const [budget, setBudget] = useState("250");
+  let dailyRate = 0;
+  let pricingError = "";
+  try { dailyRate = getBoostDailyRate(); }
+  catch (failure) { pricingError = failure instanceof Error ? failure.message : "Ad booster pricing is unavailable."; }
+  const total = !validateBoostSettings(days).days && !pricingError ? calculateBoostTotal(Number(days), dailyRate) : null;
   const [draft, setDraft] = useState<BoostDraft | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -102,7 +106,7 @@ export function useGigBoost(sellerId?: string) {
   const review = () => {
     try {
       if (boost.isBoosted) throw new Error("This gig already has an active paid boost.");
-      setDraft(buildBoostDraft(selectedId, selected?.title || "Selected gig", days, budget));
+      setDraft(buildBoostDraft(selectedId, selected?.title || "Selected gig", days));
       setError("");
     } catch (failure) { setError(failure instanceof Error ? failure.message : "Check your boost settings."); }
   };
@@ -121,7 +125,7 @@ export function useGigBoost(sellerId?: string) {
     catch (failure) { setError(failure instanceof Error ? failure.message : "Unable to load your gigs. Please retry."); }
     finally { setLoading(false); }
   };
-  return { services, selectedId, setSelectedId, days, setDays, budget, setBudget, draft, loading, saving, verifying,
+  return { services, selectedId, setSelectedId, days, setDays, dailyRate, total, pricingError, draft, loading, saving, verifying,
     error, message, boost, clock, review, checkout, cancel: () => { if (!saving) { setDraft(null); setError(""); } },
     canVerify: Boolean(attemptId && returnStatus), checkPayment: () => setVerificationRun((run) => run + 1), retryLoad };
 }

@@ -204,9 +204,25 @@ The database rejects work, delivery, or completion while a balance is outstandin
 including historical bookings without a balance deadline. Browser inserts cannot
 fabricate a paid or completed booking by omitting payment-method metadata.
 
-Booster fields now show duration and budget feedback alongside a total charge
-summary. Checkout retries retain their operation ID after a network error so an
-uncertain response does not start a second operation.
+The ad booster charges a fixed PHP 50 daily rate by default. Workers select
+1–365 whole days; the panel and payment review calculate the one-time total as
+daily rate × days. The budget is no longer editable. Checkout retries retain
+their operation ID after a network error so an uncertain response does not
+start a second operation.
+
+Set `VITE_AD_BOOST_DAILY_RATE_PHP` for the frontend and
+`AD_BOOST_DAILY_RATE_PHP` in Supabase Edge Function secrets to the same daily
+rate, then rebuild the frontend and redeploy `create-paymongo-boost-checkout`.
+Both default to `50` when unset. Rates accept PHP 1–27,397.26 with up to two
+decimal places, keeping a 365-day total within the existing checkout limit.
+Malformed configuration blocks checkout. The function calculates the charge
+independently and rejects a different browser total or pending-attempt price
+before opening PayMongo. A pending checkout with old pricing must expire
+before a new one can start; existing paid boosts retain their purchased term.
+The database continues to use its existing payment-attempt contract.
+
+Pricing verification: `node --test tests/integration/boost-pricing.node.mts`,
+`npm run check`, and `npm run test:e2e -- tests/e2e/gig-boost-payment.e2e.spec.ts`.
 
 Validation: `npm run check`; booking/payment, boost, dispute/refund, dispute recovery,
 and admin support Playwright journeys; five Deno function tests with mocked provider
