@@ -5,8 +5,8 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { performBookingLifecycleAction } from "@/features/bookings/services/bookingLifecycle";
 import {
-  deliverBookingWithEvidence, getBookingDeliveryEvidence, getBookingSupportCase, openBookingSupportCase, startBookingWork,
-  type BookingCaseType,
+  deliverBookingWithEvidence, getBookingDeliveryEvidence, getBookingSupportCase, openBookingSupportCase, respondToRepairClaim, startBookingWork,
+  type BookingCaseType, type RepairClaimResponse,
 } from "@/features/bookings/services/bookingTransactions";
 
 interface BookingRecord {
@@ -32,7 +32,7 @@ interface Props {
 }
 
 export function BookingTransactionActions({ booking, viewerRole, onUpdated }: Props) {
-  const [dialog, setDialog] = useState<"delivery" | "case" | null>(null);
+  const [dialog, setDialog] = useState<"delivery" | "case" | "response" | null>(null);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
@@ -40,6 +40,8 @@ export function BookingTransactionActions({ booking, viewerRole, onUpdated }: Pr
   const [handoverChecked, setHandoverChecked] = useState(false);
   const [explanation, setExplanation] = useState("");
   const [caseReason, setCaseReason] = useState("");
+  const [responseAction, setResponseAction] = useState<RepairClaimResponse>("offer_rework");
+  const [responseText, setResponseText] = useState("");
   const [caseType, setCaseType] = useState<BookingCaseType>(viewerRole === "client" ? "provider_no_show" : "client_no_show");
   const [image, setImage] = useState<File | null>(null);
   const [evidence, setEvidence] = useState<Awaited<ReturnType<typeof getBookingDeliveryEvidence>>>(null);
@@ -73,6 +75,10 @@ export function BookingTransactionActions({ booking, viewerRole, onUpdated }: Pr
   const withinRepairWindow = canReportCompleted && booking.warrantyPolicyCode === "repair_workmanship_7d"
     && now <= new Date(booking.completedAt || "").getTime() + (booking.warrantyDurationDays || 7) * 24 * 60 * 60_000;
   const canReport = booking.disputeStatus !== "open" && (canReportNoShow || canReportDelivery || canReportCompleted);
+  const currentCase = caseSummary?.bookingId === booking.id ? caseSummary.data : null;
+  const canRespond = viewerRole === "provider" && booking.disputeStatus === "open"
+    && currentCase?.case_type === "warranty_issue" && currentCase.policy_route === "rework_request"
+    && currentCase.status === "open" && !currentCase.provider_responded_at;
 
   const run = async (operation: () => Promise<unknown>, message: string | (() => string)) => {
     if (inFlight.current) return;
@@ -110,6 +116,17 @@ export function BookingTransactionActions({ booking, viewerRole, onUpdated }: Pr
       : "Support case saved for review. No refund was issued.");
   };
 
+  const submitResponse = () => {
+    if (!currentCase) return;
+    void run(async () => {
+      const updated = await respondToRepairClaim(booking.id, currentCase.id, responseAction, responseText);
+      setCaseSummary({ bookingId: booking.id, data: await getBookingSupportCase(booking.id) });
+      return updated;
+    }, responseAction === "offer_rework"
+      ? "Your rework offer was saved. Coordinate the next step with the client; this case remains open."
+      : "Your response was sent to support review. The case remains unresolved.");
+  };
+
   const viewEvidence = async () => {
     setError("");
     try { setEvidence(await getBookingDeliveryEvidence(booking.id, booking.scheduleVersion || 1)); }
@@ -123,7 +140,8 @@ export function BookingTransactionActions({ booking, viewerRole, onUpdated }: Pr
     {canComplete && <Button type="button" disabled={pending} onClick={() => { void run(() => performBookingLifecycleAction("complete", booking.id), "Completion confirmed and saved."); }}><CheckCircle2 aria-hidden="true" />Confirm completion</Button>}
     {viewerRole === "client" && booking.deliveryStatus === "seller_claimed" && <Button type="button" variant="outline" onClick={() => { void viewEvidence(); }}>View delivery proof</Button>}
     {canReport && <Button type="button" variant="outline" disabled={pending} onClick={openCase}><Flag aria-hidden="true" />Report a problem</Button>}
-    {booking.disputeStatus === "open" && <div className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-100"><p className="font-semibold">{caseSummary?.bookingId === booking.id && caseSummary.data?.policy_route === "rework_request" ? viewerRole === "provider" ? "Client requested repair rework" : "Repair rework requested" : "Support case open"}</p><p className="mt-1">{caseSummary?.bookingId === booking.id && caseSummary.data?.reason || "Completion is paused while this report is reviewed."}</p>{caseSummary?.bookingId === booking.id && caseSummary.data?.policy_reason && <p className="mt-1 text-xs">{caseSummary.data.policy_reason}</p>}</div>}
+    {booking.disputeStatus === "open" && <div className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-100"><p className="font-semibold">{currentCase?.policy_route === "rework_request" ? viewerRole === "provider" ? "Client requested repair rework" : "Repair rework requested" : "Support case open"}</p><p className="mt-1">{currentCase?.reason || "Completion is paused while this report is reviewed."}</p>{currentCase?.policy_reason && <p className="mt-1 text-xs">{currentCase.policy_reason}</p>}{currentCase?.provider_response_action && <div className="mt-3 border-t border-amber-300 pt-3 dark:border-amber-800"><p className="font-semibold">{currentCase.provider_response_action === "offer_rework" ? "Provider offered rework" : "Provider requested support review"}</p><p className="mt-1">{currentCase.provider_response_text}</p><p className="mt-1 text-xs">This response does not close the case or change payment.</p></div>}</div>}
+    {canRespond && <Button type="button" variant="outline" disabled={pending} onClick={() => { setResponseAction("offer_rework"); setResponseText(""); setError(""); setDialog("response"); }}>Respond to repair claim</Button>}
     {viewerRole === "provider" && booking.deliveryStatus === "seller_claimed" && <span className="self-center text-sm text-muted-foreground">Waiting for client confirmation</span>}
     {evidence && <div className="rounded-lg border bg-muted/30 p-3 text-sm"><p className="font-semibold">Delivery proof</p><p className="mt-1 text-muted-foreground">{evidence.checklist.join(" · ")}</p>{evidence.explanation && <p className="mt-2">{evidence.explanation}</p>}{evidence.imageUrl && <a className="mt-2 inline-block text-primary underline" href={evidence.imageUrl} target="_blank" rel="noreferrer">Open evidence image</a>}</div>}
     {success && <p role="status" className="text-sm text-emerald-700 dark:text-emerald-300">{success}</p>}
@@ -152,6 +170,18 @@ export function BookingTransactionActions({ booking, viewerRole, onUpdated }: Pr
           {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
         </div>
         <DialogFooter><Button type="button" variant="outline" disabled={pending} onClick={() => setDialog(null)}>Cancel</Button><Button type="button" disabled={pending || caseReason.trim().length < 20} onClick={submitCase}>{pending ? <LoaderCircle className="animate-spin" aria-hidden="true" /> : <Flag aria-hidden="true" />}Open support case</Button></DialogFooter>
+      </DialogContent>
+    </Dialog>
+
+    <Dialog open={dialog === "response"} onOpenChange={(open) => { if (!open && !pending) setDialog(null); }}>
+      <DialogContent><DialogHeader><DialogTitle>Respond to repair claim</DialogTitle><DialogDescription>Offer to inspect or rework the reported issue, or ask support to review it. Your answer does not decide coverage, close the case, or move money.</DialogDescription></DialogHeader>
+        <div className="grid gap-4">
+          <label className="grid gap-1 text-sm font-medium">Next step<select className="min-h-11 rounded-md border bg-background px-3" value={responseAction} onChange={(event) => setResponseAction(event.target.value as RepairClaimResponse)}><option value="offer_rework">Offer inspection or rework</option><option value="request_support_review">Request support review</option></select></label>
+          <label className="grid gap-1 text-sm font-medium">Your response<textarea className="min-h-28 rounded-md border bg-background p-3" value={responseText} onChange={(event) => setResponseText(event.target.value)} placeholder="Explain what you can do next, or why support should review the report (at least 20 characters)" /></label>
+          <p className="text-xs text-muted-foreground">Do not include contact details or sensitive documents here. Use the booking conversation to arrange a time with the client.</p>
+          {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
+        </div>
+        <DialogFooter><Button type="button" variant="outline" disabled={pending} onClick={() => setDialog(null)}>Cancel</Button><Button type="button" disabled={pending || responseText.trim().length < 20} onClick={submitResponse}>{pending ? <LoaderCircle className="animate-spin" aria-hidden="true" /> : <FileCheck2 aria-hidden="true" />}Send response</Button></DialogFooter>
       </DialogContent>
     </Dialog>
   </div>;

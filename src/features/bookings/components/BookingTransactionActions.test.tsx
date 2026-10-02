@@ -2,13 +2,14 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { performBookingLifecycleAction } from "@/features/bookings/services/bookingLifecycle";
-import { getBookingSupportCase, openBookingSupportCase, startBookingWork } from "@/features/bookings/services/bookingTransactions";
+import { getBookingSupportCase, openBookingSupportCase, respondToRepairClaim, startBookingWork } from "@/features/bookings/services/bookingTransactions";
 import { BookingTransactionActions } from "./BookingTransactionActions";
 
 vi.mock("@/features/bookings/services/bookingLifecycle", () => ({ performBookingLifecycleAction: vi.fn() }));
 vi.mock("@/features/bookings/services/bookingTransactions", () => ({
   startBookingWork: vi.fn(), deliverBookingWithEvidence: vi.fn(),
   openBookingSupportCase: vi.fn(), getBookingDeliveryEvidence: vi.fn(), getBookingSupportCase: vi.fn(),
+  respondToRepairClaim: vi.fn(),
 }));
 
 const booking = {
@@ -82,13 +83,67 @@ describe("BookingTransactionActions", () => {
 
   it("shows the provider a client rework request without claiming the defect was accepted", async () => {
     vi.mocked(getBookingSupportCase).mockResolvedValue({
+      id: "case-1",
       case_type: "warranty_issue", reason: "The repaired printer stopped working again.",
       policy_route: "rework_request", policy_reason: "Provider response is needed.",
       status: "open", created_at: new Date().toISOString(),
+      provider_response_action: null, provider_response_text: null, provider_responded_at: null,
     });
     render(<BookingTransactionActions booking={{ ...booking, disputeStatus: "open" }} viewerRole="provider" onUpdated={vi.fn()} />);
     expect(await screen.findByText("Client requested repair rework")).toBeVisible();
     expect(screen.getByText("The repaired printer stopped working again.")).toBeVisible();
+    expect(screen.getByRole("button", { name: "Respond to repair claim" })).toBeVisible();
+  });
+
+  it("submits one provider response and shows it to both participants", async () => {
+    const report = { id: "case-1", case_type: "warranty_issue", reason: "The repaired printer stopped working again.",
+      policy_route: "rework_request" as const, policy_reason: "Provider response is needed.", status: "open" as const,
+      created_at: new Date().toISOString(), provider_response_action: null, provider_response_text: null, provider_responded_at: null };
+    vi.mocked(getBookingSupportCase).mockResolvedValueOnce(report).mockResolvedValue({ ...report,
+      provider_response_action: "offer_rework", provider_response_text: "I can inspect the printer and repair the original work.",
+      provider_responded_at: new Date().toISOString(),
+    });
+    vi.mocked(respondToRepairClaim).mockResolvedValue(booking);
+    render(<BookingTransactionActions booking={{ ...booking, disputeStatus: "open" }} viewerRole="provider" onUpdated={vi.fn()} />);
+    fireEvent.click(await screen.findByRole("button", { name: "Respond to repair claim" }));
+    fireEvent.change(screen.getByRole("textbox", { name: "Your response" }), {
+      target: { value: "I can inspect the printer and repair the original work." },
+    });
+    const send = screen.getByRole("button", { name: "Send response" });
+    fireEvent.click(send);
+    fireEvent.click(send);
+    expect(respondToRepairClaim).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(screen.getByText("Provider offered rework")).toBeVisible());
+    expect(screen.queryByRole("button", { name: "Respond to repair claim" })).not.toBeInTheDocument();
+  });
+
+  it("keeps a failed response editable for retry", async () => {
+    vi.mocked(getBookingSupportCase).mockResolvedValue({ id: "case-1", case_type: "warranty_issue",
+      reason: "The repaired printer stopped working again.", policy_route: "rework_request",
+      policy_reason: "Provider response is needed.", status: "open", created_at: new Date().toISOString(),
+      provider_response_action: null, provider_response_text: null, provider_responded_at: null });
+    vi.mocked(respondToRepairClaim).mockRejectedValueOnce(new Error("Network unavailable"));
+    render(<BookingTransactionActions booking={{ ...booking, disputeStatus: "open" }} viewerRole="provider" onUpdated={vi.fn()} />);
+    fireEvent.click(await screen.findByRole("button", { name: "Respond to repair claim" }));
+    fireEvent.change(screen.getByRole("textbox", { name: "Your response" }), {
+      target: { value: "Please send this to support for review of the issue." },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Send response" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("Network unavailable");
+    expect(screen.getByRole("textbox", { name: "Your response" })).toHaveValue("Please send this to support for review of the issue.");
+  });
+
+  it("shows the saved response to the client without giving them provider controls", async () => {
+    vi.mocked(getBookingSupportCase).mockResolvedValue({ id: "case-1", case_type: "warranty_issue",
+      reason: "The repaired printer stopped working again.", policy_route: "rework_request",
+      policy_reason: "Provider response is needed.", status: "under_review", created_at: new Date().toISOString(),
+      provider_response_action: "request_support_review",
+      provider_response_text: "The reported fault needs an independent review before rework.",
+      provider_responded_at: new Date().toISOString() });
+    render(<BookingTransactionActions booking={{ ...booking, disputeStatus: "open" }} viewerRole="client" onUpdated={vi.fn()} />);
+    expect(await screen.findByText("Provider requested support review")).toBeVisible();
+    expect(screen.getByText("The reported fault needs an independent review before rework.")).toBeVisible();
+    expect(screen.queryByRole("button", { name: "Respond to repair claim" })).not.toBeInTheDocument();
   });
 
   it("uses the server route instead of the client's clock for the result message", async () => {

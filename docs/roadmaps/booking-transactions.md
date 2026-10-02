@@ -313,9 +313,24 @@ Implementation status on October 1, 2026:
   eligibility flags are not silently erased, but do not gain automatic rework.
   Cases remain visible to both booking participants and the admin queue.
 - Neither route automatically refunds, pays out, closes a case, or decides
-  liability. A structured provider response, evidence standard, escalation
-  owner, final remedy authority, and legally reviewed customer terms are still
+  liability. A structured provider response is now implemented: the booked
+  provider may once offer inspection/rework or request support review, with a
+  required explanation. The response is audited and visible to both parties
+  and the read-only admin queue. It cannot close the case or change payment.
+  Evidence standards, a client acceptance/rework scheduling flow, escalation
+  owner, final remedy authority, and legally reviewed customer terms remain
   required before this can be represented as a production warranty.
+- Applied `20261003103000_repair_claim_provider_response.sql` and the
+  response-completeness guard `20261003104000_guard_repair_response_completeness.sql`
+  to the confirmed demo/test project after dry runs showed each as the only
+  pending migration.
+  Local checks passed (173 tests, typecheck, lint, standards, build) and the
+  existing admin browser journey passed. A live client attempt to answer an
+  existing case was rejected by the server as wrong-role. There are currently
+  no `rework_request` cases in the demo/test project; its completed repair
+  bookings predate the explicit policy snapshot. A fresh paid repair booking,
+  in-window claim, provider answer, and client/admin refresh still need a
+  two-account rehearsal. No historic booking was relabelled or fabricated.
 
 ## Phase 1: Payment foundation
 

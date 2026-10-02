@@ -63,6 +63,7 @@ export async function reviewBookingReschedule(input: { decision: ReviewDecision;
 }
 
 export type BookingCaseType = "provider_no_show" | "client_no_show" | "delivery_issue" | "warranty_issue" | "service_issue";
+export type RepairClaimResponse = "offer_rework" | "request_support_review";
 
 const bucket = "booking-evidence";
 const imageTypes = new Set(["image/jpeg", "image/png", "image/webp"]);
@@ -136,10 +137,25 @@ export async function openBookingSupportCase(
 
 export async function getBookingSupportCase(bookingId: string) {
   const { data, error } = await supabase.from("booking_support_cases")
-    .select("case_type, reason, policy_route, policy_reason, status, created_at")
+    .select("id, case_type, reason, policy_route, policy_reason, status, created_at, provider_response_action, provider_response_text, provider_responded_at")
     .eq("booking_id", bookingId).order("created_at", { ascending: false }).limit(1).maybeSingle();
   if (error) throw new Error("The booking report could not be loaded.");
   return data;
+}
+
+export async function respondToRepairClaim(
+  bookingId: string, caseId: string, action: RepairClaimResponse, response: string,
+): Promise<unknown> {
+  if (response.trim().length < 20) throw new Error("Explain your response in at least 20 characters.");
+  const { error } = await supabase.rpc("respond_to_repair_claim", {
+    p_case_id: caseId,
+    p_action: action,
+    p_response: response.trim(),
+    p_storage_path: null,
+    p_operation_id: `repair-response:${caseId}`,
+  });
+  if (error) throw new Error(error.message);
+  return fetchBookingById(bookingId);
 }
 
 export async function getBookingDeliveryEvidence(bookingId: string, scheduleVersion: number) {

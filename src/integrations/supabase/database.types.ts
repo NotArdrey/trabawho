@@ -113,7 +113,7 @@ export interface Database {
       booking_reschedule_requests: Table<TimestampColumns & { id: string; booking_id: string; requested_by: string; requested_slot_id: number; previous_slot_id: number | null; status: "pending" | "approved" | "declined" | "cancelled"; reason: string | null; reviewer_id: string | null; review_reason: string | null; reviewed_at: string | null; operation_id: string }>;
       payment_attempts: Table<{ id: string; booking_id: string; buyer_id: string; purpose: "initial" | "balance"; status: string; amount: number; currency: string; created_at: string; paid_at: string | null }>;
       booking_delivery_evidence: Table<{ id: string; booking_id: string; schedule_version: number; provider_id: string; checklist: string[]; explanation: string | null; storage_path: string | null; created_at: string }>;
-      booking_support_cases: Table<{ id: string; booking_id: string; reporter_id: string; case_type: string; reason: string; storage_path: string | null; policy_route: "rework_request" | "support_review"; policy_reason: string | null; status: "open" | "under_review" | "closed"; created_at: string; closed_at: string | null }>;
+      booking_support_cases: Table<{ id: string; booking_id: string; reporter_id: string; case_type: string; reason: string; storage_path: string | null; policy_route: "rework_request" | "support_review"; policy_reason: string | null; status: "open" | "under_review" | "closed"; created_at: string; closed_at: string | null; provider_response_action: "offer_rework" | "request_support_review" | null; provider_response_text: string | null; provider_response_storage_path: string | null; provider_responded_at: string | null; provider_responded_by: string | null; provider_response_operation_id: string | null }>;
       conversations: Table<{ id: string; booking_id: string | null; seller_id: string | null; buyer_id: string | null; metadata: Json | null; created_at: string }>;
       messages: Table<{ id: string; conversation_id: string; sender_id: string; body: string | null; attachments: Json | null; read_by: Json | null; created_at: string }>;
       reviews: Table<TimestampColumns & { id: number; seller_id: string; reviewer_id: string; booking_id: string | null; rating: number; title: string | null; body: string | null; helpful_count: number | null; published: boolean | null }>;
@@ -132,6 +132,7 @@ export interface Database {
       start_booking_work: { Args: { p_booking_id: string; p_idempotency_key: string }; Returns: Database["public"]["Tables"]["bookings"]["Row"] };
       save_booking_delivery_evidence: { Args: { p_booking_id: string; p_checklist: string[]; p_explanation: string | null; p_storage_path: string | null }; Returns: Database["public"]["Tables"]["booking_delivery_evidence"]["Row"] };
       open_booking_support_case: { Args: { p_booking_id: string; p_case_type: string; p_reason: string; p_storage_path: string | null; p_idempotency_key: string }; Returns: Database["public"]["Tables"]["booking_support_cases"]["Row"] };
+      respond_to_repair_claim: { Args: { p_case_id: string; p_action: "offer_rework" | "request_support_review"; p_response: string; p_storage_path: string | null; p_operation_id: string }; Returns: Database["public"]["Tables"]["booking_support_cases"]["Row"] };
     };
     Enums: Record<string, never>;
     CompositeTypes: Record<string, never>;
