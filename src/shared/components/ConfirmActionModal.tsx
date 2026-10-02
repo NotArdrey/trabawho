@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { useRef } from "react";
 import { CircleAlert, TriangleAlert } from "lucide-react";
 
 import {
@@ -43,10 +44,13 @@ export default function ConfirmActionModal({
 }: ConfirmActionModalProps) {
   const resolvedVariant = variant || (destructiveLabel.test(confirmLabel) ? "destructive" : "default");
   const Icon = resolvedVariant === "destructive" ? TriangleAlert : CircleAlert;
+  const returnFocus = useRef<HTMLElement | null>(null);
 
   return (
-    <AlertDialog open={isOpen} onOpenChange={(open) => { if (!open) onCancel(); }}>
-      <AlertDialogContent>
+    <AlertDialog open={isOpen} onOpenChange={(open) => { if (!open && !isConfirming) onCancel(); }}>
+      <AlertDialogContent onOpenAutoFocus={() => { returnFocus.current = document.activeElement instanceof HTMLElement ? document.activeElement : null; }} onCloseAutoFocus={(event) => {
+        if (returnFocus.current?.isConnected) { event.preventDefault(); returnFocus.current.focus(); }
+      }}>
         <AlertDialogHeader>
           <div className="flex items-start gap-3">
             <span className={`flex size-10 shrink-0 items-center justify-center rounded-full ${resolvedVariant === "destructive" ? "bg-destructive/10 text-destructive" : "bg-primary/10 text-primary"}`}>
@@ -64,7 +68,7 @@ export default function ConfirmActionModal({
             <Button type="button" variant="outline" disabled={isConfirming}>{cancelLabel}</Button>
           </AlertDialogCancel>
           <AlertDialogAction asChild>
-            <Button type="button" variant={resolvedVariant === "destructive" ? "destructive" : "primary"} isLoading={isConfirming} onClick={onConfirm}>{isConfirming ? "Please wait…" : confirmLabel}</Button>
+            <Button type="button" variant={resolvedVariant === "destructive" ? "destructive" : "primary"} isLoading={isConfirming} onClick={(event) => { event.preventDefault(); onConfirm(); }}>{isConfirming ? "Please wait…" : confirmLabel}</Button>
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>

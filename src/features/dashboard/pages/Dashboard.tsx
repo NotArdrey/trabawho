@@ -86,7 +86,7 @@ export default function Dashboard({
   const metricHandlers: Record<DashboardMetricId, NavigationHandler> = {
     active: () => onOpenMyBookings?.(),
     upcoming: () => onOpenMyBookings?.(),
-    messages: () => onOpenChatPage?.(),
+    messages: () => onOpenChatPage?.(null, "purchases"),
     actions: () => onOpenMyBookings?.(),
   };
 

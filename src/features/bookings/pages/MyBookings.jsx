@@ -1,3 +1,4 @@
+import { useChatScope } from "@/features/bookings/hooks/useChatScope";
 import { matchesBookingSearch } from '@/features/bookings/utils/bookingSearch';
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
@@ -192,29 +193,14 @@ const MyBookings = ({
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const requestedScope = searchParams.get('scope');
-  const explicitScope = ['incoming', 'purchases'].includes(requestedScope) ? requestedScope : null;
   const isChatRoute = currentView === 'chat';
-  const [resolvedChatScope, setResolvedChatScope] = useState(null);
-  const isProviderBookingsRoute = location.pathname === paths.workerBookings;
-  const defaultScope = isWorkerAccount && isProviderBookingsRoute ? 'incoming' : 'purchases';
-  const activeScope = isWorkerAccount && isChatRoute
-    ? (explicitScope || resolvedChatScope || defaultScope)
-    : defaultScope;
+  const { activeScope, isResolvingChatScope } = useChatScope({
+    isWorker: isWorkerAccount, isChat: isChatRoute,
+    isProviderRoute: location.pathname === paths.workerBookings,
+    requestedScope, selectedId: selectedChatBookingId,
+    userId: String(sellerProfile?.userId || sellerProfile?.user_id || ''),
+  });
   const shouldLoadSellerBookings = activeScope === 'incoming';
-  const isResolvingChatScope = Boolean(isWorkerAccount && isChatRoute && selectedChatBookingId && !explicitScope && !resolvedChatScope);
-
-  useEffect(() => {
-    if (!isResolvingChatScope) return undefined;
-    let isMounted = true;
-    void fetchBookingById(selectedChatBookingId).then((booking) => {
-      if (!isMounted || !booking) return;
-      const userId = String(sellerProfile?.userId || sellerProfile?.user_id || '');
-      setResolvedChatScope(String(booking.sellerId || booking.workerId || '') === userId ? 'incoming' : 'purchases');
-    }).catch(() => {
-      if (isMounted) setResolvedChatScope(defaultScope);
-    });
-    return () => { isMounted = false; };
-  }, [defaultScope, isResolvingChatScope, selectedChatBookingId, sellerProfile?.userId, sellerProfile?.user_id]);
 
   useEffect(() => {
     if (isChatRoute && !requestedScope) return;
@@ -228,7 +214,7 @@ const MyBookings = ({
     autoLoad: !isResolvingChatScope,
     includeStandaloneChats: isChatRoute,
     listRole: shouldLoadSellerBookings ? 'seller' : 'buyer',
-    sellerId: shouldLoadSellerBookings ? sellerProfile?.userId : null,
+    sellerId: shouldLoadSellerBookings ? (sellerProfile?.userId || sellerProfile?.user_id) : null,
   });
 
   const paymentCtrl = usePaymentController(

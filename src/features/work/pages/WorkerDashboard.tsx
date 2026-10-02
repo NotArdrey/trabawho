@@ -34,7 +34,7 @@ interface WorkerDashboardProps {
   onLogout?: () => void;
   onOpenSellerSetup?: () => void;
   onOpenMyBookings?: () => void;
-  onOpenChatPage?: (bookingId?: string | null) => void;
+  onOpenChatPage?: (bookingId?: string | null, scope?: "incoming") => void;
   sellerProfile?: SellerProfile | null;
   onOpenMyWork?: () => void;
   onOpenProfile?: () => void;
@@ -130,13 +130,13 @@ function WorkerDashboard({
   const { snapshot, isLoading, error, refresh } = useProviderDashboard(userId, sellerProfile);
 
   const openAction = (action: ProviderActionItem) => {
-    if (action.destination === "messages") onOpenChatPage?.(action.bookingId || null);
+    if (action.destination === "messages") onOpenChatPage?.(action.bookingId || action.conversationId || null, "incoming");
     else if (action.destination === "bookings") onOpenMyBookings?.();
     else onOpenMyWork?.();
   };
 
   const openMetric = (metricId: keyof typeof metricIcons) => {
-    if (metricId === "messages") onOpenChatPage?.();
+    if (metricId === "messages") onOpenChatPage?.(null, "incoming");
     else if (metricId === "today" || metricId === "inquiries") onOpenMyBookings?.();
     else onOpenMyWork?.();
   };

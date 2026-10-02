@@ -2,7 +2,7 @@ import type { RealtimePostgresChangesPayload } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 import { getProfilePhotoUrl } from "@/shared/utils/profilePhoto";
 import {
-  createSellerService, fetchSellerProfile, fetchSellerServices,
+  createSellerService, fetchSellerProfile,
   fetchUserProfileBundle, syncWorkerSetup,
 } from "@/shared/services/authService";
 import type { SellerRow, ServiceRow, WorkerProfile, WorkerServiceInput } from "../types/worker-profile";
@@ -122,14 +122,18 @@ export const loadWorkerProfileServices = async ({ userId, fallbackProfile = null
     sellerUiProfile: mapSellerRowToUiProfile(null, workerBundle, fallbackProfile), sellerId: userId, sellerRatingAggregate: null };
   const sellerId = seller.user_id || userId;
   const [serviceValues, ratingAggregateResult] = await Promise.all([
-    fetchSellerServices(sellerId),
+    supabase.from("services").select("*").eq("seller_id", sellerId).order("created_at", { ascending: false }),
     supabase.from("seller_rating_aggregates").select("avg_rating, rating_count").eq("seller_id", sellerId).maybeSingle(),
   ]);
   if (ratingAggregateResult.error && ratingAggregateResult.error.code !== "PGRST116") throw ratingAggregateResult.error;
-  const services = serviceValues as ServiceRow[];
+  if (serviceValues.error) throw serviceValues.error;
+  const services = serviceValues.data;
+  const visibleServices = services.filter((service) => service.active && record(service.metadata).deleted_from_work !== true);
   const sellerUiProfile = mapSellerRowToUiProfile(seller, workerBundle, fallbackProfile);
-  return { sellerData: seller, workerProfileBundle: workerBundle, sellerDbServices: services || [],
-    workerServices: (services || []).map((service) => mapServiceRowToWorkerService(service, seller, sellerUiProfile)),
+  // Deleted listings remain in this count so legacy setup repair cannot recreate them.
+  const retainedServices = services.filter((service) => service.active || record(service.metadata).deleted_from_work === true);
+  return { sellerData: seller, workerProfileBundle: workerBundle, sellerDbServices: retainedServices,
+    workerServices: visibleServices.map((service) => mapServiceRowToWorkerService(service, seller, sellerUiProfile)),
     sellerUiProfile, sellerId, sellerRatingAggregate: ratingAggregateResult.data || null };
 };
 

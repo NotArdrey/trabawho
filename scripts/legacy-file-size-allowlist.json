@@ -5,7 +5,7 @@
   },
   {
     "path": "src/features/work/pages/MyWork.jsx",
-    "baselineLines": 1220
+    "baselineLines": 1213
   },
   {
     "path": "src/features/bookings/services/bookingService.js",
@@ -17,7 +17,7 @@
   },
   {
     "path": "src/features/bookings/pages/MyBookings.jsx",
-    "baselineLines": 1041
+    "baselineLines": 1027
   },
   {
     "path": "src/features/auth/pages/AuthPage.jsx",

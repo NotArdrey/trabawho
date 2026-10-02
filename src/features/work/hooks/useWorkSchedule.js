@@ -1,3 +1,4 @@
+import { useWorkSlotDeletion } from './useWorkSlotDeletion';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { supabase } from '../../../shared/services/supabaseClient';
 import {
@@ -8,7 +9,6 @@ import {
   buildSlotTimestamps,
   createServiceSlot,
   createEmptyWeeklySchedule,
-  deleteServiceSlot,
   fetchSellerSlots,
   formatDateOnly,
   formatDateForDay,
@@ -30,7 +30,6 @@ export const useWorkSchedule = ({ sellerId, currentProfile } = {}) => {
   const [editSlotDayKey, setEditSlotDayKey] = useState(null);
   const [editSlotId, setEditSlotId] = useState(null);
   const [slotModalType, setSlotModalType] = useState('edit');
-  const [deleteConfirmTarget, setDeleteConfirmTarget] = useState(null);
   const [isScheduleLoading, setIsScheduleLoading] = useState(false);
   const [scheduleError, setScheduleError] = useState('');
   const [scheduleLastSyncedAt, setScheduleLastSyncedAt] = useState(null);
@@ -306,63 +305,9 @@ export const useWorkSchedule = ({ sellerId, currentProfile } = {}) => {
     if (saved !== false) closeSlotModal();
   }, [closeSlotModal, handleSaveCalendarSlot, handleSaveWeeklySlot, scheduleMode]);
 
-  const handleDeleteSlot = useCallback((dayKey, slotId) => {
-    if (scheduleMode === 'calendar-only') {
-      const entry = calendarAvailability.find((item) => item.id === slotId);
-      if (!entry) return;
-
-      setDeleteConfirmTarget({
-        mode: 'calendar-only',
-        slotId,
-        dayKey: null,
-        label: `available date ${entry.date}`,
-      });
-      return;
-    }
-
-    const block = (weeklySchedule[dayKey] || []).find((item) => item.id === slotId);
-    if (!block) return;
-
-    setDeleteConfirmTarget({
-      mode: 'with-slots',
-      slotId,
-      dayKey,
-      label: `time slot ${dayKey} ${block.startTime}-${block.endTime}`,
-    });
-  }, [calendarAvailability, scheduleMode, weeklySchedule]);
-
-  const handleConfirmDelete = useCallback(async () => {
-    if (!deleteConfirmTarget) return;
-
-    const idToDelete = deleteConfirmTarget.slotId;
-    setDeleteConfirmTarget(null);
-
-    const removeLocal = () => {
-      if (deleteConfirmTarget.mode === 'calendar-only') {
-        setCalendarAvailability((prev) => prev.filter((item) => item.id !== idToDelete));
-      } else {
-        setWeeklySchedule((prev) => ({
-          ...prev,
-          [deleteConfirmTarget.dayKey]: (prev[deleteConfirmTarget.dayKey] || []).filter(
-            (item) => item.id !== idToDelete
-          ),
-        }));
-      }
-    };
-
-    if (idToDelete == null) {
-      removeLocal();
-      return;
-    }
-
-    try {
-      await deleteServiceSlot(idToDelete);
-      await loadSlots({ silent: true });
-    } catch (error) {
-      console.error('Failed to delete service slot', error);
-      setScheduleError(error?.message || 'Unable to delete schedule slot.');
-    }
-  }, [deleteConfirmTarget, loadSlots]);
+  const { deleteConfirmTarget, setDeleteConfirmTarget, handleDeleteSlot, handleConfirmDelete, isDeletingSlot } = useWorkSlotDeletion({
+    sellerId, scheduleMode, calendarAvailability, weeklySchedule, loadSlots, setScheduleError,
+  });
 
   const handleAddSlot = useCallback((dayKey) => {
     if (scheduleMode === 'calendar-only') {
@@ -416,6 +361,7 @@ export const useWorkSchedule = ({ sellerId, currentProfile } = {}) => {
     currentWeekSunday,
     dayKeys,
     deleteConfirmTarget,
+    isDeletingSlot,
     defaultAddDayKey,
     editSlotData,
     editSlotDayKey,

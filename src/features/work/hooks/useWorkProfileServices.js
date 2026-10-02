@@ -147,6 +147,7 @@ export const useWorkProfileServices = ({ sellerProfile } = {}) => {
       setSellerRatingAggregate(result.sellerRatingAggregate || null);
       setSellerDbServices(resolvedServices);
       setWorkerServices(resolvedWorkerServices);
+      setActiveServiceIndex((index) => Math.min(index, Math.max(0, resolvedWorkerServices.length - 1)));
     } catch (error) {
       console.error('Failed to load seller data:', error);
       setSellerDataError(error?.message || 'Failed to load seller profile');
@@ -177,7 +178,7 @@ export const useWorkProfileServices = ({ sellerProfile } = {}) => {
         const row = payload.new || payload.record || null;
         const oldRow = payload.old || null;
 
-        if ((eventType === 'INSERT' || eventType === 'UPDATE') && row) {
+        if ((eventType === 'INSERT' || eventType === 'UPDATE') && row?.active) {
           setSellerDbServices((prev) => {
             const others = (prev || []).filter((service) => service.id !== row.id);
             return [row, ...others];
@@ -190,8 +191,8 @@ export const useWorkProfileServices = ({ sellerProfile } = {}) => {
           });
         }
 
-        if (eventType === 'DELETE') {
-          const idToRemove = oldRow?.id || payload.record?.id;
+        if (eventType === 'DELETE' || (eventType === 'UPDATE' && row?.active === false)) {
+          const idToRemove = oldRow?.id || row?.id || payload.record?.id;
           setSellerDbServices((prev) => (prev || []).filter((service) => service.id !== idToRemove));
           setWorkerServices((prev) => (prev || []).filter((service) => service.raw?.id !== idToRemove));
         }

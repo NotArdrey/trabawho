@@ -21,6 +21,8 @@ Status: active
 
 ## Checkpoints
 
+- Provider chat scope resolution and availability deletion are extracted into strict TypeScript. Unread dashboard actions retain standalone conversation targets and open the incoming inbox. My Work service deletion requires confirmation and retains booking/chat records; deleted listings do not trigger automatic service recreation. Deletion failures stay visible for retry.
+
 - [x] Record the application, architecture, and UI standards.
 - [x] Add Vite, TypeScript, Tailwind CSS, shadcn configuration, providers, semantic tokens, and typed primitive examples.
 - [x] Replace state-only navigation with guarded React Router routes while retaining a legacy view adapter during screen migration.

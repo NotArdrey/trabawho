@@ -134,19 +134,6 @@ const hoverStyles = {
   deleteConfirm: { background: '#b91c1c' },
 };
 
-/**
- * - In production, these would be fetched from an API based on sellerProfile.id
- * - Conditional rendering checks the "hasService" flag to show Empty vs. Active states
- *
- * STATE MACHINE:
- * - If hasService === false: Show "Welcome! Setup your profile" banner
- * - If hasService === true: Show Active Inquiries + Schedule sections
- * - isSelectedChat: Controls which inquiry's chat is displayed (null = no chat open)
- *
- * DEMO DATA STRUCTURE:
- * inquiries: [{ id, clientName, service, status, requestDate }, ...]
- * schedules: { 'Mon': [...timeBlocks], 'Tue': [...], ... }
- */
 const MyWork = ({ appTheme = 'light', themeMode = 'system', onThemeChange, currentView, searchQuery, onSearchChange, onLogout, onOpenSellerSetup, onOpenMyBookings, onOpenChatPage, sellerProfile, onOpenMyWork, onOpenProfile, onOpenAccountSettings, onOpenSettings, onOpenDashboard, onOpenBrowseServices, onBackToDashboard, onAddNewWork, onOpenAdminDashboard }) => {
   // ============ STATE MANAGEMENT ============
 
@@ -189,6 +176,7 @@ const MyWork = ({ appTheme = 'light', themeMode = 'system', onThemeChange, curre
     currentWeekSunday,
     dayKeys,
     deleteConfirmTarget,
+    isDeletingSlot,
     editSlotData,
     editSlotDayKey,
     editSlotModalOpen,
@@ -823,6 +811,9 @@ const MyWork = ({ appTheme = 'light', themeMode = 'system', onThemeChange, curre
               payment={currentPaymentLabel}
               booster={currentBoostLabel}
               onEditProfile={handleOpenProfileEdit}
+              serviceId={currentProfile?.raw?.id}
+              sellerId={sellerId}
+              onDeleted={refreshWorkData}
             />
 
             <WorkSectionFilter value={workSectionFilter} options={workSectionOptions} onValueChange={setWorkSectionFilter} />
@@ -1147,9 +1138,11 @@ const MyWork = ({ appTheme = 'light', themeMode = 'system', onThemeChange, curre
         variant="destructive"
         onCancel={() => setDeleteConfirmTarget(null)}
         onConfirm={handleConfirmDelete}
+        isConfirming={isDeletingSlot}
         confirmLabel="Delete"
       >
         <p className="m-0">You are about to remove <strong>{deleteConfirmTarget?.label}</strong>.</p>
+        {scheduleError && <p role="alert" className="mt-2 text-destructive">{scheduleError}</p>}
       </ConfirmActionModal>
 
       <ConfirmActionModal

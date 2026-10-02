@@ -40,6 +40,16 @@ describe("WorkerDashboard", () => {
     useProviderDashboard.mockReturnValue({ snapshot, isLoading: false, error: "", refresh });
   });
 
+  it("opens a standalone unread conversation and the incoming message inbox", () => {
+    const onOpenChatPage = vi.fn();
+    useProviderDashboard.mockReturnValue({ snapshot: { ...snapshot, actions: [{ id: "message-1", priority: 3, title: "Unread client message", detail: "Hello", conversationId: "conversation-1", destination: "messages" }] }, isLoading: false, error: "", refresh });
+    render(<WorkerDashboard sellerProfile={{ userId: "worker-1" }} onOpenChatPage={onOpenChatPage} />);
+    fireEvent.click(screen.getByRole("button", { name: /Unread client message/ }));
+    expect(onOpenChatPage).toHaveBeenLastCalledWith("conversation-1", "incoming");
+    fireEvent.click(screen.getByRole("button", { name: "Open client messages" }));
+    expect(onOpenChatPage).toHaveBeenLastCalledWith(null, "incoming");
+  });
+
   it("presents provider priorities and opens incoming bookings", () => {
     const onOpenMyBookings = vi.fn();
     render(<WorkerDashboard sellerProfile={{ userId: "worker-1", role: "worker" }} onOpenMyBookings={onOpenMyBookings} />);

@@ -127,7 +127,7 @@ export async function fetchProviderDashboardSnapshot(userId: string, fallbackPro
   const provider = asRecord(providerValue);
   const seller = asRecord(provider.sellerData);
   const profile = asRecord(fallbackProfile);
-  const services = Array.isArray(provider.sellerDbServices) ? provider.sellerDbServices.map(asRecord) : [];
+  const services = Array.isArray(provider.sellerDbServices) ? provider.sellerDbServices.map(asRecord).filter((service) => asRecord(service.metadata).deleted_from_work !== true) : [];
   const rating = asRecord(provider.sellerRatingAggregate);
   const conversations = conversationsResult.data || [];
   const conversationIds = conversations.map((row) => row.id);
@@ -155,6 +155,7 @@ export async function fetchProviderDashboardSnapshot(userId: string, fallbackPro
     title: "Unread client message",
     detail: text(message.body) || "A client sent an attachment.",
     bookingId: text(bookingIdByConversation.get(text(message.conversation_id))),
+    conversationId: text(message.conversation_id),
     destination: "messages",
   }));
   const actions = [...bookings.map((booking) => bookingAction(booking, now)).filter((item): item is ProviderActionItem => Boolean(item)), ...messageActions]

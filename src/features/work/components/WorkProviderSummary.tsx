@@ -2,6 +2,7 @@ import { CalendarClock, MapPin, Megaphone, Pencil, Star } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { getProfilePhotoUrl } from "@/shared/utils/profilePhoto";
+import { DeleteWorkService } from "./DeleteWorkService";
 
 export interface WorkProviderSummaryProps {
   name: string;
@@ -19,6 +20,9 @@ export interface WorkProviderSummaryProps {
   payment: string;
   booster: string;
   onEditProfile: () => void;
+  serviceId?: number;
+  sellerId?: string | null;
+  onDeleted?: () => Promise<unknown> | void;
 }
 
 interface DetailProps { label: string; value: string; wide?: boolean }
@@ -48,6 +52,7 @@ export default function WorkProviderSummary({
   payment,
   booster,
   onEditProfile,
+  serviceId, sellerId, onDeleted,
 }: WorkProviderSummaryProps) {
   return (
     <section className="mb-5 rounded-xl border bg-card p-5 shadow-none max-sm:p-4" aria-label="Current service summary">
@@ -67,7 +72,7 @@ export default function WorkProviderSummary({
             </div>
           </div>
         </div>
-
+        <DeleteWorkService serviceId={serviceId} sellerId={sellerId} title={service} onDeleted={onDeleted} />
       </div>
 
       <div className="mt-5 grid grid-cols-3 divide-x rounded-xl bg-muted/45 py-4 text-center">

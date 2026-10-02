@@ -163,14 +163,14 @@ export default function DashboardNavigation({
   const clientNavItems: NavItem[] = [
     { key: "home", label: "Home", icon: Home, onClick: onOpenDashboard },
     { key: "browse", label: "Browse", icon: Store, onClick: onOpenBrowseServices || onOpenDashboard },
-    { key: "chat", label: "Chats", icon: MessageCircle, onClick: onOpenChatPage || onOpenMyBookings },
+    { key: "chat", label: "Chats", icon: MessageCircle, onClick: () => { void navigate(`${paths.messages}?scope=purchases`); } },
     { key: "bookings", label: "Bookings", icon: CalendarCheck, onClick: () => { void navigate(`${paths.bookings}?scope=purchases`); } },
     { key: "cases", label: "Support cases", icon: LifeBuoy, onClick: () => { void navigate(paths.supportCases); } },
   ];
   const workerNavItems: NavItem[] = [
     { key: "overview", label: "Overview", icon: Home, onClick: () => { void navigate(paths.workerDashboard); } },
     { key: "work", label: "My Work", icon: BriefcaseBusiness, onClick: onOpenMyWork || onOpenSellerSetup },
-    { key: "chat", label: "Messages", icon: MessageCircle, onClick: onOpenChatPage || onOpenMyBookings },
+    { key: "chat", label: "Messages", icon: MessageCircle, onClick: () => { void navigate(`${paths.messages}?scope=incoming`); } },
     { key: "bookings", label: "Bookings", icon: CalendarCheck, onClick: () => { void navigate(`${paths.workerBookings}?scope=incoming`); } },
     { key: "cases", label: "Support cases", icon: LifeBuoy, onClick: () => { void navigate(paths.supportCases); } },
   ];

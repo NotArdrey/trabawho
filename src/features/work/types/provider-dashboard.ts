@@ -16,6 +16,7 @@ export interface ProviderActionItem {
   schedule?: string;
   amount?: string;
   bookingId?: string;
+  conversationId?: string;
   destination: ProviderActionDestination;
 }
 
