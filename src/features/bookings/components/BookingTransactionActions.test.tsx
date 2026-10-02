@@ -1,8 +1,8 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { performBookingLifecycleAction } from "@/features/bookings/services/bookingLifecycle";
-import { getBookingSupportCase, openBookingSupportCase, respondToRepairClaim, startBookingWork } from "@/features/bookings/services/bookingTransactions";
+import { deliverBookingWithEvidence, getBookingSupportCase, openBookingSupportCase, respondToRepairClaim, startBookingWork } from "@/features/bookings/services/bookingTransactions";
 import { BookingTransactionActions } from "./BookingTransactionActions";
 
 vi.mock("@/features/bookings/services/bookingLifecycle", () => ({ performBookingLifecycleAction: vi.fn() }));
@@ -33,18 +33,80 @@ describe("BookingTransactionActions", () => {
     expect(screen.queryByRole("button", { name: "Submit delivery" })).not.toBeInTheDocument();
   });
 
-  it("starts work once despite duplicate clicks and refreshes the booking", async () => {
+  it("keeps provider workflow and report actions in the same responsive action group", () => {
+    render(<BookingTransactionActions booking={booking} viewerRole="provider" onUpdated={vi.fn()} />);
+    const group = screen.getByTestId("booking-transaction-actions");
+    expect(group).toHaveClass("sm:flex", "sm:flex-wrap", "sm:items-center");
+    expect(group).toContainElement(screen.getByRole("button", { name: "Start work" }));
+    expect(group).toContainElement(screen.getByRole("button", { name: "Report a problem" }));
+  });
+
+  it("does not start work when the provider cancels confirmation", () => {
+    render(<BookingTransactionActions booking={booking} viewerRole="provider" onUpdated={vi.fn()} />);
+    fireEvent.click(screen.getByRole("button", { name: "Start work" }));
+    expect(screen.getByRole("dialog", { name: "Start this work?" })).toBeVisible();
+    expect(startBookingWork).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    expect(screen.queryByRole("dialog", { name: "Start this work?" })).not.toBeInTheDocument();
+    expect(startBookingWork).not.toHaveBeenCalled();
+  });
+
+  it("starts work once after confirmation and refreshes the booking", async () => {
     let finish: ((value: unknown) => void) | undefined;
     vi.mocked(startBookingWork).mockImplementationOnce(() => new Promise((resolve) => { finish = resolve; }));
     const onUpdated = vi.fn();
     render(<BookingTransactionActions booking={booking} viewerRole="provider" onUpdated={onUpdated} />);
     const start = screen.getByRole("button", { name: "Start work" });
     fireEvent.click(start);
-    fireEvent.click(start);
+    expect(startBookingWork).not.toHaveBeenCalled();
+    const confirm = screen.getByRole("button", { name: "Confirm start work" });
+    fireEvent.click(confirm);
+    fireEvent.click(confirm);
     expect(startBookingWork).toHaveBeenCalledTimes(1);
-    expect(start).toBeDisabled();
+    expect(confirm).toBeDisabled();
     finish?.({ ...booking, workStartedAt: "2026-10-02T09:00:00Z" });
     await waitFor(() => expect(onUpdated).toHaveBeenCalledOnce());
+    expect(screen.queryByRole("dialog", { name: "Start this work?" })).not.toBeInTheDocument();
+    expect(screen.queryByText(/Work started\. The client can see this update\./)).not.toBeInTheDocument();
+  });
+
+  it("keeps start confirmation open after failure so the provider can retry", async () => {
+    vi.mocked(startBookingWork).mockRejectedValueOnce(new Error("Network unavailable"))
+      .mockResolvedValueOnce({ ...booking, workStartedAt: "2026-10-02T09:00:00Z" });
+    const onUpdated = vi.fn();
+    render(<BookingTransactionActions booking={booking} viewerRole="provider" onUpdated={onUpdated} />);
+    fireEvent.click(screen.getByRole("button", { name: "Start work" }));
+    fireEvent.click(screen.getByRole("button", { name: "Confirm start work" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("Network unavailable");
+    expect(screen.getByRole("dialog", { name: "Start this work?" })).toBeVisible();
+    fireEvent.click(screen.getByRole("button", { name: "Confirm start work" }));
+    await waitFor(() => expect(onUpdated).toHaveBeenCalledOnce());
+  });
+
+  it("explains delivery proof requirements and submits only after both checklist items and evidence", async () => {
+    vi.mocked(deliverBookingWithEvidence).mockResolvedValueOnce({ ...booking, deliveryStatus: "seller_claimed" });
+    render(<BookingTransactionActions booking={{ ...booking, workStartedAt: "2026-01-01T09:00:00Z" }} viewerRole="provider" onUpdated={vi.fn()} />);
+    fireEvent.click(screen.getByRole("button", { name: "Submit delivery" }));
+    expect(screen.getByText(/Add a photo or describe the completed work in at least 20 characters/)).toBeVisible();
+    expect(screen.getByRole("button", { name: "Choose photo" })).toBeVisible();
+    const submit = within(screen.getByRole("dialog", { name: "Submit delivery proof" })).getByRole("button", { name: "Submit delivery" });
+    expect(submit).toBeDisabled();
+    fireEvent.click(screen.getByRole("checkbox", { name: "Agreed service scope completed" }));
+    fireEvent.click(screen.getByRole("checkbox", { name: "Result handed over or explained to client" }));
+    fireEvent.change(screen.getByRole("textbox", { name: "Work notes" }), { target: { value: "I completed the agreed work and tested the result." } });
+    expect(submit).toBeEnabled();
+    fireEvent.click(submit);
+    await waitFor(() => expect(deliverBookingWithEvidence).toHaveBeenCalledOnce());
+  });
+
+  it("rejects an unsupported delivery photo before submission", () => {
+    render(<BookingTransactionActions booking={{ ...booking, workStartedAt: "2026-01-01T09:00:00Z" }} viewerRole="provider" onUpdated={vi.fn()} />);
+    fireEvent.click(screen.getByRole("button", { name: "Submit delivery" }));
+    fireEvent.change(screen.getByLabelText("Photo (optional)"), { target: { files: [new File(["text"], "notes.txt", { type: "text/plain" })] } });
+    expect(screen.getByRole("alert")).toHaveTextContent("Choose a JPEG, PNG, or WebP photo smaller than 5 MB.");
+    expect(within(screen.getByRole("dialog", { name: "Submit delivery proof" })).getByRole("button", { name: "Submit delivery" })).toBeDisabled();
+    fireEvent.click(screen.getByRole("button", { name: "Remove notes.txt" }));
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   });
 
   it("shows completion only after delivery and a report option for the client", () => {
@@ -73,6 +135,7 @@ describe("BookingTransactionActions", () => {
       warrantyPolicyCode: "repair_workmanship_7d", warrantyDurationDays: 7 }} viewerRole="client" onUpdated={vi.fn()} />);
     fireEvent.click(screen.getByRole("button", { name: "Report a problem" }));
     expect(screen.getByText(/within the seven-day repair window/i)).toBeVisible();
+    fireEvent.click(screen.getByRole("combobox", { name: "Issue type" }));
     expect(screen.getByRole("option", { name: "Repair workmanship issue" })).toBeInTheDocument();
   });
 

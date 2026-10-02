@@ -13,11 +13,11 @@ The admin experience should prioritize **work requiring a decision** over decora
 | Demo | Account search, role changes, disable/suspend/restore | **Available** | Keep server-backed feedback, reason capture, and role guard; verify RLS and privileged-action audit before production. |
 | Demo | Review list and deletion | **Partial** | Recent reviews load; deletion is permanent. Add reports, policy reason, non-destructive hide/restore, and audit before operational use. |
 | Demo | Admin audit page | **Not built** | Existing page must say the feed is unavailable; connect actor, target, reason, time, and outcome before claiming to show history. |
-| P0 | Searchable booking/support queue | **Partial** | A read-only queue lists the latest 50 submitted booking cases, shows the next actor for rework, and can open private image evidence. Add search by booking reference, client, provider, and status; show age and urgency; filter payment, delivery, dispute, and cancellation issues. |
-| P0 | Booking case detail | **Partial** | Case reason and evidence are available, but join booking timeline, participants, schedule, chat/evidence references, payment attempts and provider events; distinguish reported, verified, and disputed facts. |
+| P0 | Searchable booking/support queue | **Partial** | The latest 50 submitted booking cases can be filtered by status and searched by booking ID, issue type, or reason; the list shows the next actor for rework. This is not a full-database search. Add server-side pagination/search by reference and participants, age and urgency, and payment/cancellation exception filters. |
+| P0 | Booking case detail | **Partial** | Admins can inspect the reported issue, participants, schedule, payment attempts, delivery evidence, and recorded booking/case actions. Partial fetch failures are identified before a follow-up can be recorded. Add linked chat, provider payment-event verification, explicit source/verification labels, and a complete paginated timeline. |
 | P0 | Payment exception queue | **Not built** | Surface expired holds, failed or ambiguous checkout, mismatched webhooks, unpaid balance, refund failure, and chargebacks without manually changing money state. |
-| P0 | Dispute intake and triage | **Partial** | Booking-scoped reports persist with optional private evidence. A versioned policy routes in-window designated repair reports to rework and exceptions to support review. The provider can propose a return visit, the client can accept or escalate, the provider records rework notes, and the client can confirm or escalate. Actions are audited and visible to participants; the queue shows the next actor. This does not decide a defect or refund. Add owner, notifications, stronger evidence standards, remedy authority, and a complete case timeline. |
-| P0 | Immutable admin activity | **Partial** | Booking audit events exist; platform-wide admin actions are not exposed as a verified feed. Record reason, actor, target, before/after, and operation ID server-side. |
+| P0 | Dispute intake and triage | **Partial** | Booking-scoped reports persist with optional private evidence. A versioned policy routes in-window designated repair reports to rework and exceptions to support review. The provider can propose a return visit, the client can accept or escalate, the provider records rework notes, and the client can confirm or escalate. Admins can record an information request or recommended rework, reschedule, or refund-review next step with a mandatory reason. These records do not notify parties or decide a defect/refund. Add owner, notifications, stronger evidence standards, and remedy authority. |
+| P0 | Immutable admin activity | **Partial** | Case follow-ups have an admin-only, idempotent RPC, an append-only record, and a booking audit event. Platform-wide admin actions are not exposed as a verified feed; account/moderation actions still need the same reason-and-audit standard. |
 | P1 | Resolution and appeals | **Not built** | Record a policy-backed outcome, notify both parties, preserve evidence, and allow a controlled appeal/review path. Never directly set paid/refunded from the UI. |
 | P1 | Refund and payout operations | **Not built** | Use provider-confirmed refund/payout events, reconciliation, failure retries, and clear hold/release rules. No manual balance edits. |
 | P1 | Report and moderation queue | **Not built** | Accept review/profile/chat reports, preserve original evidence, hide content reversibly, document reason, and support appeal. |
@@ -25,12 +25,33 @@ The admin experience should prioritize **work requiring a decision** over decora
 
 ## Case-handling experience
 
-The October 2 demo/test implementation adds the read-only case queue and
-private evidence access. It does **not** grant admins a refund, payout, or
+The demo/test implementation adds the case queue, private evidence access,
+booking-specific review timeline, and reasoned follow-up records. The admin
+may record a request for information or a recommendation, but this is not an
+outbound message, accepted remedy, case closure, refund, payout, or
 payment-override action. A test no-show report was visible to the admin after
 submission. PayMongo test checkout was recoverable through server-side API
 verification, but the webhook still did not automatically record two fresh
 payments; a payment exception/reconciliation queue remains P0.
+
+The admin follow-up migrations `20261003113000_admin_support_followup.sql` and
+`20261003114000_private_admin_support_followup.sql` were applied only to the
+confirmed demo/test project after dry runs. Internal follow-up notes are
+admin-readable only; booking participants receive no automatic message. The
+RPC rejects a signed-in client, and the case queue/detail browser checks pass
+at 390, 768, 1024, 1280, and 1440 pixels. A positive live admin follow-up
+was not submitted to the demo data, so live persistence and retry still need
+rehearsal before relying on this as an operational workflow.
+
+The case-detail error seen in the demo admin portal was caused by bookings
+returning zero rows under participant-only read policy, even though the case
+itself was visible to admins. Migration `20261003115000_admin_case_detail_read_access.sql`
+adds admin read access scoped to bookings with support cases and their payment
+attempts. It is applied to the confirmed demo/test project. Live reads now
+return the booking, participants, service, and available history; an unrelated
+provider still sees zero booking and payment rows. The case detail browser
+journey passes at the five supported widths. This does not grant admin write
+access to booking or payment state.
 
 Use one queue with status and owner, then a case detail with a chronological, source-labelled timeline. Admins need clear **review**, **request evidence**, **contact parties**, and **resolve/escalate** actions, each with a reason and a visible result. Do not expose raw card data or private files beyond the assigned case. Prevent duplicate submissions and require server authorization and immutable history for exceptional actions.
 

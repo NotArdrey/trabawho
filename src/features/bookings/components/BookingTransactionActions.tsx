@@ -1,8 +1,11 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { CheckCircle2, FileCheck2, Flag, LoaderCircle, Play } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { FilePicker } from "@/components/ui/file-picker";
+import { SelectField } from "@/components/forms";
 import { performBookingLifecycleAction } from "@/features/bookings/services/bookingLifecycle";
 import { RepairCaseResolution } from "@/features/bookings/components/RepairCaseResolution";
 import {
@@ -33,7 +36,8 @@ interface Props {
 }
 
 export function BookingTransactionActions({ booking, viewerRole, onUpdated }: Props) {
-  const [dialog, setDialog] = useState<"delivery" | "case" | "response" | null>(null);
+  const checklistId = useId();
+  const [dialog, setDialog] = useState<"start" | "delivery" | "case" | "response" | null>(null);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
@@ -45,6 +49,7 @@ export function BookingTransactionActions({ booking, viewerRole, onUpdated }: Pr
   const [responseText, setResponseText] = useState("");
   const [caseType, setCaseType] = useState<BookingCaseType>(viewerRole === "client" ? "provider_no_show" : "client_no_show");
   const [image, setImage] = useState<File | null>(null);
+  const [photoError, setPhotoError] = useState("");
   const [evidence, setEvidence] = useState<Awaited<ReturnType<typeof getBookingDeliveryEvidence>>>(null);
   const [caseSummary, setCaseSummary] = useState<{ bookingId: string; data: Awaited<ReturnType<typeof getBookingSupportCase>> } | null>(null);
   const [now, setNow] = useState(() => Date.now());
@@ -81,7 +86,7 @@ export function BookingTransactionActions({ booking, viewerRole, onUpdated }: Pr
     && currentCase?.case_type === "warranty_issue" && currentCase.policy_route === "rework_request"
     && currentCase.status === "open" && !currentCase.provider_responded_at;
 
-  const run = async (operation: () => Promise<unknown>, message: string | (() => string)) => {
+  const run = async (operation: () => Promise<unknown>, message?: string | (() => string)) => {
     if (inFlight.current) return;
     inFlight.current = true;
     setPending(true);
@@ -89,7 +94,7 @@ export function BookingTransactionActions({ booking, viewerRole, onUpdated }: Pr
     setSuccess("");
     try {
       onUpdated(await operation());
-      setSuccess(typeof message === "function" ? message() : message);
+      setSuccess(typeof message === "function" ? message() : message || "");
       setDialog(null);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Could not update this booking. Please try again.");
@@ -102,8 +107,19 @@ export function BookingTransactionActions({ booking, viewerRole, onUpdated }: Pr
   const openCase = () => {
     setCaseType(canReportDelivery ? "delivery_issue" : canReportCompleted ? booking.warrantyEligible ? "warranty_issue" : "service_issue" : viewerRole === "client" ? "provider_no_show" : "client_no_show");
     setImage(null);
+    setPhotoError("");
     setError("");
     setDialog("case");
+  };
+
+  const choosePhoto = (file: File | null) => {
+    if (file && (!["image/jpeg", "image/png", "image/webp"].includes(file.type) || file.size > 5 * 1024 * 1024)) {
+      setImage(file);
+      setPhotoError("Choose a JPEG, PNG, or WebP photo smaller than 5 MB.");
+      return;
+    }
+    setImage(file);
+    setPhotoError("");
   };
 
   const submitCase = () => {
@@ -134,51 +150,70 @@ export function BookingTransactionActions({ booking, viewerRole, onUpdated }: Pr
     catch (cause) { setError(cause instanceof Error ? cause.message : "Could not load delivery proof."); }
   };
 
-  return <div className="col-span-2 grid gap-2 sm:col-auto">
+  return <div className="col-span-2 grid min-w-0 grid-cols-2 gap-2 sm:col-auto sm:flex sm:flex-wrap sm:items-center" data-testid="booking-transaction-actions">
     {viewerRole === "provider" && booking.paymentStatus === "partially_paid" && <span className="self-center text-sm font-medium text-amber-700 dark:text-amber-300">Waiting for client balance before work</span>}
-    {canStart && <Button type="button" disabled={pending} onClick={() => { void run(() => startBookingWork(booking.id, booking.scheduleVersion), "Work started. The client can see this update."); }}><Play aria-hidden="true" />Start work</Button>}
-    {canDeliver && <Button type="button" disabled={pending} onClick={() => { setImage(null); setError(""); setDialog("delivery"); }}><FileCheck2 aria-hidden="true" />Submit delivery</Button>}
+    {canStart && <Button type="button" disabled={pending} onClick={() => { setError(""); setDialog("start"); }}><Play aria-hidden="true" />Start work</Button>}
+    {canDeliver && <Button type="button" disabled={pending} onClick={() => { setImage(null); setPhotoError(""); setError(""); setDialog("delivery"); }}><FileCheck2 aria-hidden="true" />Submit delivery</Button>}
     {canComplete && <Button type="button" disabled={pending} onClick={() => { void run(() => performBookingLifecycleAction("complete", booking.id), "Completion confirmed and saved."); }}><CheckCircle2 aria-hidden="true" />Confirm completion</Button>}
     {viewerRole === "client" && booking.deliveryStatus === "seller_claimed" && <Button type="button" variant="outline" onClick={() => { void viewEvidence(); }}>View delivery proof</Button>}
     {canReport && <Button type="button" variant="outline" disabled={pending} onClick={openCase}><Flag aria-hidden="true" />Report a problem</Button>}
-    {booking.disputeStatus === "open" && <div className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-100"><p className="font-semibold">{currentCase?.policy_route === "rework_request" ? viewerRole === "provider" ? "Client requested repair rework" : "Repair rework requested" : "Support case open"}</p><p className="mt-1">{currentCase?.reason || "Completion is paused while this report is reviewed."}</p>{currentCase?.policy_reason && <p className="mt-1 text-xs">{currentCase.policy_reason}</p>}{currentCase?.provider_response_action && <div className="mt-3 border-t border-amber-300 pt-3 dark:border-amber-800"><p className="font-semibold">{currentCase.provider_response_action === "offer_rework" ? "Provider offered rework" : "Provider requested support review"}</p><p className="mt-1">{currentCase.provider_response_text}</p><p className="mt-1 text-xs">This response does not close the case or change payment.</p></div>}</div>}
+    {booking.disputeStatus === "open" && <div className="col-span-2 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950 sm:basis-full dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-100"><p className="font-semibold">{currentCase?.policy_route === "rework_request" ? viewerRole === "provider" ? "Client requested repair rework" : "Repair rework requested" : "Support case open"}</p><p className="mt-1">{currentCase?.reason || "Completion is paused while this report is reviewed."}</p>{currentCase?.policy_reason && <p className="mt-1 text-xs">{currentCase.policy_reason}</p>}{currentCase?.provider_response_action && <div className="mt-3 border-t border-amber-300 pt-3 dark:border-amber-800"><p className="font-semibold">{currentCase.provider_response_action === "offer_rework" ? "Provider offered rework" : "Provider requested support review"}</p><p className="mt-1">{currentCase.provider_response_text}</p><p className="mt-1 text-xs">This response does not close the case or change payment.</p></div>}</div>}
     {canRespond && <Button type="button" variant="outline" disabled={pending} onClick={() => { setResponseAction("offer_rework"); setResponseText(""); setError(""); setDialog("response"); }}>Respond to repair claim</Button>}
-    {currentCase && <RepairCaseResolution bookingId={booking.id} caseRecord={currentCase} viewerRole={viewerRole} onCaseChanged={(updatedBooking, updatedCase) => { setCaseSummary({ bookingId: booking.id, data: updatedCase }); onUpdated(updatedBooking); }} />}
+    {currentCase && <div className="col-span-2 min-w-0 sm:basis-full"><RepairCaseResolution bookingId={booking.id} caseRecord={currentCase} viewerRole={viewerRole} onCaseChanged={(updatedBooking, updatedCase) => { setCaseSummary({ bookingId: booking.id, data: updatedCase }); onUpdated(updatedBooking); }} /></div>}
     {viewerRole === "provider" && booking.deliveryStatus === "seller_claimed" && <span className="self-center text-sm text-muted-foreground">Waiting for client confirmation</span>}
-    {evidence && <div className="rounded-lg border bg-muted/30 p-3 text-sm"><p className="font-semibold">Delivery proof</p><p className="mt-1 text-muted-foreground">{evidence.checklist.join(" · ")}</p>{evidence.explanation && <p className="mt-2">{evidence.explanation}</p>}{evidence.imageUrl && <a className="mt-2 inline-block text-primary underline" href={evidence.imageUrl} target="_blank" rel="noreferrer">Open evidence image</a>}</div>}
-    {success && <p role="status" className="text-sm text-emerald-700 dark:text-emerald-300">{success}</p>}
-    {error && !dialog && <p role="alert" className="max-w-80 text-sm text-destructive">{error}</p>}
+    {evidence && <div className="col-span-2 rounded-lg border bg-muted/30 p-3 text-sm sm:basis-full"><p className="font-semibold">Delivery proof</p><p className="mt-1 text-muted-foreground">{evidence.checklist.join(" · ")}</p>{evidence.explanation && <p className="mt-2">{evidence.explanation}</p>}{evidence.imageUrl && <a className="mt-2 inline-block text-primary underline" href={evidence.imageUrl} target="_blank" rel="noreferrer">Open evidence image</a>}</div>}
+    {success && <p role="status" className="col-span-2 text-sm text-emerald-700 sm:basis-full dark:text-emerald-300">{success}</p>}
+    {error && !dialog && <p role="alert" className="col-span-2 text-sm text-destructive sm:basis-full">{error}</p>}
+
+    <Dialog open={dialog === "start"} onOpenChange={(open) => { if (!open && !pending) setDialog(null); }}>
+      <DialogContent><DialogHeader><DialogTitle>Start this work?</DialogTitle><DialogDescription>Confirm that you are ready to begin the booked service. The client will see that work has started. Submit delivery proof when the work is finished.</DialogDescription></DialogHeader>
+        {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
+        <DialogFooter><Button type="button" variant="outline" disabled={pending} onClick={() => setDialog(null)}>Cancel</Button><Button type="button" disabled={pending || !canStart} onClick={() => { void run(() => startBookingWork(booking.id, booking.scheduleVersion)); }}>{pending ? <LoaderCircle className="animate-spin" aria-hidden="true" /> : <Play aria-hidden="true" />}Confirm start work</Button></DialogFooter>
+      </DialogContent>
+    </Dialog>
 
     <Dialog open={dialog === "delivery"} onOpenChange={(open) => { if (!open && !pending) setDialog(null); }}>
       <DialogContent><DialogHeader><DialogTitle>Submit delivery proof</DialogTitle><DialogDescription>Tell the client what was completed. Add a photo or written work notes.</DialogDescription></DialogHeader>
-        <div className="grid gap-4">
-          <label className="flex min-h-11 items-center gap-3"><input type="checkbox" checked={scopeChecked} onChange={(event) => setScopeChecked(event.target.checked)} />Agreed service scope completed</label>
-          <label className="flex min-h-11 items-center gap-3"><input type="checkbox" checked={handoverChecked} onChange={(event) => setHandoverChecked(event.target.checked)} />Result handed over or explained to client</label>
-          <label className="grid gap-1 text-sm font-medium">Work notes<textarea className="min-h-24 rounded-md border bg-background p-3" value={explanation} onChange={(event) => setExplanation(event.target.value)} placeholder="Describe what you did (20 characters if no photo)" /></label>
-          <label className="grid gap-1 text-sm font-medium">Optional photo<input type="file" accept="image/jpeg,image/png,image/webp" onChange={(event) => setImage(event.target.files?.[0] || null)} /></label>
+        <div className="grid gap-5">
+          <fieldset className="grid gap-2"><legend className="mb-2 text-sm font-semibold">Before you submit</legend>
+            <label htmlFor={`${checklistId}-scope`} className="flex min-h-11 items-center gap-3 rounded-lg bg-muted/50 px-3 text-sm"><Checkbox id={`${checklistId}-scope`} checked={scopeChecked} disabled={pending} onChange={(event) => setScopeChecked(event.target.checked)} />Agreed service scope completed</label>
+            <label htmlFor={`${checklistId}-handover`} className="flex min-h-11 items-center gap-3 rounded-lg bg-muted/50 px-3 text-sm"><Checkbox id={`${checklistId}-handover`} checked={handoverChecked} disabled={pending} onChange={(event) => setHandoverChecked(event.target.checked)} />Result handed over or explained to client</label>
+          </fieldset>
+          <div className="grid gap-3"><div><p className="text-sm font-semibold">Proof of work</p><p className="text-xs text-muted-foreground">Add a photo or describe the completed work in at least 20 characters.</p></div>
+            <label className="grid gap-1.5 text-sm font-medium">Work notes<textarea className="min-h-24 w-full rounded-md border border-input bg-background p-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" value={explanation} disabled={pending} onChange={(event) => setExplanation(event.target.value)} placeholder="For example: Replaced the damaged part and tested the result" /></label>
+            <FilePicker accept="image/jpeg,image/png,image/webp" disabled={pending} file={image} hint="JPEG, PNG, or WebP, smaller than 5 MB" label="Photo (optional)" onChange={choosePhoto} />
+            {photoError && <p role="alert" className="text-sm text-destructive">{photoError}</p>}
+          </div>
           {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
         </div>
-        <DialogFooter><Button type="button" variant="outline" disabled={pending} onClick={() => setDialog(null)}>Cancel</Button><Button type="button" disabled={pending || !scopeChecked || !handoverChecked || (!image && explanation.trim().length < 20)} onClick={() => { void run(() => deliverBookingWithEvidence(booking.id, booking.scheduleVersion || 1, ["Agreed service scope completed", "Result handed over or explained to client"], explanation, image), "Delivery proof submitted. The client can review it now."); }}>{pending ? <LoaderCircle className="animate-spin" aria-hidden="true" /> : <FileCheck2 aria-hidden="true" />}Submit delivery</Button></DialogFooter>
+        <DialogFooter><Button type="button" variant="outline" disabled={pending} onClick={() => setDialog(null)}>Cancel</Button><Button type="button" disabled={pending || Boolean(photoError) || !scopeChecked || !handoverChecked || (!image && explanation.trim().length < 20)} onClick={() => { void run(() => deliverBookingWithEvidence(booking.id, booking.scheduleVersion || 1, ["Agreed service scope completed", "Result handed over or explained to client"], explanation, image), "Delivery proof submitted. The client can review it now."); }}>{pending ? <LoaderCircle className="animate-spin" aria-hidden="true" /> : <FileCheck2 aria-hidden="true" />}Submit delivery</Button></DialogFooter>
       </DialogContent>
     </Dialog>
 
     <Dialog open={dialog === "case"} onOpenChange={(open) => { if (!open && !pending) setDialog(null); }}>
       <DialogContent><DialogHeader><DialogTitle>Report a booking problem</DialogTitle><DialogDescription>This saves a support case. It does not issue a refund or payout.</DialogDescription></DialogHeader>
         <div className="grid gap-4">
-          <label className="grid gap-1 text-sm font-medium">Issue type<select className="min-h-11 rounded-md border bg-background px-3" value={caseType} onChange={(event) => setCaseType(event.target.value as BookingCaseType)}>{viewerRole === "client" && canReportNoShow && <option value="provider_no_show">Provider did not arrive</option>}{viewerRole === "provider" && canReportNoShow && <option value="client_no_show">Client did not arrive</option>}{canReportDelivery && <option value="delivery_issue">Delivered work has a problem</option>}{canReportCompleted && booking.warrantyEligible && <option value="warranty_issue">Repair workmanship issue</option>}{canReportCompleted && !booking.warrantyEligible && <option value="service_issue">Completed service issue</option>}</select></label>
+          <SelectField label="Issue type" value={caseType} disabled={pending} onValueChange={(value) => setCaseType(value as BookingCaseType)} options={[
+            ...(viewerRole === "client" && canReportNoShow ? [{ value: "provider_no_show", label: "Provider did not arrive" }] : []),
+            ...(viewerRole === "provider" && canReportNoShow ? [{ value: "client_no_show", label: "Client did not arrive" }] : []),
+            ...(canReportDelivery ? [{ value: "delivery_issue", label: "Delivered work has a problem" }] : []),
+            ...(canReportCompleted && booking.warrantyEligible ? [{ value: "warranty_issue", label: "Repair workmanship issue" }] : []),
+            ...(canReportCompleted && !booking.warrantyEligible ? [{ value: "service_issue", label: "Completed service issue" }] : []),
+          ]} />
           {canReportCompleted && <p className="text-sm text-muted-foreground">{withinRepairWindow ? "This is within the seven-day repair window. Submitting requests rework; the provider must review the reported defect." : "This report is outside the automatic repair route and will go to support review."} No refund is automatic.</p>}
           <label className="grid gap-1 text-sm font-medium">What happened?<textarea className="min-h-28 rounded-md border bg-background p-3" value={caseReason} onChange={(event) => setCaseReason(event.target.value)} placeholder="Describe the issue and any evidence (at least 20 characters)" /></label>
-          <label className="grid gap-1 text-sm font-medium">Optional photo<input type="file" accept="image/jpeg,image/png,image/webp" onChange={(event) => setImage(event.target.files?.[0] || null)} /></label>
+          <FilePicker accept="image/jpeg,image/png,image/webp" disabled={pending} file={image} hint="JPEG, PNG, or WebP, smaller than 5 MB" label="Photo (optional)" onChange={choosePhoto} />
+          {photoError && <p role="alert" className="text-sm text-destructive">{photoError}</p>}
           {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
         </div>
-        <DialogFooter><Button type="button" variant="outline" disabled={pending} onClick={() => setDialog(null)}>Cancel</Button><Button type="button" disabled={pending || caseReason.trim().length < 20} onClick={submitCase}>{pending ? <LoaderCircle className="animate-spin" aria-hidden="true" /> : <Flag aria-hidden="true" />}Open support case</Button></DialogFooter>
+        <DialogFooter><Button type="button" variant="outline" disabled={pending} onClick={() => setDialog(null)}>Cancel</Button><Button type="button" disabled={pending || Boolean(photoError) || caseReason.trim().length < 20} onClick={submitCase}>{pending ? <LoaderCircle className="animate-spin" aria-hidden="true" /> : <Flag aria-hidden="true" />}Open support case</Button></DialogFooter>
       </DialogContent>
     </Dialog>
 
     <Dialog open={dialog === "response"} onOpenChange={(open) => { if (!open && !pending) setDialog(null); }}>
       <DialogContent><DialogHeader><DialogTitle>Respond to repair claim</DialogTitle><DialogDescription>Offer to inspect or rework the reported issue, or ask support to review it. Your answer does not decide coverage, close the case, or move money.</DialogDescription></DialogHeader>
         <div className="grid gap-4">
-          <label className="grid gap-1 text-sm font-medium">Next step<select className="min-h-11 rounded-md border bg-background px-3" value={responseAction} onChange={(event) => setResponseAction(event.target.value as RepairClaimResponse)}><option value="offer_rework">Offer inspection or rework</option><option value="request_support_review">Request support review</option></select></label>
+          <SelectField label="Next step" value={responseAction} disabled={pending} onValueChange={(value) => setResponseAction(value as RepairClaimResponse)} options={[{ value: "offer_rework", label: "Offer inspection or rework" }, { value: "request_support_review", label: "Request support review" }]} />
           <label className="grid gap-1 text-sm font-medium">Your response<textarea className="min-h-28 rounded-md border bg-background p-3" value={responseText} onChange={(event) => setResponseText(event.target.value)} placeholder="Explain what you can do next, or why support should review the report (at least 20 characters)" /></label>
           <p className="text-xs text-muted-foreground">Do not include contact details or sensitive documents here. Use the booking conversation to arrange a time with the client.</p>
           {error && <p role="alert" className="text-sm text-destructive">{error}</p>}

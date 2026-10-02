@@ -351,6 +351,15 @@ Implementation status on October 1, 2026:
   *positive* path across two live accounts; historical bookings were not
   backfilled or used to simulate it. Admin remedy decisions, verified refunds,
   payouts, notifications, and legally reviewed terms remain out of scope.
+- Admin case detail now displays the booking, participant, payment-attempt,
+  delivery-evidence, and audit records available to the administrator. A
+  private, append-only follow-up can record information needed or a recommended
+  rework, reschedule, or refund review with a mandatory reason and stable
+  operation ID. This is **not** a decision, notification, payment, or refund.
+  The two admin follow-up migrations (`20261003113000` and `20261003114000`)
+  are applied only to the confirmed demo/test project. Client-role rejection
+  and the admin case browser journey were verified; a positive live admin
+  follow-up/retry on real demo case data remains untested.
 
 ## Phase 1: Payment foundation
 

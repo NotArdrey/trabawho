@@ -7,7 +7,7 @@ import BrandWordmark from "./BrandWordmark";
 type SidebarIcon = ComponentType<{ className?: string; "aria-hidden"?: boolean }>;
 
 export const desktopWorkspaceSidebarClass = "fixed inset-y-0 left-0 z-[140] hidden w-[248px] flex-col gap-[18px] overflow-y-auto border-r bg-background/95 px-3.5 pb-3.5 pt-[18px] shadow-[10px_0_30px_rgba(15,23,42,0.04)] backdrop-blur min-[881px]:flex";
-export const workspaceSidebarNavClass = "group relative flex min-h-12 w-full items-center gap-3 rounded-lg px-2.5 text-left text-sm font-semibold text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
+export const workspaceSidebarNavClass = "group relative flex min-h-12 min-w-0 w-full items-center gap-3 rounded-lg px-2.5 text-left text-sm font-semibold text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
 
 export function WorkspaceSidebarBrand({ onClick }: { onClick: () => void }) {
   return <button type="button" className="flex min-h-[54px] w-full items-center gap-2.5 rounded-lg px-1.5 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" onClick={onClick} aria-label="Open home">
@@ -41,7 +41,7 @@ export function WorkspaceSidebarNavItem({ label, icon: Icon, active, onClick, tr
   return <button type="button" className={cn(workspaceSidebarNavClass, active && "bg-primary/10 text-primary")} aria-current={active ? "page" : undefined} onClick={onClick}>
     <span className={cn("absolute inset-y-3 left-0 w-0.5 rounded-r bg-transparent", active && "bg-primary")} aria-hidden="true" />
     <Icon className={cn("size-8 shrink-0 rounded-lg bg-muted p-2", active && "bg-primary text-primary-foreground")} aria-hidden />
-    <span className="min-w-0 flex-1 truncate">{label}</span>{trailing}
+    <span className="min-w-0 flex-1 truncate">{label}</span>{trailing && <span className="shrink-0">{trailing}</span>}
   </button>;
 }
 
