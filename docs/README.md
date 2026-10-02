@@ -17,6 +17,7 @@ When documents disagree, follow the highest applicable document and update the l
 
 ## Integrations
 
+- [`integrations/email.md`](integrations/email.md) — Gmail SMTP and system notification delivery.
 - [`integrations/didit.md`](integrations/didit.md) — identity signup, admin review, webhook security, deployment, and verification.
 - [`integrations/supabase.md`](integrations/supabase.md) — local configuration, database-change boundaries, and concise troubleshooting.
 - [`integrations/paymongo.md`](integrations/paymongo.md) — hosted card checkout, webhook security, deployment, and verification.

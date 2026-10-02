@@ -11,4 +11,9 @@ describe("marketplace ad ranking", () => {
   it("prioritizes paid ads in recommendations", () => expect(compareMarketplaceServices(ad, organic, "recommended", now)).toBeLessThan(0));
   it.each(["price-low", "rating", "newest"])("respects explicit %s sorting", (mode) => expect(compareMarketplaceServices(ad, organic, mode, now)).toBeGreaterThan(0));
   it("stops prioritizing at expiry without a refresh", () => expect(compareMarketplaceServices(ad, organic, "recommended", Date.parse("2026-10-08"))).toBeGreaterThan(0));
+  it("places custom and quote-only pricing after listed prices", () => {
+    expect(compareMarketplaceServices({}, organic, "price-low")).toBeGreaterThan(0);
+    expect(compareMarketplaceServices({ projectRate: 1, pricingType: "inquiry" }, organic, "price-low")).toBeGreaterThan(0);
+    expect(compareMarketplaceServices({ projectRate: 0 }, organic, "price-low")).toBeGreaterThan(0);
+  });
 });

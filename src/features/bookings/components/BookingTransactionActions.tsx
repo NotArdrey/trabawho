@@ -9,35 +9,21 @@ import { SelectField } from "@/components/forms";
 import { performBookingLifecycleAction } from "@/features/bookings/services/bookingLifecycle";
 import { RepairCaseResolution } from "@/features/bookings/components/RepairCaseResolution";
 import { BookingRefundProgress } from "./BookingRefundProgress";
-import { isBookingFullyFunded, type BookingFunding } from "../utils/bookingPaymentGuard";
+import { isBookingFullyFunded } from "../utils/bookingPaymentGuard";
+import type { BookingActionRecord } from "../types/booking-action-record";
 import {
   deliverBookingWithEvidence, getBookingDeliveryEvidence, getBookingSupportCase, openBookingSupportCase, respondToRepairClaim, startBookingWork,
   type BookingCaseType, type RepairClaimResponse,
 } from "@/features/bookings/services/bookingTransactions";
 
-interface BookingRecord extends BookingFunding {
-  id: string;
-  paymentStatus?: string;
-  deliveryStatus?: string;
-  disputeStatus?: string;
-  scheduleStatus?: string;
-  scheduleVersion?: number;
-  workStartedAt?: string | null;
-  appointmentStartAt?: string | null;
-  completedAt?: string | null;
-  warrantyEligible?: boolean;
-  warrantyPolicyCode?: string | null;
-  warrantyDurationDays?: number | null;
-  raw?: { booking?: { status?: string } };
-}
-
 interface Props {
-  booking: BookingRecord;
+  booking: BookingActionRecord;
+  supportCaseId?: string;
   viewerRole: "client" | "provider";
   onUpdated: (booking: unknown) => void;
 }
 
-export function BookingTransactionActions({ booking, viewerRole, onUpdated }: Props) {
+export function BookingTransactionActions({ booking, supportCaseId, viewerRole, onUpdated }: Props) {
   const checklistId = useId();
   const [dialog, setDialog] = useState<"start" | "delivery" | "case" | "response" | null>(null);
   const [pending, setPending] = useState(false);
@@ -67,7 +53,7 @@ export function BookingTransactionActions({ booking, viewerRole, onUpdated }: Pr
   useEffect(() => {
     if (booking.disputeStatus !== "open" && booking.disputeStatus !== "closed") return;
     let active = true;
-    void getBookingSupportCase(booking.id).then((value) => {
+    void getBookingSupportCase(booking.id, supportCaseId).then((value) => {
       if (!active) return;
       setCaseSummary({ bookingId: booking.id, data: value });
       setCaseLoadError(value ? "" : "The report is not available yet. Retry loading it.");
@@ -76,7 +62,7 @@ export function BookingTransactionActions({ booking, viewerRole, onUpdated }: Pr
     const timer = window.setInterval(refreshOnFocus, 30_000);
     window.addEventListener("focus", refreshOnFocus);
     return () => { active = false; window.clearInterval(timer); window.removeEventListener("focus", refreshOnFocus); };
-  }, [booking.id, booking.disputeStatus, caseReload]);
+  }, [booking.id, booking.disputeStatus, supportCaseId, caseReload]);
 
   const active = ["confirmed", "in_progress"].includes(booking.raw?.booking?.status || "");
   const startAt = booking.appointmentStartAt ? new Date(booking.appointmentStartAt).getTime() : NaN;
@@ -148,7 +134,7 @@ export function BookingTransactionActions({ booking, viewerRole, onUpdated }: Pr
     if (!currentCase) return;
     void run(async () => {
       const updated = await respondToRepairClaim(booking.id, currentCase.id, responseAction, responseText);
-      setCaseSummary({ bookingId: booking.id, data: await getBookingSupportCase(booking.id) });
+      setCaseSummary({ bookingId: booking.id, data: await getBookingSupportCase(booking.id, supportCaseId) });
       return updated;
     }, responseAction === "offer_rework"
       ? "Your rework offer was saved. Coordinate the next step with the client; this case remains open."

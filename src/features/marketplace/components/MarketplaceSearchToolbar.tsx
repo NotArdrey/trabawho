@@ -47,7 +47,7 @@ export function MarketplaceSearchToolbar({
           <SelectContent position="popper">
             <SelectItem value="recommended">Recommended</SelectItem>
             <SelectItem value="rating">Highest rated</SelectItem>
-            <SelectItem value="price-low">Lowest price</SelectItem>
+            <SelectItem value="price-low">Lowest listed price</SelectItem>
             <SelectItem value="newest">Newest</SelectItem>
           </SelectContent>
         </Select>
@@ -56,6 +56,7 @@ export function MarketplaceSearchToolbar({
           {filtersOpen ? "Hide filters" : "Filters"}
         </Button>
       </div>
+      {sortMode === "price-low" && <p className="text-xs text-muted-foreground">Compares listed amounts. Billing units vary; services requiring a quote appear last.</p>}
     </section>
   );
 }

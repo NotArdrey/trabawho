@@ -9,9 +9,14 @@ import {
   Settings,
   WorkerDashboard,
 } from '../index';
+import { ParticipantSupportCases } from '@/features/bookings';
 
 // Map each view to its component and required props
 export const viewMap = {
+  'support-cases': {
+    component: ParticipantSupportCases,
+    propsBuilder: (context) => viewMap['my-bookings'].propsBuilder(context),
+  },
   'admin-dashboard': {
     component: AdminDashboard,
     propsBuilder: (context) => ({

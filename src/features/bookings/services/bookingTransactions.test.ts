@@ -1,11 +1,37 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { fetchBookingById } from "@/features/bookings/services/bookingService";
-import { advanceRepairRework, respondToRepairClaim } from "./bookingTransactions";
+import { advanceRepairRework, getBookingSupportCase, respondToRepairClaim } from "./bookingTransactions";
 
-const { rpc } = vi.hoisted(() => ({ rpc: vi.fn() }));
-vi.mock("@/integrations/supabase", () => ({ supabase: { rpc } }));
+const { rpc, from } = vi.hoisted(() => ({ rpc: vi.fn(), from: vi.fn() }));
+vi.mock("@/integrations/supabase", () => ({ supabase: { rpc, from } }));
 vi.mock("@/features/bookings/services/bookingService", () => ({ fetchBookingById: vi.fn() }));
+
+describe("selected support case history", () => {
+  const query = () => ({ select: vi.fn().mockReturnThis(), eq: vi.fn().mockReturnThis(),
+    order: vi.fn().mockReturnThis(), limit: vi.fn().mockReturnThis(), maybeSingle: vi.fn() });
+  beforeEach(() => vi.clearAllMocks());
+
+  it("reads the selected case within its booking instead of a different report", async () => {
+    const selected = query();
+    selected.maybeSingle.mockResolvedValue({ data: { id: "older-case", status: "closed" }, error: null });
+    from.mockReturnValue(selected);
+    await expect(getBookingSupportCase("booking-1", "older-case")).resolves.toMatchObject({ id: "older-case", status: "closed" });
+    expect(selected.eq).toHaveBeenCalledWith("booking_id", "booking-1");
+    expect(selected.eq).toHaveBeenCalledWith("id", "older-case");
+  });
+
+  it("keeps the selected case restriction during a staged-schema fallback", async () => {
+    const initial = query();
+    const fallback = query();
+    initial.maybeSingle.mockResolvedValue({ data: null, error: { code: "42703" } });
+    fallback.maybeSingle.mockResolvedValue({ data: { id: "older-case", status: "closed" }, error: null });
+    from.mockReturnValueOnce(initial).mockReturnValueOnce(fallback);
+    await expect(getBookingSupportCase("booking-1", "older-case")).resolves.toMatchObject({ id: "older-case" });
+    expect(fallback.eq).toHaveBeenCalledWith("booking_id", "booking-1");
+    expect(fallback.eq).toHaveBeenCalledWith("id", "older-case");
+  });
+});
 
 describe("respondToRepairClaim", () => {
   beforeEach(() => {

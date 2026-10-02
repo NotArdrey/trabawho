@@ -17,6 +17,7 @@ export type AppRoute =
   | "/work"
   | "/worker/dashboard"
   | "/worker/bookings"
+  | "/support-cases"
   | "/profile"
   | "/settings/account"
   | "/settings/preferences"

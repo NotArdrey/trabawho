@@ -17,7 +17,7 @@
   },
   {
     "path": "src/features/bookings/pages/MyBookings.jsx",
-    "baselineLines": 1070
+    "baselineLines": 1041
   },
   {
     "path": "src/features/auth/pages/AuthPage.jsx",

@@ -54,6 +54,20 @@ deployment steps, and the exact test commands are in the
 
 ## Case-handling experience
 
+Clients and workers can open **Support cases** from their desktop sidebar or
+mobile navigation at `/support-cases`. This participant view lists reports for
+their own bookings in either role, including closed cases. Each report links to
+its case reference, participant conversation, existing rework actions, safe
+support summaries, and refund progress. Internal admin follow-up notes remain
+restricted to the admin portal. Selecting a case is stored in the URL.
+
+The admin support queue now reconciles on case activity, focus, reconnect, and
+every 15 seconds while visible. This covers projects without working realtime
+publications. Refreshes retain loaded cases, the selected detail, and unfinished
+follow-up notes. Mocked client-to-admin journeys verify report submission and
+support updates at all five supported widths; live read checks verify existing
+case-to-booking links without creating or changing records.
+
 The demo/test implementation adds the case queue, private evidence access,
 booking-specific review timeline, and reasoned follow-up records. The admin
 may record a request for information or a recommendation, but this is not an

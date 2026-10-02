@@ -6,10 +6,7 @@ import {
   updateBookingWorkflow,
 } from '@/features/bookings/services/bookingService';
 import { useBookingActivity } from './useBookingActivity';
-
-const COMPLETED_STATUSES = ['Completed Service', 'Service Stopped'];
-const TERMINAL_STATUSES = [...COMPLETED_STATUSES, 'Cancelled', 'Cancelled (Cash)', 'Refunded'];
-const PAYMENT_PENDING_STATUSES = ['Payment Pending', 'Slot Selected - Payment Pending', 'Downpayment Paid'];
+import { matchesBookingHubFilter, matchesBookingDisplayFilter } from '../utils/bookingFilters';
 
 export interface BookingListItem {
   id: string;
@@ -157,42 +154,10 @@ export function useBookingListController(initialBookings: BookingListItem[] = []
     persistBookingUpdate(bookingId, updates)
   ), [persistBookingUpdate]);
 
-  const statusFilteredBookings = useMemo(() => (
-    visibleBookings.filter((booking) => {
-      if (activeFilter === 'completed') {
-        return COMPLETED_STATUSES.includes(booking.status);
-      }
-      if (activeFilter === 'active') {
-        return !TERMINAL_STATUSES.includes(booking.status);
-      }
-      return true;
-    })
-  ), [activeFilter, visibleBookings]);
-
-  const filteredBookings = useMemo(() => (
-    statusFilteredBookings.filter((booking) => {
-      if (displayFilter === 'cash-approvals') {
-        return booking.paymentMethod === 'after-service-cash';
-      }
-      if (displayFilter === 'payment-pending') {
-        return PAYMENT_PENDING_STATUSES.includes(booking.status)
-          || ['pending_provider', 'partially_paid'].includes(booking.paymentStatus || '');
-      }
-      if (displayFilter === 'paid') {
-        return booking.paymentStatus === 'paid';
-      }
-      if (displayFilter === 'completed') {
-        return COMPLETED_STATUSES.includes(booking.status);
-      }
-      if (displayFilter === 'refunds') {
-        return Boolean(booking.refundStatus) || ['Refund Processing', 'Refunded'].includes(booking.status);
-      }
-      if (displayFilter === 'cancelled') {
-        return ['Cancelled', 'Cancelled (Cash)'].includes(booking.status);
-      }
-      return true;
-    })
-  ), [statusFilteredBookings, displayFilter]);
+  const filteredBookings = useMemo(() => visibleBookings.filter((booking) =>
+    matchesBookingHubFilter(booking, activeFilter, listRole === 'seller' ? 'incoming' : 'purchases')
+    && matchesBookingDisplayFilter(booking, displayFilter)
+  ), [visibleBookings, activeFilter, displayFilter, listRole]);
 
   return {
     actionError,

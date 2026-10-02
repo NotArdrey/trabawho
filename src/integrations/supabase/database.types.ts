@@ -15,6 +15,12 @@ type TimestampColumns = {
 export interface Database {
   public: {
     Tables: {
+      notification_preferences: Table<{
+        user_id: string;
+        email_enabled: boolean;
+        sms_enabled: boolean;
+        updated_at: string;
+      }>;
       profiles: Table<TimestampColumns & {
         user_id: string;
         first_name: string | null;

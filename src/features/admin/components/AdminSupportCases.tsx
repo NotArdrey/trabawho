@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { AlertCircle, ArrowRight, CircleCheck, Clock3, Eye, Inbox, RefreshCw } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
@@ -8,7 +8,8 @@ import { WorkflowPanel } from "@/components/ui/workflow-panel";
 import { caseNextActor } from "@/features/admin/domain/caseNextActor";
 import { supportCaseNextStep } from "@/features/admin/domain/supportCaseNextStep";
 import { AdminCaseDetailDialog } from "@/features/admin/components/AdminCaseDetailDialog";
-import { listSupportCases, openSupportEvidence, type SupportCase } from "@/features/admin/services/adminSupportService";
+import { useAdminSupportCases } from "@/features/admin/hooks/useAdminSupportCases";
+import { openSupportEvidence, type SupportCase } from "@/features/admin/services/adminSupportService";
 
 function SupportCaseCard({ item, onViewEvidence, onOpen }: { item: SupportCase; onViewEvidence: (path: string) => void; onOpen: () => void }) {
   const closed = item.status === "closed";
@@ -42,27 +43,13 @@ function SupportCaseCard({ item, onViewEvidence, onOpen }: { item: SupportCase; 
 }
 
 export default function AdminSupportCases() {
-  const [cases, setCases] = useState<SupportCase[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
+  const { cases, loading, error, refresh } = useAdminSupportCases();
   const [evidenceError, setEvidenceError] = useState("");
-  const [refresh, setRefresh] = useState(0);
   const [selected, setSelected] = useState<SupportCase | null>(null);
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<"all" | "active" | "closed">("active");
 
-  useEffect(() => {
-    let active = true;
-    void (async () => {
-      try {
-        const result = await listSupportCases();
-        if (active) { setCases(result); setSelected((current) => current ? result.find((item) => item.id === current.id) || null : null); setError(""); }
-      } catch (cause) {
-        if (active) setError(cause instanceof Error ? cause.message : "Could not load support cases.");
-      } finally { if (active) setLoading(false); }
-    })();
-    return () => { active = false; };
-  }, [refresh]);
+  const selectedCase = selected ? cases.find((item) => item.id === selected.id) || selected : null;
 
   const openEvidence = async (path: string) => {
     setEvidenceError("");
@@ -78,12 +65,12 @@ export default function AdminSupportCases() {
   });
 
   return <section className="space-y-4" aria-labelledby="support-cases-title">
-    <div className="flex flex-wrap items-start justify-between gap-3"><div><h1 id="support-cases-title" className="text-2xl font-bold">Booking support cases</h1><p className="mt-1 text-sm text-muted-foreground">Review booking history, record support follow-up, and approve verified booking refunds.</p></div><Button variant="outline" onClick={() => { setLoading(true); setRefresh((value) => value + 1); }}><RefreshCw aria-hidden="true" />Refresh</Button></div>
+    <div className="flex flex-wrap items-start justify-between gap-3"><div><h1 id="support-cases-title" className="text-2xl font-bold">Booking support cases</h1><p className="mt-1 text-sm text-muted-foreground">Review booking history, record support follow-up, and approve verified booking refunds.</p></div><Button variant="outline" disabled={loading} onClick={refresh}><RefreshCw aria-hidden="true" />Refresh</Button></div>
     {loading && <p role="status" className="rounded-xl border bg-card p-6 text-sm text-muted-foreground">Loading support cases…</p>}
     {error && <div role="alert" className="flex gap-2 rounded-xl border border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive"><AlertCircle className="size-4 shrink-0" aria-hidden="true" />{error}</div>}
     {evidenceError && <p role="alert" className="text-sm text-destructive">{evidenceError}</p>}
     {!loading && !error && cases.length === 0 && <div className="rounded-xl border bg-card p-8 text-center"><Inbox className="mx-auto size-8 text-muted-foreground" aria-hidden="true" /><p className="mt-2 font-semibold">No support cases yet</p><p className="text-sm text-muted-foreground">Reports submitted from booking cards will appear here.</p></div>}
-    {!loading && !error && cases.length > 0 && <>
+    {cases.length > 0 && <>
       <SearchFilterBar
         searchLabel="Search loaded support cases"
         searchPlaceholder="Search booking ID, issue or reason"
@@ -101,6 +88,6 @@ export default function AdminSupportCases() {
       <p className="text-xs text-muted-foreground">Search applies to loaded cases only.</p>
       {visible.length ? <div className="grid gap-3">{visible.map((item) => <SupportCaseCard key={item.id} item={item} onViewEvidence={(path) => { void openEvidence(path); }} onOpen={() => setSelected(item)} />)}</div> : <p className="rounded-xl border bg-card p-6 text-sm text-muted-foreground">No cases match this search or status.</p>}
     </>}
-    <AdminCaseDetailDialog key={selected?.id || "none"} item={selected} onClose={() => setSelected(null)} onSaved={() => { setRefresh((value) => value + 1); }} />
+    <AdminCaseDetailDialog key={selectedCase?.id || "none"} item={selectedCase} onClose={() => setSelected(null)} onSaved={refresh} />
   </section>;
 }

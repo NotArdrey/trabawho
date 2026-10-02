@@ -36,6 +36,7 @@ import { BookingListFeedback } from '@/features/bookings/components/BookingListF
 import { Button } from '@/components/ui/button';
 import { MetricCard } from '@/components/ui/metric-card';
 import { SearchFilterBar } from '@/components/ui/search-filter-bar';
+import { isBookingActionNeeded, matchesBookingHubFilter } from '../utils/bookingFilters';
 import { WorkflowEmptyState } from '@/components/ui/workflow-panel';
 import { paths } from '@/app/router/routes';
 import { hasPastUnpaidSchedule } from '@/features/bookings/utils/bookingSchedule';
@@ -146,36 +147,6 @@ const getStatusMeta = (status) => {
     return { className: 'booking-status-active', icon: MessageCircle, label: 'Negotiating' };
   }
   return { className: 'booking-status-active', icon: CalendarCheck, label: status || 'Active' };
-};
-
-const COMPLETED_BOOKING_STATUSES = ['Completed Service', 'Service Stopped'];
-const CANCELLED_BOOKING_STATUSES = ['Cancelled', 'Cancelled (Cash)'];
-const SCHEDULED_BOOKING_STATUSES = ['Payment Confirmed', 'Service Scheduled', 'Active Service'];
-const isBookingActionNeeded = (booking, scope) => {
-  if (scope === 'incoming') {
-    return ['Negotiating', 'Cash Verification Pending', 'Refund Processing'].includes(booking.status)
-      || booking.paymentStatus === 'pending_provider';
-  }
-  return ['Awaiting Slot Selection', 'Payment Pending', 'Downpayment Paid', 'Slot Selected - Payment Pending'].includes(booking.status)
-    || booking.deliveryStatus === 'seller_claimed';
-};
-
-const matchesBookingHubFilter = (booking, filter, scope) => {
-  if (filter === 'all') return true;
-  if (filter === 'completed') return COMPLETED_BOOKING_STATUSES.includes(booking.status);
-  if (filter === 'cancelled') return CANCELLED_BOOKING_STATUSES.includes(booking.status);
-  if (filter === 'refunds') return Boolean(booking.refundStatus) || ['Refund Processing', 'Refunded'].includes(booking.status);
-  if (filter === 'delivered') return booking.deliveryStatus === 'seller_claimed' || booking.status === 'Service Delivered';
-  if (filter === 'scheduled') return SCHEDULED_BOOKING_STATUSES.includes(booking.status);
-  if (filter === 'payment-due') {
-    return ['Payment Pending', 'Slot Selected - Payment Pending', 'Downpayment Paid'].includes(booking.status)
-      || ['pending_provider', 'partially_paid'].includes(booking.paymentStatus);
-  }
-  if (filter === 'action-needed') return isBookingActionNeeded(booking, scope);
-  if (filter === 'active') {
-    return ![...COMPLETED_BOOKING_STATUSES, ...CANCELLED_BOOKING_STATUSES, 'Refunded'].includes(booking.status);
-  }
-  return scope === 'incoming';
 };
 
 const MyBookings = ({

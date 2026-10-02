@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Search } from 'lucide-react';
 import DashboardNavigation from '../../../shared/components/DashboardNavigation';
@@ -15,8 +15,7 @@ import {
 import SuccessNotification from '../../../shared/components/SuccessNotification';
 import ErrorNotification from '../../../shared/components/ErrorNotification';
 import { fetchMarketplaceServices } from "../services/marketplaceServices";
-import { compareMarketplaceServices } from "../utils/marketplaceRanking";
-import { getActiveAdBooster } from "@/shared/utils/serviceBoost";
+import { useMarketplaceFilters } from "../hooks/useMarketplaceFilters";
 import { supabase } from '../../../shared/services/supabaseClient';
 import BookingCalendarModal from '../../bookings/components/BookingCalendarModal';
 import PaymentModal from '../../bookings/components/PaymentModal';
@@ -29,12 +28,10 @@ import { useMarketplaceSchedules } from '../hooks/useMarketplaceSchedules';
 import { useMarketplaceBookingFlow } from '../hooks/useMarketplaceBookingFlow';
 import {
   createScheduleForProvider,
-  getDisplayServiceType,
   normalizeServiceRecord,
 } from '../utils/serviceNormalizer';
 import { useMarketplaceSearch } from '../hooks/useMarketplaceSearch';
 
-const DEFAULT_CATEGORIES = ['All', 'Tutor', 'Technician', 'Cleaner', 'More Services'];
 const SERVICES_PER_PAGE = 6;
 
 const getPaginationPages = (currentPage, totalPages) => {
@@ -76,10 +73,8 @@ function BrowseServicesPage({
 }) {
   const isPublic = mode === 'public';
   const [urlSearchParams, setUrlSearchParams] = useSearchParams();
-  const { searchQuery, locationQuery, handleSearchChange, handleLocationChange, clearSearch } = useMarketplaceSearch(onSearchChange);
-  const [activeCategory, setActiveCategory] = useState('All');
-  const [selectedDistrict, setSelectedDistrict] = useState('All Districts');
-  const [sortMode, setSortMode] = useState('recommended');
+  const { searchQuery, locationQuery, handleSearchChange, handleLocationChange, activeCategory, setActiveCategory,
+    selectedDistrict, setSelectedDistrict, sortMode, setSortMode, hasActiveFilters, clearFilters: handleClearFilters } = useMarketplaceSearch(onSearchChange);
   const [currentPage, setCurrentPage] = useState(() => {
     const requestedPage = Number(urlSearchParams.get('page'));
     return Number.isInteger(requestedPage) && requestedPage > 0 ? requestedPage : 1;
@@ -178,59 +173,9 @@ function BrowseServicesPage({
     };
   }, [reviewsBySeller, reviewsSellerId, reviewsTarget]);
 
-  const categories = useMemo(() => {
-    const dynamic = services
-      .map(getDisplayServiceType)
-      .filter(Boolean)
-      .filter((value) => !DEFAULT_CATEGORIES.includes(value));
-    return [...DEFAULT_CATEGORIES, ...Array.from(new Set(dynamic)).slice(0, 5)];
-  }, [services]);
-
-  const districts = useMemo(() => {
-    const items = services.map((service) => service.location).filter(Boolean);
-    return ['All Districts', ...Array.from(new Set(items))];
-  }, [services]);
-
-  const categoryFilters = useMemo(() => categories.map((category) => ({
-    label: category,
-    count: category === 'All' ? services.length : services.filter((item) => {
-      const serviceLabel = getDisplayServiceType(item);
-      const core = ['Tutor', 'Technician', 'Cleaner'];
-      return category === 'More Services' ? !core.includes(serviceLabel) : serviceLabel === category;
-    }).length,
-  })), [categories, services]);
-
-  const filteredServices = useMemo(() => {
-    const normalizedSearch = String(searchQuery || '').trim().toLowerCase();
-    const normalizedLocation = String(locationQuery || '').trim().toLowerCase();
-    const core = ['Tutor', 'Technician', 'Cleaner'];
-
-    const filtered = services.filter((provider) => {
-      const serviceLabel = getDisplayServiceType(provider);
-      const haystack = [
-        provider.name,
-        provider.title,
-        serviceLabel,
-        provider.description,
-        provider.location,
-      ].join(' ').toLowerCase();
-
-      const matchesSearch = !normalizedSearch || haystack.includes(normalizedSearch);
-      const matchesLocation = !normalizedLocation
-        || String(provider.location || '').toLowerCase().includes(normalizedLocation);
-      const isCore = core.includes(serviceLabel);
-      const matchesCategory = activeCategory === 'All'
-        || (activeCategory === 'More Services' ? !isCore : serviceLabel === activeCategory);
-      const matchesDistrict = isPublic
-        ? matchesLocation
-        : selectedDistrict === 'All Districts' || provider.location === selectedDistrict;
-
-      return matchesSearch && matchesCategory && matchesDistrict;
-    });
-
-    return filtered.map((provider) => ({ ...provider, ...getActiveAdBooster(provider.rawService, boostClock) }))
-      .sort((a, b) => compareMarketplaceServices(a, b, sortMode, boostClock));
-  }, [activeCategory, isPublic, locationQuery, searchQuery, selectedDistrict, services, sortMode, boostClock]);
+  const { categoryFilters, districts, filteredServices } = useMarketplaceFilters(services, {
+    search: searchQuery, location: locationQuery, category: activeCategory, district: selectedDistrict, sort: sortMode,
+  }, boostClock);
 
   const totalPages = Math.max(1, Math.ceil(filteredServices.length / SERVICES_PER_PAGE));
   const activePage = Math.min(currentPage, totalPages);
@@ -257,21 +202,6 @@ function BrowseServicesPage({
       else next.set('page', String(nextPage));
       return next;
     }, { replace });
-  };
-
-  const resetPage = () => updatePage(1, true);
-
-  const hasActiveFilters = activeCategory !== 'All'
-    || selectedDistrict !== 'All Districts'
-    || Boolean(locationQuery)
-    || sortMode !== 'recommended';
-
-  const handleClearFilters = () => {
-    resetPage();
-    setActiveCategory('All');
-    setSelectedDistrict('All Districts');
-    setSortMode('recommended');
-    clearSearch();
   };
 
   return (
@@ -320,16 +250,10 @@ function BrowseServicesPage({
             isOpen={showMobileFilters}
             isPublic={isPublic}
             locationQuery={locationQuery}
-            onCategoryChange={(category) => {
-              setActiveCategory(category);
-              resetPage();
-            }}
+            onCategoryChange={setActiveCategory}
             onClear={handleClearFilters}
             onClose={() => setShowMobileFilters(false)}
-            onDistrictChange={(value) => {
-              setSelectedDistrict(value);
-              resetPage();
-            }}
+            onDistrictChange={setSelectedDistrict}
             onLocationChange={(value) => handleLocationChange({ target: { value } })}
             selectedDistrict={selectedDistrict}
           />
@@ -340,7 +264,7 @@ function BrowseServicesPage({
               sortMode={sortMode}
               filtersOpen={showMobileFilters}
               onSearchChange={(value) => handleSearchChange({ target: { value } })}
-              onSortChange={(value) => { setSortMode(value); resetPage(); }}
+              onSortChange={setSortMode}
               onToggleFilters={() => setShowMobileFilters((open) => !open)}
             />
 
@@ -382,7 +306,7 @@ function BrowseServicesPage({
             ) : (
               <div className="gl-empty">
                 <strong>No services match these filters yet.</strong>
-                <p>Try a broader search, another district, or the All category.</p>
+                <p>Try a broader search, another location, or the All category.</p>
               </div>
             )}
 

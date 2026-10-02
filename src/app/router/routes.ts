@@ -6,6 +6,7 @@ export type LegacyView =
   | "browse-services"
   | "my-bookings"
   | "worker-bookings"
+  | "support-cases"
   | "chat"
   | "my-work"
   | "worker-dashboard"
@@ -24,6 +25,7 @@ export const paths = {
   dashboard: "/dashboard",
   bookings: "/bookings",
   workerBookings: "/worker/bookings",
+  supportCases: "/support-cases",
   messages: "/messages",
   work: "/work",
   workerDashboard: "/worker/dashboard",
@@ -55,6 +57,7 @@ const exactViewPaths: Partial<Record<string, LegacyView>> = {
   [paths.dashboard]: "client-dashboard",
   [paths.bookings]: "my-bookings",
   [paths.workerBookings]: "worker-bookings",
+  [paths.supportCases]: "support-cases",
   [paths.work]: "my-work",
   [paths.workerDashboard]: "worker-dashboard",
   [paths.profile]: "profile",
@@ -69,6 +72,7 @@ const viewPaths: Record<LegacyView, string> = {
   "browse-services": paths.services,
   "my-bookings": paths.bookings,
   "worker-bookings": paths.workerBookings,
+  "support-cases": paths.supportCases,
   chat: paths.messages,
   "my-work": paths.work,
   "worker-dashboard": paths.workerDashboard,

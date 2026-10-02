@@ -5,6 +5,7 @@ import {
   BriefcaseBusiness,
   CalendarCheck,
   Home,
+  LifeBuoy,
   LogOut,
   MessageCircle,
   Search,
@@ -70,7 +71,7 @@ export interface DashboardNavigationProps {
   isAdminView?: boolean;
 }
 
-type NavKey = "home" | "overview" | "browse" | "chat" | "bookings" | "work" | "profile" | "settings";
+type NavKey = "home" | "overview" | "browse" | "chat" | "bookings" | "work" | "cases" | "profile" | "settings";
 interface NavItem { key: NavKey; label: string; icon: ComponentType<{ className?: string; "aria-hidden"?: boolean }>; onClick?: () => void }
 
 function isWorkerProfile(profile?: DashboardProfile | null) {
@@ -120,6 +121,7 @@ export default function DashboardNavigation({
     chat: "chat",
     "my-bookings": "bookings",
     "worker-bookings": "bookings",
+    "support-cases": "cases",
     "my-work": "work",
     "worker-dashboard": "overview",
     profile: "profile",
@@ -165,12 +167,14 @@ export default function DashboardNavigation({
     { key: "browse", label: "Browse", icon: Store, onClick: onOpenBrowseServices || onOpenDashboard },
     { key: "chat", label: "Chats", icon: MessageCircle, onClick: onOpenChatPage || onOpenMyBookings },
     { key: "bookings", label: "Bookings", icon: CalendarCheck, onClick: () => { void navigate(`${paths.bookings}?scope=purchases`); } },
+    { key: "cases", label: "Support cases", icon: LifeBuoy, onClick: () => { void navigate(paths.supportCases); } },
   ];
   const workerNavItems: NavItem[] = [
     { key: "overview", label: "Overview", icon: Home, onClick: () => { void navigate(paths.workerDashboard); } },
     { key: "work", label: "My Work", icon: BriefcaseBusiness, onClick: onOpenMyWork || onOpenSellerSetup },
     { key: "chat", label: "Messages", icon: MessageCircle, onClick: onOpenChatPage || onOpenMyBookings },
     { key: "bookings", label: "Bookings", icon: CalendarCheck, onClick: () => { void navigate(`${paths.workerBookings}?scope=incoming`); } },
+    { key: "cases", label: "Support cases", icon: LifeBuoy, onClick: () => { void navigate(paths.supportCases); } },
   ];
   const navItems = isWorkerAccount && !isAdminAccount && isProviderWorkspace ? workerNavItems : clientNavItems;
 
@@ -184,7 +188,7 @@ export default function DashboardNavigation({
   };
 
   const renderNavButtons = (mobile = false) => (
-    <nav className={cn("grid gap-1", mobile && "grid-cols-4")} aria-label={mobile ? "Mobile dashboard navigation" : "Dashboard navigation"}>
+    <nav className={cn("grid gap-1", mobile && "grid-cols-5")} aria-label={mobile ? "Mobile dashboard navigation" : "Dashboard navigation"}>
       {navItems.map(({ key, label, icon: Icon, onClick }) => {
         const active = activeKey === key;
         if (!mobile) return <WorkspaceSidebarNavItem key={key} label={label} icon={Icon} active={active} onClick={onClick} />;
@@ -193,7 +197,7 @@ export default function DashboardNavigation({
             {active ? <span className="absolute -top-1 h-0.5 w-5 rounded-full bg-brand-highlight" aria-hidden="true" /> : null}
             <Icon className="size-5" aria-hidden />
           </span>
-          <span className="max-w-full truncate">{label}</span>
+          <span className="max-w-full text-center text-[11px] leading-tight">{label}</span>
         </button>;
       })}
     </nav>

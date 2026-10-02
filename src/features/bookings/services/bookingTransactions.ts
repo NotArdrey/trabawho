@@ -136,15 +136,18 @@ export async function openBookingSupportCase(
   return { booking: await fetchBookingById(bookingId), policyRoute: data.policy_route };
 }
 
-export async function getBookingSupportCase(bookingId: string) {
+export async function getBookingSupportCase(bookingId: string, caseId?: string) {
   const fields = "id, case_type, reason, policy_route, policy_reason, status, created_at, provider_response_action, provider_response_text, provider_responded_at, rework_state, rework_appointment_at, rework_evidence_note, rework_delivered_at, rework_confirmed_at, rework_escalated_at";
-  const { data, error } = await supabase.from("booking_support_cases")
+  const query = supabase.from("booking_support_cases")
     .select(`${fields}, refund_requested_at, latest_support_action, latest_support_target, latest_support_at`)
-    .eq("booking_id", bookingId).order("created_at", { ascending: false }).limit(1).maybeSingle();
+    .eq("booking_id", bookingId);
+  if (caseId) query.eq("id", caseId);
+  const { data, error } = await query.order("created_at", { ascending: false }).limit(1).maybeSingle();
   // Keep existing case history available during a staged database rollout.
   if (error?.code === "42703" || error?.code === "PGRST204") {
-    const fallback = await supabase.from("booking_support_cases").select(fields)
-      .eq("booking_id", bookingId).order("created_at", { ascending: false }).limit(1).maybeSingle();
+    const fallbackQuery = supabase.from("booking_support_cases").select(fields).eq("booking_id", bookingId);
+    if (caseId) fallbackQuery.eq("id", caseId);
+    const fallback = await fallbackQuery.order("created_at", { ascending: false }).limit(1).maybeSingle();
     if (fallback.error) throw new Error("The booking report could not be loaded.");
     return fallback.data ? { ...fallback.data, refund_requested_at: null, latest_support_action: null, latest_support_target: null, latest_support_at: null } : null;
   }

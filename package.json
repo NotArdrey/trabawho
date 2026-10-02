@@ -33,6 +33,7 @@
     "zod": "^4.1.5"
   },
   "scripts": {
+    "email:configure": "node scripts/configure-system-email.mts",
     "ai:stitch:mcp": "node scripts/ai-ui-agent/stitch-mcp-bridge.mjs",
     "ai:stitch:redesign": "node scripts/ai-ui-agent/stitch-redesign.mjs",
     "dev": "vite",

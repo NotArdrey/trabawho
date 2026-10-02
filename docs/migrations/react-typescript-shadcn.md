@@ -34,6 +34,8 @@ Status: active
 
 Each checkpoint must remain deployable and pass the applicable quality gates before the next checkpoint begins.
 
+Marketplace filter state and matching now live in typed hooks/domain functions, including URL restoration, category metadata, location matching, pagination reset, and price sorting. Booking hub and list filters share typed domain rules for payment due, delivered work, terminal states, and cash approvals. Legacy pages retain compatibility wiring until their remaining orchestration and presentation migrate.
+
 ## Compatibility rules
 
 - Supabase schema, RPCs, Edge Functions, stored data, and business behavior remain unchanged.

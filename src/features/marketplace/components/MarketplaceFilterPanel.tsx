@@ -1,13 +1,7 @@
 import { Filter, MapPin, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { SelectField } from "@/components/forms";
 import { cn } from "@/lib/utils";
 
 export interface MarketplaceCategoryFilter {
@@ -118,7 +112,7 @@ export function MarketplaceFilterPanel({
           </div>
         </fieldset>
 
-        {isPublic ? (
+        {(isPublic || locationQuery) && (
           <label className="grid gap-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
             Location
             <span className="relative block">
@@ -131,20 +125,10 @@ export function MarketplaceFilterPanel({
               />
             </span>
           </label>
-        ) : (
-          <div className="grid gap-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-            <span>District</span>
-            <Select value={selectedDistrict} onValueChange={onDistrictChange}>
-              <SelectTrigger className="font-normal normal-case tracking-normal" aria-label="Filter by district">
-                <SelectValue placeholder="All districts" />
-              </SelectTrigger>
-              <SelectContent position="popper">
-                {districts.map((district) => (
-                  <SelectItem key={district} value={district}>{district}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+        )}
+        {(!isPublic || selectedDistrict !== "All Districts") && (
+          <SelectField label="Listed location" value={selectedDistrict} onValueChange={onDistrictChange}
+            options={districts.map((district) => ({ value: district, label: district === "All Districts" ? "All locations" : district }))} />
         )}
       </div>
 

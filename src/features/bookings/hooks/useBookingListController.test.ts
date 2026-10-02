@@ -21,11 +21,11 @@ const bookings = [
 describe('useBookingListController filters', () => {
   const setup = () => renderHook(() => useBookingListController(bookings, { autoLoad: false }));
 
-  test.each([
+  test.each<[string, string[]]>([
     ['payment-pending', ['pending', 'partial']],
     ['paid', ['paid', 'completed']],
     ['completed', ['completed']],
-    ['cash-approvals', ['completed']],
+    ['cash-approvals', []],
     ['refunds', ['refunded']],
     ['cancelled', ['cancelled']],
   ])('filters %s bookings', (filter, expectedIds) => {
@@ -46,7 +46,7 @@ describe('useBookingListController filters', () => {
 
   test('forwards an optional review image to review persistence', async () => {
     const image = new File(['image'], 'work.png', { type: 'image/png' });
-    submitBookingReview.mockResolvedValue({ ...bookings[3], rating: 5, canRate: false });
+    vi.mocked(submitBookingReview).mockResolvedValue({ ...bookings[3], rating: 5, review: 'Excellent work', reviewImageUrl: '', canRate: false });
     const { result } = setup();
 
     await act(async () => {

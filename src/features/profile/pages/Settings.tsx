@@ -12,6 +12,7 @@ import { AppearancePicker, SelectField, type AppearanceChoice, type ThemeMode } 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
+import { useNotificationPreferences } from "../hooks/useNotificationPreferences";
 import DashboardNavigation, {
   type DashboardProfile,
 } from "@/shared/components/DashboardNavigation";
@@ -106,6 +107,7 @@ const translations = {
 
 interface PreferenceSwitchProps {
   checked: boolean;
+  disabled?: boolean;
   description: string;
   icon: ComponentType<{ className?: string; "aria-hidden"?: boolean }>;
   label: string;
@@ -116,6 +118,7 @@ interface PreferenceSwitchProps {
 
 function PreferenceSwitch({
   checked,
+  disabled,
   description,
   icon: Icon,
   label,
@@ -141,15 +144,16 @@ function PreferenceSwitch({
           role="switch"
           aria-checked={checked}
           aria-label={label}
+          disabled={disabled}
           onClick={() => onChange(!checked)}
           className={cn(
-            "relative h-7 w-12 rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+            "relative h-11 w-14 rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:opacity-50",
             checked ? "bg-primary" : "bg-muted-foreground/25",
           )}
         >
           <span
             className={cn(
-              "absolute left-1 top-1 size-5 rounded-full bg-white shadow-sm transition-transform",
+              "absolute left-1 top-2 size-7 rounded-full bg-white shadow-sm transition-transform",
               checked && "translate-x-5",
             )}
           />
@@ -185,9 +189,8 @@ function Settings({
   const selectedTheme: ThemeMode =
     themeMode === "light" || themeMode === "dark" ? themeMode : "system";
   const t = translations[language];
-  const [emailNotifications, setEmailNotifications] = useState(true);
-  const [smsAlerts, setSmsAlerts] = useState(false);
-  const [isSaving, setIsSaving] = useState(false);
+  const { emailNotifications, setEmailNotifications, smsAlerts, setSmsAlerts,
+    hasLoaded, isLoading, isSaving, error, save, retry } = useNotificationPreferences();
   const [saveMessage, setSaveMessage] = useState("");
 
   useEffect(() => {
@@ -202,13 +205,9 @@ function Settings({
     { value: "dark", label: t.dark, description: t.darkDescription },
   ];
 
-  const handleSave = () => {
+  const handleSave = async () => {
     setSaveMessage("");
-    setIsSaving(true);
-    window.setTimeout(() => {
-      setIsSaving(false);
-      setSaveMessage(t.saved);
-    }, 500);
+    if (await save()) setSaveMessage(t.saved);
   };
 
   return (
@@ -291,6 +290,7 @@ function Settings({
                 description={t.emailDescription}
                 icon={Mail}
                 checked={emailNotifications}
+                disabled={!hasLoaded || isLoading || isSaving}
                 onChange={setEmailNotifications}
                 onLabel={t.on}
                 offLabel={t.off}
@@ -301,6 +301,7 @@ function Settings({
                 description={t.smsDescription}
                 icon={MessageSquareText}
                 checked={smsAlerts}
+                disabled={!hasLoaded || isLoading || isSaving}
                 onChange={setSmsAlerts}
                 onLabel={t.on}
                 offLabel={t.off}
@@ -311,16 +312,18 @@ function Settings({
 
         <div className="mt-6 flex min-h-16 items-center justify-between gap-4 rounded-xl bg-card px-5 py-3 shadow-sm max-sm:flex-col max-sm:items-stretch">
           <div className="min-h-5" aria-live="polite" role="status">
-            {saveMessage ? (
+            {error ? (
+              <div className="flex items-center gap-2"><p className="text-sm text-destructive">{error}</p><Button type="button" variant="outline" onClick={() => { if (hasLoaded) void handleSave(); else retry(); }} disabled={isLoading || isSaving}>Try again</Button></div>
+            ) : saveMessage ? (
               <p className="flex items-center gap-2 text-sm font-medium text-emerald-700 dark:text-emerald-300">
                 <CheckCircle2 className="size-4" aria-hidden="true" />
                 {saveMessage}
               </p>
             ) : (
-              <p className="text-sm text-muted-foreground">Your notification choices are saved when you select the button.</p>
+              <p className="text-sm text-muted-foreground">{isLoading ? "Loading notification preferences…" : "Your notification choices are saved when you select the button."}</p>
             )}
           </div>
-          <Button type="button" onClick={handleSave} isLoading={isSaving} className="min-w-44 max-sm:w-full">
+          <Button type="button" onClick={() => { void handleSave(); }} disabled={!hasLoaded || isLoading} isLoading={isSaving} className="min-w-44 max-sm:w-full">
             <Save className="size-4" aria-hidden="true" />
             {isSaving ? t.saving : t.save}
           </Button>

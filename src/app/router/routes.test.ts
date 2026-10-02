@@ -15,6 +15,8 @@ describe("application route policy", () => {
     expect(pathForView("client-dashboard")).toBe("/dashboard");
     expect(viewFromPathname("/bookings")).toBe("my-bookings");
     expect(viewFromPathname("/worker/bookings")).toBe("worker-bookings");
+    expect(viewFromPathname("/support-cases")).toBe("support-cases");
+    expect(pathForView("support-cases")).toBe("/support-cases");
     expect(viewFromPathname("/messages/booking-1")).toBe("chat");
     expect(getMessageBookingId("/messages/booking-1")).toBe("booking-1");
   });
@@ -26,6 +28,8 @@ describe("application route policy", () => {
     expect(canAccessPath("/worker/dashboard", "client")).toBe(false);
     expect(canAccessPath("/worker/bookings", "worker")).toBe(true);
     expect(canAccessPath("/worker/bookings", "client")).toBe(false);
+    expect(canAccessPath("/support-cases", "client")).toBe(true);
+    expect(canAccessPath("/support-cases", "worker")).toBe(true);
     expect(homePathForRole("admin")).toBe("/admin");
     expect(homePathForRole("worker")).toBe("/worker/dashboard");
     expect(homePathForRole("client")).toBe("/dashboard");

@@ -1,4 +1,5 @@
 export { default as MyBookings } from './pages/MyBookings';
+export { ParticipantSupportCases } from './pages/ParticipantSupportCases';
 export { default as BookingCalendarModal } from './components/BookingCalendarModal';
 export { default as BookingNotification } from './components/BookingNotification';
 export { default as ChatWindow } from './components/ChatWindow';
