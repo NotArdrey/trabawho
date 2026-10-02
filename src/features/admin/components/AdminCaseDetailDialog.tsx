@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from "react";
-import { AlertCircle, ClipboardList, ExternalLink, RefreshCw } from "lucide-react";
+import { AlertCircle, ClipboardList, ExternalLink, RefreshCw, X } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { SelectField } from "@/components/forms";
 import { getSupportCaseDetail, openSupportEvidence, recordSupportFollowup,
   type SupportAction, type SupportCase, type SupportCaseDetail, type TargetParty } from "@/features/admin/services/adminSupportService";
@@ -71,9 +71,10 @@ export function AdminCaseDetailDialog({ item, onClose, onSaved }: {
   const client = detail?.people.find((person) => person.user_id === booking?.buyer_id);
   const provider = detail?.people.find((person) => person.user_id === booking?.seller_id);
   return <Dialog open={Boolean(item)} onOpenChange={(open) => { if (!open && !pending) onClose(); }}>
-    <DialogContent className="flex max-w-3xl flex-col gap-0 overflow-hidden p-0 [&>button:last-child]:right-4 [&>button:last-child]:top-4 sm:[&>button:last-child]:right-5 sm:[&>button:last-child]:top-5">
-      <DialogHeader className="shrink-0 bg-primary/5 p-4 pr-16 sm:p-5 sm:pr-16"><div className="flex items-start gap-3"><span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary"><ClipboardList className="size-5" aria-hidden="true" /></span><div className="min-w-0"><DialogTitle>Support case detail</DialogTitle><DialogDescription className="mt-1">Review the report, booking history, and evidence before recording a next step. No action here moves money.</DialogDescription></div></div></DialogHeader>
-      <div data-testid="support-case-scroll-content" className="min-h-0 overflow-y-auto overscroll-contain px-4 py-4 [scrollbar-width:thin] sm:px-6">
+    <DialogContent showClose={false} className="flex max-w-3xl flex-col gap-0 overflow-hidden p-0">
+      <DialogHeader className="shrink-0 bg-primary/5 p-4 sm:p-5"><div className="flex items-start gap-3"><span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary"><ClipboardList className="size-5" aria-hidden="true" /></span><div className="min-w-0 flex-1"><DialogTitle>Support case detail</DialogTitle><DialogDescription className="mt-1">Review the report, booking history, and evidence before recording a next step. No action here moves money.</DialogDescription></div><DialogClose disabled={pending} className="inline-flex size-11 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label="Close"><X className="size-5" aria-hidden="true" /></DialogClose></div></DialogHeader>
+      {/* eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- The visually hidden scrollbar needs a keyboard-focusable scroll region. */}
+      <div data-testid="support-case-scroll-content" role="region" tabIndex={0} aria-label="Case details, scroll for more" className="min-h-0 overflow-y-auto overscroll-contain px-4 py-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:px-6">
       {loading && <p role="status" className="text-sm text-muted-foreground">Loading booking history…</p>}
       {detailError && <div role="alert" className="flex gap-3 rounded-lg bg-destructive/10 p-4 text-sm text-destructive"><AlertCircle className="mt-0.5 size-5 shrink-0" aria-hidden="true" /><div className="grid gap-3"><p>{detailError}</p><Button type="button" variant="outline" className="w-fit" onClick={() => { setDetailError(""); setLoading(true); setReload((value) => value + 1); }}><RefreshCw aria-hidden="true" />Retry loading details</Button></div></div>}
       {error && <p role="alert" className="flex gap-2 rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive"><AlertCircle className="size-4 shrink-0" aria-hidden="true" />{error}</p>}

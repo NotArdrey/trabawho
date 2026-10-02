@@ -39,6 +39,8 @@ for (const width of [390, 768, 1024, 1280, 1440]) {
       await expect(page.getByRole("heading", { name: "Payment attempts" })).toBeVisible();
       await expect(page.getByRole("heading", { name: "Recorded timeline" })).toBeVisible();
       const scrollContent = dialog.getByTestId("support-case-scroll-content");
+      expect(await scrollContent.evaluate((element) => getComputedStyle(element).scrollbarWidth)).toBe("none");
+      await expect(scrollContent).toHaveAttribute("tabindex", "0");
       const headerTop = await dialog.getByRole("heading", { name: "Support case detail" }).evaluate((element) => element.getBoundingClientRect().top);
       const closeButtons = dialog.getByRole("button", { name: "Close" });
       const footerTop = await closeButtons.last().evaluate((element) => element.getBoundingClientRect().top);
