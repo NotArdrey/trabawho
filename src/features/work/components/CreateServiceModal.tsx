@@ -110,7 +110,7 @@ const createClientSlotId = (dayKey: string) =>
 const getAvailabilitySnapshot = (availability: Partial<Availability> = {}): Availability =>
   DAYS.reduce((schedule, dayKey) => {
     schedule[dayKey] = Array.isArray(availability[dayKey])
-      ? availability[dayKey].map((slot) => ({ ...slot }))
+      ? availability[dayKey].map((slot) => ({ ...slot, capacity: 1 }))
       : [];
     return schedule;
   }, {} as Availability);
@@ -119,14 +119,13 @@ const cloneSlotForDay = (dayKey: DayKey, slot: AvailabilitySlot, index = 0): Ava
   id: createClientSlotId(`${dayKey}-${index}`),
   startTime: slot.startTime || "09:00",
   endTime: slot.endTime || "17:00",
-  capacity: slot.capacity || 1,
+  capacity: 1,
 });
 
 const isValidSlot = (slot: AvailabilitySlot) => Boolean(
   slot.startTime
   && slot.endTime
   && slot.endTime.slice(0, 5) > slot.startTime.slice(0, 5)
-  && Number(slot.capacity) > 0
 );
 
 function CreateServiceModal({ isOpen, newService, onChange, onClose, onSubmit, mode = "create", bookingExtras, validateBooking }: CreateServiceModalProps) {
@@ -167,7 +166,7 @@ function CreateServiceModal({ isOpen, newService, onChange, onClose, onSubmit, m
         id: createClientSlotId(dayKey),
         startTime: lastSlot?.endTime || "09:00",
         endTime: lastSlot ? "17:00" : "11:00",
-        capacity: lastSlot?.capacity || 1,
+        capacity: 1,
       }];
     });
     setExpandedDays((previous) => ({ ...previous, [dayKey]: true }));
@@ -227,7 +226,7 @@ function CreateServiceModal({ isOpen, newService, onChange, onClose, onSubmit, m
       return false;
     }
     if (targetStep === 1 && showAvailability && invalidSlotCount > 0) {
-      setLocalError("Check the highlighted schedule entries. End time must follow start time and capacity must be at least one.");
+      setLocalError("Check the highlighted schedule entries. End time must follow start time.");
       return false;
     }
     if (targetStep === 0 && String(newService.durationMinutes).trim() && (!Number.isInteger(Number(newService.durationMinutes)) || Number(newService.durationMinutes) <= 0)) {
@@ -327,7 +326,7 @@ function CreateServiceModal({ isOpen, newService, onChange, onClose, onSubmit, m
               {bookingExtras}
               {showAvailability ? <><Separator /><section aria-labelledby="availability-title">
                 <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                  <div className="flex items-start gap-3"><CalendarClock className="mt-0.5 size-5 text-primary" aria-hidden="true" /><div><h3 id="availability-title" className="font-semibold">Weekly availability</h3><p className="text-sm text-muted-foreground">{slotCount} valid {slotCount === 1 ? "slot" : "slots"} configured</p></div></div>
+                  <div className="flex items-start gap-3"><CalendarClock className="mt-0.5 size-5 text-primary" aria-hidden="true" /><div><h3 id="availability-title" className="font-semibold">Weekly availability</h3><p className="text-sm text-muted-foreground">{slotCount} valid {slotCount === 1 ? "slot" : "slots"} configured. You can accept one booking at a time across all your services.</p></div></div>
                   <div className="flex flex-wrap gap-2"><Button type="button" size="sm" variant="outline" disabled={availability.Mon.length === 0} onClick={() => copyMondayToDays(WEEKDAYS.filter((day) => day !== "Mon"))}><Copy aria-hidden="true" />Weekdays</Button><Button type="button" size="sm" variant="outline" disabled={availability.Mon.length === 0} onClick={() => copyMondayToDays(DAYS.filter((day) => day !== "Mon"))}><Copy aria-hidden="true" />Whole week</Button></div>
                 </div>
 
@@ -339,10 +338,9 @@ function CreateServiceModal({ isOpen, newService, onChange, onClose, onSubmit, m
                       <button type="button" className="flex min-h-12 w-full items-center justify-between gap-3 rounded-md px-1 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" onClick={() => setExpandedDays((previous) => ({ ...previous, [dayKey]: !previous[dayKey] }))} aria-expanded={expanded}><span className="inline-flex items-center gap-2 font-semibold">{expanded ? <ChevronDown className="size-4" aria-hidden="true" /> : <ChevronRight className="size-4" aria-hidden="true" />}{DAY_LABELS[dayKey]}</span><span className="text-xs font-medium text-muted-foreground">{slots.length} {slots.length === 1 ? "slot" : "slots"}</span></button>
                       {expanded ? <div className="space-y-3 pb-4 pl-6">
                         {slots.length === 0 ? <p className="py-2 text-sm text-muted-foreground">No times added for {DAY_LABELS[dayKey]}.</p> : null}
-                        {slots.map((slot) => <div key={slot.id} className={cn("grid gap-3 rounded-lg bg-background p-3 sm:grid-cols-[1fr_1fr_0.7fr_auto] sm:items-end", !isValidSlot(slot) && "bg-destructive/5")}>
+                        {slots.map((slot) => <div key={slot.id} className={cn("grid gap-3 rounded-lg bg-background p-3 sm:grid-cols-[1fr_1fr_auto] sm:items-end", !isValidSlot(slot) && "bg-destructive/5")}>
                           <div className="space-y-2"><Label htmlFor={`${slot.id}-start`}>Start</Label><Input id={`${slot.id}-start`} type="time" value={slot.startTime} onChange={(event) => handleSlotChange(dayKey, slot.id, "startTime", event.target.value)} /></div>
                           <div className="space-y-2"><Label htmlFor={`${slot.id}-end`}>End</Label><Input id={`${slot.id}-end`} type="time" value={slot.endTime} onChange={(event) => handleSlotChange(dayKey, slot.id, "endTime", event.target.value)} /></div>
-                          <div className="space-y-2"><Label htmlFor={`${slot.id}-capacity`}>Capacity</Label><Input id={`${slot.id}-capacity`} type="number" min="1" value={slot.capacity} onChange={(event) => handleSlotChange(dayKey, slot.id, "capacity", event.target.value)} /></div>
                           <Button type="button" size="icon" variant="ghost" className="text-muted-foreground hover:text-destructive" onClick={() => handleRemoveSlot(dayKey, slot.id)} aria-label={`Remove ${DAY_LABELS[dayKey]} slot`}><Trash2 aria-hidden="true" /></Button>
                         </div>)}
                         <Button type="button" size="sm" variant="ghost" className="text-primary" onClick={() => handleAddSlot(dayKey)}><Plus aria-hidden="true" />Add time</Button>

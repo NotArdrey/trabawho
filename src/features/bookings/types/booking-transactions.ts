@@ -13,7 +13,9 @@ export interface BookingQuote {
   scope_summary: string;
   proposed_start_ts: string;
   proposed_end_ts: string;
-  status: "proposed" | "accepted" | "rejected" | "superseded";
+  expires_at: string;
+  response_note: string | null;
+  status: "proposed" | "accepted" | "rejected" | "superseded" | "changes_requested" | "declined" | "expired";
 }
 
 export interface BookingTransitionResult {

@@ -1,13 +1,14 @@
 import { describe, expect, it } from "vitest";
 
 import type { Database } from "@/integrations/supabase";
-import { bookingNotification, caseNotification, messageNotification } from "./notification-items";
+import { bookingNotification, caseNotification, messageNotification, quoteNotification } from "./notification-items";
 
 type Booking = Database["public"]["Tables"]["bookings"]["Row"];
 type Conversation = Database["public"]["Tables"]["conversations"]["Row"];
 type Message = Database["public"]["Tables"]["messages"]["Row"];
 type CaseNotice = Database["public"]["Tables"]["booking_case_notifications"]["Row"];
 type CaseMessage = Database["public"]["Tables"]["booking_case_messages"]["Row"];
+type Quote = Database["public"]["Tables"]["booking_quotes"]["Row"];
 
 describe("notification destinations", () => {
   it("filters booking notifications to the exact booking in the correct workspace", () => {
@@ -39,5 +40,15 @@ describe("notification destinations", () => {
     expect(result.caseId).toBe("case-123");
     expect(result.isRead).toBe(false);
     expect(caseNotification({ ...notice, read_at: "2026-10-04T02:00:00Z" }, message).isRead).toBe(true);
+  });
+
+  it("sends a new offer to the client and a change request to the provider", () => {
+    const booking = { id: "booking-123", buyer_id: "client-1", seller_id: "provider-1" } as Booking;
+    const quote = { id: "quote-1", booking_id: "booking-123", status: "proposed", updated_at: "2026-10-04T01:00:00Z" } as Quote;
+    expect(quoteNotification(quote, booking, "client-1", new Set())?.href)
+      .toBe("/messages/booking-123?scope=purchases");
+    expect(quoteNotification(quote, booking, "provider-1", new Set())).toBeNull();
+    expect(quoteNotification({ ...quote, status: "changes_requested" }, booking, "provider-1", new Set())?.href)
+      .toBe("/messages/booking-123?scope=incoming");
   });
 });

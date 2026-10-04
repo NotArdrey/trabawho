@@ -13,6 +13,11 @@ const asRecord = (value: Json | undefined): Record<string, Json | undefined> =>
   value !== null && typeof value === "object" && !Array.isArray(value) ? value : {};
 const safeError = (message?: string) => {
   const normalized = String(message || "").toLowerCase();
+  if (normalized.includes("quote has expired") || normalized.includes("proposed schedule is in the past")) return new Error("This quote has expired. Ask the provider for a new price and time.");
+  if (normalized.includes("newer quote") || normalized.includes("quote is no longer available")) return new Error("This offer has changed. Review the latest quote before continuing.");
+  if (normalized.includes("already has a booking") || normalized.includes("conflicts with another booking")) return new Error("The provider is already booked at that time. Choose another time before sending a quote.");
+  if (normalized.includes("cannot receive a new quote") || normalized.includes("already has an active schedule or payment") || normalized.includes("cannot receive a quote response")) return new Error("This booking already has a schedule or payment, so its quote cannot be changed.");
+  if (normalized.includes("cannot receive a quote")) return new Error("This request is no longer open for a quote.");
   if (normalized.includes("just booked") || normalized.includes("no longer available")) return new Error("That time is no longer available. Choose another time to continue.");
   if (normalized.includes("past")) return new Error("Choose a future date and time.");
   if (normalized.includes("own service")) return new Error("You cannot book your own service.");
@@ -30,6 +35,16 @@ export async function proposeBookingQuote(input: { amount: number; bookingId: st
   const { data, error } = await supabase.rpc("propose_booking_quote", { p_booking_id: input.bookingId, p_amount: input.amount, p_start_ts: input.startAt, p_end_ts: input.endAt, p_scope_summary: input.scopeSummary, p_operation_id: input.operationId || operationId("quote") });
   if (error) throw safeError(error.message);
   return asRecord(data) as unknown as QuoteProposalResult;
+}
+
+export async function respondBookingQuote(input: { action: "request_changes" | "decline"; bookingId: string; feedback: string; quoteVersion: number; operationId?: string }): Promise<BookingRow> {
+  const { data, error } = await supabase.rpc("respond_booking_quote", {
+    p_booking_id: input.bookingId, p_quote_version: input.quoteVersion,
+    p_action: input.action, p_feedback: input.feedback,
+    p_operation_id: input.operationId || operationId(`quote-${input.action}`),
+  });
+  if (error) throw safeError(error.message);
+  return data;
 }
 
 export async function rejectBookingQuote(input: { bookingId: string; quoteVersion: number; reason: string; operationId?: string }): Promise<BookingRow> {

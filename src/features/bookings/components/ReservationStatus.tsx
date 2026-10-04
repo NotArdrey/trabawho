@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 
 interface ReservationStatusProps {
   actionLabel?: string;
+  expiredDescription?: string;
   expiresAt?: string | null;
   onChooseAnotherTime?: () => void;
   scheduleStatus?: string | null;
@@ -19,6 +20,7 @@ const formatRemaining = (milliseconds: number) => {
 
 export function ReservationStatus({
   actionLabel = "Choose another time",
+  expiredDescription,
   expiresAt,
   onChooseAnotherTime,
   scheduleStatus,
@@ -51,7 +53,7 @@ export function ReservationStatus({
           <AlertCircle className="mt-0.5 size-5 shrink-0" aria-hidden="true" />
           <div className="min-w-0">
             <h4 id="reservation-expired-title" className="font-bold">{passed ? "Scheduled time has passed" : "Reservation expired"}</h4>
-            <p className="mt-1 text-sm leading-5">{passed ? "Payment is unavailable for a past appointment. Choose another available time to continue with this booking." : "Your request and quote are saved. Choose another available time to continue."}</p>
+            <p className="mt-1 text-sm leading-5">{expiredDescription || (passed ? "Payment is unavailable for a past appointment. Choose another available time to continue with this booking." : "Your request and quote are saved. Choose another available time to continue.")}</p>
           </div>
         </div>
         {onChooseAnotherTime ? <Button type="button" className="self-start" onClick={onChooseAnotherTime}>{actionLabel}</Button> : null}

@@ -69,7 +69,9 @@ describe("FeaturedServices", () => {
     expect(screen.getAllByText("Chemical Making")).toHaveLength(1);
     expect(screen.queryByRole("img")).not.toBeInTheDocument();
     expect(screen.queryByText("Schedule available")).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "Browse similar services" }));
+    const browseButton = screen.getByRole("button", { name: "Browse similar services" });
+    expect(browseButton).toHaveClass("bg-primary/10", "text-primary", "min-h-11");
+    fireEvent.click(browseButton);
     expect(onSelect).toHaveBeenCalledWith({ query: "Chemical Making" });
   });
 

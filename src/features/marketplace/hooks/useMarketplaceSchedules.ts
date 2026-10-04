@@ -28,14 +28,7 @@ export function useMarketplaceSchedules(services: MarketplaceProvider[]) {
     if (serviceIds.length === 0) return () => { active = false; };
 
     const load = async () => {
-      const { data, error } = await supabase
-        .from("service_slots")
-        .select("id, service_id, seller_id, start_ts, end_ts, capacity, status, visibility, metadata")
-        .in("service_id", serviceIds)
-        .eq("status", "available")
-        .eq("visibility", "public")
-        .gte("start_ts", new Date().toISOString())
-        .order("start_ts", { ascending: true });
+      const { data, error } = await supabase.rpc("list_available_service_slots", { p_service_ids: serviceIds });
       if (!active || error) return;
 
       const slotsByService = (data ?? []).reduce<Record<string, typeof data>>((result, slot) => {

@@ -57,7 +57,6 @@ function SlotEditModal({
   const isCalendarMode = mode === "calendar-only";
   const [startTime, setStartTime] = useState(slotData?.startTime || "09:00");
   const [endTime, setEndTime] = useState(slotData?.endTime || "11:00");
-  const [capacity, setCapacity] = useState(String(slotData?.capacity || 3));
   const [date, setDate] = useState(slotData?.date || "");
   const [maxBookings, setMaxBookings] = useState(String(slotData?.maxBookings || 3));
   const [note, setNote] = useState(slotData?.note || "");
@@ -85,17 +84,13 @@ function SlotEditModal({
         setError("End time must be later than start time.");
         return;
       }
-      if (!capacity.trim() || Number(capacity) < 1) {
-        setError("Capacity must be at least one.");
-        return;
-      }
     }
 
     try {
       setIsSaving(true);
       await onSave(isCalendarMode
         ? { date, maxBookings: Number(maxBookings), note: note.trim() }
-        : { startTime, endTime, capacity: Number(capacity) });
+        : { startTime, endTime, capacity: 1 });
     } finally {
       setIsSaving(false);
     }
@@ -109,7 +104,7 @@ function SlotEditModal({
         <DialogHeader className="px-6 pb-5 pt-6">
           <DialogTitle>{resolvedTitle}</DialogTitle>
           <DialogDescription>
-            {isCalendarMode ? "Choose when clients can request this service." : `Set the booking window and capacity for ${dayLabel || "this day"}.`}
+            {isCalendarMode ? "Choose when clients can request this service." : `Set the booking window for ${dayLabel || "this day"}. You can accept one booking at a time across all your services.`}
           </DialogDescription>
         </DialogHeader>
 
@@ -131,8 +126,7 @@ function SlotEditModal({
                 <div className="space-y-2"><Label htmlFor="edit-start">Start time</Label><Input id="edit-start" type="time" value={startTime} onChange={(event) => setStartTime(event.target.value)} /></div>
                 <div className="space-y-2"><Label htmlFor="edit-end">End time</Label><Input id="edit-end" type="time" value={endTime} onChange={(event) => setEndTime(event.target.value)} /></div>
               </div>
-              <div className="space-y-2"><Label htmlFor="edit-capacity">Slot capacity</Label><Input id="edit-capacity" type="number" min="1" inputMode="numeric" value={capacity} onChange={(event) => setCapacity(event.target.value)} /><p className="text-xs text-muted-foreground">Number of clients who can book during this time.</p></div>
-              {startTime && endTime ? <div className="grid gap-3 rounded-lg bg-primary/5 p-4 sm:grid-cols-2"><div className="flex items-center gap-3"><Clock3 className="size-5 shrink-0 text-primary" aria-hidden="true" /><div><p className="text-xs text-muted-foreground">Time window</p><p className="text-sm font-semibold">{formatTime(startTime)}–{formatTime(endTime)}</p></div></div><div className="flex items-center gap-3"><Users className="size-5 shrink-0 text-primary" aria-hidden="true" /><div><p className="text-xs text-muted-foreground">Capacity</p><p className="text-sm font-semibold">{capacity || 0} {capacity === "1" ? "client" : "clients"}</p></div></div></div> : null}
+              {startTime && endTime ? <div className="grid gap-3 rounded-lg bg-primary/5 p-4 sm:grid-cols-2"><div className="flex items-center gap-3"><Clock3 className="size-5 shrink-0 text-primary" aria-hidden="true" /><div><p className="text-xs text-muted-foreground">Time window</p><p className="text-sm font-semibold">{formatTime(startTime)}–{formatTime(endTime)}</p></div></div><div className="flex items-center gap-3"><Users className="size-5 shrink-0 text-primary" aria-hidden="true" /><div><p className="text-xs text-muted-foreground">Booking limit</p><p className="text-sm font-semibold">One client at a time</p></div></div></div> : null}
             </>
           )}
         </div>

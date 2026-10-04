@@ -86,11 +86,9 @@ export async function confirmReplacement(visitId: string) {
 }
 
 export async function listReplacementSlots(serviceId: number, providerId: string) {
-  const result = await supabase.from("service_slots").select("id, start_ts, end_ts, capacity, status")
-    .eq("service_id", serviceId).eq("seller_id", providerId).eq("status", "available")
-    .gt("start_ts", new Date().toISOString()).order("start_ts").limit(40);
+  const result = await supabase.rpc("list_available_service_slots", { p_service_ids: [serviceId] });
   if (result.error) throw new Error("Available times could not be loaded. Try again.");
-  return result.data;
+  return (result.data ?? []).filter((slot) => slot.seller_id === providerId).slice(0, 40);
 }
 
 export async function getLatestReplacement(caseId: string) {

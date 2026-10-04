@@ -472,6 +472,36 @@ Priority: P0
 - [ ] Retrying booking creation returns the existing booking.
 - [ ] A provider cannot book their own listing.
 
+### Provider-wide calendar for multiple services (local implementation; not deployed)
+
+Providers may publish multiple active services, but a solo provider can accept
+only one appointment at a time across all of them. The homepage features at
+most one recently listed service per provider; search still exposes every
+active service. New time-slot editors present a one-booking limit rather than
+an independent capacity for each service.
+
+The pending `20261005113000_featured_provider_diversity.sql` migration selects
+the latest active service from each visible provider. The pending
+`20261005113100_provider_calendar_conflicts.sql` migration serializes a
+provider's booking transactions and rejects overlapping direct bookings,
+reschedules, and accepted replacement visits. Public availability hides
+conflicting slots without exposing other clients' booking records. Expired
+holds, cancellation, and completion release time according to their existing
+states. Existing slot-capacity values are preserved for audit; new writes are
+normalized to one, and public availability presents an effective limit of one.
+These migrations and their dependent frontend changes must be released
+together; the database changes have **not** been applied to the shared project.
+
+- [ ] Run the read-only [`provider calendar audit`](../../scripts/audit-provider-calendar.sql)
+      before applying the migrations. Review existing overlapping bookings and
+      legacy slots with capacity above one without deleting customer history.
+- [ ] Apply migrations in order, then deploy the dependent frontend.
+- [ ] Exercise concurrent checkouts across two services from one provider,
+      quote checkout, paid and unpaid reschedules, accepted replacement visits,
+      expiry, cancellation, and availability refresh against a test database.
+- [ ] Decide whether team accounts need an explicit separate capacity model;
+      do not infer team size from an individual service slot's legacy capacity.
+
 ## Phase 3: Server-owned booking state machine
 
 Priority: P0
@@ -507,6 +537,15 @@ resolve_booking_dispute
 ## Phase 4: Quote and scope integrity
 
 Priority: P1
+
+The local quotation change in `20261005114000_unified_booking_quotes.sql` adds a
+24-hour offer deadline, server-owned change-request and decline transitions,
+and provider-wide calendar checks at offer creation and checkout. It depends on
+the preceding provider-calendar migration. The worker's My Work quote path now
+uses the same versioned RPC as booking chat; neither path may edit booking price
+directly. This remains **unverified against a migrated test database** until the
+two migrations and a PayMongo sandbox quote journey are rehearsed. Do not treat
+the browser-only journey as proof of payment or migration correctness.
 
 - [ ] Add immutable quote versions with service scope, amount, schedule terms,
       expiry, proposer, and timestamps.
