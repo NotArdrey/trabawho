@@ -1,36 +1,70 @@
-﻿import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, ArrowRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription,
+  AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
+import { cn } from '@/lib/utils';
 import BrandWordmark from '@/shared/components/BrandWordmark';
 import PasswordField from '../components/PasswordField';
 import { AccountRegistrationJourney } from '../components/AccountRegistrationJourney';
+import { AuthVisual } from '../components/AuthVisual';
 import { useAuthPageController, type AuthPageProps } from '../hooks/useAuthPageController';
+import { useAuthPageNavigation } from '../hooks/useAuthPageNavigation';
+
 export default function AuthPage({ mode = 'login', onModeChange, onBack, onSubmit, onForgotPasswordSubmit }: AuthPageProps) {
   const { email, setEmail, password, setPassword, busy, error, message, submit, resend } = useAuthPageController({ mode, onSubmit, onForgotPasswordSubmit });
+  const navigation = useAuthPageNavigation();
   const title = mode === 'register' ? 'Create account' : mode === 'forgot' ? 'Reset Password' : 'Sign in';
-  return <main className="min-h-screen bg-background px-4 py-6 text-foreground sm:px-8 sm:py-10">
-    <div className="mx-auto max-w-5xl"><Button variant="ghost" onClick={onBack}><ArrowLeft className="size-4" aria-hidden="true" />Back to home</Button>
-      <div className="my-6"><BrandWordmark /></div>
-      <div className="grid gap-6 lg:grid-cols-2">
-        <aside className="relative hidden min-h-96 overflow-hidden rounded-2xl lg:block" aria-label="TrabaWho marketplace preview">
-          <img src="https://images.unsplash.com/photo-1556761175-b413da4baf72?w=1400&h=1600&fit=crop" alt="Local professionals collaborating with clients" className="absolute inset-0 size-full object-cover" />
-          <div className="absolute inset-0 bg-linear-to-t from-slate-950 via-slate-950/40 to-transparent" aria-hidden="true" />
-          <div className="absolute inset-x-0 bottom-0 space-y-4 p-8 text-white"><p className="text-sm font-semibold">Built for local work</p><h2 className="text-3xl font-bold">Find help, book work, and manage every job in one place.</h2><p className="text-sm leading-6 text-white/85">From the first search to the finished service, TrabaWho keeps the experience clear and connected.</p></div>
-        </aside>
-        <section className="space-y-6 rounded-2xl border bg-card p-5 shadow-sm sm:p-8" aria-label={title}>
-          <div className="space-y-2"><h1 className="text-3xl font-bold tracking-tight">{title}</h1><p className="text-sm leading-6 text-muted-foreground">{mode === 'register' ? 'Confirm your email, verify your identity, and join the marketplace.' : mode === 'forgot' ? 'Get a secure link to reset your password.' : 'Access your bookings and service workspace, or resume your registration.'}</p></div>
-          {mode === 'register' ? <AccountRegistrationJourney /> : <form className="space-y-4" onSubmit={(event) => { event.preventDefault(); void submit(); }}>
-            {error && <p role="alert" className="rounded-lg bg-destructive/10 p-3 text-sm text-destructive">{error}</p>}
-            {message && <p role="status" className="rounded-lg bg-muted p-3 text-sm">{message}</p>}
-            <div className="space-y-2"><Label htmlFor="auth-email">Email</Label><Input id="auth-email" required type="email" autoComplete="email" value={email} onChange={(event) => setEmail(event.target.value)} /></div>
-            {mode === 'login' && <PasswordField id="auth-password" label="Password" required autoComplete="current-password" value={password} onChange={(event) => setPassword(event.target.value)} />}
-            <Button type="submit" isLoading={busy} className="w-full">{mode === 'forgot' ? 'Send reset link' : 'Sign in'}</Button>
-            {mode === 'login' && <div className="flex flex-wrap gap-2"><Button variant="ghost" type="button" onClick={() => onModeChange?.('forgot')}>Forgot password?</Button><Button variant="outline" type="button" disabled={busy || !email} onClick={() => void resend()}>Resend confirmation email</Button></div>}
-          </form>}
-          <Button variant="ghost" className="w-full" onClick={() => onModeChange?.(mode === 'register' ? 'login' : 'register')}>{mode === 'register' ? 'Already have an account? Sign in' : 'Create an account'}</Button>
-        </section>
+  return (
+    <main className="min-h-dvh bg-background px-4 py-4 text-foreground sm:px-8 sm:py-6">
+      <div className="mx-auto max-w-7xl space-y-6">
+        <header className="flex min-w-0 flex-wrap items-center justify-between gap-3">
+          <BrandWordmark className="text-2xl [&>span:first-child]:text-primary" />
+          <Button variant="ghost" onClick={() => navigation.request(() => onBack?.())}><ArrowLeft aria-hidden="true" />Back to home</Button>
+        </header>
+        <div className="grid min-w-0 gap-6 lg:h-[calc(100dvh-8rem)] lg:min-h-[32rem] lg:grid-cols-[minmax(0,1.25fr)_minmax(0,1fr)]">
+          <AuthVisual />
+          <section className="w-full min-w-0 max-w-xl justify-self-center rounded-lg border bg-card text-card-foreground shadow-sm lg:max-w-none lg:overflow-y-auto lg:overscroll-contain"
+            aria-label={title} data-testid="auth-task-panel">
+            <div className="space-y-4 p-6 sm:p-8">
+              <nav aria-label="Account access" className="grid grid-cols-2 gap-2 rounded-lg bg-muted/60 p-1">
+                <Button variant="ghost" className={cn('h-auto min-w-0 w-full whitespace-normal px-2 py-2', mode === 'register' && 'bg-card text-primary shadow-sm')}
+                  aria-current={mode === 'register' ? 'page' : undefined} disabled={busy} onClick={() => { if (mode !== 'register') navigation.request(() => onModeChange?.('register')); }}>Create an account</Button>
+                <Button variant="ghost" className={cn('h-auto min-w-0 w-full whitespace-normal px-2 py-2', mode === 'login' && 'bg-card text-primary shadow-sm')}
+                  aria-label={mode === 'register' ? 'Already have an account? Sign in' : undefined}
+                  aria-current={mode === 'login' ? 'page' : undefined} disabled={busy} onClick={() => { if (mode !== 'login') navigation.request(() => onModeChange?.('login')); }}>Sign in</Button>
+              </nav>
+              {mode === 'register' ? <p className="text-xs font-semibold text-primary">Join TrabaWho</p> : <div className="space-y-3">
+                <p className="text-xs font-semibold text-primary">{mode === 'forgot' ? 'Account recovery' : 'Welcome back'}</p>
+                <h1 className="text-4xl font-semibold tracking-tight">{title}</h1>
+                <p className="text-sm leading-6 text-muted-foreground">{mode === 'forgot' ? 'Get a secure link to reset your password.' : 'Manage your bookings and services, or pick up your registration.'}</p>
+              </div>}
+              {mode === 'register' ? <AccountRegistrationJourney onDraftChange={navigation.setDirty} /> : <form className="space-y-4" onSubmit={(event) => { event.preventDefault(); void submit(); }}>
+                {error && <p role="alert" className="rounded-lg bg-destructive/10 p-4 text-sm leading-6 text-destructive">{error}</p>}
+                {message && <p role="status" className="rounded-lg bg-primary/10 p-4 text-sm leading-6">{message}</p>}
+                <div className="space-y-2"><Label htmlFor="auth-email">Email</Label><Input id="auth-email" required type="email" autoComplete="email" disabled={busy} value={email} onChange={(event) => setEmail(event.target.value)} /></div>
+                {mode === 'login' && <PasswordField id="auth-password" label="Password" required autoComplete="current-password" disabled={busy} value={password} onChange={(event) => setPassword(event.target.value)} />}
+                {mode === 'login' && <div className="flex flex-col items-start gap-2">
+                  <Button variant="ghost" type="button" className="px-0 text-primary" onClick={() => onModeChange?.('forgot')}>Forgot password?</Button>
+                  <Button variant="outline" type="button" disabled={busy || !email} onClick={() => void resend()}>Resend confirmation email</Button>
+                </div>}
+                <Button type="submit" isLoading={busy} className="w-full">{mode === 'forgot' ? 'Send reset link' : 'Sign in'}<ArrowRight aria-hidden="true" /></Button>
+              </form>}
+            </div>
+          </section>
+        </div>
       </div>
-    </div>
-  </main>;
+      <AlertDialog open={Boolean(navigation.pending)} onOpenChange={(open) => { if (!open) navigation.cancel(); }}>
+        <AlertDialogContent onCloseAutoFocus={(event) => { event.preventDefault(); navigation.restoreFocus(); }}>
+          <AlertDialogHeader><AlertDialogTitle>Leave registration?</AlertDialogTitle>
+            <AlertDialogDescription>Your unsaved form entries and selected images will be lost. Stay here to continue your registration.</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter><AlertDialogCancel asChild><Button variant="outline">Stay on registration</Button></AlertDialogCancel>
+            <AlertDialogAction asChild><Button onClick={navigation.confirm}>Leave registration</Button></AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </main>
+  );
 }

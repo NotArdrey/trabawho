@@ -1,31 +1,63 @@
-import { useState } from 'react';
+import { FileCheck, Upload } from 'lucide-react';
+import type { ReactNode } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { encodeIdentityImage } from '@/shared/services/accountRegistrationService';
+import { evidenceLabels } from '../domain/manualReviewValidation';
+import { useManualAccountReview } from '../hooks/useManualAccountReview';
+import type { DraftListener } from '../hooks/useRegistrationDraft';
+import { RegistrationStepHeader } from './RegistrationStepHeader';
 
-export function ManualAccountReview({ busy, submit, canSubmit = true }: { busy: boolean; canSubmit?: boolean; submit: (body: Record<string, unknown>) => Promise<void> }) {
-  const [name, setName] = useState(''); const [number, setNumber] = useState(''); const [document, setDocument] = useState('');
-  const [expiry, setExpiry] = useState(''); const [error, setError] = useState(''); const [encoding, setEncoding] = useState(false);
-  const [files, setFiles] = useState<Record<string, File | null>>({ front: null, back: null, selfie: null });
-  return <form className="space-y-4" onSubmit={(event) => {
-    event.preventDefault(); if (busy || encoding || !canSubmit) return;
-    setEncoding(true); setError('');
-    void (async () => {
-      try {
-        const [frontImage, backImage, selfieImage] = await Promise.all([encodeIdentityImage(files.front), encodeIdentityImage(files.back), encodeIdentityImage(files.selfie)]);
-        await submit({ action: 'manual', fullName: name, documentNumber: number, documentType: document, expiry, frontImage, backImage, selfieImage, acceptedIdentityTerms: true });
-      } catch (cause) { setError(cause instanceof Error ? cause.message : 'Evidence could not be read.'); }
-      finally { setEncoding(false); }
-    })();
-  }}>
-    <h2 className="text-lg font-semibold">Manual identity review</h2>
-    <p className="text-sm text-muted-foreground">Use this if the hosted workflow cannot verify your document. An administrator reviews this evidence before access opens. Allow up to seven days.</p>
-    {[['manual-name', 'Name on ID', name, setName], ['manual-document', 'Government document type', document, setDocument], ['manual-number', 'ID number', number, setNumber]]
-      .map(([id, label, value, setter]) => <div key={String(id)} className="space-y-2"><Label htmlFor={String(id)}>{String(label)}</Label><Input id={String(id)} value={String(value)} maxLength={200} required disabled={busy || encoding} onChange={(event) => (setter as (value: string) => void)(event.target.value)} /></div>)}
-    <div className="space-y-2"><Label htmlFor="manual-expiry">ID expiry date (if shown)</Label><Input id="manual-expiry" type="date" value={expiry} onChange={(event) => setExpiry(event.target.value)} /></div>
-    {(['front', 'back', 'selfie'] as const).map((slot) => <div key={slot} className="space-y-2"><Label htmlFor={`manual-${slot}-image`}>{slot === 'selfie' ? 'Selfie' : `ID ${slot}`}</Label><Input id={`manual-${slot}-image`} type="file" accept="image/jpeg,image/png,image/webp" required disabled={busy || encoding} onChange={(event) => setFiles((current) => ({ ...current, [slot]: event.target.files?.[0] || null }))} /></div>)}
-    {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
-    <Button type="submit" disabled={!canSubmit} isLoading={busy || encoding}>Submit for human review</Button>
-  </form>;
+interface Props {
+  busy: boolean; canSubmit?: boolean; consentContent?: ReactNode; onDraftChange?: DraftListener;
+  submit: (body: Record<string, unknown>) => Promise<void>;
+}
+
+export function ManualAccountReview({ busy, submit, canSubmit = true, consentContent, onDraftChange }: Props) {
+  const form = useManualAccountReview(submit, onDraftChange);
+  const disabled = busy || form.encoding;
+  return (
+    <form noValidate className="space-y-6" onSubmit={(event) => {
+      event.preventDefault(); if (disabled || !canSubmit) return;
+      void form.send().then((id) => { if (id) document.getElementById(id)?.focus(); });
+    }}>
+      <RegistrationStepHeader icon={FileCheck} title="Manual identity review"
+        description="An administrator reviews your ID and selfie before you can access the marketplace. Allow up to seven days." />
+      <fieldset className="space-y-4" disabled={disabled}>
+        <legend className="mb-4 text-lg font-semibold">Document details</legend>
+        {([{ key: 'name', label: 'Name on ID', placeholder: 'Complete name as shown on your ID' },
+          { key: 'document', label: 'Government document type', placeholder: 'For example, Passport or Postal ID' },
+          { key: 'number', label: 'ID number', placeholder: 'Number printed on your ID' }] as const).map(({ key, label, placeholder }) => (
+          <div key={key} className="space-y-2">
+            <Label htmlFor={'manual-' + key}>{label}</Label>
+            <Input id={'manual-' + key} value={form.fields[key]} maxLength={200} required placeholder={placeholder}
+              aria-invalid={Boolean(form.errors[key])} aria-describedby={form.errors[key] ? 'manual-' + key + '-error' : undefined}
+              onChange={(event) => form.update(key, event.target.value)} />
+            {form.errors[key] && <p id={'manual-' + key + '-error'} className="text-sm text-destructive">{form.errors[key]}</p>}
+          </div>
+        ))}
+        <div className="space-y-2"><Label htmlFor="manual-expiry">ID expiry date (if shown)</Label>
+          <Input id="manual-expiry" type="date" value={form.fields.expiry} onChange={(event) => form.update('expiry', event.target.value)} />
+        </div>
+      </fieldset>
+      <fieldset className="space-y-4 border-t pt-6" disabled={disabled} aria-describedby="manual-evidence-help">
+        <legend className="mb-3 pt-6 text-lg font-semibold">Identity evidence</legend>
+        <p id="manual-evidence-help" className="text-xs leading-5 text-muted-foreground">Use clear JPEG, PNG, or WebP images, up to 7 MB each. All three images are required.</p>
+        {(['front', 'back', 'selfie'] as const).map((slot) => (
+          <div key={slot} className="space-y-2">
+            <Label htmlFor={'manual-' + slot + '-image'} className="flex items-center gap-2"><Upload className="size-4 text-muted-foreground" aria-hidden="true" />{evidenceLabels[slot]}</Label>
+            <Input id={'manual-' + slot + '-image'} type="file" accept="image/jpeg,image/png,image/webp" required
+              className="h-auto min-h-12 min-w-0 py-3 text-xs file:mr-3 file:rounded-md file:border-0 file:bg-muted file:px-3 file:py-1 file:font-medium file:text-foreground"
+              aria-invalid={Boolean(form.errors[slot])} aria-describedby={form.errors[slot] ? 'manual-' + slot + '-error' : 'manual-evidence-help'}
+              onChange={(event) => form.setFile(slot, event.target.files?.[0] || null)} />
+            {form.errors[slot] && <p id={'manual-' + slot + '-error'} className="text-sm text-destructive">{form.errors[slot]}</p>}
+          </div>
+        ))}
+      </fieldset>
+      {consentContent}
+      {!canSubmit && <p className="text-xs leading-5 text-muted-foreground">Select the identity consent checkbox before submitting your evidence.</p>}
+      {form.error && <p role="alert" className="text-sm text-destructive">{form.error}</p>}
+      <Button type="submit" className="h-auto min-h-11 w-full whitespace-normal py-3" disabled={!canSubmit} isLoading={disabled}>Submit for human review</Button>
+    </form>
+  );
 }

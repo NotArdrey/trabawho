@@ -7,10 +7,12 @@ export function useAccountRegistration() {
   const [pending, setPending] = useState<PendingAccount | null>(() => pendingAccount());
   const [busy, setBusy] = useState(false); const [error, setError] = useState('');
   const [message, setMessage] = useState(''); const working = useRef(false);
+  const [initializing, setInitializing] = useState(true);
+  const [restoreFailed, setRestoreFailed] = useState(false);
   const run = useCallback(async (action: () => Promise<void>) => {
-    if (working.current) return;
+    if (working.current) return false;
     working.current = true; setBusy(true); setError(''); setMessage('');
-    try { await action(); } catch (cause) { setError(cause instanceof Error ? cause.message : 'Registration could not be completed. Retry.'); }
+    try { await action(); return true; } catch (cause) { setError(cause instanceof Error ? cause.message : 'Registration could not be completed. Retry.'); return false; }
     finally { working.current = false; setBusy(false); }
   }, []);
   const refresh = useCallback(() => run(async () => {
@@ -21,12 +23,20 @@ export function useAccountRegistration() {
   useEffect(() => {
     let mounted = true;
     void Promise.resolve().then(async () => {
-      if (!mounted) return; await refresh();
+      if (!mounted) return;
+      const restored = await refresh();
+      if (!mounted) return;
+      setRestoreFailed(!restored); setInitializing(false);
       if (mounted && new URLSearchParams(window.location.hash.slice(1)).has('error'))
         setError('The confirmation link expired or could not be used. Request a new confirmation email from Sign in.');
     });
     return () => { mounted = false; };
   }, [refresh]);
+  const retryRestore = async () => {
+    setInitializing(true);
+    const restored = await refresh();
+    setRestoreFailed(!restored); setInitializing(false);
+  };
   const create = (email: string, password: string, acceptedTerms: boolean) => run(async () => {
     const result = await registrationRequest('account-registration', { action: 'create', email, password, acceptedTerms });
     if (!result.pendingAccount) throw new Error('Account recovery information is unavailable. Use sign in to resume.');
@@ -49,5 +59,7 @@ export function useAccountRegistration() {
     setRegistration(state); setPending(null);
   });
   return { registration: registration || (pending ? { state: 'email_pending' as const, email: pending.email } : null), busy, error, message,
-    create, emailAction, identityAction, resume, refresh };
+    create, emailAction, identityAction, resume, refresh, initializing, restoreFailed, retryRestore };
 }
+
+export type AccountRegistrationFlow = ReturnType<typeof useAccountRegistration>;
