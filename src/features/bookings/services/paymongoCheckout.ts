@@ -1,6 +1,8 @@
 import { supabase } from "@/integrations/supabase";
+import type { ServiceAddress } from '@/shared/domain/serviceAddress';
 
 interface CheckoutBooking {
+  serviceAddress?: ServiceAddress;
   amountPaid?: number | string;
   id?: string;
   quoteVersion?: number | string;
@@ -118,6 +120,7 @@ export async function createPayMongoCheckout(booking: CheckoutBooking): Promise<
     {
       body: {
         bookingId: booking.id || null,
+        serviceAddress: booking.serviceAddress,
         serviceId: booking.serviceId || null,
         slotId,
         quoteVersion: booking.quoteVersion || null,

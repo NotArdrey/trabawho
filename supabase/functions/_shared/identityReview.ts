@@ -86,7 +86,10 @@ export async function loadIdentityReviewDetail(client: AdminClient, reviewId: st
     }
   }
   const summary = Object.fromEntries(reviewColumns.split(",").map((key) => [key, review[key]]));
-  return { review: summary, profile: profileResult.data, history: historyResult.data, images, warnings, didit };
+  const registration = await client.from('account_registrations')
+    .select('source_legal_name,requested_legal_name,name_issue,reviewed_legal_name').eq('user_id', review.user_id).maybeSingle();
+  if (registration.error) throw new ReviewError('Name review details could not be loaded. Retry.', 503);
+  return { review: summary, profile: profileResult.data, history: historyResult.data, images, warnings, didit, registration: registration.data };
 }
 
 export async function deliverIdentityConfirmation(client: AdminClient, reviewId: string, resend = false) {

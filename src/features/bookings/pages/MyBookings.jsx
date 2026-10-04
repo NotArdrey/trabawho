@@ -25,7 +25,6 @@ import PaymentModal from '../components/PaymentModal';
 import BookingTermsModal from '../components/BookingTermsModal';
 import RatingModal from '../components/RatingModal';
 import { BookingDetailsDialog } from '../components/BookingDetailsDialog';
-import { BookingScopeSwitcher } from '../components/BookingScopeSwitcher';
 import { BookingReservationNotice } from '../components/BookingReservationNotice';
 import { CancelBookingDialog } from '../components/CancelBookingDialog';
 import { BookingRequestReviewDialog } from '../components/BookingRequestReviewDialog';
@@ -574,12 +573,6 @@ const MyBookings = ({
     nextParams.set('scope', activeScope);
     setSearchParams(nextParams, { replace });
   };
-  const handleScopeChange = (nextScope) => {
-    const nextParams = new URLSearchParams();
-    nextParams.set('scope', nextScope);
-    const destination = nextScope === 'incoming' ? paths.workerBookings : paths.bookings;
-    navigate(`${destination}?${nextParams.toString()}`);
-  };
   const bookingSearch = searchParams.get('q') || '';
   const activeSearch = bookingSearch.trim().toLowerCase();
   const displayedBookings = useMemo(() => {
@@ -753,7 +746,6 @@ const MyBookings = ({
         </div>
       </section>
 
-      {isWorkerAccount && !isChatRoute && <BookingScopeSwitcher value={activeScope} onValueChange={handleScopeChange} />}
 
       {/* KPI Overview Metrics Grid */}
       <section className="grid auto-cols-[minmax(15rem,1fr)] grid-flow-col gap-3 overflow-x-auto pb-2 md:grid-flow-row md:grid-cols-2 md:overflow-visible lg:grid-cols-4" aria-label="Bookings metrics snapshot">

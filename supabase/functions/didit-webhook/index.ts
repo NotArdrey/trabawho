@@ -1,6 +1,7 @@
 import { buildIdentityDocumentFingerprint, corsHeaders, createAdminClient,
   jsonResponse, sanitizeIdentityVerificationData, sha256Hex } from "../_shared/identityRegistration.ts";
-import { asRecord, extractIdentityDocument, resolveDiditDecisionStatus } from "../_shared/identityDomain.ts";
+import { asRecord, resolveDiditDecisionStatus } from "../_shared/identityDomain.ts";
+import { verifiedDocument } from "../_shared/accountRegistration.ts";
 import { verifyDiditSignature } from "../_shared/diditSignature.ts";
 
 Deno.serve(async (req: Request) => {
@@ -20,12 +21,12 @@ Deno.serve(async (req: Request) => {
     const eventId = typeof payload.event_id === "string" ? payload.event_id : "";
     const status = resolveDiditDecisionStatus(payload);
     if (!sessionId || !eventId || !status) return jsonResponse({ error: "Missing session event fields" }, 400);
-    const document = extractIdentityDocument(payload);
+    const document = verifiedDocument(payload);
     const fingerprint: string | null = await buildIdentityDocumentFingerprint(payload);
     const sanitized: unknown = sanitizeIdentityVerificationData(payload);
     const { data, error } = await createAdminClient().rpc("apply_didit_identity_event", {
       p_event_key: `didit:${eventId}`, p_payload_hash: await sha256Hex(rawBody), p_session_id: sessionId,
-      p_status: status, p_payload: sanitized, p_document: document, p_fingerprint: fingerprint,
+      p_status: status, p_payload: sanitized, p_document: { ...document, documentNumber: undefined }, p_fingerprint: fingerprint,
     });
     if (error) throw new Error(error.code);
     return jsonResponse(asRecord(data));

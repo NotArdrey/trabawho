@@ -33,8 +33,6 @@ import { desktopWorkspaceSidebarClass, WorkspaceSidebarAccount, WorkspaceSidebar
 
 const WORKER_ROLES = new Set(["worker", "workers", "seller", "sellers"]);
 const CLIENT_ROLES = new Set(["client", "clients", "buyer", "buyers", "customer", "customers"]);
-const PROVIDER_VIEWS = new Set(["worker-dashboard", "worker-bookings", "my-work"]);
-const CLIENT_VIEWS = new Set(["client-dashboard", "browse-services", "my-bookings"]);
 
 export interface DashboardProfile {
   userId?: string;
@@ -105,8 +103,6 @@ export default function DashboardNavigation({
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
   const [isLogoutModalOpen, setIsLogoutModalOpen] = useState(false);
   const [showMobileSearch, setShowMobileSearch] = useState(false);
-  const workspaceUserId = sellerProfile?.userId || sellerProfile?.user_id || "anonymous";
-  const workspaceStorageKey = `trabawho-worker-workspace:${workspaceUserId}`;
   const { notifications, isLoading, error, actionError, markRead, markAllRead, retry } = useRealtimeNotifications(sellerProfile?.userId || sellerProfile?.user_id);
 
   useEffect(() => {
@@ -130,9 +126,7 @@ export default function DashboardNavigation({
   const role = String(sellerProfile?.role || "").trim().toLowerCase();
   const isAdminAccount = Boolean(sellerProfile?.isAdmin) || role === "admin";
   const isWorkerAccount = isWorkerProfile(sellerProfile);
-  const routeWorkspace = PROVIDER_VIEWS.has(currentView) ? "provider" : CLIENT_VIEWS.has(currentView) ? "client" : null;
-  const resolvedWorkspace = routeWorkspace || localStorage.getItem(workspaceStorageKey) || "provider";
-  const isProviderWorkspace = isWorkerAccount && resolvedWorkspace === "provider";
+  const isProviderWorkspace = isWorkerAccount && !isAdminAccount;
   const showGlobalSearch = !["browse-services", "client-dashboard"].includes(currentView);
   const submitSearch = (event: React.KeyboardEvent<HTMLInputElement>) => {
     if (event.key === "Enter") {
@@ -144,17 +138,6 @@ export default function DashboardNavigation({
   const profilePhotoUrl = getProfilePhotoUrl(sellerProfile?.profilePhoto);
   const displayName = sellerProfile?.fullName || [sellerProfile?.firstName, sellerProfile?.lastName].filter(Boolean).join(" ") || "TrabaWho member";
   const workspaceLabel = isProviderWorkspace ? "Provider workspace" : "Client workspace";
-
-  useEffect(() => {
-    if (!isWorkerAccount) return;
-    if (routeWorkspace) localStorage.setItem(workspaceStorageKey, routeWorkspace);
-  }, [isWorkerAccount, routeWorkspace, workspaceStorageKey]);
-
-  const switchWorkerWorkspace = () => {
-    const nextWorkspace = isProviderWorkspace ? "client" : "provider";
-    localStorage.setItem(workspaceStorageKey, nextWorkspace);
-    void navigate(nextWorkspace === "provider" ? paths.workerDashboard : paths.dashboard);
-  };
 
   const openWorkspaceHome = () => {
     if (isProviderWorkspace) void navigate(paths.workerDashboard);
@@ -208,15 +191,6 @@ export default function DashboardNavigation({
       <DropdownMenuItem onSelect={onOpenAccountSettings || onOpenProfile}><Shield />Account &amp; Privacy</DropdownMenuItem>
       <DropdownMenuItem onSelect={onOpenSettings}><Settings />Settings</DropdownMenuItem>
       {sellerProfile?.role === "admin" && <DropdownMenuItem onSelect={onToggleAdminView}><Shield />{isAdminView ? "Switch to Client View" : "Switch to Admin View"}</DropdownMenuItem>}
-      {isWorkerAccount && !isAdminAccount && (
-        <DropdownMenuItem
-          className="my-1 border border-primary/20 bg-primary/10 font-semibold text-primary focus:bg-primary/15 focus:text-primary [&>svg]:text-primary"
-          onSelect={switchWorkerWorkspace}
-        >
-          <BriefcaseBusiness />
-          {isProviderWorkspace ? "Switch to client workspace" : "Switch to provider workspace"}
-        </DropdownMenuItem>
-      )}
       <DropdownMenuSeparator />
       <DropdownMenuItem className="text-destructive focus:bg-destructive/10 focus:text-destructive" onSelect={() => setIsLogoutModalOpen(true)}><LogOut />Logout</DropdownMenuItem>
     </>

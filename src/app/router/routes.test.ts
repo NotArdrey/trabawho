@@ -38,6 +38,18 @@ describe("application route policy", () => {
     expect(homePathForRole("client")).toBe("/dashboard");
   });
 
+  it("keeps Client and Worker activities on separate accounts", () => {
+    for (const path of ['/dashboard', '/bookings']) {
+      expect(canAccessPath(path, 'worker')).toBe(false);
+      expect(canAccessPath(path, 'client')).toBe(true);
+    }
+    for (const path of ['/worker/dashboard', '/worker/bookings', '/work', '/seller/onboarding']) {
+      expect(canAccessPath(path, 'worker')).toBe(true);
+      expect(canAccessPath(path, 'client')).toBe(false);
+    }
+    expect(canAccessPath('/admin', 'worker')).toBe(false);
+  });
+
   it("accepts only known internal return paths", () => {
     expect(isKnownPath("/settings/account")).toBe(true);
     expect(isSafeReturnPath("/bookings?filter=pending")).toBe(true);

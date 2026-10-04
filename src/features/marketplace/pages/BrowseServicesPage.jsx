@@ -382,7 +382,7 @@ function BrowseServicesPage({
       />
 
       {isPaymentModalOpen && pendingBooking && (
-        <PaymentModal
+        <PaymentModal collectServiceAddress
           booking={pendingBooking}
           requireBookingTerms
           onSelectPayment={handleSelectPayment}

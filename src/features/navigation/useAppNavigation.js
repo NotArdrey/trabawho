@@ -1,3 +1,4 @@
+import { routePendingRegistration } from '@/shared/services/accountRegistrationService';
 import { useState, useEffect } from 'react';
 import { authIdentityFallback } from '@/shared/utils/authIdentityFallback';
 import { useLocation, useNavigate } from 'react-router-dom';
@@ -16,7 +17,6 @@ import {
   signOutUser,
   syncAuthenticatedUserProfile,
   fetchUserProfileBundle,
-  syncWorkerSetup,
   uploadProfilePhoto,
   updateUserProfileFields,
   resendSignupVerificationEmail,
@@ -398,6 +398,7 @@ export const useAppNavigation = () => {
         if (!isMounted) return;
 
         if (sessionUser) {
+          if (await routePendingRegistration(location.pathname)) return;
           let profile;
           try {
             profile = await syncAuthenticatedUserProfile(sessionUser);
@@ -560,96 +561,11 @@ export const useAppNavigation = () => {
     const userId = authUser?.id || sellerProfile?.userId;
     if (!userId) return;
 
-    const resolvedLocation = profileData?.location || userLocation || sellerProfile?.location || {};
-    const profilePayload = {
-      ...profileData,
-      firstName: profileData?.firstName || sellerProfile?.firstName || authUser?.user_metadata?.first_name || '',
-      middleName: profileData?.middleName || sellerProfile?.middleName || authUser?.user_metadata?.middle_name || '',
-      lastName: profileData?.lastName || sellerProfile?.lastName || authUser?.user_metadata?.last_name || '',
-      serviceType: profileData?.serviceType || sellerProfile?.serviceType || '',
-      customServiceType: profileData?.customServiceType || sellerProfile?.customServiceType || '',
-      bio: profileData?.bio || sellerProfile?.bio || '',
-      pricingModel: profileData?.pricingModel || sellerProfile?.pricingModel || 'fixed',
-      fixedPrice: profileData?.fixedPrice || sellerProfile?.fixedPrice || '',
-      rateBasis: profileData?.rateBasis || sellerProfile?.rateBasis || 'per-project',
-      bookingMode: profileData?.bookingMode || sellerProfile?.bookingMode || 'with-slots',
-      paymentAdvance: profileData?.paymentAdvance ?? sellerProfile?.paymentAdvance ?? false,
-      paymentAfterService: profileData?.paymentAfterService ?? sellerProfile?.paymentAfterService ?? true,
-      afterServicePaymentType: profileData?.afterServicePaymentType || sellerProfile?.afterServicePaymentType || 'both',
-      gcashNumber: profileData?.gcashNumber || sellerProfile?.gcashNumber || '',
-      qrFileName: profileData?.qrFileName || sellerProfile?.qrFileName || '',
-      fullName: profileData?.fullName
-        || sellerProfile?.fullName
-        || [
-          profileData?.firstName || sellerProfile?.firstName || authUser?.user_metadata?.first_name || '',
-          profileData?.middleName || sellerProfile?.middleName || authUser?.user_metadata?.middle_name || '',
-          profileData?.lastName || sellerProfile?.lastName || authUser?.user_metadata?.last_name || '',
-        ].filter(Boolean).join(' ').trim()
-        || authUser?.user_metadata?.full_name
-        || authUser?.user_metadata?.name
-        || '',
-      email: profileData?.email || authUser?.email || sellerProfile?.email || '',
-      province: profileData?.province || resolvedLocation.province || '',
-      city: profileData?.city || resolvedLocation.city || '',
-      barangay: profileData?.barangay || resolvedLocation.barangay || '',
-      address: profileData?.address || resolvedLocation.address || '',
-      location: resolvedLocation,
-    };
-
-    try {
-      const mergedProfile = await syncWorkerSetup(userId, profilePayload);
-      setSellerProfile(mergedProfile);
-      setUserLocation(mergedProfile?.location || null);
-      setIsSellerOnboardingOpen(false);
-      if (destination === 'home') {
-        setCurrentView('client-dashboard');
-        return;
-      }
-      setCurrentView('my-work');
-    } catch (error) {
-      console.error('Failed to complete seller onboarding (first attempt):', error);
-
-      // Retry once with a minimal payload to avoid issues from optional fields.
-      try {
-        const retryPayload = {
-          fullName: profilePayload.fullName,
-          serviceType: profilePayload.serviceType,
-          customServiceType: profilePayload.customServiceType,
-          bio: profilePayload.bio,
-          pricingModel: profilePayload.pricingModel,
-          fixedPrice: profilePayload.fixedPrice,
-          bookingMode: profilePayload.bookingMode,
-          rateBasis: profilePayload.rateBasis,
-          paymentAdvance: profilePayload.paymentAdvance,
-          paymentAfterService: profilePayload.paymentAfterService,
-          afterServicePaymentType: profilePayload.afterServicePaymentType,
-          gcashNumber: profilePayload.gcashNumber,
-          qrFileName: profilePayload.qrFileName,
-          province: profilePayload.province,
-          city: profilePayload.city,
-          barangay: profilePayload.barangay,
-          address: profilePayload.address,
-          location: profilePayload.location,
-        };
-
-        const mergedProfile = await syncWorkerSetup(userId, retryPayload);
-        setSellerProfile(mergedProfile);
-        setUserLocation(mergedProfile?.location || null);
-        setIsSellerOnboardingOpen(false);
-        setCurrentView(destination === 'home' ? 'client-dashboard' : 'my-work');
-        showSuccessNotification('Seller onboarding synced on retry.');
-        return;
-      } catch (retryError) {
-        console.error('Failed to complete seller onboarding (retry):', retryError);
-      }
-
-      // Keep user in onboarding with a real backend error instead of fake local mode.
-      setIsSellerOnboardingOpen(true);
-      showErrorNotification(
-        `${toErrorMessage(error, 'Unable to sync seller onboarding.')}`
-        + ' Please ensure Supabase seller tables and RLS policies are applied (profiles, worker_profiles, sellers, services).'
-      );
-    }
+    const mergedProfile = await fetchUserProfileBundle(userId);
+    setSellerProfile(mergedProfile);
+    setUserLocation(mergedProfile?.location || null);
+    setIsSellerOnboardingOpen(false);
+    setCurrentView(destination === 'home' ? 'client-dashboard' : 'my-work');
   };
 
   const handleCloseSellerOnboarding = () => {

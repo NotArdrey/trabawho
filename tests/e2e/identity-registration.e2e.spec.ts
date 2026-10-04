@@ -1,105 +1,94 @@
-import { test, expect, type Page } from '@playwright/test';
-import { corsHeaders, expectNoRegistrationOverflow, fillManualEvidence, fillRegistration, mockRegistrationLocations, selectRegistrationOption, serviceLocation } from './helpers/registration';
-
-test.beforeEach(async ({ page }) => { await mockRegistrationLocations(page); });
-
-async function mockDidit(page: Page, status: string) {
-  const completions: unknown[] = [];
-  await page.route('**/functions/v1/create-didit-session', async route => {
-    if (route.request().method() === 'OPTIONS') { await route.fulfill({ status: 204, headers: corsHeaders }); return; }
-    const body = route.request().postDataJSON() as Record<string, unknown>;
-    await route.fulfill({ headers: corsHeaders, json: body.action === 'get_session'
-      ? { success: true, status, businessStatus: status }
-      : { success: true, sessionId: 'didit-session-123', sessionNonce: 'nonce-123', verificationUrl: 'https://verification.didit.me/session/demo' } });
-  });
-  await page.route('**/functions/v1/create-unverified-user', async route => {
-    if (route.request().method() === 'OPTIONS') { await route.fulfill({ status: 204, headers: corsHeaders }); return; }
-    completions.push(route.request().postDataJSON() as unknown);
-    await route.fulfill({ headers: corsHeaders, json: { success: true, identityStatus: status } });
-  });
-  return completions;
-}
-
-for (const outcome of [
-  { status: 'APPROVED', message: 'Your identity was approved. Confirm your email, then log in.' },
-  { status: 'PENDING_REVIEW', message: 'Your account was created, but access is held until identity review is approved.' },
-]) {
-  test(`legacy identity route submits the full address and consents for ${outcome.status}`, async ({ page }) => {
-    const completions = await mockDidit(page, outcome.status);
-    await page.goto('/#identity-register');
-    await fillRegistration(page);
-    await page.getByRole('button', { name: 'Start Didit Verification' }).click();
-    await expect(page.getByTestId('didit-session-panel')).toBeVisible();
-    await expect(page.getByRole('link', { name: 'Open Didit Verification' })).toHaveAttribute('href', /verification\.didit\.me/);
-    await page.reload();
-    await page.getByRole('button', { name: 'Check Verification Status' }).click();
-    await expect(page.getByRole('heading', { name: 'Sign in', exact: true })).toBeVisible();
-    await expect(page.getByText(outcome.message, { exact: true })).toBeVisible();
-    expect(completions).toEqual([expect.objectContaining({ ...serviceLocation, acceptedIdentityTerms: true, acceptedRaTerms: true, diditStatus: outcome.status })]);
+import { expect, test } from '@playwright/test';
+import { mockAccountJourney, fillManualEvidence, expectNoRegistrationOverflow } from './helpers/registration';
+for(const width of [390,768,1024,1280,1440]) {
+  test(`approved identity requires complete name confirmation at ${width}px`,async({page})=>{
+    await page.setViewportSize({width,height:900});
+    const flow=await mockAccountJourney(page,{state:'identity_pending'});
+    await page.goto('/register');
+    await expect(page.getByRole('heading',{name:'Verify your identity',exact:true})).toBeVisible();
+    await expect(page.getByRole('button',{name:'Start identity verification'})).toBeDisabled();
+    await page.getByRole('checkbox',{name:/I consent to identity/}).check();
+    await page.getByRole('button',{name:'Start identity verification'}).click();
+    await expect(page.getByRole('link',{name:/Continue in Didit/})).toHaveAttribute('href',/didit\.me/);
+    await page.getByRole('button',{name:'Check verification status'}).click();
+    await expect(page.getByRole('heading',{name:'Name on your verified ID'})).toBeVisible();
+    await expect(page.getByText('Maria Isabel de la Cruz Santos',{exact:true})).toBeVisible();
+    await expect(page.locator('input[type=file]')).toHaveCount(0);
+    await page.getByRole('button',{name:'Confirm my legal name'}).click();
+    await expect(page.getByRole('heading',{name:'Your account is ready'})).toBeVisible();
+    expect(flow.requests.filter(item=>item.name==='account-identity-name')).toEqual([expect.objectContaining({body:expect.objectContaining({action:'confirm_name',confirmed:true})})]);
     await expectNoRegistrationOverflow(page);
   });
 }
-
-test('declined verification cannot create an account and preserves registration details for retry', async ({ page }) => {
-  const completions = await mockDidit(page, 'DECLINED');
-  await page.goto('/#identity-register');
-  await fillRegistration(page);
-  await page.getByRole('button', { name: 'Start Didit Verification' }).click();
-  await page.getByRole('button', { name: 'Check Verification Status' }).click();
-  await expect(page.getByTestId('identity-outcome')).toContainText('Verification was not completed');
-  expect(completions).toEqual([]);
-  await page.getByRole('button', { name: 'Try Again' }).click();
-  await page.getByRole('button', { name: 'Go to next page' }).click();
-  await expect(page.getByLabel('Email', { exact: true })).toHaveValue('person@example.com');
+for(const [label,next] of [
+  ['review',{state:'identity_review',nameIssue:'The overall decision needs review.'}],
+  ['missing name',{state:'identity_review',nameIssue:'The verified name needs human review.'}],
+  ['duplicate',{state:'identity_review',nameIssue:'Another account has a matching identity document.'}],
+  ['declined',{state:'declined'}], ['abandoned',{state:'declined'}],
+] as const) test(`${label} does not expose marketplace access`,async({page})=>{
+  await mockAccountJourney(page,next);
+  await page.goto('/register');
+  await expect(page.getByRole('heading',{name:next.state==='declined'?'Verification needs another attempt':'Identity review pending'})).toBeVisible();
+  await expect(page.getByRole('link',{name:'Start booking services'})).toHaveCount(0);
+  await expect(page.getByRole('button',{name:'Confirm my legal name'})).toHaveCount(0);
 });
-
-test('Postal ID signup from the legacy identity route includes all address fields and image evidence', async ({ page }) => {
-  let payload: unknown;
-  await page.route('**/functions/v1/manual-identity-review', async route => {
-    if (route.request().method() === 'OPTIONS') { await route.fulfill({ status: 204, headers: corsHeaders }); return; }
-    payload = route.request().postDataJSON() as unknown;
-    await route.fulfill({ headers: corsHeaders, json: { success: true, message: 'Manual review submitted.' } });
-  });
-  await page.goto('/#identity-register');
-  await fillRegistration(page, 'Postal ID');
+test('a disputed legal name stays a correction request for human review',async({page})=>{
+  const flow=await mockAccountJourney(page,{state:'name_pending',legalName:'Original Source Name',documentType:'passport',sessionId:'didit-owned'});
+  await page.goto('/register');
+  await page.getByText('My legal name is missing or incorrect',{exact:true}).click();
+  await page.getByLabel('Requested legal name').fill('Requested Correct Name');
+  await page.getByRole('button',{name:'Request name review'}).click();
+  await expect(page.getByRole('heading',{name:'Identity review pending'})).toBeVisible();
+  await expect(page.getByText('Name from ID: Original Source Name')).toBeVisible();
+  await expect(page.getByText('Requested correction: Requested Correct Name')).toBeVisible();
+  expect(flow.requests.some(item=>item.body.action==='confirm_name')).toBe(false);
+});
+test('manual fallback submits evidence for the existing confirmed account without credentials or address',async({page})=>{
+  const flow=await mockAccountJourney(page,{state:'identity_pending'});
+  await page.goto('/register');
+  await page.getByRole('checkbox',{name:/I consent to identity/}).check();
+  await page.getByRole('button',{name:'Use manual identity review instead'}).click();
   await fillManualEvidence(page);
-  await page.getByRole('button', { name: 'Go to previous page' }).click();
-  await expect(page.getByLabel('Specific Address')).toHaveValue(serviceLocation.address);
-  await page.getByRole('button', { name: 'Go to next page' }).click();
-  await page.getByRole('button', { name: 'Submit Manual Review' }).click();
-  await expect(page.getByTestId('identity-outcome')).toContainText('Manual review submitted');
-  expect(payload).toMatchObject({ ...serviceLocation, action: 'submit_manual_review_signup', documentTypeKey: 'postal_id', acceptedIdentityTerms: true, acceptedRaTerms: true,
-    frontImage: { mimeType: 'image/png' }, backImage: { mimeType: 'image/png' }, selfieImage: { mimeType: 'image/png' } });
-  await expectNoRegistrationOverflow(page);
+  await page.getByRole('button',{name:'Submit for human review'}).click();
+  await expect(page.getByRole('heading',{name:'Identity review pending'})).toBeVisible();
+  const body=flow.requests.find(item=>item.name==='account-manual-review')?.body;
+  expect(body).toMatchObject({fullName:'Manual User',documentType:'Postal ID',frontImage:{mimeType:'image/png'},acceptedIdentityTerms:true});
+  expect(body).not.toHaveProperty('password'); expect(body).not.toHaveProperty('address');
+});
+test('cross-device return resumes the server-linked session without local signup data',async({page})=>{
+  const flow=await mockAccountJourney(page,{state:'identity_in_progress',sessionId:'didit-owned',sessionUrl:'https://verification.didit.me/session/test'});
+  await page.goto('/register?check_verification=true&status=Approved');
+  await expect(page.getByRole('heading',{name:'Name on your verified ID'})).toBeVisible();
+  expect(flow.requests.filter(item=>item.body.action==='create')).toHaveLength(0);
+  expect(await page.evaluate(()=>sessionStorage.getItem('trabawho.identitySignup.v1'))).toBeNull();
+});
+test('worker intent survives verification responses from older identity endpoints', async ({ page }) => {
+  await mockAccountJourney(page, { state: 'identity_pending', signupRole: 'worker' });
+  await page.goto('/register');
+  await page.getByRole('checkbox', { name: /I consent to identity/ }).check();
+  await page.getByRole('button', { name: 'Start identity verification' }).click();
+  await page.getByRole('button', { name: 'Check verification status' }).click();
+  await page.getByRole('button', { name: 'Confirm my legal name' }).click();
+  await expect(page.getByTestId('auth-task-panel').getByRole('link').last()).toHaveText('Offer services');
 });
 
-for (const [document, manual] of [
-    ['National ID / ID card', false], ['Passport', false], ["Driver's license", false], ['UMID', true], ['Postal ID', true],
-    ["Voter's ID", true], ['PRC ID', true], ['Health insurance ID', true], ['Other government document', true],
-  ] as const) {
-  test(`${document} uses its correct verification path`, async ({ page }) => {
-    await page.goto('/#identity-register');
-    await fillRegistration(page, document);
-    await expect(page.getByTestId('manual-review-fields')).toHaveCount(manual ? 1 : 0);
-    await expect(page.getByRole('button', { name: manual ? 'Submit Manual Review' : 'Start Didit Verification' })).toBeVisible();
-  });
-}
-
-test('identity route supports mobile direct entry', async ({ page }) => {
-  await page.setViewportSize({ width: 390, height: 844 });
-  await page.goto('/#identity-register');
-  await expect(page.getByRole('heading', { name: 'Create Account', exact: true })).toBeVisible();
-  await fillRegistration(page, 'Postal ID');
-  await fillManualEvidence(page);
-  await expectNoRegistrationOverflow(page);
+for (const signupRole of ['client', 'worker'] as const) test(`ready ${signupRole} resumes with the relevant next action`, async ({ page }) => {
+  const flow = await mockAccountJourney(page, { state: 'ready', signupRole });
+  await page.goto('/register');
+  await expect(page.getByRole('heading', { name: 'Your account is ready', exact: true })).toBeVisible();
+  const actions = page.getByTestId('auth-task-panel').getByRole('link');
+  await expect(page.getByText(/To use the other role, sign out and register a separate account with a different email/)).toBeVisible();
+  await expect(actions).toHaveCount(1);
+  await expect(page.getByRole('link', { name: signupRole === 'worker' ? 'Start booking services' : 'Offer services', exact: true })).toHaveCount(0);
+  await expect(actions.last()).toHaveText(signupRole === 'worker' ? 'Offer services' : 'Start booking services');
+  await expect(actions.last()).toHaveAttribute('href', signupRole === 'worker' ? '/seller/onboarding' : '/dashboard');
+  await page.reload();
+  await expect(actions.last()).toHaveAttribute('href', signupRole === 'worker' ? '/seller/onboarding' : '/dashboard');
+  expect(flow.requests.filter(item => item.body.action === 'create')).toHaveLength(0);
 });
-
-test('existing register link includes client and worker choices on mobile', async ({ page }) => {
-  await page.setViewportSize({ width: 390, height: 844 });
-  await page.goto('/#register');
-  await selectRegistrationOption(page, 'Account Type', 'Worker');
-  await expect(page.getByRole('combobox', { name: 'Account Type' })).toContainText('Worker');
-  await selectRegistrationOption(page, 'Account Type', 'Client');
-  await expect(page.getByRole('combobox', { name: 'Account Type' })).toContainText('Client');
-  await expectNoRegistrationOverflow(page);
+test('dashboard refresh redirects a pending account back to registration',async({page})=>{
+  await mockAccountJourney(page,{state:'identity_review'});
+  await page.goto('/dashboard');
+  await expect(page).toHaveURL(/\/register/);
+  await expect(page.getByRole('heading',{name:'Identity review pending'})).toBeVisible();
 });

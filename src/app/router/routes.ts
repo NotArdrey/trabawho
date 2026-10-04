@@ -114,7 +114,8 @@ export function isKnownPath(pathname: string): boolean {
 
 export function canAccessPath(pathname: string, role: UserRole): boolean {
   if (pathname === paths.admin || pathname === adminCasesPath || getAdminCaseId(pathname)) return role === "admin";
-  if (pathname === paths.workerDashboard || pathname === paths.workerBookings) return role === "worker" || role === "admin";
+  if ([paths.workerDashboard, paths.workerBookings, paths.work, paths.sellerOnboarding].some(path => path === pathname)) return role === "worker" || role === "admin";
+  if (pathname === paths.dashboard || pathname === paths.bookings) return role === "client" || role === "admin";
   return true;
 }
 

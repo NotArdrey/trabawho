@@ -119,7 +119,7 @@ export function useMarketplaceBookingFlow({ isPublic, services, schedulesByProvi
     setIsBookingSubmitting(true);
     setBookingError("");
     try {
-      redirectToPayMongo(await createPayMongoCheckout({ ...pendingBooking, paymentPlan: details.paymentPlan }));
+      redirectToPayMongo(await createPayMongoCheckout({ ...pendingBooking, paymentPlan: details.paymentPlan, serviceAddress: details.serviceAddress }));
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unable to reserve this booking.";
       if (/time (?:is|was).*(?:unavailable|booked)|slot.*(?:unavailable|full)/i.test(message)) {

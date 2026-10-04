@@ -8,7 +8,9 @@ import "@/styles/globals.css";
 function Journey() {
   const [sending, setSending] = useState(false);
   const [messages, setMessages] = useState<string[]>([]);
-  const booking = { serviceId: 1, quoteAmount: 1200, selectedSlot: { slotId: 1, date: "2026-10-02" }, serviceType: "Test service" };
+  const params = new URLSearchParams(window.location.search);
+  const booking = { serviceId: 1, quoteAmount: 1200, selectedSlot: { slotId: 1, date: "2026-10-02" }, serviceType: "Test service",
+    ...(params.has('quote') ? { id: 'quote-booking', bookingMode: 'calendar-only' } : {}) };
   if (new URLSearchParams(window.location.search).get("mode") === "chat") {
     return <main>
       <div aria-label="Messages">{messages.map((message, index) => <p key={index}>{message}</p>)}</div>
@@ -21,8 +23,8 @@ function Journey() {
       }} />
     </main>;
   }
-  return <PaymentModal booking={booking} requireBookingTerms={new URLSearchParams(window.location.search).has("terms")} onCancel={() => {}} onSelectPayment={async (_method, details) => {
-    redirectToPayMongo(await createPayMongoCheckout({ ...booking, paymentPlan: details.paymentPlan }));
+  return <PaymentModal booking={booking} collectServiceAddress={params.has('address')} requireBookingTerms={new URLSearchParams(window.location.search).has("terms")} onCancel={() => {}} onSelectPayment={async (_method, details) => {
+    redirectToPayMongo(await createPayMongoCheckout({ ...booking, paymentPlan: details.paymentPlan, serviceAddress: details.serviceAddress }));
   }} />;
 }
 
