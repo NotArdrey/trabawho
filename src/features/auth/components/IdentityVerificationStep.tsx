@@ -22,9 +22,10 @@ export function IdentityVerificationStep({ flow, state, onDraftChange }: { flow:
       <div data-identity-choice hidden={controls.manual} className="space-y-6">
         {!inProgress && <div className="space-y-3">
           <ol className="space-y-3 text-sm leading-6">
-            {['Have your government ID ready.', 'Use good lighting and a camera-enabled device.', 'Check the complete name from your ID afterwards.'].map((item, index) =>
+            {['Have your government ID ready. Upload an existing ID photo if Didit offers that option, or capture your ID with your camera.', 'Use good lighting and a camera-enabled device for the selfie check.', 'Check the complete name from your ID afterwards.'].map((item, index) =>
               <li key={item} className="flex items-start gap-3"><span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-semibold text-primary">{index + 1}</span>{item}</li>)}
           </ol>
+          <p className="text-xs leading-5 text-muted-foreground">If you cannot use Didit, manual review lets you upload your ID photos and selfie for an administrator to check.</p>
           <label htmlFor="account-identity-consent" className="flex min-h-11 cursor-pointer items-start gap-3 py-3 text-sm leading-5">
             <Checkbox id="account-identity-consent" disabled={flow.busy} checked={controls.consent} aria-describedby="identity-consent-help"
               onChange={(event) => controls.setConsent(event.target.checked)} />

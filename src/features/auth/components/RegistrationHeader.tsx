@@ -14,5 +14,5 @@ export function RegistrationHeader({ registration }: { registration: AccountRegi
     title={state === 'identity_in_progress' ? 'Identity verification in progress' : state === 'declined' ? 'Verification needs another attempt' : 'Verify your identity'}
     description={state === 'identity_in_progress' ? 'Continue your existing Didit session. Return here when you’re finished to check your result.'
       : state === 'declined' ? 'Your previous attempt was declined, abandoned, or expired. You can retry with valid evidence.'
-        : 'Your email is confirmed. Didit will guide you through choosing a supported government ID, scanning it, and taking a selfie.'} />;
+        : 'Your email is confirmed. Didit will guide you through submitting a supported government ID and completing a selfie check.'} />;
 }

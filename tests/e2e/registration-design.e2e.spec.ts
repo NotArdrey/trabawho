@@ -61,6 +61,7 @@ test('failed account creation keeps the entered password available for retry', a
     ? route.fulfill({ status: 204, headers: corsHeaders })
     : route.fulfill({ status: 503, headers: corsHeaders, json: { error: 'Account setup could not be saved. Retry.' } }));
   await page.goto('/register');
+  await page.getByRole('radio', { name: 'Worker: Offer services', exact: true }).check();
   await page.getByLabel('Email', { exact: true }).fill('person@example.com');
   await page.getByLabel('Password', { exact: true }).fill('Password123!');
   await page.getByLabel('Confirm password', { exact: true }).fill('Password123!');

@@ -11,6 +11,9 @@ export function IdentityResultStep({ flow, state, onDraftChange }: { flow: Accou
   const correction = useNameCorrection(flow, onDraftChange);
   const ready = state.state === 'ready';
   const namePending = state.state === 'name_pending';
+  const book = { href: '/dashboard', label: 'Start booking services' };
+  const offer = { href: '/seller/onboarding', label: 'Offer services' };
+  const nextActions = state.signupRole === 'worker' ? [book, offer] : [offer, book];
   return (
     <section className="space-y-6">
       {namePending && <div className="space-y-2 rounded-lg bg-muted/60 p-4">
@@ -43,9 +46,10 @@ export function IdentityResultStep({ flow, state, onDraftChange }: { flow: Accou
         </form>}
       </div>}
       {!correction.open && (ready ? <div className="space-y-3">
-        <p className="text-sm leading-6 text-muted-foreground">Enter a service address when you book. Complete provider setup before publishing a gig.</p>
-        <Button variant="outline" asChild className="h-auto min-h-11 w-full whitespace-normal py-3"><a href="/seller/onboarding">Offer services</a></Button>
-        <Button asChild className="h-auto min-h-11 w-full whitespace-normal py-3"><a href="/dashboard">Start booking services<ArrowRight aria-hidden="true" /></a></Button>
+        <p className="text-sm leading-6 text-muted-foreground">Use this same account to book and offer services. Enter a service address when you book. Complete provider setup before publishing a gig.</p>
+        {nextActions.map((action, index) => <Button key={action.href} variant={index === 1 ? 'primary' : 'outline'} asChild className="h-auto min-h-11 w-full whitespace-normal py-3">
+          <a href={action.href}>{action.label}{index === 1 && <ArrowRight aria-hidden="true" />}</a>
+        </Button>)}
       </div> : <Button className="h-auto min-h-11 w-full whitespace-normal py-3" isLoading={flow.busy} onClick={() => void (namePending
         ? flow.identityAction('account-identity-name', { action: 'confirm_name', confirmed: true }) : flow.refresh())}>
         {namePending ? 'Confirm my legal name' : 'Refresh review status'}{namePending && <ArrowRight aria-hidden="true" />}

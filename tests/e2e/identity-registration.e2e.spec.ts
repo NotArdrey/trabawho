@@ -62,6 +62,31 @@ test('cross-device return resumes the server-linked session without local signup
   expect(flow.requests.filter(item=>item.body.action==='create')).toHaveLength(0);
   expect(await page.evaluate(()=>sessionStorage.getItem('trabawho.identitySignup.v1'))).toBeNull();
 });
+test('worker intent survives verification responses from older identity endpoints', async ({ page }) => {
+  await mockAccountJourney(page, { state: 'identity_pending', signupRole: 'worker' });
+  await page.goto('/register');
+  await page.getByRole('checkbox', { name: /I consent to identity/ }).check();
+  await page.getByRole('button', { name: 'Start identity verification' }).click();
+  await page.getByRole('button', { name: 'Check verification status' }).click();
+  await page.getByRole('button', { name: 'Confirm my legal name' }).click();
+  await expect(page.getByTestId('auth-task-panel').getByRole('link').last()).toHaveText('Offer services');
+});
+
+for (const signupRole of ['client', 'worker'] as const) test(`ready ${signupRole} resumes with the relevant next action`, async ({ page }) => {
+  const flow = await mockAccountJourney(page, { state: 'ready', signupRole });
+  await page.goto('/register');
+  await expect(page.getByRole('heading', { name: 'Your account is ready', exact: true })).toBeVisible();
+  const actions = page.getByTestId('auth-task-panel').getByRole('link');
+  await expect(page.getByText('Use this same account to book and offer services.', { exact: false })).toBeVisible();
+  await expect(actions).toHaveCount(2);
+  await expect(page.getByRole('link', { name: 'Offer services', exact: true })).toHaveAttribute('href', '/seller/onboarding');
+  await expect(page.getByRole('link', { name: 'Start booking services', exact: true })).toHaveAttribute('href', '/dashboard');
+  await expect(actions.last()).toHaveText(signupRole === 'worker' ? 'Offer services' : 'Start booking services');
+  await expect(actions.last()).toHaveAttribute('href', signupRole === 'worker' ? '/seller/onboarding' : '/dashboard');
+  await page.reload();
+  await expect(actions.last()).toHaveAttribute('href', signupRole === 'worker' ? '/seller/onboarding' : '/dashboard');
+  expect(flow.requests.filter(item => item.body.action === 'create')).toHaveLength(0);
+});
 test('dashboard refresh redirects a pending account back to registration',async({page})=>{
   await mockAccountJourney(page,{state:'identity_review'});
   await page.goto('/dashboard');

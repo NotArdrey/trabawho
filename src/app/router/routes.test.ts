@@ -38,6 +38,14 @@ describe("application route policy", () => {
     expect(homePathForRole("client")).toBe("/dashboard");
   });
 
+  it("allows one worker account to use both client and provider routes", () => {
+    for (const path of ['/dashboard', '/bookings', '/services', '/worker/dashboard', '/worker/bookings']) {
+      expect(canAccessPath(path, 'worker')).toBe(true);
+    }
+    expect(canAccessPath('/seller/onboarding', 'client')).toBe(true);
+    expect(canAccessPath('/admin', 'worker')).toBe(false);
+  });
+
   it("accepts only known internal return paths", () => {
     expect(isKnownPath("/settings/account")).toBe(true);
     expect(isSafeReturnPath("/bookings?filter=pending")).toBe(true);

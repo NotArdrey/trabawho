@@ -7,6 +7,8 @@ for(const width of [390,768,1024,1280,1440]) test(`base account defers identity 
   await expect(page.getByLabel('Email',{exact:true})).toBeVisible();
   await expect(page.getByLabel('Password',{exact:true})).toBeVisible();
   await expect(page.getByLabel('Confirm password',{exact:true})).toBeVisible();
+  await expect(page.getByRole('radio', { name: 'Client: Book a service', exact: true })).not.toBeChecked();
+  await expect(page.getByRole('radio', { name: 'Worker: Offer services', exact: true })).not.toBeChecked();
   await expect(page.getByLabel('Password',{exact:true})).toHaveAttribute('placeholder','Create a password');
   await expect(page.getByLabel('Confirm password',{exact:true})).toHaveAttribute('placeholder','Re-enter your password');
   for(const label of ['Identity document','Name on ID','Specific service address','Account Type']) await expect(page.getByLabel(label,{exact:true})).toHaveCount(0);
@@ -25,8 +27,33 @@ for(const width of [390,768,1024,1280,1440]) test(`base account defers identity 
   await expect(page.getByRole('heading',{name:'Confirm your email',exact:true})).toBeVisible();
   await expectNoRegistrationOverflow(page);
 });
+test('signup requires an explicit choice and supports changing it with the keyboard', async ({ page }) => {
+  const flow = await mockAccountJourney(page);
+  await page.goto('/register');
+  await page.getByLabel('Email', { exact: true }).fill('worker@example.com');
+  await page.getByLabel('Password', { exact: true }).fill('Password123!');
+  await page.getByLabel('Confirm password', { exact: true }).fill('Password123!');
+  await page.getByRole('checkbox', { name: 'I agree to the Terms and Conditions', exact: true }).check();
+  await page.getByRole('button', { name: 'Create account', exact: true }).click();
+  const client = page.getByRole('radio', { name: 'Client: Book a service', exact: true });
+  const worker = page.getByRole('radio', { name: 'Worker: Offer services', exact: true });
+  await expect(client).toBeFocused();
+  await expect(page.getByText('Choose Client or Worker to continue.', { exact: true })).toBeVisible();
+  expect(flow.requests).toHaveLength(0);
+  await page.keyboard.press('Space');
+  await expect(client).toBeChecked();
+  await page.keyboard.press('ArrowRight');
+  await expect(worker).toBeChecked();
+  await expect(client).not.toBeChecked();
+  await page.getByRole('button', { name: 'Create account', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Confirm your email', exact: true })).toBeVisible();
+  expect(flow.requests.find(item => item.body.action === 'create')?.body.signupRole).toBe('worker');
+  expect(flow.requests.some(item => item.name === 'account-didit-session')).toBe(false);
+});
+
 test('field validation prevents malformed email, short password, and missing terms submission',async({page})=>{
   const flow=await mockAccountJourney(page); await page.goto('/register');
+  await page.getByRole('radio', { name: 'Client: Book a service', exact: true }).check();
   await page.getByLabel('Email',{exact:true}).fill('invalid');
   await page.getByLabel('Password',{exact:true}).fill('short');
   await page.getByRole('button',{name:'Create account',exact:true}).click();
@@ -41,6 +68,7 @@ test('field validation prevents malformed email, short password, and missing ter
 });
 test('password confirmation blocks creation, focuses its error, and never reaches the server',async({page})=>{
   const flow=await mockAccountJourney(page); await page.goto('/register');
+  await page.getByRole('radio', { name: 'Client: Book a service', exact: true }).check();
   await page.getByLabel('Email',{exact:true}).fill('person@example.com');
   await page.getByLabel('Password',{exact:true}).fill('Password123!');
   await page.getByRole('checkbox',{name:'I agree to the Terms and Conditions',exact:true}).check();

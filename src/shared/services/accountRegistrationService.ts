@@ -9,8 +9,10 @@ const stateSchema = z.object({
   providerStatus: z.string().optional(), providerSetupComplete: z.boolean().optional(),
   pendingAccount: z.object({ userId: z.string(), nonce: z.string() }).optional(),
   emailDelivery: z.object({ sent: z.boolean() }).optional(),
+  signupRole: z.enum(['client', 'worker']).optional(),
 });
 export type AccountRegistration = z.infer<typeof stateSchema>;
+export type SignupRole = NonNullable<AccountRegistration['signupRole']>;
 export type PendingAccount = { userId: string; nonce: string; email: string };
 const pendingKey = 'trabawho.pendingAccount.v2';
 

@@ -156,6 +156,11 @@ export default function DashboardNavigation({
     void navigate(nextWorkspace === "provider" ? paths.workerDashboard : paths.dashboard);
   };
 
+  const openProviderSetup = () => {
+    if (onOpenSellerSetup) onOpenSellerSetup();
+    else void navigate(paths.sellerOnboarding);
+  };
+
   const openWorkspaceHome = () => {
     if (isProviderWorkspace) void navigate(paths.workerDashboard);
     else onOpenDashboard?.();
@@ -217,6 +222,7 @@ export default function DashboardNavigation({
           {isProviderWorkspace ? "Switch to client workspace" : "Switch to provider workspace"}
         </DropdownMenuItem>
       )}
+      {!isWorkerAccount && !isAdminAccount && <DropdownMenuItem onSelect={openProviderSetup}><BriefcaseBusiness />Offer services</DropdownMenuItem>}
       <DropdownMenuSeparator />
       <DropdownMenuItem className="text-destructive focus:bg-destructive/10 focus:text-destructive" onSelect={() => setIsLogoutModalOpen(true)}><LogOut />Logout</DropdownMenuItem>
     </>
@@ -234,6 +240,9 @@ export default function DashboardNavigation({
 
         <div className="mt-auto grid gap-2.5 border-t pt-3">
           <div className="grid gap-1" aria-label="Account shortcuts">
+            {!isAdminAccount && <Button type="button" variant="outline" className="h-auto min-h-11 justify-start whitespace-normal px-2.5 text-left" onClick={isWorkerAccount ? switchWorkerWorkspace : openProviderSetup}>
+              <BriefcaseBusiness aria-hidden />{isWorkerAccount ? isProviderWorkspace ? 'Switch to client workspace' : 'Switch to provider workspace' : 'Offer services'}
+            </Button>}
             <Button type="button" variant="ghost" className={cn("justify-start px-2.5 text-muted-foreground", activeKey === "settings" && "bg-accent text-foreground")} onClick={onOpenSettings}><Settings />Settings</Button>
           </div>
           <WorkspaceSidebarAccount name={displayName} subtitle={workspaceLabel} imageUrl={profilePhotoUrl} active={activeKey === "profile"} onClick={() => onOpenProfile?.()} actionLabel="Open profile" />

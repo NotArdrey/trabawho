@@ -7,6 +7,7 @@ import { useBaseAccountForm } from '../hooks/useBaseAccountForm';
 import type { AccountRegistrationFlow } from '../hooks/useAccountRegistration';
 import type { DraftListener } from '../hooks/useRegistrationDraft';
 import PasswordField from './PasswordField';
+import { SignupRoleChoice } from './SignupRoleChoice';
 
 export function BaseAccountForm({ flow, onDraftChange }: { flow: AccountRegistrationFlow; onDraftChange?: DraftListener }) {
   const form = useBaseAccountForm(flow.create, onDraftChange);
@@ -15,6 +16,7 @@ export function BaseAccountForm({ flow, onDraftChange }: { flow: AccountRegistra
       event.preventDefault();
       void form.submit().then((id) => { if (id) document.getElementById(id)?.focus(); });
     }}>
+      <SignupRoleChoice value={form.signupRole} onChange={form.setSignupRole} disabled={flow.busy} error={form.errors.signupRole} />
       <div className="space-y-2">
         <Label htmlFor="registration-email">Email</Label>
         <Input id="registration-email" type="email" autoComplete="email" required disabled={flow.busy} value={form.email}
@@ -43,7 +45,7 @@ export function BaseAccountForm({ flow, onDraftChange }: { flow: AccountRegistra
         </details>
       </div>
       <Button type="submit" isLoading={flow.busy} className="h-auto min-h-11 w-full whitespace-normal py-3">Create account<ArrowRight aria-hidden="true" /></Button>
-      <p className="text-xs leading-5 text-muted-foreground">Everyone can book after verification. Set up offering services when you’re ready.</p>
+      <p className="text-xs leading-5 text-muted-foreground">Next, confirm your email, then verify your identity with Didit or submit evidence for admin review.</p>
     </form>
   );
 }

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { pendingAccount, registrationRequest, resumeRegistration, savePendingAccount, signInForRegistration,
-  type AccountRegistration, type PendingAccount } from '@/shared/services/accountRegistrationService';
+  type AccountRegistration, type PendingAccount, type SignupRole } from '@/shared/services/accountRegistrationService';
 
 export function useAccountRegistration() {
   const [registration, setRegistration] = useState<AccountRegistration | null>(null);
@@ -17,7 +17,10 @@ export function useAccountRegistration() {
   }, []);
   const refresh = useCallback(() => run(async () => {
     const state = await resumeRegistration();
-    if (state?.state === 'identity_in_progress') setRegistration(await registrationRequest('account-didit-session', { action: 'get_session' }));
+    if (state?.state === 'identity_in_progress') {
+      const result = await registrationRequest('account-didit-session', { action: 'get_session' });
+      setRegistration({ ...result, signupRole: result.signupRole ?? state.signupRole });
+    }
     else if (state && state.state !== 'legacy') setRegistration(state);
   }), [run]);
   useEffect(() => {
@@ -37,8 +40,8 @@ export function useAccountRegistration() {
     const restored = await refresh();
     setRestoreFailed(!restored); setInitializing(false);
   };
-  const create = (email: string, password: string, acceptedTerms: boolean) => run(async () => {
-    const result = await registrationRequest('account-registration', { action: 'create', email, password, acceptedTerms });
+  const create = (email: string, password: string, acceptedTerms: boolean, signupRole: SignupRole) => run(async () => {
+    const result = await registrationRequest('account-registration', { action: 'create', email, password, acceptedTerms, signupRole });
     if (!result.pendingAccount) throw new Error('Account recovery information is unavailable. Use sign in to resume.');
     const account = { ...result.pendingAccount, email: result.email || email };
     savePendingAccount(account); setPending(account); setRegistration(result);
@@ -48,11 +51,14 @@ export function useAccountRegistration() {
     if (!pending) throw new Error('Sign in to resume or resend your confirmation link.');
     const result = await registrationRequest('account-registration', { action, ...pending, email: email || pending.email });
     const account = { ...pending, email: result.email || pending.email }; savePendingAccount(account); setPending(account);
-    setRegistration(result);
+    setRegistration((previous) => ({ ...result, signupRole: result.signupRole ?? previous?.signupRole }));
     if (!result.emailDelivery?.sent) throw new Error('The confirmation email could not be sent. Wait one minute and retry.');
     setMessage('Confirmation email requested. Check your inbox and spam folder.');
   });
-  const identityAction = (name: string, body: Record<string, unknown>) => run(async () => setRegistration(await registrationRequest(name, body)));
+  const identityAction = (name: string, body: Record<string, unknown>) => run(async () => {
+    const result = await registrationRequest(name, body);
+    setRegistration((previous) => ({ ...result, signupRole: result.signupRole ?? previous?.signupRole }));
+  });
   const resume = (email: string, password: string) => run(async () => {
     const state = await signInForRegistration(email, password);
     if (state.state === 'legacy') throw new Error('This account uses the existing verification flow. Sign in from the login page.');

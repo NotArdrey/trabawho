@@ -2,7 +2,7 @@ import { corsHeaders, createSessionNonce, hashSessionNonce, verifySessionNonce, 
   sendEmailConfirmation, jsonResponse, RegistrationRateLimitError } from "../_shared/identityRegistration.ts";
 import { asRecord } from "../_shared/identityDomain.ts";
 import { identityReturnUrl } from "../_shared/identityRedirect.ts";
-import { accountClient, AccountError, accountUser, registrationRow, registrationState, text } from "../_shared/accountRegistration.ts";
+import { accountClient, AccountError, accountUser, registrationRow, registrationState, signupRole, text } from "../_shared/accountRegistration.ts";
 
 Deno.serve(async (request: Request) => {
   if (request.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
@@ -13,6 +13,7 @@ Deno.serve(async (request: Request) => {
     const returnUrl = identityReturnUrl(body.redirectTo, Deno.env.get("TRABAWHO_APP_URL") || "", Deno.env.get("IDENTITY_ALLOWED_ORIGINS") || "");
     returnUrl.pathname = "/register"; returnUrl.hash = ""; returnUrl.search = "";
     if (body.action === "create") {
+      const role = signupRole(body.signupRole);
       const email = text(body.email).toLowerCase();
       const password = typeof body.password === "string" ? body.password : "";
       if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || password.length < 8 || password.length > 128 || password !== password.trim() || body.acceptedTerms !== true)
@@ -20,7 +21,7 @@ Deno.serve(async (request: Request) => {
       await recordRegistrationAttempt(client, request, { action: "base_account", email });
       const created = await client.auth.admin.createUser({ email, password, email_confirm: false,
         user_metadata: { registration_version: 2, role: "client" },
-        app_metadata: { identity_required: true, verification_status: "UNVERIFIED" } });
+        app_metadata: { identity_required: true, verification_status: "UNVERIFIED", signup_role: role } });
       if (created.error || !created.data.user) throw new AccountError("This account could not be created. If the email is already registered, sign in or resend confirmation.");
       const user = created.data.user; const nonce = createSessionNonce();
       const initialized = await client.rpc("initialize_account_registration", { p_user_id: user.id, p_nonce_hash: await hashSessionNonce(user.id, nonce) });
@@ -30,7 +31,7 @@ Deno.serve(async (request: Request) => {
       }
       const delivery = await sendEmailConfirmation(email, returnUrl.toString());
       await client.from("account_registrations").update({ email_sent_at: new Date().toISOString() }).eq("user_id", user.id);
-      return jsonResponse({ state: "email_pending", email, pendingAccount: { userId: user.id, nonce }, emailDelivery: delivery });
+      return jsonResponse({ state: "email_pending", email, signupRole: role, pendingAccount: { userId: user.id, nonce }, emailDelivery: delivery });
     }
     if (["resend", "change_email"].includes(text(body.action))) {
       const userId = text(body.userId);

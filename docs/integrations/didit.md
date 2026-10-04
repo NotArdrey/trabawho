@@ -17,9 +17,24 @@ Existing identity-reviewed names are not backfilled or silently corrected.
 ## Account and email
 
 `/register`, `#register`, and `#identity-register` open the same base-account
-journey. It collects email, password, and Terms and Conditions agreement. It does
-not ask for a role, document type, legal name, or service address. Everyone can
-book after verification; **Offer services** starts separate provider setup.
+journey. It starts with an explicit **Client — Book a service** or
+**Worker — Offer services** choice, with neither preselected, then collects email,
+password, password confirmation, and Terms and Conditions agreement. It does
+not ask for a document type, legal name, or service address at this stage.
+The server validates the choice and saves it in protected Auth app metadata as
+`signup_role`. This records signup intent; provider setup still establishes the
+worker profile and publication permissions after verification. A returning worker
+sees **Offer services** as the primary next action. Both choices can book after
+verification. Older frontend bundles that omit the preference retain client intent.
+
+One person uses one account for both Client and Worker activities. The signup
+choice decides the initial next action; it does not create a separate login or
+identity record for each role. Existing clients use **Offer services** to complete
+provider setup on their authenticated user ID. Setup upserts the single worker
+profile and seller record for that ID while retaining client booking access.
+Workers can switch between client and provider workspaces on desktop and mobile
+with the same login, profile, and verification. Existing-email signup is rejected;
+matching identity documents on another account require review across roles.
 
 `account-registration` creates an unconfirmed Auth account and initializes its
 restricted profile and `account_registrations` record. Profile initialization and
@@ -50,6 +65,18 @@ before creating a hosted workflow. Didit handles document selection, ID capture,
 liveness, and face matching. Session creation has a database lease, and the
 session belongs to the account from the start. Retries reuse the current pending
 session; returns and polling resume it across devices after sign-in.
+
+Existing ID-photo upload is controlled by the Didit workflow's **ID verification
+→ Advanced → Document upload** option, not a TrabaWho form field or session
+parameter. Enable it in the configured workflow if uploads should be offered;
+live selfie/liveness checks remain independent. The UI describes uploads
+conditionally because the configured workflow has not been changed by this code.
+See [Didit's document upload guidance](https://help.didit.me/documents-coverage/document-upload-problems).
+Manual review remains the clearly labeled upload fallback.
+
+Email verification occurs before identity verification. The confirmation link
+proves inbox access; an identity-review decision notification follows the admin
+decision and does not replace email verification.
 
 The browser return bridge preserves an allowlisted `/register` destination.
 Callback status and session query parameters are informational. Polling fetches
@@ -173,6 +200,11 @@ Deploy `account-registration`, `account-didit-session`, `account-identity-name`,
 disabled; protected actions validate tokens and live account/admin access inside
 their handlers. Keep the earlier identity endpoints available until the production
 frontend has been published with the new endpoint names.
+
+The signup-choice update additionally requires redeploying `account-registration`
+with its shared `accountRegistration.ts` helper before publishing the frontend.
+It requires no schema migration. Until that deployment, the earlier endpoint
+ignores the preference and returning users retain the earlier default action.
 
 ## Verification record
 
