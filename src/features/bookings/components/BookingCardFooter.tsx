@@ -53,35 +53,35 @@ export function BookingCardFooter({
   return (
     <footer className="grid min-w-0 gap-4 border-t border-border/70 pt-4">
       <section aria-label="Payment summary" className="min-w-0">
-        <dl className="grid min-w-0 grid-cols-2 gap-2 sm:flex sm:flex-wrap">
-          <div className={cn("min-w-0 rounded-lg px-3 py-2 sm:min-w-28", emphasizeAmount ? "bg-emerald-50 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-200 sm:min-w-40" : "bg-muted/60")}>
+        <dl className="grid min-w-0 grid-cols-2 gap-2 sm:grid-cols-[repeat(auto-fit,minmax(10rem,1fr))]">
+          <div className={cn("min-w-0 rounded-lg px-3 py-2", emphasizeAmount ? "bg-emerald-50 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-200" : "bg-muted/60")}>
             <dt className={cn("text-xs font-medium", emphasizeAmount ? "text-emerald-800 dark:text-emerald-200" : "text-muted-foreground")}>{amountLabel}</dt>
             <dd className={cn("mt-1 font-bold tabular-nums", emphasizeAmount ? "text-lg text-emerald-700 dark:text-emerald-300" : "text-sm text-foreground")}>{amount}</dd>
           </div>
 
           {requestedOn && (
-            <div className="min-w-0 rounded-lg bg-primary/10 px-3 py-2 text-primary sm:min-w-40">
+            <div className="min-w-0 rounded-lg bg-primary/10 px-3 py-2 text-primary">
               <dt className="flex items-center gap-1 text-xs font-medium"><CalendarDays className="size-3.5" aria-hidden="true" />Requested on</dt>
               <dd className="mt-1 text-sm font-bold">{requestedOn}</dd>
             </div>
           )}
 
           {platformFee && (
-            <div className="min-w-0 rounded-lg bg-muted/60 px-3 py-2 sm:min-w-28">
+            <div className="min-w-0 rounded-lg bg-muted/60 px-3 py-2">
               <dt className="text-xs font-medium text-muted-foreground">Platform fee</dt>
               <dd className="mt-1 text-sm font-bold text-foreground">{platformFee}</dd>
             </div>
           )}
 
           {totalPayment && (
-            <div className="min-w-0 rounded-lg bg-emerald-50 px-3 py-2 dark:bg-emerald-950/40 sm:min-w-28">
+            <div className="min-w-0 rounded-lg bg-emerald-50 px-3 py-2 dark:bg-emerald-950/40">
               <dt className="text-xs font-medium text-muted-foreground">Total payment</dt>
               <dd className="mt-1 text-sm font-extrabold text-emerald-700 dark:text-emerald-300">{totalPayment}</dd>
             </div>
           )}
 
           {paymentProgress && (
-            <div className="col-span-2 min-w-0 rounded-lg bg-muted/60 px-3 py-2 sm:min-w-48">
+            <div className="col-span-2 min-w-0 rounded-lg bg-muted/60 px-3 py-2 sm:col-span-1">
               <dt className="text-xs font-medium text-muted-foreground">Payment progress</dt>
               <dd className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-sm font-semibold text-foreground">
                 <span>Paid: {paymentProgress.paid}</span>

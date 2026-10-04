@@ -26,6 +26,16 @@ describe("dispute refund progress", () => {
     expect(screen.getByText(/ref_verified/)).toBeVisible();
     expect(screen.queryByRole("button", { name: "Request refund review" })).not.toBeInTheDocument();
   });
+  it("summarizes split refunds while keeping each provider reference visible", async () => {
+    vi.mocked(getBookingRefunds).mockResolvedValue([
+      { id: "refund-1", case_id: "case-1", payment_attempt_id: "attempt-1", amount: 325, currency: "PHP", status: "succeeded", provider_refund_id: "ref_first", updated_at: "2026-10-03T08:00:00Z" },
+      { id: "refund-2", case_id: "case-1", payment_attempt_id: "attempt-2", amount: 357.5, currency: "PHP", status: "succeeded", provider_refund_id: "ref_second", updated_at: "2026-10-03T08:00:00Z" },
+    ]);
+    render(<BookingRefundProgress {...props} canRequest={false} />);
+    expect(await screen.findByText("PHP 682.50 sent across 2 refunds.")).toBeVisible();
+    expect(screen.getByText(/ref_first/)).toBeVisible();
+    expect(screen.getByText(/ref_second/)).toBeVisible();
+  });
   it("preserves failed requests and permits a retry", async () => {
     vi.mocked(requestCaseRefund).mockRejectedValueOnce(new Error("Check your connection")).mockResolvedValueOnce();
     render(<BookingRefundProgress {...props} />);

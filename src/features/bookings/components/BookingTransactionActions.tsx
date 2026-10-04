@@ -147,7 +147,7 @@ export function BookingTransactionActions({ booking, supportCaseId, viewerRole, 
     catch (cause) { setError(cause instanceof Error ? cause.message : "Could not load delivery proof."); }
   };
 
-  return <div className="col-span-2 grid min-w-0 grid-cols-2 gap-2 sm:col-auto sm:flex sm:flex-wrap sm:items-center" data-testid="booking-transaction-actions">
+  return <div className="col-span-2 grid w-full min-w-0 grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:items-center sm:justify-end" data-testid="booking-transaction-actions">
     {viewerRole === "provider" && active && !isBookingFullyFunded(booking) && ["paid", "partially_paid"].includes(booking.paymentStatus || "") && <span className="self-center text-sm font-medium text-amber-700 dark:text-amber-300">Waiting for client balance before work. Do not begin until full payment is verified.</span>}
     {canStart && <Button type="button" disabled={pending} onClick={() => { setError(""); setDialog("start"); }}><Play aria-hidden="true" />Start work</Button>}
     {canDeliver && <Button type="button" disabled={pending} onClick={() => { setImage(null); setPhotoError(""); setError(""); setDialog("delivery"); }}><FileCheck2 aria-hidden="true" />Submit delivery</Button>}
