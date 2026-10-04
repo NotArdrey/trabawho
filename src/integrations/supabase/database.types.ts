@@ -15,6 +15,19 @@ type TimestampColumns = {
 export interface Database {
   public: {
     Tables: {
+      account_registrations: Table<{
+        user_id: string; terms_accepted_at: string; pending_nonce_hash: string; pending_expires_at: string;
+        email_sent_at: string | null; identity_consent_at: string | null; current_session_id: string | null;
+        creation_lease: string | null; creation_started_at: string | null; provider_status: string;
+        source_legal_name: string | null; document_type: string | null; requested_legal_name: string | null;
+        name_issue: string | null; name_confirmed_at: string | null; reviewed_legal_name: string | null;
+        provider_setup_completed_at: string | null; updated_at: string;
+      }>;
+      identity_name_actions: Table<{
+        id: string; user_id: string; actor_id: string; operation_id: string | null;
+        action: 'CONFIRMED' | 'CORRECTION_REQUESTED' | 'REVIEWED'; source_name: string | null;
+        requested_name: string | null; reviewed_name: string | null; created_at: string;
+      }>;
       notification_preferences: Table<{
         user_id: string;
         email_enabled: boolean;
@@ -149,6 +162,9 @@ export interface Database {
     };
     Views: Record<string, never>;
     Functions: {
+      start_booking_checkout_with_address: { Args: { p_booking_id?: string | null; p_service_id?: number | null;
+        p_slot_id?: number | null; p_quote_version?: number | null; p_payment_plan?: string;
+        p_operation_id?: string | null; p_service_address?: Json | null }; Returns: Json };
       claim_booking_support_case: { Args: { p_case_id: string }; Returns: Database["public"]["Tables"]["booking_support_cases"]["Row"] };
       escalate_overdue_booking_cases: { Args: Record<string, never>; Returns: number };
       request_booking_case_review: { Args: { p_case_id: string; p_reason: string }; Returns: Database["public"]["Tables"]["booking_case_review_requests"]["Row"] };

@@ -5,236 +5,210 @@ Official references: [Create Session](https://docs.didit.me/sessions-api/create-
 [verification statuses](https://docs.didit.me/integration/verification-statuses), and
 [webhooks](https://docs.didit.me/integration/webhooks).
 
-## Registration and access
+## Implementation and rollout
 
-The form validates account type, document, credentials, full service address, and
-both explicit consents. `create-didit-session` creates the configured workflow with
-`POST https://verification.didit.me/v3/session/`, `callback_method: both`, and a
-temporary signup reference. The browser receives the hosted URL and a random
-nonce; only the nonce hash is stored on the server. Unfinished signup is preserved
-in session storage. Finish in the original browser so its credentials and nonce
-are available after cross-device verification.
+The registration redesign is implemented in the repository. Its six migrations
+and eight new or updated backend functions are deployed on the linked Supabase
+project. Frontend publishing is outside the requested scope; the production
+frontend still uses the earlier registration bundle. The new
+account-owned endpoints run alongside the earlier endpoints during this transition.
+Existing identity-reviewed names are not backfilled or silently corrected.
 
-The return bridge sends the browser to `/?check_verification=true#login`.
-Provider `status` and `verificationSessionId` query values are informational.
-`get_session` requires the saved nonce and retrieves
-`GET /v3/session/{id}/decision/`. `create-unverified-user` revalidates the nonce,
-email, account type, address, and consents. Only an approved overall decision can
-proceed directly. `In Review` and duplicate identities enter the admin queue.
-Client-submitted status and auto-approve environment overrides cannot approve a
-registration. Declined, expired, and abandoned sessions cannot finalize.
+## Account and email
 
-Manual signup validates legal name, ID number, expiry, address, consents, and
-JPEG/PNG/WebP images up to 7 MB each. The private `identity-manual` bucket stores
-the front, back, and selfie evidence. Profile, review, claim, and finalized session
-writes use one database transaction. Identity approval and email confirmation are
-separate requirements; `is_verified` requires both. Account suspension/disable
-status remains independent. Profile-load failure blocks access.
+`/register`, `#register`, and `#identity-register` open the same base-account
+journey. It collects email, password, and Terms and Conditions agreement. It does
+not ask for a role, document type, legal name, or service address. Everyone can
+book after verification; **Offer services** starts separate provider setup.
 
-The `/register`, `#register`, and legacy `#identity-register` entry points share
-the same registration steps, including the complete service address and both
-consents. The legacy identity link must not open the retired form that omitted
-location fields and used a different identity-consent property.
+`account-registration` creates an unconfirmed Auth account and initializes its
+restricted profile and `account_registrations` record. Profile initialization and
+consent/recovery metadata are transactional. A failed initialization removes the
+new Auth account. An existing email cannot have its password replaced through
+registration. Account creation and confirmation delivery are separate: delivery
+failure preserves the account and exposes resend recovery.
 
-The provider's overall status covers every workflow check. Approved ID and face
-nodes must not override an overall decline or review, for example an AML warning.
+The confirmation link returns to `/register`. The email-pending screen offers
+resend, change-email, and sign-in after confirmation on another device. Its
+recovery capability expires after 24 hours; expired recovery or confirmation
+links can be recovered through the login screen's resend action. Resends have a
+one-minute cooldown and use a locked, atomic delivery lease. Change-email checks
+confirmation and revokes the old confirmation link in the same transaction. It is
+restricted to the same unconfirmed account; a confirmed account cannot use the
+pending capability to change credentials.
+
+Only the pending account ID, expiring recovery capability, and email are stored
+in session storage. The retired password-bearing signup state is removed. Auth
+credentials are never saved by the registration journey; normal Supabase Auth
+session persistence continues to support returning users.
+
+## Identity and name confirmation
+
+`account-didit-session` authenticates the account using `auth.getUser`, checks its
+live account restrictions and confirmed email, and requires identity consent
+before creating a hosted workflow. Didit handles document selection, ID capture,
+liveness, and face matching. Session creation has a database lease, and the
+session belongs to the account from the start. Retries reuse the current pending
+session; returns and polling resume it across devices after sign-in.
+
+The browser return bridge preserves an allowlisted `/register` destination.
+Callback status and session query parameters are informational. Polling fetches
+`GET /v3/session/{id}/decision/` on the server. The overall decision controls
+access; approved ID/face nodes cannot override an overall decline or review.
 V3 reports use plural arrays such as `id_verifications`, `liveness_checks`, and
 `face_matches`.
 
-## Planned registration redesign (not implemented)
+Server-fetched reports supply the complete legal name and document type. The
+profile remains restricted after provider approval until the user confirms
+**Name on your verified ID** through `account-identity-name`. The protected
+`full_name` uses the complete source value without a forced first/middle/last
+split. Missing names or document types, incomplete/conflicting extracted names,
+duplicates, disputed names, and overall review decisions enter the admin queue.
 
-The current flow above remains deployed behavior. The next developer should
-replace it with one base-account journey, then role-specific marketplace setup:
+A requested correction remains separate from the source name. It never becomes
+verified automatically. `identity_name_actions` records confirmations, correction
+requests, and reviewed names as immutable audit entries. An approved later
+webhook cannot bypass pending local review. A changed source name after user
+confirmation requires review while preserving the existing protected profile name.
+Later approvals preserve completed admin corrections when the source evidence
+has not changed. Local correction requests do not overwrite the provider decision.
+Decline, abandonment, expiry, suspension, and disable status continue to block
+access. Duplicate/stale events and superseded sessions cannot open access.
 
-1. **Create the base account.** Collect email, password, Terms and Conditions
-   agreement, and only the information needed to start an account. Do not ask
-   every registrant to choose an ID type, type a legal name, or provide a full
-   service address. Do not preselect a consequential account role. Everyone may
-   book services; "Offer services" starts a separate provider setup before a gig
-   can be published. A role-intent choice may route the user to that setup, but
-   it must not be treated as proof of identity.
-2. **Confirm the email before paid/hosted identity work.** Provide a dedicated
-   confirmation state with resend, change-email, expiry, and delivery-error
-   recovery. Verify real inbox receipt and callback handling on the linked test
-   project before making this the first gate; SMTP configuration or an accepted
-   send request alone is not proof of delivery. Supabase supports signup
-   confirmation and explicit [resend](https://supabase.com/docs/reference/javascript/auth-resend).
-   Decide whether the UI uses a code or link, then test that exact template and
-   return path. A confirmed email must not bypass the identity gate.
-3. **Complete identity verification.** Explain the ID/selfie steps and obtain
-   identity consent immediately before redirecting to the configured Didit
-   workflow. Didit handles supported-document selection and capture. Treat the
-   top-level provider decision, not a browser callback or one approved node, as
-   authoritative. Preserve a clearly labeled manual-review fallback when the
-   configured workflow cannot verify a document. Do not request another ID
-   upload from someone who completed the Didit route.
-4. **Confirm the ID-derived legal name.** Extract the complete legal name and
-   document type from Didit's server-fetched report, retaining the original full
-   name rather than requiring an unreliable first/middle/last split. Display
-   "Name on your verified ID" for confirmation. If extraction is absent,
-   ambiguous, or disputed, hold access for human review and provide a correction
-   request; a user's edited value must never silently become verified. Keep the
-   verified source, any requested correction, and the review decision distinct
-   and auditable. Pre-entered names are not a second proof of identity; collect
-   one only if a separate product requirement needs it before verification.
-5. **Finish marketplace setup after the gates.** Ask a client for the precise
-   service address when creating a booking. Ask a prospective provider for a
-   service area and gig details during provider setup. Keep address purpose and
-   copy role-appropriate; do not describe a service address as an ID check.
+## Manual fallback
 
-Access remains blocked until **email is confirmed and identity is approved**
-(Didit approval or approved manual review). Provider publication additionally
-requires provider setup. Show distinct email-pending, Didit-in-progress,
-identity-review, declined, and ready states, each with a truthful next action.
-Returning from Didit must resume the same server-linked signup safely across
-devices and retries; duplicate callbacks must not create duplicate accounts.
+The identity screen provides a clearly labeled manual fallback, including when
+an unfinished hosted workflow cannot verify a document. It reuses the same
+confirmed account. It collects the document type, name shown on the document,
+number, expiry if shown, front/back images, selfie, and identity consent. A
+successful Didit journey does not request a second ID upload.
 
-This is a backend and migration change, not a field-hiding exercise. In
-particular, remove the signup password from browser-persisted session state,
-replace the temporary email/document-type assumptions with an account-linked
-verification session, move full-address validation to its point of use, map
-Didit's extracted name into the protected profile name, and keep all existing
-email/identity access checks effective throughout the transition. Today
-`AuthPage.jsx` defaults to `id_card`, `identityRegistrationService.ts` saves a
-signup state containing the password in `sessionStorage`, and
-`identityDomain.ts` can use the email prefix as `full_name` even when Didit has
-extracted a legal name. Review existing accounts before correcting those names;
-never silently overwrite an identity-reviewed record.
+`account-manual-review` accepts JPEG/PNG/WebP evidence up to 7 MB per image and
+stores it in the private `identity-manual` bucket. Evidence, review, claim, and
+profile writes are checked server-side; failed submissions remove uploaded
+files. The submitted name is a review request, not a verified profile name.
+Manual profile/review/claim/session changes use one database transaction.
+Retries follow the local decision and expiry, so a completed admin rejection can
+use manual review even when Didit still reports approval. Submitting manual review
+revokes any in-flight hosted-session creation lease and clears stale name approval
+flags while preserving the protected profile name and immutable name history.
 
-Before release, test confirmed-email and failed-delivery recovery; Didit
-approved, in-review, declined, missing-name, correction, duplicate, abandoned,
-and cross-device returns; manual fallback; provider setup and booking-address
-deferral; and denial of dashboard or gig-publication access while any gate is
-pending. Run `npm run check`, the registration/identity Playwright journeys at
-the documented widths, backend identity tests, and a real inbox plus camera
-rehearsal. No migration, provider configuration, or email settings change is
-authorized by this documentation entry.
+## Marketplace setup and access
+
+The UI distinguishes email pending, identity pending/in progress, name pending,
+identity review, declined, and ready states. Dashboard refresh sends pending V2
+accounts to registration. Profile-load failure blocks access. Database guards
+also require confirmed email and either source-name confirmation or an approved
+reviewed name before a V2 profile can become verified.
+
+Provider setup collects service area and gig details after the gates. It displays
+the verified name without a self-service edit. `provider-setup` saves the provider,
+seller, first gig, and completion flag in one transaction. An active gig cannot
+be published for a V2 account until email/identity approval and provider setup
+are complete. Expiry is checked at setup, publication, and checkout, including
+before an expiry webhook arrives. Identity restrictions deactivate existing V2
+listings; clearing a restriction does not automatically republish them.
+The provider service area remains distinct from a precise booking
+address. Existing legacy accounts retain their established access behavior.
+
+Booking checkout collects the province, city/municipality, barangay, and precise
+service address. Inquiry conversations can start before a precise address is
+needed; their checkout collects it later. `start_booking_checkout_with_address`
+locks the profile, saves the address, reserves checkout, and captures the booking's
+address snapshot in one transaction. A failed checkout rolls back its address
+write. Retries and later balance payments preserve the original booking snapshot.
+The earlier checkout RPC remains available through the same V2 access gate.
 
 ## Admin review
 
-Open **Admin portal → Identity reviews**. Search by email, filter status, and page
-through results. Review the full address, expiry, duplicate warnings, document
-images, selfie, and current Didit report. Manual images use five-minute signed
-links. Didit media is fetched server-side for authenticated admins.
+Open **Admin portal → Identity reviews**. Search by email, filter status, and
+page through results. Review expiry, duplicate warnings, evidence, and the live
+Didit report. Manual images use five-minute signed links. V2 review details show
+the source name, requested correction, and reason for review separately; a service
+address is not described as identity evidence.
 
-Approval requires acknowledgement that evidence was reviewed and a reason of
-20–2000 characters. Rejection also requires a reason and confirmation. The service
-checks the admin's live role/account status. A service-only RPC locks the review
-and atomically updates profile, claims, session, and immutable decision history.
-Conflicting decisions fail; repeating the same operation is idempotent. Expired
-documents cannot be approved.
+V2 approval additionally requires the complete legal name verified from the
+evidence. Approval requires acknowledgement and a reason of 20–2000 characters;
+rejection requires a reason and confirmation. `account-admin-identity-review`
+checks the administrator's live role/account status. Its service-only RPC updates
+profile, claims, session, review decision, and immutable name/decision history
+atomically. A requested correction alone cannot support approval. Expired
+documents cannot be approved. Repeated operations are idempotent; conflicting
+names or decisions fail. Existing V1 review decisions keep their established
+behavior and do not overwrite names.
 
-Approval sends Supabase signup confirmation when the email is unconfirmed.
-Delivery failure remains visible and can be retried. SMTP acceptance does not prove
-inbox delivery. Explicit resend has a one-minute cooldown and a delivery lease;
-retrying approval does not send duplicate mail. Rejection keeps access blocked and requires new valid evidence.
+## Webhook security
 
-For Didit-approved signup, account creation and the Supabase confirmation request
-are separate steps. A failed request must be shown with a resend path; an accepted
-request still needs Auth and SMTP-provider delivery checks if no message arrives.
-The current registration form does not collect a legal name before Didit and
-asks users to preselect a Didit ID type even though the hosted workflow provides
-that choice. The planned redesign above replaces both assumptions; do not
-represent the current flow as a user-confirmed identity name match.
-Account and profile screens now display the name without a self-service edit path.
-The `20261005111000` migration additionally rejects direct browser updates to
-name columns for identity-registered profiles; service-role identity review can
-still correct a record. A formal name-correction request and re-verification
-workflow is not built, so support must review any correction manually.
-Public retries cannot change a confirmed account's password; those accounts need
-support-assisted verification retry. Unconfirmed retries retain account restrictions.
-Restoring account access does not approve identity. TrabaWho's decision controls
-local access; it does not change Didit's provider report or impersonate a console
-review.
+The public HTTPS `didit-webhook` destination uses V3 payloads and exact
+subscriptions `status.updated` and `data.updated`. It is independent of the browser
+callback. The handler checks `X-Signature-V2` over sorted compact JSON, or
+`X-Signature` over raw bytes. `X-Signature-Simple` is rejected. The signed body
+timestamp must match `X-Timestamp` and be within five minutes. Event recording and
+application are atomic; failed writes remain retryable. Earlier V1 sessions and
+reviewed accounts continue through the legacy event branch.
 
-## Configuration
+## Configuration and deployment
 
-Set these Supabase Edge Function secrets, never browser `VITE_*` variables:
+Server-only secrets are `DIDIT_API_KEY`, `DIDIT_WORKFLOW_ID`,
+`DIDIT_WEBHOOK_SECRET`, `IDENTITY_DOCUMENT_HASH_SECRET`,
+`DIDIT_SESSION_NONCE_SECRET`, `TRABAWHO_APP_URL`, and optional
+`IDENTITY_ALLOWED_ORIGINS`. Supabase supplies its URL, anonymous key, and service
+role key. Browser configuration contains only the public URL/key. Auth email
+confirmation remains enabled and automatic confirmation disabled. The confirmation
+allowlist must include the application origin's `/register` route; existing `/**`
+entries also cover it.
 
-| Secret | Purpose |
-| --- | --- |
-| `DIDIT_API_KEY` | Server-only provider access |
-| `DIDIT_WORKFLOW_ID` | Explicit KYC workflow; invalid configuration fails instead of creating another workflow |
-| `DIDIT_WEBHOOK_SECRET` | Destination's `secret_shared_key` |
-| `IDENTITY_DOCUMENT_HASH_SECRET` | Stable document fingerprint HMAC key |
-| `DIDIT_SESSION_NONCE_SECRET` | Signup nonce HMAC key |
-| `TRABAWHO_APP_URL` | App origin and confirmation return URL |
-| `IDENTITY_ALLOWED_ORIGINS` | Optional additional HTTPS callback origins, comma-separated |
+Apply the maintained identity/email migrations followed by:
 
-Supabase supplies `SUPABASE_URL`, `SUPABASE_ANON_KEY`, and
-`SUPABASE_SERVICE_ROLE_KEY`. Configure Auth SMTP, disable automatic email
-confirmation, and allow the app's confirmation return URL. Localhost HTTP callbacks
-support development. Browser configuration contains only the public Supabase URL
-and anonymous/publishable key.
+- `20261006100000_account_registration.sql`
+- `20261006101000_registration_review_marketplace.sql`
+- `20261006102000_booking_address_checkout.sql`
+- `20261006103000_pending_registration_email.sql`
+- `20261006104000_registration_event_gate_hardening.sql`
+- `20261006105000_registration_retry_hardening.sql`
 
-## Webhooks
+Deploy `account-registration`, `account-didit-session`, `account-identity-name`,
+`account-manual-review`, `account-admin-identity-review`, `provider-setup`,
+`didit-webhook`, and `create-paymongo-checkout`. JWT gateway verification is
+disabled; protected actions validate tokens and live account/admin access inside
+their handlers. Keep the earlier identity endpoints available until the production
+frontend has been published with the new endpoint names.
 
-Create a destination in Didit **API & Webhooks** for the public HTTPS
-`/functions/v1/didit-webhook` endpoint, V3 payloads, and exact subscriptions
-`status.updated` and `data.updated`. This destination is independent of the browser
-callback. Store its signing secret in Supabase.
+## Verification record
 
-The handler checks `X-Signature-V2` over recursively sorted compact JSON with
-Unicode preserved, or `X-Signature` over raw bytes. `X-Signature-Simple` is rejected
-because it does not authenticate decision data. The signed body timestamp must
-equal `X-Timestamp` and be within five minutes. `event_id` identifies retries;
-event recording and application happen in one transaction. Failed writes return
-an error and remain retryable. Older events and superseded sessions are ignored.
+On 2026-10-04, `npm run check` passed with 424 unit tests and 14 standards checks.
+All 74 selected Playwright journeys passed, covering the new base
+account, email recovery, Didit/name gates, correction review, manual fallback,
+cross-device resumption, dashboard denial, provider setup, and booking-address
+collection. Rollback-only live SQL suites cover account registration, legacy
+identity behavior, and email notifications. The account suite also covers
+creation leases, duplicates across roles, name/decision replay, protected names,
+provider publication, manual rejection, retries after admin rejection, stale
+creation/approval denial after manual fallback, expiry gates, and address rollback.
 
-After signup, the session's `user_id` owns updates even though `vendor_data` is a
-temporary reference. A pending local review stays held after later provider
-approval. Decline and KYC expiry block access. Duplicate approved events preserve
-email-confirmed access. Admin-only `integration_status` diagnostics check workflow
-availability and webhook destinations without returning credentials.
+A separately authorized diagnostic verified actual Gmail inbox receipt and the
+new confirmation link's HTTP 303 return to `/register` on the allowed local app
+origin. Confirmed email kept identity pending. Live account-owned Didit creation,
+repeat-session reuse, polling, identity-consent denial, and premature/forged
+approval denial passed. The synthetic Auth account was removed; its unfinished
+provider session remains for webhook correlation. Anonymous requests to every
+protected V2 identity/admin endpoint returned 401. A further Native Auth diagnostic
+confirmed that changing the pending email preserves the account and password,
+rejects the old confirmation link and old email login, accepts the new link and
+new email login, and leaves identity pending. Its synthetic account was removed.
 
-## Deployment and verification
-
-Apply the maintained identity migrations in order, then deploy
-`create-didit-session`, `create-unverified-user`, `manual-identity-review`,
-`admin-identity-review`, `verification-redirect`, and `didit-webhook` together.
-Disable JWT gateway verification for the redirect and webhook. The admin function
-also verifies tokens itself with `auth.getUser` and a database role check; an
-anonymous key alone cannot authorize it.
-
-Run `npm run check`, registration/admin identity Playwright journeys, and
-`npx deno test supabase/functions/_shared/identityDomain_test.ts`:
+A real camera scan and signed approved/declined provider deliveries still require
+a human rehearsal. Automated tests and a signed pending event do not establish
+that a real ID/selfie scan has passed. Frontend publishing was excluded at the
+user's request; the backend deployment alone does not update the live form.
 
 ```sh
 npm run check
-npx playwright test tests/e2e/registration-validation.e2e.spec.ts tests/e2e/identity-registration.e2e.spec.ts tests/e2e/identity-login-gate.e2e.spec.ts tests/e2e/admin-identity-review.e2e.spec.ts
-npx deno test supabase/functions/_shared/identityDomain_test.ts
+npx playwright test tests/e2e/registration-validation.e2e.spec.ts tests/e2e/identity-registration.e2e.spec.ts tests/e2e/identity-login-gate.e2e.spec.ts tests/e2e/admin-identity-review.e2e.spec.ts tests/e2e/provider-setup.e2e.spec.ts tests/e2e/booking-payment-chat.e2e.spec.ts tests/e2e/ai-redesign-smoke.e2e.spec.ts
+npx deno test --allow-env --allow-net supabase/functions/_shared/identityDomain_test.ts supabase/functions/_shared/accountRegistration_test.ts
 ```
 
-Run [`tests/integration/identity-registration.sql`](../../tests/integration/identity-registration.sql)
-through a privileged connection to the linked test project. Its fixtures and
-assertions run in a transaction and roll back. Database checks
-cover address persistence, pending/rejected access, approval before/after email
-confirmation, repeated/conflicting decisions, nonadmin denial, immutable history,
-stale/duplicate events, and rollback on failed events. Use Didit's **Try Webhook**
-and sandbox flows for signed approved/declined/review deliveries. A real camera
-scan and inbox confirmation require separate verification from mocked tests.
-
-The identity migrations through `20261004105000`, the `20261005111000` name
-protection migration, and all six functions above are deployed on the linked
-project. On 2026-10-04, the live entry points matched the repository, but the
-deployed shared confirmation helper still used the retired request-body redirect
-option and returned provider errors. All six functions were redeployed together
-with the current query-parameter redirect and safe error handling. Live provider diagnostics returned HTTP 200 for the
-configured workflow and destination list, with an active matching V3 destination
-subscribed to both required events. Live session creation/polling and forged-status
-rejection passed. Didit delivered a signed pending event; transactional application
-and subsequent polling preserved its event timestamp and the session nonce.
-Polling merges current metadata under the same lock as webhook and signup writes,
-and cannot overwrite finalized local decisions. Synthetic manual signup, private evidence reads, admin approval
-and rejection, idempotent retry, conflict rejection, and nonadmin denial passed;
-the synthetic users and images were removed. A browser journey without API mocks
-confirmed pending login denial, admin approval, and subsequent dashboard access.
-Blocked login retains the entered email and its denial reason. Approval used synthetic email
-confirmation to avoid sending external test email. A separately permitted SMTP
-diagnostic subsequently verified real Gmail inbox receipt and the confirmation
-link's production login return; email confirmation alone kept identity access
-blocked. The live identity and email transaction-rollback SQL suites passed after
-the missing name-protection migration was applied. These checks do not claim a
-completed camera scan or signed approved/declined provider delivery.
-Unfinished synthetic provider sessions and their event records remain for webhook
-correlation; they created no auth accounts.
+Run `tests/integration/account-registration.sql`,
+`tests/integration/identity-registration.sql`, and
+`tests/integration/email-notifications.sql` through a privileged linked-project
+connection; each suite rolls its fixtures back.

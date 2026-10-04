@@ -5,7 +5,7 @@ import type { IdentityDecision, IdentityQuery } from "@/features/admin/identity/
 
 const errorSchema = z.object({ error: z.string() });
 async function request(body: Record<string, unknown>): Promise<unknown> {
-  const response = await supabase.functions.invoke<unknown>("admin-identity-review", { body });
+  const response = await supabase.functions.invoke<unknown>("account-admin-identity-review", { body });
   const error: unknown = response.error;
   if (error) {
     if (typeof error === "object" && "context" in error && error.context instanceof Response) {
@@ -26,7 +26,7 @@ export async function getIdentityReview(reviewId: string) {
   return identityDetailSchema.parse(await request({ action: "detail", reviewId }));
 }
 export async function decideIdentityReview(input: {
-  reviewId: string; decision: IdentityDecision; reason: string; evidenceReviewed: boolean; operationId: string;
+  reviewId: string; decision: IdentityDecision; reason: string; evidenceReviewed: boolean; operationId: string; reviewedLegalName?: string;
 }) {
   return decisionResultSchema.parse(await request({ action: "decide", ...input }));
 }

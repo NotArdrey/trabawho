@@ -22,6 +22,8 @@ import {
 import { cn } from "@/lib/utils";
 import { calculateBookingPricing } from "@/features/bookings/utils/bookingPricing";
 import BookingTermsModal from "./BookingTermsModal";
+import { ServiceAddressFields } from '@/shared/components/ServiceAddressFields';
+import { emptyServiceAddress, serviceAddressValid, type ServiceAddress } from '@/shared/domain/serviceAddress';
 
 type PaymentPlan = "full" | "downpayment";
 type PaymentMethod = "paymongo-card";
@@ -58,6 +60,7 @@ interface PaymentWarrantyPolicy {
 }
 
 export interface PaymentSelectionDetails {
+  serviceAddress?: ServiceAddress;
   serviceAmount: number;
   transactionFeeRate: number;
   transactionFeePercent: string;
@@ -83,6 +86,7 @@ export interface PaymentModalProps {
   title?: string;
   transactionFeeRate?: number | string | null;
   requireBookingTerms?: boolean;
+  collectServiceAddress?: boolean;
 }
 
 function formatPhp(value: number | string | null | undefined) {
@@ -133,6 +137,7 @@ export default function PaymentModal({
   title = "Choose payment",
   transactionFeeRate,
   requireBookingTerms = false,
+  collectServiceAddress = booking.bookingMode === 'calendar-only' && booking.paymentStatus !== 'partially_paid',
 }: PaymentModalProps) {
   const allowsPayMongo = true;
   const isRequestBooking = booking.bookingMode === "calendar-only" || booking.isRequestBooking;
@@ -145,6 +150,7 @@ export default function PaymentModal({
   const [isProcessing, setIsProcessing] = useState(false);
   const [submitError, setSubmitError] = useState("");
   const [reviewingTerms, setReviewingTerms] = useState(false);
+  const [serviceAddress, setServiceAddress] = useState(emptyServiceAddress);
 
   const amountDueNow = isPayingRemainingBalance
     ? Number(booking.balanceDueAmount || pricing.downpaymentBalanceAmount)
@@ -163,6 +169,9 @@ export default function PaymentModal({
 
   const handleConfirmPayment = async () => {
     if (processingRef.current) return;
+    if (collectServiceAddress && !serviceAddressValid(serviceAddress)) {
+      setSubmitError('Complete the province, city, barangay, and specific service address.'); return;
+    }
     if (!selectedMethod) {
       setSubmitError("Select a payment method before continuing.");
       return;
@@ -172,6 +181,7 @@ export default function PaymentModal({
       processingRef.current = true;
       setIsProcessing(true);
       const paymentDetails: PaymentSelectionDetails = {
+        serviceAddress: collectServiceAddress ? serviceAddress : undefined,
         serviceAmount: baseAmount,
         transactionFeeRate: pricing.transactionFeeRate,
         transactionFeePercent: pricing.transactionFeePercent,
@@ -221,6 +231,7 @@ export default function PaymentModal({
         ) : (
           <>
           <div className="grid gap-5 px-4 py-5 sm:px-6 sm:py-6">
+          {collectServiceAddress && <ServiceAddressFields value={serviceAddress} onChange={setServiceAddress} />}
           <section className="grid gap-4 rounded-xl bg-muted/45 p-4 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center" aria-labelledby="payment-summary-heading">
             <div className="min-w-0">
               <p id="payment-summary-heading" className="text-xs font-bold uppercase tracking-wide text-muted-foreground">Booking summary</p>

@@ -1,7 +1,7 @@
 [
   {
     "path": "src/shared/styles/modern.css",
-    "baselineLines": 5919
+    "baselineLines": 4806
   },
   {
     "path": "src/features/work/pages/MyWork.jsx",
@@ -20,20 +20,12 @@
     "baselineLines": 981
   },
   {
-    "path": "src/features/auth/pages/AuthPage.jsx",
-    "baselineLines": 732
-  },
-  {
     "path": "src/features/bookings/components/ChatWindow.jsx",
     "baselineLines": 964
   },
   {
     "path": "src/features/navigation/useAppNavigation.js",
-    "baselineLines": 846
-  },
-  {
-    "path": "src/features/auth/pages/IdentityRegistrationPage.jsx",
-    "baselineLines": 892
+    "baselineLines": 762
   },
   {
     "path": "src/shared/components/FloatingChatbot.jsx",

@@ -134,6 +134,7 @@ function App() {
       aria-modal="true"
     >
       <SellerOnboarding
+        verifiedName={navigationContext.sellerProfile?.fullName}
         onBack={navigationContext.handleCloseSellerOnboarding}
         onComplete={navigationContext.handleOnboardingComplete}
         userLocation={navigationContext.userLocation}

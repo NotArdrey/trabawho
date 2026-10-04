@@ -1,46 +1,39 @@
 import { expect, type Page } from '@playwright/test';
-
-export const serviceLocation = { province: 'Bulacan', city: 'Guiguinto', barangay: 'Poblacion', address: 'Figueroa Street 352' };
 export const corsHeaders = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': '*', 'Access-Control-Allow-Methods': 'POST, OPTIONS' };
-
-export async function mockRegistrationLocations(page: Page) {
-  await page.route('https://psgc.gitlab.io/api/**', route => route.fulfill({ json:
-    route.request().url().endsWith('/provinces/') ? [{ code: '030140000', name: serviceLocation.province }]
-      : route.request().url().endsWith('/cities-municipalities/') ? [{ code: '030140900', name: serviceLocation.city }]
-        : [{ code: '030140901', name: serviceLocation.barangay }],
-  }));
+export type JourneyState = { state: string; email?: string; legalName?: string; documentType?: string; sessionId?: string; sessionUrl?: string; nameIssue?: string; requestedName?: string };
+export async function mockAccountJourney(page: Page, initial: JourneyState | null = null, next: JourneyState = {state:'name_pending',legalName:'Maria Isabel de la Cruz Santos',documentType:'passport',sessionId:'didit-owned'}) {
+  let state = initial;
+  const requests: { name: string; body: Record<string, unknown> }[] = [];
+  if (initial) await page.addInitScript(() => {
+    const encode = (value: unknown) => btoa(JSON.stringify(value)).replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_');
+    const expiry = Math.floor(Date.now()/1000)+3600;
+    localStorage.setItem('sb-dczhfpcfqlygpbqjctwf-auth-token', JSON.stringify({ access_token:`${encode({alg:'HS256',typ:'JWT'})}.${encode({sub:'account-test',exp:expiry,role:'authenticated'})}.test`,refresh_token:'test',expires_at:expiry,expires_in:3600,token_type:'bearer',user:{id:'account-test',email:'person@example.com',email_confirmed_at:new Date().toISOString(),aud:'authenticated',role:'authenticated',app_metadata:{},user_metadata:{registration_version:2}} }));
+  });
+  await page.route('**/functions/v1/**', async route => {
+    if (route.request().method() === 'OPTIONS') { await route.fulfill({status:204,headers:corsHeaders}); return; }
+    const body = route.request().postDataJSON() as Record<string,unknown>; const name=route.request().url().split('/').pop() || '';
+    requests.push({name,body});
+    if(name==='account-registration' && body.action==='create') state={state:'email_pending',email:String(body.email)};
+    if(name==='account-didit-session') state=body.action==='get_session'?next:{state:'identity_in_progress',sessionId:'didit-owned',sessionUrl:'https://verification.didit.me/session/test'};
+    if(name==='account-identity-name') state=body.action==='request_correction'?{...state,state:'identity_review',requestedName:String(body.requestedName),nameIssue:'Applicant requested a correction.'}:{state:'ready'};
+    if(name==='account-manual-review') state={state:'identity_review',nameIssue:'Manual evidence needs review.'};
+    await route.fulfill({headers:corsHeaders,json:{...state,...(body.action==='create'?{pendingAccount:{userId:'account-test',nonce:'recovery-test'},emailDelivery:{sent:true}}:{})}});
+  });
+  return {requests,setState:(value:JourneyState)=>{state=value;}};
 }
-
-export async function selectRegistrationOption(page: Page, label: string, option: string) {
-  await page.getByRole('combobox', { name: label, exact: true }).click();
-  await page.getByRole('option', { name: option, exact: true }).click();
+export async function fillRegistration(page: Page, email = 'person@example.com') {
+  await page.getByLabel('Email',{exact:true}).fill(email);
+  await page.getByLabel('Password',{exact:true}).fill('Password123!');
+  await page.getByRole('checkbox',{name:'I agree to the Terms and Conditions',exact:true}).check();
+  await page.getByRole('button',{name:'Create account',exact:true}).click();
 }
-
-export async function fillRegistration(page: Page, document = 'National ID / ID card', email = 'person@example.com') {
-  await selectRegistrationOption(page, 'Identity document', document);
-  await page.getByRole('button', { name: 'Go to next page' }).click();
-  await page.getByLabel('Email', { exact: true }).fill(email);
-  await page.getByLabel('Password', { exact: true }).fill('Password123!');
-  await page.getByLabel('Confirm Password', { exact: true }).fill('Password123!');
-  await page.getByRole('button', { name: 'Go to next page' }).click();
-  await selectRegistrationOption(page, 'Province', serviceLocation.province);
-  await selectRegistrationOption(page, 'City/Municipality', serviceLocation.city);
-  await selectRegistrationOption(page, 'Barangay', serviceLocation.barangay);
-  await page.getByLabel('Specific Address').fill(serviceLocation.address);
-  await page.getByRole('button', { name: 'Go to next page' }).click();
-  await page.getByRole('checkbox', { name: /I consent to identity verification/ }).check();
-  await page.getByRole('checkbox', { name: 'I agree to the Terms and Conditions', exact: true }).check();
-}
-
 export async function fillManualEvidence(page: Page) {
-  await page.getByLabel('Name on ID', { exact: true }).fill('Manual User');
-  await page.getByLabel('ID number', { exact: true }).fill('POSTAL-1234567');
-  await page.getByLabel('ID expiry date').fill('2099-12-31');
-  for (const part of ['front', 'back', 'selfie']) {
-    await page.locator(`#manual-${part}-image`).setInputFiles({ name: `${part}-1530d0be-8d55-41ac-8134-d4099e503249.png`, mimeType: 'image/png', buffer: Buffer.from('image') });
-  }
+  await page.getByLabel('Name on ID',{exact:true}).fill('Manual User');
+  await page.getByLabel('Government document type').fill('Postal ID');
+  await page.getByLabel('ID number',{exact:true}).fill('POSTAL-1234567');
+  await page.getByLabel('ID expiry date (if shown)').fill('2099-12-31');
+  for(const part of ['front','back','selfie']) await page.locator(`#manual-${part}-image`).setInputFiles({name:`${part}.png`,mimeType:'image/png',buffer:Buffer.from('image')});
 }
-
 export async function expectNoRegistrationOverflow(page: Page) {
-  expect(await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)).toBeLessThanOrEqual(1);
+  expect(await page.evaluate(()=>document.documentElement.scrollWidth-window.innerWidth)).toBeLessThanOrEqual(1);
 }

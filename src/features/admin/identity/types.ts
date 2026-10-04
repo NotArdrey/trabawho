@@ -14,6 +14,8 @@ const reportSchema = z.object({
   checks: z.array(z.object({ label: z.string(), status: z.string() })), warnings: z.array(z.string()),
 });
 export const identityDetailSchema = z.object({
+  registration: z.object({ source_legal_name: z.string().nullable(), requested_legal_name: z.string().nullable(),
+    name_issue: z.string().nullable(), reviewed_legal_name: z.string().nullable() }).nullable().optional(),
   review: identityReviewSchema,
   profile: z.object({ full_name: z.string(), email: z.string(), role: z.string(),
     province: z.string().nullable(), city: z.string().nullable(), barangay: z.string().nullable(), address: z.string().nullable(),

@@ -1,11 +1,8 @@
-const { test, expect } = require('@playwright/test');
-const {
-  DEMO_ADMIN_EMAIL,
-  DEMO_PASSWORD,
-} = require('./helpers/supabase');
+import { test, expect, type Page } from '@playwright/test';
+import { DEMO_ADMIN_EMAIL, DEMO_PASSWORD } from './helpers/supabase.js';
 
-function collectConsoleFailures(page) {
-  const failures = [];
+function collectConsoleFailures(page: Page) {
+  const failures: string[] = [];
 
   page.on('console', (message) => {
     if (message.type() === 'error') {
@@ -20,7 +17,7 @@ function collectConsoleFailures(page) {
   return failures;
 }
 
-async function expectNoHorizontalOverflow(page) {
+async function expectNoHorizontalOverflow(page: Page) {
   const layoutIssue = await page.evaluate(() => {
     const rootElement = document.querySelector('#root');
     if (!rootElement) return 'Missing #root element.';
@@ -40,7 +37,7 @@ async function expectNoHorizontalOverflow(page) {
   expect(layoutIssue).toBe('');
 }
 
-async function loginAs(page, email, password = DEMO_PASSWORD) {
+async function loginAs(page: Page, email: string, password = DEMO_PASSWORD) {
   await page.goto('/');
   await page.getByRole('button', { name: /^Sign in$/i }).first().click();
   await expect(page.getByRole('heading', { name: 'Sign in' })).toBeVisible();
@@ -89,7 +86,8 @@ test.describe('AI redesign smoke verification', () => {
       await expect(page.getByTestId('public-browse-services')).toBeVisible({ timeout: 20_000 });
       await expect(page.getByLabel('Search services and providers')).toHaveValue('aircon cleaning');
       await expect(page.getByPlaceholder('City or province')).toHaveValue('Malolos');
-      await expect(page.getByRole('button', { name: /^All$/ })).toBeVisible();
+      if (viewport.width < 881) await page.getByRole('button', { name: 'Filters', exact: true }).click();
+      await expect(page.getByRole('group', { name: 'Category', exact: true }).getByRole('button', { name: /^All \d+ services$/ })).toBeVisible();
       await expectNoHorizontalOverflow(page);
 
       expect(consoleFailures).toEqual([]);
@@ -161,50 +159,25 @@ test.describe('AI redesign smoke verification', () => {
       await page.setViewportSize({ width: viewport.width, height: viewport.height });
       await page.goto('/register');
 
-      await expect(page.getByRole('heading', { name: 'Create Account' })).toBeVisible();
-      await expect(page.getByLabel('Account Type')).toBeVisible();
-      const identityDocument = page.getByLabel('Identity document');
-      await expect(identityDocument).toBeVisible();
-      await identityDocument.click();
-      await page.getByRole('option', { name: 'Passport' }).click();
-      await expect(identityDocument).toContainText('Passport');
-      await expect(page.getByRole('navigation', { name: 'Registration progress' })).toBeVisible();
-      await expect(page.getByRole('button', { name: 'Go to next page' })).toBeVisible();
-      await expect(page.getByLabel('Email')).toHaveCount(0);
-      await expect(page.getByText('80+')).toHaveCount(0);
-      if (viewport.visualVisible) {
-        await expect(page.locator('.auth-visual')).toBeVisible();
-      } else {
-        await expect(page.locator('.auth-visual')).toBeHidden();
-      }
+      await expect(page.getByRole('heading', { name: 'Create account', exact: true })).toBeVisible();
+      await expect(page.getByLabel('Email', { exact: true })).toBeVisible();
+      await expect(page.getByLabel('Password', { exact: true })).toBeVisible();
+      await expect(page.getByLabel('Account Type')).toHaveCount(0);
+      await expect(page.getByLabel('Identity document')).toHaveCount(0);
+      await expect(page.getByRole('button', { name: 'Create account', exact: true })).toBeVisible();
       await expectNoHorizontalOverflow(page);
     });
   }
 
   test('authentication mode control uses consistent sign-in language', async ({ page }) => {
     await page.goto('/register');
-    await page.getByRole('tab', { name: 'Sign in' }).click();
+    await page.getByRole('button', { name: 'Already have an account? Sign in' }).click();
     await expect(page).toHaveURL(/\/sign-in$/);
     await expect(page.getByRole('heading', { name: 'Sign in' })).toBeVisible();
 
-    await page.getByRole('tab', { name: 'Register' }).click();
+    await page.getByRole('button', { name: 'Create an account', exact: true }).click();
     await expect(page).toHaveURL(/\/register$/);
-    await expect(page.getByRole('heading', { name: 'Create Account' })).toBeVisible();
-  });
-
-  test('registration steps move forward and backward without losing account choices', async ({ page }) => {
-    await page.goto('/register');
-    const accountType = page.getByLabel('Account Type');
-    await accountType.click();
-    await page.getByRole('option', { name: 'Worker' }).click();
-
-    await page.getByRole('button', { name: 'Go to next page' }).click();
-    await expect(page.getByText('Step 2 of 4')).toBeVisible();
-    await expect(page.getByLabel('Email')).toBeVisible();
-
-    await page.getByRole('button', { name: 'Go to previous page' }).click();
-    await expect(page.getByText('Step 1 of 4')).toBeVisible();
-    await expect(accountType).toContainText('Worker');
+    await expect(page.getByRole('heading', { name: 'Create account', exact: true })).toBeVisible();
   });
 
   test('password recovery route is direct, accessible, and validates safely', async ({ page }) => {

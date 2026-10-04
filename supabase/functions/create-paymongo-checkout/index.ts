@@ -138,7 +138,7 @@ serve(async (request: Request) => {
     }
     const userClient = createPaymentUserClient(request);
     const { data: checkoutData, error: attemptError } = await userClient.rpc(
-      "start_booking_checkout",
+      "start_booking_checkout_with_address",
       {
         p_booking_id: bookingId,
         p_service_id: serviceId,
@@ -146,6 +146,7 @@ serve(async (request: Request) => {
         p_quote_version: quoteVersion,
         p_payment_plan: paymentPlan,
         p_operation_id: idempotencyKey,
+        p_service_address: body.serviceAddress || null,
       },
     );
     if (attemptError) {

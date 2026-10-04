@@ -6,7 +6,7 @@ Status: active
 
 - Vite, strict TypeScript for migrated files, Tailwind CSS, shadcn/ui configuration, Vitest, linting, file-size enforcement, typed route policy, and Vercel SPA deployment are active.
 - The application shell, public navigation, landing experience, loading state, notifications, shared confirmation dialog, route contracts, Supabase integration contract, pricing utility, profile-photo utility, and feature entry points are typed.
-- The landing page and authentication presentation follow the white-led light theme, blue-led dark theme, image-forward composition, selective orange accent, and no-glow rules. The main registration form, step validation, location lookups, consent dialog, password fields, and identity signup transport are strict TypeScript. The remaining authentication shell and login/identity outcome orchestration remain frozen legacy JavaScript pending conversion.
+- The landing and authentication presentation use the documented themes and image-forward composition. Authentication pages/controllers, account-owned registration, source-name confirmation and corrections, manual fallback, provider setup, and booking-address collection are strict TypeScript. The retired password-bearing signup transport and two oversized auth pages are removed; 160 unused authentication CSS rules are deleted. Legacy auth modals remain on their shrinking baselines. The explicitly authorized backend rollout is deployed; frontend publishing was excluded at the user's request. See the [Didit integration guide](../integrations/didit.md).
 - Admin identity queue, evidence dialog, domain contracts, orchestration, and service access are strict TypeScript. Identity backend migrations and function deployment were explicitly authorized; address persistence, admin decisions, and protected evidence were rehearsed on the linked test project. See the [Didit integration guide](../integrations/didit.md).
 - The machine-readable source and file-size allowlists record the remaining legacy paths and their shrinking baselines.
 - Booking conversation loading, refresh, duplicate-send protection, and the message composer are strict TypeScript. The remaining `ChatWindow.jsx` presentation stays on its shrinking baseline. Pricing tests are migrated to TypeScript; payment checkout no longer displays the GCash preview.
@@ -27,7 +27,7 @@ Status: active
 - [x] Add Vite, TypeScript, Tailwind CSS, shadcn configuration, providers, semantic tokens, and typed primitive examples.
 - [x] Replace state-only navigation with guarded React Router routes while retaining a legacy view adapter during screen migration.
 - [ ] Migrate application shell, navigation, theme, and feedback.
-- [ ] Migrate public authentication, identity registration, and seller onboarding. The landing and password-recovery pages are migrated.
+- [ ] Finish the legacy auth modals. Public authentication, identity registration, seller onboarding, landing, and password recovery pages are migrated.
 - [ ] Migrate dashboard, marketplace, profile, and settings.
 - [ ] Migrate bookings, messages, payments, reviews, and chatbot.
 - [ ] Migrate worker and admin workflows.
@@ -40,7 +40,7 @@ Marketplace filter state and matching now live in typed hooks/domain functions, 
 
 ## Compatibility rules
 
-- Supabase schema, RPCs, Edge Functions, stored data, and business behavior remain unchanged.
+- Supabase schemas, RPCs, Edge Functions, and business behavior remain unchanged unless a separate backend task is explicitly authorized. The account-owned identity redesign is such an authorized task; existing reviewed names and legacy account access are preserved.
 - `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` are canonical. Legacy `REACT_APP_*` names remain accepted until deployment settings are migrated.
 - Existing hash-based public links are accepted until their equivalent route has shipped.
 - Existing CSS may remain only for screens not yet migrated.

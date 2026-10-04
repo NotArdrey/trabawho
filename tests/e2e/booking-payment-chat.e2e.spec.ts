@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { corsHeaders } from './helpers/registration';
 
 test.beforeEach(async ({ page }) => {
   await page.route("**/__booking-journey*", async (route) => {
@@ -11,6 +12,29 @@ test.beforeEach(async ({ page }) => {
         window.__vite_plugin_react_preamble_installed__ = true;
       </script></head><body><div id="root"></div><script type="module" src="/tests/e2e/fixtures/booking-payment-journey.tsx"></script></body></html>` });
   });
+});
+
+for (const width of [390,768,1024,1280,1440]) test(`new booking collects its service address at checkout at ${width}px`, async ({ page }) => {
+  await page.setViewportSize({ width, height: 900 });
+  const calls: Record<string, unknown>[] = [];
+  await page.route('**/functions/v1/create-paymongo-checkout', route => {
+    if (route.request().method() === 'OPTIONS') return route.fulfill({ status: 204, headers: corsHeaders });
+    calls.push(route.request().postDataJSON() as Record<string, unknown>);
+    return route.fulfill({ headers: corsHeaders, json: { bookingId: 'booking-address', paymentAttemptId: 'attempt', checkoutUrl: 'https://checkout.paymongo.com/address-test' } });
+  });
+  await page.route('https://checkout.paymongo.com/address-test', route => route.fulfill({ contentType: 'text/html', body: '<h1>Address captured</h1>' }));
+  await page.goto('/__booking-journey?address');
+  await page.getByRole('button', { name: 'Reserve and continue' }).click();
+  await expect(page.getByRole('alert')).toContainText('specific service address');
+  expect(calls).toHaveLength(0);
+  await page.getByLabel('Province', { exact: true }).fill('Bulacan');
+  await page.getByLabel('City/Municipality', { exact: true }).fill('Guiguinto');
+  await page.getByLabel('Barangay', { exact: true }).fill('Poblacion');
+  await page.getByLabel('Specific service address', { exact: true }).fill('12 Service Street');
+  await page.getByRole('button', { name: 'Reserve and continue' }).click();
+  await expect(page.getByRole('heading', { name: 'Address captured' })).toBeVisible();
+  expect(calls).toHaveLength(1);
+  expect(calls[0]).toMatchObject({ serviceAddress: { province: 'Bulacan', city: 'Guiguinto', barangay: 'Poblacion', address: '12 Service Street' } });
 });
 
 for (const width of [390, 768, 1024, 1280, 1440]) {

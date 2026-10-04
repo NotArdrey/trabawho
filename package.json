@@ -46,7 +46,7 @@
     "test:standards": "node --test scripts/standards-guards.test.mjs scripts/supabase-contracts.test.mts scripts/system-email-config.test.mts",
     "test:watch": "vitest",
     "test:e2e": "playwright test",
-    "test:e2e:ai-redesign": "playwright test tests/e2e/ai-redesign-smoke.e2e.spec.js",
+    "test:e2e:ai-redesign": "playwright test tests/e2e/ai-redesign-smoke.e2e.spec.ts",
     "test:e2e:headed": "playwright test --headed",
     "paymongo:test-checkout": "node scripts/paymongo-sandbox-checkout.mts",
     "check:file-sizes": "node scripts/check-file-sizes.mjs",
