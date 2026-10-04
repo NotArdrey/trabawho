@@ -32,6 +32,7 @@ export function IdentityResultStep({ flow, state, onDraftChange }: { flow: Accou
         {correction.open && <form id="registration-name-correction" className="space-y-4" onSubmit={(event) => { event.preventDefault(); void correction.submit(); }}>
           <div className="space-y-2"><Label htmlFor="requested-name">Requested legal name</Label>
             <Input id="requested-name" required minLength={2} maxLength={200} disabled={flow.busy} value={correction.requested}
+              placeholder="Enter your complete legal name"
               aria-describedby="requested-name-help" onChange={(event) => correction.setRequested(event.target.value)} />
             <p id="requested-name-help" className="text-xs leading-5 text-muted-foreground">Your correction stays separate from the name on your ID. It becomes verified only after human review.</p>
           </div>

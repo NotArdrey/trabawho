@@ -6,6 +6,7 @@ import type { AccountRegistrationFlow } from '../hooks/useAccountRegistration';
 import { useEmailConfirmationForm } from '../hooks/useEmailConfirmationForm';
 import type { DraftListener } from '../hooks/useRegistrationDraft';
 import PasswordField from './PasswordField';
+import { ResendConfirmationButton } from './ResendConfirmationButton';
 
 export function EmailConfirmationStep({ flow, email, onDraftChange }: { flow: AccountRegistrationFlow; email: string; onDraftChange?: DraftListener }) {
   const form = useEmailConfirmationForm(flow, email, onDraftChange);
@@ -13,8 +14,8 @@ export function EmailConfirmationStep({ flow, email, onDraftChange }: { flow: Ac
     <section className="space-y-6" aria-label="Email confirmation">
       <div className="space-y-2">
         <p className="text-sm leading-6 text-muted-foreground">No email or an expired link? Request another confirmation or correct your email.</p>
-        <div className="flex flex-wrap gap-2">
-          <Button variant="outline" disabled={flow.busy} onClick={() => void flow.emailAction('resend')}>Resend confirmation email</Button>
+        <div className="grid gap-2">
+          <ResendConfirmationButton disabled={flow.busy} onClick={() => void flow.emailAction('resend')} />
           <Button variant="ghost" disabled={flow.busy} aria-expanded={form.changingEmail} aria-controls="registration-change-email"
             onClick={() => form.setChangingEmail(!form.changingEmail)}>Change email</Button>
         </div>
@@ -22,6 +23,7 @@ export function EmailConfirmationStep({ flow, email, onDraftChange }: { flow: Ac
       {form.changingEmail && <form id="registration-change-email" className="space-y-4 border-t pt-6" onSubmit={(event) => { event.preventDefault(); void form.changeEmail(); }}>
         <div className="space-y-2"><Label htmlFor="change-email">New email address</Label>
           <Input id="change-email" type="email" autoComplete="email" required disabled={flow.busy} value={form.newEmail}
+            placeholder="you@example.com"
             aria-describedby="change-email-help" onChange={(event) => form.setNewEmail(event.target.value)} />
           <p id="change-email-help" className="text-xs leading-5 text-muted-foreground">Your old confirmation link will stop working. We’ll send a new one to this address.</p>
         </div>
@@ -36,6 +38,7 @@ export function EmailConfirmationStep({ flow, email, onDraftChange }: { flow: Ac
         </div>
         <div className="space-y-2"><Label htmlFor="resume-email">Email</Label>
           <Input id="resume-email" type="email" autoComplete="email" required disabled={flow.busy} value={form.signInEmail}
+            placeholder="you@example.com"
             onChange={(event) => form.setSignInEmail(event.target.value)} />
         </div>
         <PasswordField id="resume-password" label="Password" required autoComplete="current-password" disabled={flow.busy}

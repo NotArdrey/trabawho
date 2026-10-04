@@ -26,12 +26,14 @@ test('keyboard navigation preserves a draft when leaving is cancelled', async ({
   await page.goto('/register');
   await page.getByLabel('Email', { exact: true }).fill('draft@example.com');
   await page.getByLabel('Password', { exact: true }).fill('PrivatePassword123!');
+  await page.getByLabel('Confirm password', { exact: true }).fill('PrivatePassword123!');
   await page.getByRole('button', { name: 'Already have an account? Sign in' }).focus();
   await page.keyboard.press('Enter');
   const dialog = page.getByRole('alertdialog', { name: 'Leave registration?' });
   await expect(dialog).toBeVisible();
   await page.getByRole('button', { name: 'Stay on registration' }).click();
   await expect(page.getByLabel('Password', { exact: true })).toHaveValue('PrivatePassword123!');
+  await expect(page.getByLabel('Confirm password', { exact: true })).toHaveValue('PrivatePassword123!');
   await expect(page.getByRole('button', { name: 'Already have an account? Sign in' })).toBeFocused();
 });
 
@@ -61,10 +63,12 @@ test('failed account creation keeps the entered password available for retry', a
   await page.goto('/register');
   await page.getByLabel('Email', { exact: true }).fill('person@example.com');
   await page.getByLabel('Password', { exact: true }).fill('Password123!');
+  await page.getByLabel('Confirm password', { exact: true }).fill('Password123!');
   await page.getByRole('checkbox', { name: 'I agree to the Terms and Conditions', exact: true }).check();
   await page.getByRole('button', { name: 'Create account', exact: true }).click();
   await expect(page.getByRole('alert')).toContainText('Retry');
   await expect(page.getByLabel('Password', { exact: true })).toHaveValue('Password123!');
+  await expect(page.getByLabel('Confirm password', { exact: true })).toHaveValue('Password123!');
   expect(await page.evaluate(() => JSON.stringify(sessionStorage))).not.toContain('Password123!');
 });
 

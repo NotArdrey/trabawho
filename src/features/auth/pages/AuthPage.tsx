@@ -7,6 +7,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { cn } from '@/lib/utils';
 import BrandWordmark from '@/shared/components/BrandWordmark';
 import PasswordField from '../components/PasswordField';
+import { ResendConfirmationButton } from '../components/ResendConfirmationButton';
 import { AccountRegistrationJourney } from '../components/AccountRegistrationJourney';
 import { AuthVisual } from '../components/AuthVisual';
 import { useAuthPageController, type AuthPageProps } from '../hooks/useAuthPageController';
@@ -43,11 +44,11 @@ export default function AuthPage({ mode = 'login', onModeChange, onBack, onSubmi
               {mode === 'register' ? <AccountRegistrationJourney onDraftChange={navigation.setDirty} /> : <form className="space-y-4" onSubmit={(event) => { event.preventDefault(); void submit(); }}>
                 {error && <p role="alert" className="rounded-lg bg-destructive/10 p-4 text-sm leading-6 text-destructive">{error}</p>}
                 {message && <p role="status" className="rounded-lg bg-primary/10 p-4 text-sm leading-6">{message}</p>}
-                <div className="space-y-2"><Label htmlFor="auth-email">Email</Label><Input id="auth-email" required type="email" autoComplete="email" disabled={busy} value={email} onChange={(event) => setEmail(event.target.value)} /></div>
+                <div className="space-y-2"><Label htmlFor="auth-email">Email</Label><Input id="auth-email" placeholder="you@example.com" required type="email" autoComplete="email" disabled={busy} value={email} onChange={(event) => setEmail(event.target.value)} /></div>
                 {mode === 'login' && <PasswordField id="auth-password" label="Password" required autoComplete="current-password" disabled={busy} value={password} onChange={(event) => setPassword(event.target.value)} />}
-                {mode === 'login' && <div className="flex flex-col items-start gap-2">
-                  <Button variant="ghost" type="button" className="px-0 text-primary" onClick={() => onModeChange?.('forgot')}>Forgot password?</Button>
-                  <Button variant="outline" type="button" disabled={busy || !email} onClick={() => void resend()}>Resend confirmation email</Button>
+                {mode === 'login' && <div className="flex flex-col gap-2">
+                  <Button variant="ghost" type="button" className="self-start px-0 text-primary" onClick={() => onModeChange?.('forgot')}>Forgot password?</Button>
+                  <ResendConfirmationButton disabled={busy || !email} onClick={() => void resend()} />
                 </div>}
                 <Button type="submit" isLoading={busy} className="w-full">{mode === 'forgot' ? 'Send reset link' : 'Sign in'}<ArrowRight aria-hidden="true" /></Button>
               </form>}

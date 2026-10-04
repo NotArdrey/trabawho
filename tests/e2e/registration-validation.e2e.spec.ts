@@ -6,9 +6,18 @@ for(const width of [390,768,1024,1280,1440]) test(`base account defers identity 
   await page.goto('/register');
   await expect(page.getByLabel('Email',{exact:true})).toBeVisible();
   await expect(page.getByLabel('Password',{exact:true})).toBeVisible();
+  await expect(page.getByLabel('Confirm password',{exact:true})).toBeVisible();
+  await expect(page.getByLabel('Password',{exact:true})).toHaveAttribute('placeholder','Create a password');
+  await expect(page.getByLabel('Confirm password',{exact:true})).toHaveAttribute('placeholder','Re-enter your password');
   for(const label of ['Identity document','Name on ID','Specific service address','Account Type']) await expect(page.getByLabel(label,{exact:true})).toHaveCount(0);
+  await page.screenshot({path:test.info().outputPath(`account-${width}.png`),fullPage:true});
   await fillRegistration(page);
   await expect(page.getByRole('heading',{name:'Confirm your email',exact:true})).toBeVisible();
+  const resend = page.getByRole('button',{name:'Resend confirmation email',exact:true});
+  await expect(resend).toBeVisible();
+  expect((await resend.boundingBox())!.height).toBeGreaterThanOrEqual(44);
+  await expectNoRegistrationOverflow(page);
+  await page.screenshot({path:test.info().outputPath(`email-confirmation-${width}.png`),fullPage:true});
   expect(flow.requests.filter(item=>item.name==='account-didit-session')).toHaveLength(0);
   const stored=await page.evaluate(()=>JSON.stringify(sessionStorage));
   expect(stored).not.toContain('Password123!'); expect(stored).not.toContain('password');
@@ -26,8 +35,33 @@ test('field validation prevents malformed email, short password, and missing ter
   expect(flow.requests).toHaveLength(0);
   await page.getByLabel('Email',{exact:true}).fill('person@example.com');
   await page.getByLabel('Password',{exact:true}).fill('Password123!');
+  await page.getByLabel('Confirm password',{exact:true}).fill('Password123!');
   await page.getByRole('button',{name:'Create account',exact:true}).click();
   expect(flow.requests).toHaveLength(0);
+});
+test('password confirmation blocks creation, focuses its error, and never reaches the server',async({page})=>{
+  const flow=await mockAccountJourney(page); await page.goto('/register');
+  await page.getByLabel('Email',{exact:true}).fill('person@example.com');
+  await page.getByLabel('Password',{exact:true}).fill('Password123!');
+  await page.getByRole('checkbox',{name:'I agree to the Terms and Conditions',exact:true}).check();
+  const confirmation = page.getByLabel('Confirm password',{exact:true});
+  await page.getByRole('button',{name:'Create account',exact:true}).click();
+  await expect(confirmation).toBeFocused();
+  await expect(confirmation).toHaveAttribute('aria-invalid','true');
+  await expect(page.getByText('Re-enter your password to confirm it.',{exact:true})).toBeVisible();
+  await confirmation.fill('DifferentPassword123!');
+  await page.getByRole('button',{name:'Show confirm password'}).click();
+  await expect(confirmation).toHaveAttribute('type','text');
+  await page.getByRole('button',{name:'Create account',exact:true}).click();
+  await expect(page.getByText('Passwords do not match. Re-enter the same password.',{exact:true})).toBeVisible();
+  expect(flow.requests).toHaveLength(0);
+  await confirmation.fill('Password123!');
+  await page.getByRole('button',{name:'Create account',exact:true}).click();
+  await expect(page.getByRole('heading',{name:'Confirm your email',exact:true})).toBeVisible();
+  const request=flow.requests.find(item=>item.body.action==='create');
+  expect(request?.body).toMatchObject({email:'person@example.com',password:'Password123!',acceptedTerms:true});
+  expect(request?.body).not.toHaveProperty('confirmPassword');
+  expect(await page.evaluate(()=>JSON.stringify(sessionStorage))).not.toContain('DifferentPassword123!');
 });
 test('email delivery failure preserves the account with resend and change-email recovery',async({page})=>{
   await page.route('**/functions/v1/account-registration',async route=>{
@@ -40,9 +74,30 @@ test('email delivery failure preserves the account with resend and change-email 
   await page.getByRole('button',{name:'Resend confirmation email',exact:true}).click();
   await expect(page.getByRole('status')).toContainText('Confirmation email requested');
   await page.getByRole('button',{name:'Change email',exact:true}).click();
+  await expect(page.getByLabel('New email address')).toHaveAttribute('placeholder','you@example.com');
   await page.getByLabel('New email address').fill('correct@example.com');
   await page.getByRole('button',{name:'Save email and resend'}).click();
   await expect(page.getByText('Open the confirmation link sent to correct@example.com.',{exact:false})).toBeVisible();
+});
+test('sign-in email recovery uses the shared resend design and preserves its response',async({page})=>{
+  await page.route('**/auth/v1/resend',async route=>route.request().method()==='OPTIONS'
+    ? route.fulfill({status:204,headers:corsHeaders})
+    : route.fulfill({headers:corsHeaders,json:{}}));
+  await page.setViewportSize({width:390,height:844});
+  await page.goto('/sign-in');
+  const resend=page.getByRole('button',{name:'Resend confirmation email',exact:true});
+  await expect(resend).toBeDisabled();
+  await expect(page.getByLabel('Email',{exact:true})).toHaveAttribute('placeholder','you@example.com');
+  await expect(page.getByLabel('Password',{exact:true})).toHaveAttribute('placeholder','Enter your password');
+  await page.getByLabel('Email',{exact:true}).fill('person@example.com');
+  await resend.click();
+  await expect(page.getByRole('status')).toContainText('Confirmation requested');
+  expect((await resend.boundingBox())!.height).toBeGreaterThanOrEqual(44);
+  expect((await resend.boundingBox())!.width).toBeCloseTo((await page.getByRole('button',{name:'Sign in',exact:true}).last().boundingBox())!.width,0);
+  await expectNoRegistrationOverflow(page);
+  await page.screenshot({path:test.info().outputPath('sign-in-recovery-390.png'),fullPage:true});
+  await page.getByRole('button',{name:'Forgot password?'}).click();
+  await expect(page.getByLabel('Email',{exact:true})).toHaveAttribute('placeholder','you@example.com');
 });
 for(const url of ['/#register','/#identity-register']) test(`legacy entry ${url} opens the same base-account journey`,async({page})=>{
   await mockAccountJourney(page); await page.goto(url);
