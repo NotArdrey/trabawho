@@ -13,8 +13,9 @@ project. Frontend publishing is outside the requested scope; the production
 frontend still uses the earlier registration bundle. The new
 account-owned endpoints run alongside the earlier endpoints during this transition.
 Existing identity-reviewed names are not backfilled or silently corrected.
-The subsequent fixed-account-role change adds two local migrations and updated
-function code. These additions have not been deployed to the linked project.
+The subsequent fixed-account-role change adds two migrations and updated
+function code. Both migrations and seven affected functions are deployed on the
+linked project. Frontend publishing remains outside this backend rollout.
 
 ## Account and email
 
@@ -235,6 +236,17 @@ URL redirects at all five supported widths, registration, identity recovery,
 Worker setup, incoming messages, and Client checkout. Backend helper tests also
 passed (10 tests).
 
+The fixed-role backend rollout was completed using the PAT from the ignored
+`.env` file. Both migrations are recorded in the linked project's migration
+history. The seven affected Edge Functions are active; protected endpoints reject
+anonymous requests and the webhook rejects unsigned requests with HTTP 401.
+Live profile capabilities match their account roles. Rollback-only SQL suites
+`account-registration.sql` and `account-roles.sql` passed, including same-ID
+approval across roles, duplicate admin-approval rollback, fixed role enforcement,
+and opposite-role setup/checkout denial. All synthetic accounts and test events
+were rolled back. The deployment did not change email confirmation or the Didit
+workflow configuration.
+
 On 2026-10-04, `npm run check` passed with 424 unit tests and 14 standards checks.
 All 74 selected Playwright journeys passed, covering the new base
 account, email recovery, Didit/name gates, correction review, manual fallback,
@@ -267,7 +279,7 @@ npx playwright test tests/e2e/registration-validation.e2e.spec.ts tests/e2e/iden
 npx deno test --allow-env --allow-net supabase/functions/_shared/identityDomain_test.ts supabase/functions/_shared/accountRegistration_test.ts
 ```
 
-Run `tests/integration/account-registration.sql`,
+Run `tests/integration/account-registration.sql`, `tests/integration/account-roles.sql`,
 `tests/integration/identity-registration.sql`, and
 `tests/integration/email-notifications.sql` through a privileged linked-project
 connection; each suite rolls its fixtures back.
