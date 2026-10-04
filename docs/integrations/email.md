@@ -7,7 +7,11 @@ secrets. Never prefix it with `VITE_` or place it in browser code.
 ## Activation
 
 Copy `supabase/.env.example` to `supabase/.env.local` and supply `SMTP_PASSWORD`.
-Use a `SUPABASE_ACCESS_TOKEN` with access to the linked project, then run:
+Use a `SUPABASE_ACCESS_TOKEN` with access to the linked project in the shell or an
+ignored environment file; `PAT` in `.env` is also supported. The command reads
+`.env`, `.env.local`, and `supabase/.env.local`, with shell values taking priority.
+If an inherited CLI token receives 401/403, a read-only preflight tries the local
+project token before any remote changes. Then run:
 
 ```sh
 npm run email:configure
@@ -20,9 +24,27 @@ updates Auth SMTP. Repeated runs preserve the worker secret. Existing Auth email
 hooks require review because they override custom SMTP. Auth confirmation rules,
 redirect allowlists, templates and rate limits are preserved.
 
-Gmail credentials were authenticated locally. Hosted activation could not run
-because the available Supabase connection returned access denied (HTTP 403).
-No live delivery or inbox receipt has been verified.
+Hosted activation completed on 2026-10-04. The inherited CLI token lacked project
+access; the local project token succeeded. Auth SMTP, server secrets, the email
+migration, worker, Vault credentials, and minute scheduler are deployed. The
+Management API requires `smtp_port` as the string `"465"`; the setup command now
+uses that contract rather than a number, which was rejected with HTTP 400.
+
+Auth's site URL now points to `https://trabawho-kappa.vercel.app`; its redirect
+allowlist includes that origin and the localhost/127.0.0.1 development origins on
+port 3000. The default Auth email limit of two requests per hour was increased to
+30 for this project. These project settings were corrected during activation;
+re-running the command preserves them.
+
+A permitted diagnostic signup confirmation reached the sender's Gmail inbox.
+Following its actual link confirmed the synthetic account and returned to the
+deployed app's login screen. Identity remained unverified and access stayed
+blocked. The synthetic account was removed. The hosted notification worker also
+processed five queued events with zero delivery failures; this records SMTP
+acceptance, not inbox receipt for those notifications. Both live transaction-
+rollback integration suites passed, including email recipients, leases, privacy,
+identity decisions, and name protection. A real camera verification still needs
+separate rehearsal.
 
 ## Events and preferences
 

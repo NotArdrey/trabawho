@@ -214,8 +214,12 @@ stale/duplicate events, and rollback on failed events. Use Didit's **Try Webhook
 and sandbox flows for signed approved/declined/review deliveries. A real camera
 scan and inbox confirmation require separate verification from mocked tests.
 
-The identity migrations through `20261004105000` and all six functions above are
-deployed on the linked project. Live provider diagnostics returned HTTP 200 for the
+The identity migrations through `20261004105000`, the `20261005111000` name
+protection migration, and all six functions above are deployed on the linked
+project. On 2026-10-04, the live entry points matched the repository, but the
+deployed shared confirmation helper still used the retired request-body redirect
+option and returned provider errors. All six functions were redeployed together
+with the current query-parameter redirect and safe error handling. Live provider diagnostics returned HTTP 200 for the
 configured workflow and destination list, with an active matching V3 destination
 subscribed to both required events. Live session creation/polling and forged-status
 rejection passed. Didit delivered a signed pending event; transactional application
@@ -226,7 +230,11 @@ and rejection, idempotent retry, conflict rejection, and nonadmin denial passed;
 the synthetic users and images were removed. A browser journey without API mocks
 confirmed pending login denial, admin approval, and subsequent dashboard access.
 Blocked login retains the entered email and its denial reason. Approval used synthetic email
-confirmation to avoid sending external test email. These checks do not claim a
-completed camera scan, signed approved/declined provider delivery, or inbox receipt.
+confirmation to avoid sending external test email. A separately permitted SMTP
+diagnostic subsequently verified real Gmail inbox receipt and the confirmation
+link's production login return; email confirmation alone kept identity access
+blocked. The live identity and email transaction-rollback SQL suites passed after
+the missing name-protection migration was applied. These checks do not claim a
+completed camera scan or signed approved/declined provider delivery.
 Unfinished synthetic provider sessions and their event records remain for webhook
 correlation; they created no auth accounts.

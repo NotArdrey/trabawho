@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { CalendarCheck, CheckCircle2, MapPin, Star } from "lucide-react";
+import { CalendarCheck, CheckCircle2, MapPin, Star, UserRound } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 
@@ -17,41 +17,52 @@ function ServiceCard({
   service: LandingFeaturedService;
   onSelect: (search: LandingSearchParams) => void;
 }) {
+  const [failedPhoto, setFailedPhoto] = useState<string>();
+  const [failedProviderPhoto, setFailedProviderPhoto] = useState<string>();
   return (
-    <article className="group overflow-hidden rounded-xl border bg-card transition-[box-shadow,transform] duration-300 hover:-translate-y-1 hover:shadow-xl focus-within:shadow-lg motion-reduce:transform-none motion-reduce:transition-none">
-      <div className="aspect-[16/10] overflow-hidden bg-muted">
-        {service.photoUrl ? (
+    <article className="flex min-w-0 flex-col overflow-hidden rounded-xl border bg-card">
+      {service.photoUrl && failedPhoto !== service.photoUrl && (
+        <div className="aspect-[16/9] max-h-48 overflow-hidden bg-muted">
           <img
-            className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.035] motion-reduce:transform-none motion-reduce:transition-none"
+            className="h-full w-full object-cover"
             src={service.photoUrl}
-            alt={`${service.providerName}, ${service.serviceType} provider`}
+            alt={`${service.title}, shared by ${service.providerName}`}
             loading="lazy"
+            onError={() => setFailedPhoto(service.photoUrl)}
           />
-        ) : (
-          <div className="flex h-full items-center justify-center text-sm font-medium text-muted-foreground">
-            {service.serviceType}
-          </div>
-        )}
-      </div>
+        </div>
+      )}
 
-      <div className="p-5">
+      <div className="flex flex-1 flex-col p-5">
         <div className="flex items-start justify-between gap-3">
-          <p className="text-sm font-semibold text-primary">{service.serviceType}</p>
+          {service.serviceType.toLowerCase() !== service.title.toLowerCase() && (
+            <p className="min-w-0 break-words text-sm font-semibold text-primary">{service.serviceType}</p>
+          )}
           {service.isVerified && (
             <span className="inline-flex items-center gap-1 text-xs font-semibold text-primary">
-              <CheckCircle2 className="size-4" aria-hidden="true" /> Verified
+              <CheckCircle2 className="size-4 shrink-0" aria-hidden="true" /> Verified provider
             </span>
           )}
         </div>
-        <h3 className="mt-2 line-clamp-2 text-lg font-bold text-foreground">{service.title}</h3>
-        <p className="mt-1 text-sm font-medium text-muted-foreground">{service.providerName}</p>
+        <h3 className="mt-2 break-words text-lg font-bold text-foreground">{service.title}</h3>
+        <div className="mt-3 flex items-center gap-2 text-sm text-muted-foreground">
+          {service.providerPhotoUrl && failedProviderPhoto !== service.providerPhotoUrl ? (
+            <img className="size-9 shrink-0 rounded-full object-cover" src={service.providerPhotoUrl}
+              alt="" loading="lazy" onError={() => setFailedProviderPhoto(service.providerPhotoUrl)} />
+          ) : (
+            <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-muted">
+              <UserRound className="size-4" aria-hidden="true" />
+            </span>
+          )}
+          <p className="min-w-0 break-words font-medium">{service.providerName}</p>
+        </div>
 
         <div className="mt-4 flex flex-wrap gap-x-4 gap-y-2 text-sm text-muted-foreground">
           {service.rating !== undefined && (
             <span className="inline-flex items-center gap-1">
               <Star className="size-4 fill-brand-highlight text-brand-highlight" aria-hidden="true" />
               {service.rating.toFixed(1)}
-              {service.reviewCount !== undefined && ` (${service.reviewCount})`}
+              {service.reviewCount !== undefined && ` · ${service.reviewCount} provider ${service.reviewCount === 1 ? "review" : "reviews"}`}
             </span>
           )}
           {service.location && (
@@ -66,11 +77,13 @@ function ServiceCard({
           )}
         </div>
 
-        <div className="mt-5 flex items-center justify-between gap-3 border-t pt-4">
-          <span className="text-sm font-bold text-foreground">{service.priceLabel || "View pricing"}</span>
-          <Button variant="outline" onClick={() => onSelect({ query: service.serviceType })}>
-            View service
-          </Button>
+        <div className="mt-auto pt-5">
+          <div className="flex flex-col gap-3 border-t pt-4">
+            <span className="break-words text-sm font-bold text-foreground">{service.priceLabel || "Ask provider for pricing"}</span>
+            <Button variant="outline" className="w-full" onClick={() => onSelect({ query: service.title })}>
+              Browse similar services
+            </Button>
+          </div>
         </div>
       </div>
     </article>
@@ -80,7 +93,6 @@ function ServiceCard({
 function ServiceSkeleton() {
   return (
     <div className="overflow-hidden rounded-xl border bg-card" aria-hidden="true">
-      <div className="aspect-[16/10] bg-muted" />
       <div className="space-y-3 p-5">
         <div className="h-4 w-24 rounded bg-muted" />
         <div className="h-6 w-4/5 rounded bg-muted" />
@@ -131,12 +143,12 @@ export default function FeaturedServices({ onSelect }: FeaturedServicesProps) {
     <section className="py-14 sm:py-20" aria-labelledby="featured-services-title">
       <div className="mx-auto max-w-7xl px-4 sm:px-6">
         <div>
-          <p className="text-sm font-semibold text-primary">Available on TrabaWho</p>
-          <h2 id="featured-services-title" className="mt-2 text-3xl font-bold tracking-tight text-foreground">
-            Featured local services
+          <p className="text-sm font-semibold text-primary">Explore TrabaWho</p>
+          <h2 id="featured-services-title" className="mt-2 text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
+            Recently listed services
           </h2>
           <p className="mt-2 max-w-2xl text-muted-foreground">
-            Explore active listings and compare the information each provider has shared.
+            Discover services shared by providers. Compare details and confirm pricing and schedules before booking.
           </p>
         </div>
 
@@ -156,7 +168,7 @@ export default function FeaturedServices({ onSelect }: FeaturedServicesProps) {
 
         {!isLoading && !error && services.length === 0 && (
           <div className="mt-8 rounded-xl border bg-muted/30 p-8 text-center">
-            <p className="font-semibold text-foreground">No featured services are available yet.</p>
+            <p className="font-semibold text-foreground">No services have been listed yet.</p>
             <p className="mt-2 text-sm text-muted-foreground">Browse all services or check back later.</p>
           </div>
         )}

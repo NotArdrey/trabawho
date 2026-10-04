@@ -94,7 +94,14 @@ begin
     update public.profiles set role='admin' where user_id=u;
     raise exception 'Client could self-promote';
   exception when insufficient_privilege then null; end;
+  begin
+    update public.profiles set full_name='Unreviewed browser name' where user_id=u;
+    raise exception 'Client could change an identity-registered name';
+  exception when insufficient_privilege then null; end;
   perform set_config('request.jwt.claims','{"role":"service_role"}',true);
+  update public.profiles set full_name='Reviewed service correction' where user_id=u;
+  if not exists(select 1 from public.profiles where user_id=u and full_name='Reviewed service correction') then
+    raise exception 'Service identity name correction was blocked'; end if;
   result := public.apply_didit_identity_event('identity-expired-'||sid,'hash',sid,'EXPIRED',jsonb_build_object('created_at',extract(epoch from now())::bigint + 10),'{}',null);
   if not exists(select 1 from public.profiles where user_id=u and not is_verified and verification_status='EXPIRED') then
     raise exception 'KYC expiry did not block access'; end if;

@@ -15,6 +15,7 @@ export interface LandingFeaturedService {
   serviceType: string;
   location?: string;
   photoUrl?: string;
+  providerPhotoUrl?: string;
   rating?: number;
   reviewCount?: number;
   priceLabel?: string;

@@ -1,15 +1,16 @@
 import fs from 'node:fs';
 import { randomBytes } from 'node:crypto';
+import { authSmtpConfiguration, projectTokenCandidates, readServerEnvironment, selectProjectToken } from './system-email-config.mts';
 
 const environmentFile = 'supabase/.env.local';
-const environment = Object.fromEntries(fs.readFileSync(environmentFile, 'utf8').split(/\r?\n/)
-  .filter((line) => /^[A-Z][A-Z0-9_]*=/.test(line))
-  .map((line) => { const index = line.indexOf('='); return [line.slice(0, index), line.slice(index + 1).trim().replace(/^['"]|['"]$/g, '')]; }));
+const localEnvironment = readServerEnvironment(['.env', '.env.local', environmentFile]);
+const environment = { ...localEnvironment, ...process.env };
 const ref = process.env.SUPABASE_PROJECT_REF || fs.readFileSync('supabase/.temp/project-ref', 'utf8').trim();
-const token = process.env.SUPABASE_ACCESS_TOKEN;
+const candidates = projectTokenCandidates(localEnvironment, process.env);
+let token = '';
 const smtpUser = environment.SMTP_USER;
 const smtpPassword = (environment.SMTP_PASSWORD || '').replace(/\s/g, '');
-if (!/^[a-z0-9]{20}$/.test(ref) || !token || !smtpUser || !smtpPassword)
+if (!/^[a-z0-9]{20}$/.test(ref) || !candidates.length || !smtpUser || !smtpPassword)
   throw new Error('Set a project access token and the server SMTP_USER/SMTP_PASSWORD before configuring email.');
 
 async function management(path: string, init: RequestInit = {}): Promise<unknown> {
@@ -27,7 +28,9 @@ const query = (sql: string) => management('database/query', {
 
 try {
   // Preflight before changing any remote settings or deploying code.
-  const auth = await management('config/auth') as { site_url?: string; hook_send_email_enabled?: boolean };
+  const selected = await selectProjectToken(ref, candidates);
+  token = selected.token;
+  const auth = selected.auth;
   if (auth.hook_send_email_enabled) throw new Error('An existing Auth email hook overrides SMTP. Review its configuration before deploying.');
   const appUrl = environment.TRABAWHO_APP_URL || auth.site_url || '';
   const url = new URL(appUrl);
@@ -66,8 +69,7 @@ try {
   }
   await management('config/auth', {
     method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ smtp_host: 'smtp.gmail.com', smtp_port: 465, smtp_user: smtpUser,
-      smtp_pass: smtpPassword, smtp_admin_email: smtpUser, smtp_sender_name: 'TrabaWho' }),
+    body: JSON.stringify(authSmtpConfiguration(smtpUser, smtpPassword)),
   });
   console.log('Gmail SMTP configured for Auth and all system notification events. Worker deployed and scheduled.');
 } catch (error) {
