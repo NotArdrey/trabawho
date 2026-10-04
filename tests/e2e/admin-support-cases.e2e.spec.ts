@@ -37,7 +37,7 @@ for (const width of [390, 768, 1024, 1280, 1440]) {
       await expect(page).toHaveURL(/\/admin\/support-cases\/[0-9a-f-]{36}/i);
       await page.reload();
       const casePage = page.getByTestId("admin-case-page");
-      await expect(casePage.getByRole("heading", { name: "Payment truth" })).toBeVisible();
+      await expect(casePage.getByRole("heading", { name: "Payment status" })).toBeVisible();
       const sections = casePage.getByRole("navigation", { name: "Case sections" });
       await sections.getByRole("button", { name: "Evidence" }).click();
       await expect(casePage.getByRole("heading", { name: "Payment attempts" })).toBeVisible();

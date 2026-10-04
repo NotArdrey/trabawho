@@ -72,6 +72,19 @@ describe("participant support cases", () => {
     expect(result.some((item) => item.report.id === "case-100")).toBe(true);
   });
 
+  it("loads the accepted replacement time for either booking participant", async () => {
+    mockTables({
+      bookings: [{ id: "booking-1", buyer_id: "member-1", seller_id: "provider-1", service_id: 1 }],
+      booking_support_cases: [{ id: "case-1", booking_id: "booking-1", created_at: "2026-10-04", status: "under_review",
+        resolution_status: "replacement_accepted" }],
+      booking_case_replacement_visits: [{ booking_id: "booking-1", case_id: "case-1", slot_id: 12,
+        status: "accepted", accepted_at: "2026-10-04T08:00:00Z" }],
+      service_slots: [{ id: 12, start_ts: "2026-10-10T08:00:00+08:00", end_ts: "2026-10-10T09:00:00+08:00" }],
+    });
+    const result = await listParticipantSupportCases();
+    expect(result[0].replacementSchedule).toMatchObject({ caseId: "case-1", startAt: "2026-10-10T08:00:00+08:00" });
+  });
+
   it("does not read case data after authentication is lost", async () => {
     mocks.getUser.mockResolvedValue({ data: { user: null }, error: { code: "401" } });
     await expect(listParticipantSupportCases()).rejects.toThrow("Please sign in again");

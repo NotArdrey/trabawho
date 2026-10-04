@@ -102,6 +102,32 @@ No live replacement visit, email receipt, or PayMongo sandbox refund has been
 verified. Payouts, partial refunds, other dispute remedies, and production
 policy remain out of scope.
 
+The replacement-visit UI now treats an accepted case-linked slot as the active
+appointment on participant booking cards, booking details, and the provider's
+upcoming schedule while retaining the original booking time as history. Case
+and admin views show each participant's acceptance and refresh visit progress
+while open. This is a presentation fix, not a change to the booking's stored
+original slot or to payment state. Migration
+`20261005112500_case_replacement_slot_visibility.sql` is also required: a
+confirmed slot can become `booked`, and the previous slot-read policy hid that
+time from the client and admin. The migration grants only case participants and
+admins read access to their case-linked slot; it has **not** been deployed by
+this UI change. The referenced live case still needs a read-only status check
+and a client/provider/admin rehearsal after deployment; local mocked journeys
+alone do not prove its slot was accepted.
+
+For an accepted replacement, the participant booking card now puts the agreed
+date and time in its primary schedule row, explains that the case stays open
+until replacement work is confirmed, and routes new problems to the case
+conversation. Ordinary booking reschedule/cancel controls are hidden while a
+support case is open. A fresh refund-review button is not presented alongside
+an accepted replacement; existing refund progress remains visible. **Deferred
+backend work:** `request_booking_case_refund` still permits a review request
+while a replacement is accepted, although no-show refund approval rejects an
+active replacement. Define and implement a reasoned replacement-cancellation
+and refund-review transition, then enforce it in the RPC before treating these
+as mutually exclusive remedies. This UI work does not issue or approve a refund.
+
 Clients and workers can open **Support cases** from their desktop sidebar or
 mobile navigation at `/support-cases`. This participant view lists reports for
 their own bookings in either role, including closed cases. Each report links to

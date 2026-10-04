@@ -51,7 +51,7 @@ describe("AdminCasePage", () => {
 
   it("loads a case by ID and keeps another admin's actions read-only", async () => {
     renderCase();
-    expect(await screen.findByRole("heading", { name: "Payment truth" })).toBeVisible();
+    expect(await screen.findByRole("heading", { name: "Payment status" })).toBeVisible();
     expect(screen.getByText(/another support admin/i)).toBeVisible();
     expect(screen.queryByRole("button", { name: "Take ownership" })).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Conversation" }));
@@ -73,14 +73,15 @@ describe("AdminCasePage", () => {
     vi.mocked(getSupportCaseById).mockResolvedValue(null);
     renderCase();
     expect(await screen.findByRole("alert")).toHaveTextContent(/unavailable to your account/i);
-    expect(screen.queryByRole("heading", { name: "Payment truth" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Payment status" })).not.toBeInTheDocument();
   });
 
   it("keeps payment context visible and opens the secondary history disclosure", async () => {
     renderCase();
     expect(await screen.findByRole("heading", { name: "Reported issue" })).toBeVisible();
     expect(screen.getByRole("heading", { name: "People and appointment" })).toBeVisible();
-    expect(screen.getByText(/Payment verification needed before refund approval/)).toBeVisible();
+    expect(screen.getByText(/No confirmed PayMongo payment is linked to this booking/)).toBeVisible();
+    expect(screen.getByText(/The booking price is not proof that payment was received/)).toBeVisible();
     const disclosure = screen.getByText("History and technical references").closest("details");
     expect(disclosure).not.toHaveAttribute("open");
     fireEvent.click(screen.getByText("History and technical references"));
@@ -90,7 +91,7 @@ describe("AdminCasePage", () => {
 
   it("groups evidence and separates participant conversation from private notes", async () => {
     renderCase();
-    await screen.findByRole("heading", { name: "Payment truth" });
+    await screen.findByRole("heading", { name: "Payment status" });
     fireEvent.click(screen.getByRole("button", { name: "Evidence" }));
     expect(screen.getByRole("heading", { name: "Report evidence" })).toBeVisible();
     expect(screen.getByRole("heading", { name: "Delivery evidence" })).toBeVisible();

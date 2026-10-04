@@ -12,7 +12,6 @@ import {
   CreditCard,
   Filter,
   MessageCircle,
-  Receipt,
   RotateCcw,
   Search,
   ShieldCheck,
@@ -32,11 +31,15 @@ import { CancelBookingDialog } from '../components/CancelBookingDialog';
 import { BookingRequestReviewDialog } from '../components/BookingRequestReviewDialog';
 import { PaymentReturnStatus } from '../components/PaymentReturnStatus';
 import { BookingCardFooter } from '../components/BookingCardFooter';
+import { BookingCardSchedule } from '../components/BookingCardSchedule';
+import { isShowcasePaymentReference } from '../utils/bookingPaymentPresentation';
 import { BookingTransactionActions } from '../components/BookingTransactionActions';
 import { BookingListFeedback } from '@/features/bookings/components/BookingListFeedback';
 import { Button } from '@/components/ui/button';
 import { MetricCard } from '@/components/ui/metric-card';
 import { SearchFilterBar } from '@/components/ui/search-filter-bar';
+import { DataPagination } from '@/components/ui/data-pagination';
+import { paginateBookings } from '../utils/bookingPagination';
 import { isBookingActionNeeded, matchesBookingHubFilter } from '../utils/bookingFilters';
 import { WorkflowEmptyState } from '@/components/ui/workflow-panel';
 import { paths } from '@/app/router/routes';
@@ -60,10 +63,8 @@ import {
   reviewBookingCancellation,
   reviewBookingReschedule,
 } from '../services/bookingTransactions';
-
 const WORKER_ROLE_VALUES = new Set(['worker', 'workers', 'seller', 'sellers']);
 const CLIENT_ROLE_VALUES = new Set(['client', 'clients', 'buyer', 'buyers', 'customer', 'customers']);
-
 const isWorkerProfile = (profile = {}) => {
   const normalizedRole = String(profile?.role || '').trim().toLowerCase();
   if (CLIENT_ROLE_VALUES.has(normalizedRole)) return false;
@@ -571,27 +572,24 @@ const MyBookings = ({
       if (value && (key === 'filter' || value !== 'all')) nextParams.set(key, value);
       else nextParams.delete(key);
     });
+    if ('filter' in updates || 'q' in updates) nextParams.delete('page');
     nextParams.set('scope', activeScope);
     setSearchParams(nextParams, { replace });
   };
-
   const handleScopeChange = (nextScope) => {
     const nextParams = new URLSearchParams();
     nextParams.set('scope', nextScope);
     const destination = nextScope === 'incoming' ? paths.workerBookings : paths.bookings;
     navigate(`${destination}?${nextParams.toString()}`);
   };
-
   const bookingSearch = searchParams.get('q') || '';
   const activeSearch = bookingSearch.trim().toLowerCase();
-
   const displayedBookings = useMemo(() => {
     let list = allBookings.filter((booking) => matchesBookingHubFilter(booking, selectedDisplayFilter, activeScope));
-    if (activeSearch) {
-      list = list.filter((booking) => matchesBookingSearch(booking, activeSearch));
-    }
+    if (activeSearch) list = list.filter((booking) => matchesBookingSearch(booking, activeSearch));
     return list;
   }, [activeScope, activeSearch, allBookings, selectedDisplayFilter]);
+  const bookingPage = paginateBookings(displayedBookings, searchParams.get('page'));
   const renderBookingCard = (booking) => {
     const scheduleHasPassed = hasPastUnpaidSchedule(booking);
     const statusMeta = getStatusMeta(scheduleHasPassed ? 'Reservation Expired' : booking.status);
@@ -653,55 +651,10 @@ const MyBookings = ({
             } : undefined}
           />
 
-          <div className="booking-details-grid border border-orange-200 dark:border-orange-800/60">
-            <div className="booking-detail-item">
-              <CalendarDays size={16} aria-hidden="true" />
-              <div>
-                <span>Date: </span>
-                <strong>{booking.selectedSlot?.date || booking.requestDate || 'Coordinated in chat'}</strong>
-              </div>
-            </div>
-
-            <div className="booking-detail-item">
-              <Clock size={16} aria-hidden="true" />
-              <div>
-                <span>Time: </span>
-                <strong>
-                  {formatBookingTimeRange(booking.selectedSlot?.timeBlock)}
-                </strong>
-              </div>
-            </div>
-
-            <div className="booking-detail-item">
-              <CreditCard size={16} aria-hidden="true" />
-              <div>
-                <span>Payment: </span>
-                <strong>
-                  {booking.paymentMethod === 'paymongo-card'
-                    ? 'PayMongo Card'
-                    : booking.paymentMethod === 'gcash-advance'
-                    ? 'Legacy GCash'
-                    : booking.paymentMethod === 'after-service-cash'
-                    ? 'Cash on Meetup'
-                    : booking.paymentMethod === 'after-service-gcash'
-                    ? 'GCash on Meetup'
-                    : 'Pending Selection'}
-                </strong>
-              </div>
-            </div>
-
-            {booking.paymentReference && (
-              <div className="booking-detail-item">
-                <Receipt size={16} aria-hidden="true" />
-                <div>
-                  <span>Ref: </span>
-                  <code className="booking-reference">
-                    {booking.paymentReference}
-                  </code>
-                </div>
-              </div>
-            )}
-          </div>
+          <BookingCardSchedule bookingId={booking.id} checkReplacement={['open', 'closed'].includes(booking.disputeStatus)}
+            originalDate={booking.selectedSlot?.date || booking.requestDate}
+            originalTime={formatBookingTimeRange(booking.selectedSlot?.timeBlock)}
+            paymentMethod={booking.paymentMethod} paymentReference={booking.paymentReference} />
         </div>
         <BookingCardFooter
           amountLabel={shouldLoadSellerBookings ? 'Booking amount' : 'Service price'}
@@ -710,6 +663,7 @@ const MyBookings = ({
           requestDate={shouldLoadSellerBookings ? booking.requestDate : undefined}
           platformFee={!shouldLoadSellerBookings && booking.transactionFeeAmount > 0 ? formatPhp(booking.transactionFeeAmount) : undefined}
           totalPayment={!shouldLoadSellerBookings && booking.totalChargedAmount > 0 ? formatPhp(booking.totalChargedAmount) : undefined}
+          demoPayment={isShowcasePaymentReference(booking.paymentReference)}
           paymentProgress={booking.paymentPlan === 'downpayment' ? {
             paid: formatPhp(booking.amountPaid),
             balance: formatPhp(booking.balanceDueAmount),
@@ -718,11 +672,11 @@ const MyBookings = ({
           messageIsPrimary={!hasPrimaryWorkflowAction}
           onViewDetails={() => setDetailBookingId(booking.id)}
           onMessage={() => handleOpenChat(booking.id)}
-          onReschedule={!shouldLoadSellerBookings && !['Completed Service', 'Cancelled', 'Cancelled (Cash)', 'Refunded'].includes(booking.status) && booking.selectedSlot ? () => {
+          onReschedule={!shouldLoadSellerBookings && booking.disputeStatus !== 'open' && !['Completed Service', 'Cancelled', 'Cancelled (Cash)', 'Refunded'].includes(booking.status) && booking.selectedSlot ? () => {
             setSelectedBookingId(booking.id);
             setScheduleAction(scheduleHasPassed ? 'checkout' : 'reschedule'); setUiState('slots');
           } : undefined}
-          onCancel={!shouldLoadSellerBookings && !['Completed Service', 'Cancelled', 'Cancelled (Cash)', 'Refunded'].includes(booking.status) ? () => setCancelBookingId(booking.id) : undefined}
+          onCancel={!shouldLoadSellerBookings && booking.disputeStatus !== 'open' && !['Completed Service', 'Cancelled', 'Cancelled (Cash)', 'Refunded'].includes(booking.status) ? () => setCancelBookingId(booking.id) : undefined}
         >
             {canPayNow && (
               <Button
@@ -780,7 +734,6 @@ const MyBookings = ({
       </article>
     );
   };
-
   const renderBookingsList = () => (
     <main className="gl-shell gl-page-pad bookings-launchpad">
       <section className="bookings-hero" aria-labelledby="bookings-title">
@@ -822,7 +775,7 @@ const MyBookings = ({
           onSearchChange?.({ target: { value } });
         }}
         options={displayFilters}
-        resultLabel={`Showing ${displayedBookings.length} of ${allBookings.length} booking${allBookings.length === 1 ? '' : 's'}`}
+        resultLabel={displayedBookings.length ? `Showing ${bookingPage.first}–${bookingPage.last} of ${displayedBookings.length} matching bookings` : 'No matching bookings'}
         searchLabel="Search bookings"
         searchPlaceholder="Search by worker, service, or reference..."
         searchValue={bookingSearch}
@@ -878,9 +831,10 @@ const MyBookings = ({
 
       {displayedBookings.length > 0 && (
         <section className="bookings-list" aria-label="Bookings list">
-          {displayedBookings.map((booking) => renderBookingCard(booking))}
+          {bookingPage.items.map((booking) => renderBookingCard(booking))}
         </section>
       )}
+      <DataPagination label="Booking pages" page={bookingPage.page} pageCount={bookingPage.pageCount} onPageChange={(page) => updateSearchParams({ page: String(page) })} />
     </main>
   );
 

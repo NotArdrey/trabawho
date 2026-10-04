@@ -17,6 +17,7 @@ interface BookingCardFooterProps {
   emphasizeAmount?: boolean;
   platformFee?: string;
   totalPayment?: string;
+  demoPayment?: boolean;
   paymentProgress?: { paid: string; balance: string };
   requestDate?: string;
   messageLabel: string;
@@ -34,6 +35,7 @@ export function BookingCardFooter({
   emphasizeAmount = false,
   platformFee,
   totalPayment,
+  demoPayment = false,
   paymentProgress,
   requestDate,
   messageLabel,
@@ -74,9 +76,9 @@ export function BookingCardFooter({
           )}
 
           {totalPayment && (
-            <div className="min-w-0 rounded-lg bg-emerald-50 px-3 py-2 dark:bg-emerald-950/40">
-              <dt className="text-xs font-medium text-muted-foreground">Total payment</dt>
-              <dd className="mt-1 text-sm font-extrabold text-emerald-700 dark:text-emerald-300">{totalPayment}</dd>
+            <div className={cn("min-w-0 rounded-lg px-3 py-2", demoPayment ? "bg-muted/60" : "bg-emerald-50 dark:bg-emerald-950/40")}>
+              <dt className="text-xs font-medium text-muted-foreground">{demoPayment ? "Illustrative total" : "Total payment"}</dt>
+              <dd className={cn("mt-1 text-sm font-extrabold", demoPayment ? "text-foreground" : "text-emerald-700 dark:text-emerald-300")}>{totalPayment}</dd>
             </div>
           )}
 

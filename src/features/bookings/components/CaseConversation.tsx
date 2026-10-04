@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Eye, MessageSquareText, RefreshCw, Send } from "lucide-react";
 
 import { SelectField } from "@/components/forms";
@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { FilePicker } from "@/components/ui/file-picker";
 import { Badge } from "@/components/ui/badge";
 import { PrivateEvidencePreview } from "@/shared/components/PrivateEvidencePreview";
+import { useBookingActivity } from "@/features/bookings/hooks/useBookingActivity";
 import { getCaseConversation, markCaseRead, openCaseImage, sendCaseMessage,
   type CaseAudience, type CaseMessage, type ReplacementVisit } from "@/features/bookings/services/caseWorkflow";
 
@@ -28,7 +29,7 @@ export function CaseConversation({ caseId, bookingId, viewerRole, closed = false
   const [evidence, setEvidence] = useState<{ path: string; source: string; at: string } | null>(null);
   const operationId = useRef(crypto.randomUUID());
 
-  const refresh = async () => {
+  const refresh = useCallback(async () => {
     setLoading(true);
     try {
       const result = await getCaseConversation(caseId);
@@ -39,8 +40,9 @@ export function CaseConversation({ caseId, bookingId, viewerRole, closed = false
       if (result.notifications.length) await markCaseRead(caseId);
     } catch (cause) { setError(cause instanceof Error ? cause.message : "Updates could not be loaded."); }
     finally { setLoading(false); }
-  };
-  useEffect(() => { queueMicrotask(() => { void refresh(); }); }, [caseId]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [caseId]);
+  useEffect(() => { queueMicrotask(() => { void refresh(); }); }, [refresh]);
+  useBookingActivity(refresh, true, 30_000, "support");
 
   const send = async () => {
     if (pending || body.trim().length < 20) return;
@@ -61,7 +63,7 @@ export function CaseConversation({ caseId, bookingId, viewerRole, closed = false
     {!loading && !messages.length && <p className="rounded-lg bg-card p-4 text-sm text-muted-foreground">No messages yet. Send an update to request information or explain the next step.</p>}
     <ol className="grid gap-2">{messages.map((message) => <li key={message.id} className="min-w-0 rounded-lg bg-card p-3 text-sm"><div className="flex flex-wrap items-center justify-between gap-1"><p className="font-semibold capitalize">{message.author_role === "admin" ? "TrabaWho support" : message.author_role}</p><p className="text-xs text-muted-foreground">{date(message.created_at)}</p></div><p className="mt-1 text-xs text-muted-foreground">To {message.audience === "both" ? "both participants" : message.audience === "admin" ? "support" : `the ${message.audience}`}</p><p className="mt-2 whitespace-pre-wrap break-words leading-6">{message.body}</p>{message.storage_path && <Button type="button" variant="outline" size="sm" className="mt-2 min-h-11" onClick={() => setEvidence({ path: message.storage_path || "", source: message.author_role === "admin" ? "TrabaWho support" : message.author_role, at: message.created_at })}><Eye aria-hidden="true" />Preview evidence photo</Button>}</li>)}</ol>
     <PrivateEvidencePreview path={evidence?.path || null} title="Case message evidence" description={evidence ? `Attached by ${evidence.source} · ${date(evidence.at)}` : undefined} loadUrl={openCaseImage} onClose={() => setEvidence(null)} />
-    {visits.length > 0 && <div className="rounded-lg bg-primary/5 p-3"><h4 className="font-semibold text-primary">Replacement visit</h4>{visits.map((visit) => <p key={visit.id} className="mt-1 text-sm capitalize">{visit.status.replaceAll("_", " ")} · Slot #{visit.slot_id} · {date(visit.created_at)}</p>)}</div>}
+    {visits.length > 0 && <div className="rounded-lg bg-primary/5 p-3"><h4 className="font-semibold text-primary">Replacement visit</h4>{visits.map((visit) => <p key={visit.id} className="mt-1 text-sm capitalize">{visit.status.replaceAll("_", " ")} · Proposed {date(visit.created_at)}. See Resolution and next steps for the agreed time.</p>)}</div>}
     {!closed && !readOnly && <div className="grid gap-3 border-t pt-4"><h4 className="font-semibold text-primary">{viewerRole === "admin" ? "Send a case update" : "Reply to support"}</h4>
       {viewerRole === "admin" && <SelectField label="Send to" value={audience} disabled={pending} onValueChange={(value) => { setAudience(value as CaseAudience); setPreview(false); operationId.current = crypto.randomUUID(); }} options={[{ value: "provider", label: "Provider" }, { value: "client", label: "Client" }, { value: "both", label: "Both participants" }]} />}
       <label className="grid gap-1 text-sm font-medium">Message<textarea className="min-h-28 w-full rounded-md border border-input bg-background p-3 font-normal focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" value={body} disabled={pending} maxLength={4000} onChange={(event) => { setBody(event.target.value); setPreview(false); operationId.current = crypto.randomUUID(); }} placeholder="Explain what information is needed or what happens next (at least 20 characters)" /></label>

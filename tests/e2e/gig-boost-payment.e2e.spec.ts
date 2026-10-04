@@ -45,8 +45,29 @@ test("cancelled checkout leaves the gig inactive", async ({ page }) => {
   await page.route("**/functions/v1/reconcile-paymongo-boost-checkout", (route) => route.fulfill({ json: { status: "awaiting_payment", verified: false, requiresReview: false, serviceId: 83, endsAt: null } }));
   await page.goto(`/__boost-journey?boostPayment=cancelled&boostAttempt=${attempt}`);
   await expect(page.getByRole("status").filter({ hasText: "Your gig boost is inactive" })).toBeVisible();
+  await expect(page.getByRole("status").filter({ hasText: "Your gig boost is inactive" })).toHaveClass(/border-amber-300/);
+  await expect(page.getByRole("button", { name: "Check payment again" })).toHaveCount(0);
+  await expect(page).not.toHaveURL(/boostAttempt=/);
   await expect(page.getByRole("button", { name: "Review boost payment" })).toBeEnabled();
   await expect(page.getByRole("button", { name: "Gig already boosted" })).toHaveCount(0);
+});
+
+test("a delayed PayMongo confirmation is checked automatically", async ({ page }) => {
+  let checks = 0;
+  await page.clock.install();
+  await page.route("**/functions/v1/reconcile-paymongo-boost-checkout", (route) => {
+    checks++;
+    return route.fulfill({ json: { status: checks === 1 ? "awaiting_payment" : "paid",
+      verified: checks > 1, requiresReview: false, serviceId: 83,
+      endsAt: new Date(Date.now() + 7 * 86400_000).toISOString() } });
+  });
+  await page.goto(`/__boost-journey?boostPayment=verifying&boostAttempt=${attempt}`);
+  await expect.poll(() => checks).toBe(1);
+  await expect(page.getByRole("button", { name: "Check payment again" })).toHaveCount(0);
+  await page.clock.fastForward(3000);
+  await expect.poll(() => checks).toBeGreaterThan(1);
+  await expect(page.getByRole("status").filter({ hasText: "Payment verified" })).toBeVisible();
+  await expect(page.getByRole("status").filter({ hasText: "Payment verified" })).toHaveClass(/border-emerald-300/);
 });
 
 test("duration uses fixed, keyboard-accessible choices and updates the price", async ({ page }) => {

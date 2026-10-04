@@ -3,6 +3,7 @@ import type { BookingFunding } from "../utils/bookingPaymentGuard";
 export interface BookingActionRecord extends BookingFunding {
   id: string;
   paymentStatus?: string;
+  paymentReference?: string;
   deliveryStatus?: string;
   disputeStatus?: string;
   scheduleStatus?: string;

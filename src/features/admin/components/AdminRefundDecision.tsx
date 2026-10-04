@@ -14,7 +14,7 @@ export function AdminRefundDecision({ bookingId, caseId, paidAmount, closed, inc
   const [reason, setReason] = useState("");
   const [confirming, setConfirming] = useState(false);
   return <section aria-label="Refund decision" className="grid gap-3 rounded-lg bg-muted/40 p-4">
-    <h3 className="flex items-center gap-2 font-semibold"><RotateCcw aria-hidden="true" className="size-4" />Dispute refund</h3>
+    <h3 className="flex items-center gap-2 font-semibold"><RotateCcw aria-hidden="true" className="size-4" />Refund review</h3>
     {requestedAt && <p>The client requested refund review.</p>}
     {flow.loading && <p role="status">Loading refunds...</p>}
     {flow.refunds.map((refund) => <div key={refund.id} className="border-t pt-2"><p>{refund.currency} {refund.amount.toLocaleString("en-PH")} · {refundStatusLabels[refund.status]}</p>{refund.provider_refund_id && <p className="break-all text-xs">Reference: {refund.provider_refund_id}</p>}</div>)}

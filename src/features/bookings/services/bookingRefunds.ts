@@ -9,6 +9,17 @@ export async function getBookingRefunds(bookingId: string) {
 }
 export type BookingRefund = Awaited<ReturnType<typeof getBookingRefunds>>[number];
 
+export async function hasVerifiedRefundPayment(bookingId: string): Promise<boolean> {
+  const { data, error } = await supabase.from("payment_attempts")
+    .select("id")
+    .eq("booking_id", bookingId)
+    .in("status", ["paid", "late_paid"])
+    .not("payment_id", "is", null)
+    .limit(1);
+  if (error) throw new Error("Payment verification could not be checked. Try again before requesting a refund review.");
+  return Boolean(data?.length);
+}
+
 export async function requestCaseRefund(caseId: string) {
   const { error } = await supabase.rpc("request_booking_case_refund", { p_case_id: caseId });
   if (error) throw new Error("Refund review could not be requested. Check that the case is open and payment is verified.");

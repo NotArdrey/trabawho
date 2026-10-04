@@ -71,6 +71,40 @@ activate the client redirect before both functions are reachable.
 
 ## Verification checklist
 
+### Faster QA checkout for bookings and gig boosts
+
+The same test-only helper fills PayMongo's public successful test card for any
+TrabaWho Hosted Checkout session, whether it came from a booking deposit,
+booking balance, or gig boost:
+
+```powershell
+npm run paymongo:test-checkout -- "https://checkout.paymongo.com/cs_..."
+```
+
+Copy the checkout URL after starting payment in the app. The helper requires a
+server-only `PAYMONGO_SECRET_KEY=sk_test_...` in the local ignored `.env` or
+process environment. Before opening or filling the page, it retrieves that
+session from PayMongo and refuses any session whose `livemode` is not `false`.
+It then uses PayMongo's documented no-3DS test card, submits the hosted form,
+and waits for the return to TrabaWho. No real card or money is used. If PayMongo
+changes its hosted form, the helper stops and leaves manual checkout available.
+It never marks a booking paid or activates a boost itself: the signed webhook
+or server-side reconciliation still has to verify the provider outcome. Do not
+use this helper with live keys or as a customer-facing "saved card" button.
+Both checkout functions also send the payer's existing name, email, phone,
+street, barangay, city, and province as billing prefill when available. This
+applies only to **new** sessions after those Edge Functions are deployed;
+opening an older checkout URL will not gain the prefill. TrabaWho does not
+store a postal code, so PayMongo may still ask for it. Card details remain on
+PayMongo's hosted page; this is not card vaulting or a reusable saved card.
+The QA helper above is run locally with a checkout URL, not by clicking the
+app's payment button. The boost return flow checks provider status
+automatically and does not offer a separate "Check payment again" button.
+
+- [PayMongo test mode and test cards](https://docs.paymongo.com/docs/payment-acceptance-testing)
+- [Hosted Checkout test mode](https://docs.paymongo.com/docs/payment-channels-testing)
+
+
 - The browser receives only `checkoutUrl`, `paymentAttemptId`, `bookingId`, and
   the server-generated `holdExpiresAt` timestamp.
 - The checkout URL uses `https://checkout.paymongo.com`.
@@ -176,7 +210,7 @@ server-only `PAYMONGO_SECRET_KEY` and intentionally accepts only a test secret.
 No live refunds are enabled. Existing case history remains readable during staged
 rollouts through the legacy-column fallback.
 
-Clients request review from the booking card's **Dispute refund** section. Both
+Clients request review from the booking card's **Refund review** section. Both
 participants see the support next step, approved amounts, provider references,
 and pending, sent, failed, or review-required states. Private admin reasons are
 excluded from participant column grants. A referral still does not issue money.

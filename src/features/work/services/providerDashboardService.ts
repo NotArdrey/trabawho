@@ -1,5 +1,6 @@
 import { supabase } from "@/integrations/supabase";
 import { fetchSellerBookings } from "@/features/bookings/services/bookingService";
+import { getActiveReplacementSchedules } from "@/features/bookings/services/replacementSchedules";
 import { loadWorkerProfileServices } from "@/features/work/services/workerService";
 import type {
   ConfirmedEarningsSummary,
@@ -27,7 +28,7 @@ function bookingDate(booking: UnknownRecord) {
   const raw = asRecord(asRecord(booking.raw).booking);
   const selectedSlot = asRecord(booking.selectedSlot);
   const timeBlock = asRecord(selectedSlot.timeBlock);
-  const timestamp = text(raw.start_ts, booking.startTs, selectedSlot.startTs);
+  const timestamp = text(booking.activeReplacementStartAt, raw.start_ts, booking.startTs, selectedSlot.startTs);
   if (timestamp) {
     const parsed = new Date(timestamp);
     if (!Number.isNaN(parsed.getTime())) return parsed;
@@ -85,7 +86,7 @@ function scheduleItem(booking: UnknownRecord): ProviderScheduleItem {
     service: text(booking.serviceType) || "Service",
     client: text(booking.clientName) || "Client",
     schedule: formatSchedule(date),
-    status: text(booking.status) || "Scheduled",
+    status: text(booking.activeReplacementStartAt) ? "Replacement visit confirmed" : text(booking.status) || "Scheduled",
     bookingId: text(booking.id),
   };
 }
@@ -107,6 +108,7 @@ function bookingAction(booking: UnknownRecord, now: Date): ProviderActionItem | 
   };
   if (text(booking.cashConfirmationStatus) === "pending-worker-review") return { ...base, priority: 1, title: "Review payment confirmation", destination: "work" };
   if (text(booking.refundStatus) && !["completed", "approved"].includes(text(booking.refundStatus).toLowerCase())) return { ...base, priority: 1, title: "Review refund request", destination: "work" };
+  if (text(booking.activeReplacementStartAt)) return { ...base, priority: 2, title: "Replacement visit confirmed", destination: "bookings" };
   if (INQUIRY_STATUSES.has(normalizedStatus)) return { ...base, priority: 2, title: "Respond to client request", destination: "bookings" };
   if (date && sameDay(date, now) && !TERMINAL_STATUSES.has(normalizedStatus)) return { ...base, priority: 4, title: "Job scheduled today", destination: "bookings" };
   if (!TERMINAL_STATUSES.has(normalizedStatus)) return { ...base, priority: 5, title: "Active booking update", destination: "bookings" };
@@ -123,7 +125,12 @@ export async function fetchProviderDashboardSnapshot(userId: string, fallbackPro
   if (conversationsResult.error) throw conversationsResult.error;
   if (slotsResult.error) throw slotsResult.error;
 
-  const bookings = Array.isArray(bookingsValue) ? bookingsValue.map(asRecord) : [];
+  const storedBookings = Array.isArray(bookingsValue) ? bookingsValue.map(asRecord) : [];
+  const replacements = await getActiveReplacementSchedules(storedBookings.map((booking) => text(booking.id)));
+  const bookings = storedBookings.map((booking) => {
+    const replacement = replacements.get(text(booking.id));
+    return replacement ? { ...booking, activeReplacementStartAt: replacement.startAt } : booking;
+  });
   const provider = asRecord(providerValue);
   const seller = asRecord(provider.sellerData);
   const profile = asRecord(fallbackProfile);

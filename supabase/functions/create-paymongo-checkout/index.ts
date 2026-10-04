@@ -11,6 +11,7 @@ import {
   safePaymentError,
   type UnknownRecord,
 } from "../_shared/paymongo.ts";
+import { paymongoBilling } from "../_shared/paymongoBilling.ts";
 
 const PAYMONGO_CHECKOUT_URL = "https://api.paymongo.com/v2/checkout_sessions";
 
@@ -166,7 +167,7 @@ serve(async (request: Request) => {
     const admin = createPaymentAdminClient();
     const { data: booking, error: bookingError } = await admin
       .from("bookings")
-      .select("id, service_id, metadata, services(title)")
+      .select("id, buyer_id, service_id, metadata, services(title)")
       .eq("id", attempt.booking_id)
       .single();
     if (bookingError || !booking) {
@@ -174,6 +175,9 @@ serve(async (request: Request) => {
     }
 
     const bookingRecord = asRecord(booking);
+    const { data: payer } = await admin.from("profiles").select("full_name, email, phone_number, address, barangay, city, province")
+      .eq("user_id", bookingRecord.buyer_id).maybeSingle();
+    const billing = paymongoBilling(payer);
     const service = asRecord(bookingRecord.services);
     const metadata = asRecord(bookingRecord.metadata);
     const serviceName = cleanPaymentString(service.title || metadata.service_type) || "TrabaWho service";
@@ -191,6 +195,7 @@ serve(async (request: Request) => {
       cancel_url: `${appUrl}/bookings?payment=cancelled&${returnQuery}`,
       reference_number: attempt.reference_number,
       send_email_receipt: true,
+      ...(billing ? { billing } : {}),
       metadata: {
         booking_id: attempt.booking_id,
         payment_attempt_id: attempt.id,

@@ -1,3 +1,4 @@
+import { useCallback, useState } from "react";
 import {
   CalendarDays,
   CheckCircle2,
@@ -12,6 +13,9 @@ import {
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { BookingReplacementSchedule } from "@/features/bookings/components/BookingReplacementSchedule";
+import type { ActiveReplacementSchedule } from "@/features/bookings/services/replacementSchedules";
+import { isShowcasePaymentReference } from "@/features/bookings/utils/bookingPaymentPresentation";
 import {
   Dialog,
   DialogContent,
@@ -128,7 +132,14 @@ function ProgressStep({ complete, detail, label }: ProgressStepProps) {
 }
 
 export function BookingDetailsDialog({ booking, isProviderView, onClose, onMessage, onPay, statusLabel }: BookingDetailsDialogProps) {
+  const [replacementState, setReplacementState] = useState<{ bookingId: string; schedule: ActiveReplacementSchedule | null } | null>(null);
+  const onScheduleChange = useCallback((schedule: ActiveReplacementSchedule | null) => {
+    if (booking) setReplacementState({ bookingId: String(booking.id), schedule });
+  }, [booking]);
   if (!booking) return null;
+  const replacementActive = replacementState?.bookingId === String(booking.id)
+    && replacementState.schedule?.status !== "completed" && Boolean(replacementState.schedule);
+  const demoPayment = isShowcasePaymentReference(booking.paymentReference);
   const providerComplete = ["seller_claimed", "buyer_confirmed"].includes(booking.deliveryStatus || "");
   const clientComplete = booking.deliveryStatus === "buyer_confirmed";
   const clientDetail = clientComplete ? "Completed" : booking.deliveryStatus === "seller_claimed" ? "Awaiting client" : "Waiting for delivery";
@@ -138,8 +149,10 @@ export function BookingDetailsDialog({ booking, isProviderView, onClose, onMessa
     || normalizedStatus.includes("payment pending");
   const cancelled = normalizedStatus.includes("cancel") || normalizedStatus.includes("refund");
   const completed = normalizedStatus.includes("complete") || clientComplete;
-  const nextStep = booking.disputeStatus === "open"
-    ? { title: "Support case open", detail: "Completion is paused while the case is reviewed. View the dispute refund section on your booking card to request review or check refund progress.", complete: false }
+  const nextStep = replacementActive
+    ? { title: "Replacement visit confirmed", detail: "The agreed new appointment is active. The support case stays open until replacement work is completed and confirmed.", complete: true }
+    : booking.disputeStatus === "open"
+    ? { title: "Support case open", detail: "Completion is paused while the case is reviewed. Check the support case for messages, a replacement visit, or refund progress.", complete: false }
     : cancelled
     ? { title: "This booking is no longer active", detail: "Review the payment and reference details below for your records.", complete: false }
     : completed
@@ -175,11 +188,12 @@ export function BookingDetailsDialog({ booking, isProviderView, onClose, onMessa
             </div>
           </section>
 
+          {["open", "closed"].includes(booking.disputeStatus || "") && <BookingReplacementSchedule bookingId={String(booking.id)} onScheduleChange={onScheduleChange} />}
           <section className="rounded-xl border bg-card p-4" aria-labelledby="booking-schedule-heading">
-            <div className="flex items-center gap-2"><CalendarDays className="size-5 text-primary" aria-hidden="true" /><h3 id="booking-schedule-heading" className="font-bold text-foreground">Appointment</h3></div>
+            <div className="flex items-center gap-2"><CalendarDays className="size-5 text-primary" aria-hidden="true" /><h3 id="booking-schedule-heading" className="font-bold text-foreground">{replacementActive ? "Original booking appointment" : "Appointment"}</h3></div>
             <dl className="mt-4 grid gap-4 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
-              <div><dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Date</dt><dd className="mt-1 text-base font-bold text-foreground">{formatDate(booking.selectedSlot?.date || booking.requestDate)}</dd></div>
-              <div className="sm:text-right"><dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Time</dt><dd className="mt-1 text-base font-bold text-foreground">{formatTimeRange(booking.selectedSlot?.timeBlock)}</dd></div>
+              <div><dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Booked date</dt><dd className="mt-1 text-base font-bold text-foreground">{formatDate(booking.selectedSlot?.date || booking.requestDate)}</dd></div>
+              <div className="sm:text-right"><dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Booked time</dt><dd className="mt-1 text-base font-bold text-foreground">{formatTimeRange(booking.selectedSlot?.timeBlock)}</dd></div>
             </dl>
           </section>
 
@@ -187,11 +201,11 @@ export function BookingDetailsDialog({ booking, isProviderView, onClose, onMessa
             <section className="rounded-xl border bg-card p-4" aria-labelledby="booking-payment-heading">
               <div className="flex items-center gap-2"><CreditCard className="size-5 text-primary" aria-hidden="true" /><h3 id="booking-payment-heading" className="font-bold text-foreground">Payment</h3></div>
               <dl className="mt-3 divide-y">
-                <div className="flex justify-between gap-3 py-2.5"><dt className="text-sm text-muted-foreground">Method</dt><dd className="text-right text-sm font-bold text-foreground">{paymentLabel(booking.paymentMethod)}</dd></div>
+                <div className="flex justify-between gap-3 py-2.5"><dt className="text-sm text-muted-foreground">Method</dt><dd className="text-right text-sm font-bold text-foreground">{demoPayment ? "Demo booking — no charge" : paymentLabel(booking.paymentMethod)}</dd></div>
                 <div className="flex justify-between gap-3 py-2.5"><dt className="text-sm text-muted-foreground">{isProviderView ? "Booking amount" : "Service price"}</dt><dd className="font-bold text-foreground">{formatPhp(booking.quoteAmount)}</dd></div>
                 {!isProviderView && Number(booking.transactionFeeAmount || 0) > 0 ? <div className="flex justify-between gap-3 py-2.5"><dt className="text-sm text-muted-foreground">Platform fee</dt><dd className="font-bold text-foreground">{formatPhp(booking.transactionFeeAmount)}</dd></div> : null}
                 {booking.paymentPlan === "downpayment" && <><div className="flex justify-between gap-3 py-2.5"><dt className="text-sm text-muted-foreground">Deposit + platform fee</dt><dd className="font-bold text-foreground">{formatPhp(booking.upfrontRequiredAmount)}</dd></div><div className="flex justify-between gap-3 py-2.5"><dt className="text-sm text-muted-foreground">Verified paid</dt><dd className="font-bold text-emerald-700 dark:text-emerald-300">{formatPhp(booking.amountPaid)}</dd></div><div className="flex justify-between gap-3 py-2.5"><dt className="text-sm text-muted-foreground">Balance before work</dt><dd className="font-bold text-foreground">{formatPhp(booking.balanceDueAmount)}</dd></div></>}
-                {!isProviderView ? <div className="flex items-end justify-between gap-3 py-3"><dt className="text-sm font-semibold text-foreground">{paymentDue ? "Total payment" : "Total charged"}</dt><dd className="text-lg font-extrabold text-emerald-700 dark:text-emerald-300">{formatPhp(total)}</dd></div> : null}
+                {!isProviderView ? <div className="flex items-end justify-between gap-3 py-3"><dt className="text-sm font-semibold text-foreground">{demoPayment ? "Illustrative total" : paymentDue ? "Total payment" : "Total charged"}</dt><dd className={demoPayment ? "text-lg font-extrabold text-foreground" : "text-lg font-extrabold text-emerald-700 dark:text-emerald-300"}>{formatPhp(total)}</dd></div> : null}
               </dl>
             </section>
 
@@ -206,7 +220,7 @@ export function BookingDetailsDialog({ booking, isProviderView, onClose, onMessa
             </section>
           </div>
 
-          {booking.paymentReference ? <section className="flex gap-3 rounded-xl bg-primary/5 p-4" aria-labelledby="booking-reference-heading"><FileText className="mt-0.5 size-5 shrink-0 text-primary" aria-hidden="true" /><div className="min-w-0"><h3 id="booking-reference-heading" className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Payment reference</h3><p className="mt-1 break-all font-mono text-sm font-bold text-foreground">{booking.paymentReference}</p></div></section> : null}
+          {booking.paymentReference ? <section className="flex gap-3 rounded-xl bg-primary/5 p-4" aria-labelledby="booking-reference-heading"><FileText className="mt-0.5 size-5 shrink-0 text-primary" aria-hidden="true" /><div className="min-w-0"><h3 id="booking-reference-heading" className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{demoPayment ? "Demo booking reference" : booking.paymentReference.startsWith("pay_") ? "PayMongo payment ID" : "Payment reference"}</h3><p className="mt-1 break-all font-mono text-sm font-bold text-foreground">{booking.paymentReference}</p></div></section> : null}
           {booking.completedAt ? <p className="text-sm text-muted-foreground">Completed on <strong className="text-foreground">{new Date(booking.completedAt).toLocaleDateString("en-PH")}</strong></p> : null}
           {booking.paymentPlan === "downpayment" && booking.balanceDueAt && Number(booking.balanceDueAmount || 0) > 0 && <p className="text-sm text-muted-foreground">Balance due before <strong className="text-foreground">{new Date(booking.balanceDueAt).toLocaleString("en-PH")}</strong>.</p>}
           {booking.completionDueAt && booking.deliveryStatus === "seller_claimed" && <p className="text-sm text-muted-foreground">Client review ends {new Date(booking.completionDueAt).toLocaleString("en-PH")} if no case is open.</p>}

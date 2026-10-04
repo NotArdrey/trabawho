@@ -1,8 +1,13 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { MemoryRouter } from "react-router-dom";
 import { describe, expect, it, vi } from "vitest";
 
+import { getActiveReplacementSchedule } from "@/features/bookings/services/replacementSchedules";
 import { BookingDetailsDialog } from "./BookingDetailsDialog";
+
+vi.mock("@/features/bookings/services/replacementSchedules", () => ({ getActiveReplacementSchedule: vi.fn() }));
+vi.mock("@/features/bookings/hooks/useBookingActivity", () => ({ useBookingActivity: vi.fn() }));
 
 const booking = {
   id: "booking-1",
@@ -52,5 +57,31 @@ describe("BookingDetailsDialog", () => {
     expect(message.compareDocumentPosition(pay) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     await user.click(pay);
     expect(onPay).toHaveBeenCalledWith("booking-1");
+  });
+
+  it("does not describe a showcase booking as a PayMongo charge", () => {
+    render(<BookingDetailsDialog booking={{ ...booking, paymentMethod: "paymongo-card", paymentStatus: "paid",
+      paymentReference: "SHOWCASE-PAID-DE8D36F05202" }} isProviderView={false} statusLabel="Confirmed" onClose={vi.fn()} onMessage={vi.fn()} />);
+    expect(screen.getByText("Demo booking — no charge")).toBeVisible();
+    expect(screen.getByText("Illustrative total")).toBeVisible();
+    expect(screen.getByRole("heading", { name: "Demo booking reference" })).toBeVisible();
+    expect(screen.queryByText("Card via PayMongo")).not.toBeInTheDocument();
+  });
+
+  it("keeps a genuine PayMongo payment ID distinct from a demo reference", () => {
+    render(<BookingDetailsDialog booking={{ ...booking, paymentMethod: "paymongo-card", paymentReference: "pay_test123" }}
+      isProviderView={false} statusLabel="Confirmed" onClose={vi.fn()} onMessage={vi.fn()} />);
+    expect(screen.getByRole("heading", { name: "PayMongo payment ID" })).toBeVisible();
+    expect(screen.getByText("Card via PayMongo")).toBeVisible();
+  });
+
+  it("distinguishes the agreed replacement from the original booking appointment", async () => {
+    vi.mocked(getActiveReplacementSchedule).mockResolvedValue({ bookingId: "booking-1", caseId: "case-1",
+      status: "accepted", startAt: "2026-10-05T09:00:00+08:00", endAt: "2026-10-05T10:00:00+08:00" });
+    render(<MemoryRouter><BookingDetailsDialog booking={{ ...booking, disputeStatus: "open" }}
+      isProviderView={false} statusLabel="Dispute Open" onClose={vi.fn()} onMessage={vi.fn()} /></MemoryRouter>);
+    expect(await screen.findByRole("heading", { name: "Original booking appointment" })).toBeVisible();
+    expect(screen.getByRole("heading", { name: "Replacement visit confirmed" })).toBeVisible();
+    expect(screen.getByText(/case stays open until replacement work is completed/)).toBeVisible();
   });
 });

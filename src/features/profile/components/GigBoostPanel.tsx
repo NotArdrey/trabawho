@@ -1,4 +1,4 @@
-import { Rocket } from "lucide-react";
+import { CircleAlert, CircleCheck, Info, Rocket } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { SelectField } from "@/components/forms";
 import { getActiveAdBooster } from "@/shared/utils/serviceBoost";
@@ -23,9 +23,11 @@ export function GigBoostPanel({ sellerId }: { sellerId?: string }) {
       {flow.total !== null && <div role="status" className="mt-3 flex flex-wrap items-center justify-between gap-x-4 gap-y-1 rounded-lg border border-primary/20 bg-primary/5 p-3 text-sm"><span className="font-medium text-foreground">Total price · {flow.days} days</span><span className="font-bold text-primary">PHP {flow.total.toLocaleString("en-PH", { maximumFractionDigits: 2 })}</span><span className="w-full text-xs text-muted-foreground">Boost starts after verified payment.</span></div>}
       {flow.pricingError ? <p role="alert" className="mt-3 text-sm text-destructive">{flow.pricingError}</p> : null}
       <Button type="button" className="mt-4 min-h-11 w-full" onClick={flow.review} disabled={disabled || !flow.selectedId || flow.boost.isBoosted || Boolean(flow.pricingError)}>{flow.boost.isBoosted ? "Gig already boosted" : "Review boost payment"}</Button>
-      {flow.message ? <p role="status" className="mt-3 rounded-lg border bg-muted p-3 text-sm">{flow.message}</p> : null}
+      {flow.message ? <div role="status" className={`mt-3 flex items-start gap-3 rounded-lg border p-3 text-sm ${flow.messageKind === "warning" ? "border-amber-300 bg-amber-50 text-amber-950 dark:border-amber-700 dark:bg-amber-950/40 dark:text-amber-100" : flow.messageKind === "success" ? "border-emerald-300 bg-emerald-50 text-emerald-950 dark:border-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-100" : "border-primary/20 bg-primary/5 text-foreground"}`}>
+        {flow.messageKind === "warning" ? <CircleAlert className="mt-0.5 size-4 shrink-0" aria-hidden="true" /> : flow.messageKind === "success" ? <CircleCheck className="mt-0.5 size-4 shrink-0" aria-hidden="true" /> : <Info className="mt-0.5 size-4 shrink-0 text-primary" aria-hidden="true" />}
+        <span>{flow.message}</span>
+      </div> : null}
       {flow.error && !flow.draft ? <p role="alert" className="mt-3 text-sm text-destructive">{flow.error}</p> : null}
-      {flow.canVerify ? <Button variant="outline" className="mt-3 min-h-11" disabled={flow.verifying} onClick={flow.checkPayment}>Check payment again</Button> : null}
       {flow.error && !flow.services.length ? <Button variant="outline" className="mt-3 min-h-11" disabled={flow.loading} onClick={() => { void flow.retryLoad(); }}>Reload gigs</Button> : null}
       {flow.draft ? <BoostActivationDialog totalPrice={flow.draft.amount} days={flow.draft.days} serviceTitle={flow.draft.serviceTitle} isOpen isSaving={flow.saving} error={flow.error} onCancel={flow.cancel} onConfirm={() => { void flow.checkout(); }} /> : null}
     </section>

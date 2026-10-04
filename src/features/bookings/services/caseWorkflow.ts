@@ -102,6 +102,7 @@ export async function getLatestReplacement(caseId: string) {
   const slot = await supabase.from("service_slots").select("id, start_ts, end_ts")
     .eq("id", visit.slot_id).maybeSingle();
   if (slot.error) throw new Error("Replacement time could not be loaded. Try again.");
+  if (!slot.data) throw new Error("The replacement time is not visible to this account. Ask support to check access, then retry.");
   return { visit, slot: slot.data };
 }
 

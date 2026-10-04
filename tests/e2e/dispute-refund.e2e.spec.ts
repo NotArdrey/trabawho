@@ -20,6 +20,7 @@ for (const width of [390, 768, 1024, 1280, 1440]) {
     } }));
     await page.route("**/rest/v1/booking_refunds?*", (route) => route.fulfill({ json: approved ? [{ id: "refund-1", case_id: caseId,
       amount: 464, currency: "PHP", status: succeeded ? "succeeded" : "pending", provider_refund_id: "ref_verified", updated_at: new Date().toISOString() }] : [] }));
+    await page.route("**/rest/v1/payment_attempts?*", (route) => route.fulfill({ json: [{ id: "attempt-verified" }] }));
     await page.route("**/rest/v1/rpc/request_booking_case_refund", async (route) => {
       requests++; requested = true;
       await route.fulfill({ json: {} });
@@ -31,6 +32,7 @@ for (const width of [390, 768, 1024, 1280, 1440]) {
     });
     await page.goto("/__refund-journey");
     await expect(page.getByText(/Support update: Referred for refund review/)).toBeVisible();
+    await expect(page.getByText("Refund review", { exact: true })).toBeVisible();
     await page.getByRole("button", { name: "Request refund review" }).click();
     await expect(page.getByText("Refund review requested. Waiting for support approval.")).toBeVisible();
     expect(requests).toBe(1);
@@ -43,6 +45,20 @@ for (const width of [390, 768, 1024, 1280, 1440]) {
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   });
 }
+test("a paid booking without a provider-verified attempt does not offer refund review", async ({ page }) => {
+  let paymentChecks = 0;
+  await page.route("**/rest/v1/booking_support_cases?*", (route) => route.fulfill({ json: {
+    id: caseId, case_type: "provider_no_show", reason: "The provider did not arrive.", status: "under_review",
+    refund_requested_at: null, resolution_status: null,
+  } }));
+  await page.route("**/rest/v1/booking_refunds?*", (route) => route.fulfill({ json: [] }));
+  await page.route("**/rest/v1/payment_attempts?*", (route) => { paymentChecks++; return route.fulfill({ json: [] }); });
+  await page.goto("/__refund-journey");
+  await expect.poll(() => paymentChecks).toBeGreaterThan(0);
+  await expect(page.getByText("Refund review")).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Request refund review" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Check refund status" })).toHaveCount(0);
+});
 test("provider cannot start work with an outstanding balance and stale paid label", async ({ page }) => {
   await page.goto("/__refund-journey?role=provider");
   await expect(page.getByText(/Do not begin until full payment is verified/)).toBeVisible();
@@ -61,6 +77,7 @@ test("admin refund requires an evidence reason and explicit confirmation", async
     await route.fulfill({ json: { checked: true, needsRetry: false } });
   });
   await page.goto("/__refund-journey?role=admin");
+  await expect(page.getByRole("heading", { name: "Refund review" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Approve full refund" })).toBeDisabled();
   await page.getByRole("textbox", { name: "Refund approval reason" }).fill("The provider did not attend the confirmed appointment.");
   await page.getByRole("button", { name: "Approve full refund" }).click();

@@ -1,9 +1,9 @@
-import { ChevronLeft, ChevronRight, MessageSquareText, Star } from "lucide-react";
+import { MessageSquareText, Star } from "lucide-react";
 import { SelectField } from "@/components/forms";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Pagination, PaginationContent, PaginationItem } from "@/components/ui/pagination";
+import { DataPagination } from "@/components/ui/data-pagination";
 import { SearchFilterBar } from "@/components/ui/search-filter-bar";
 import type { AdminComment, ReviewRatingFilter, ReviewStatusFilter } from "../types";
 
@@ -57,6 +57,6 @@ export default function AdminCommentsSection({ comments, isLoading, error, total
     <SearchFilterBar searchLabel="Search written review comments" searchPlaceholder="Search written comments…" searchValue={search} onSearchValueChange={onSearchChange} activeValue={status} onActiveValueChange={(value) => onStatusChange(value as ReviewStatusFilter)} options={[{ value: "all", label: "All" }, { value: "published", label: "Published" }, { value: "unpublished", label: "Unpublished" }]} resultLabel={isLoading ? "Loading reviews…" : error ? "Reviews unavailable" : `Showing ${first}–${last} of ${total} reviews`} endControl={<SelectField id="admin-review-rating" label="Rating" labelClassName="sr-only" value={rating} onValueChange={(value) => onRatingChange(value as ReviewRatingFilter)} options={ratingOptions} className="w-full lg:w-40" />} />
     {error && <div role="alert" className="flex flex-wrap items-center gap-3 rounded-lg border border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive"><span>{error}</span><Button type="button" variant="outline" onClick={onRetry}>Try again</Button></div>}
     {isLoading ? <Card><CardContent className="p-6 text-sm text-muted-foreground" role="status">Loading reviews…</CardContent></Card> : !error && comments.length === 0 ? <Card><CardContent className="space-y-3 p-6"><MessageSquareText className="size-8 text-muted-foreground" aria-hidden="true" /><h2 className="font-semibold">{hasFilters ? "No matching reviews" : "No reviews yet"}</h2><p className="text-sm text-muted-foreground">{hasFilters ? "Try another search or clear the filters." : "Reviews will appear here when clients submit them."}</p>{hasFilters && <Button type="button" variant="outline" onClick={clearFilters}>Clear filters</Button>}</CardContent></Card> : !error && <div className="grid gap-3">{comments.map((comment) => <ReviewCard key={comment.id} comment={comment} onOpenDeleteComment={onOpenDeleteComment} />)}</div>}
-    {!isLoading && !error && pageCount > 1 && <Pagination aria-label="Review pages"><PaginationContent><PaginationItem><Button type="button" variant="outline" disabled={page === 1} onClick={() => onPageChange(page - 1)}><ChevronLeft aria-hidden="true" />Previous</Button></PaginationItem><PaginationItem><span className="px-3 text-sm text-muted-foreground" aria-live="polite">Page {page} of {pageCount}</span></PaginationItem><PaginationItem><Button type="button" variant="outline" disabled={page >= pageCount} onClick={() => onPageChange(page + 1)}>Next<ChevronRight aria-hidden="true" /></Button></PaginationItem></PaginationContent></Pagination>}
+    {!isLoading && !error && <DataPagination label="Review pages" page={page} pageCount={pageCount} onPageChange={onPageChange} />}
   </section>;
 }

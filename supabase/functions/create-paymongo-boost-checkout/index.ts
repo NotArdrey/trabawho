@@ -3,6 +3,7 @@ import { asRecord, cleanPaymentString, createPaymentAdminClient, createPaymentUs
   PaymentFunctionError, paymentJsonResponse, parsePaymentJson, safePaymentError } from "../_shared/paymongo.ts";
 import { boostSecret, boostAppOrigin, boostCheckoutRecord, validBoostCheckoutUrl } from "../_shared/gigBoost.ts";
 import { boostCheckoutAmount } from "../_shared/boostPricing.ts";
+import { paymongoBilling } from "../_shared/paymongoBilling.ts";
 
 serve(async (request: Request) => {
   if (request.method === "OPTIONS") return new Response("ok", { headers: paymentCorsHeaders });
@@ -36,6 +37,10 @@ serve(async (request: Request) => {
     }
     const response = (url: string) => paymentJsonResponse({ checkoutUrl: url, attemptId: attempt.id, expiresAt: attempt.expires_at });
     if (attempt.checkout_url) return response(validBoostCheckoutUrl(attempt.checkout_url));
+    const admin = createPaymentAdminClient();
+    const { data: payer } = await admin.from("profiles").select("full_name, email, phone_number, address, barangay, city, province")
+      .eq("user_id", attempt.seller_id).maybeSingle();
+    const billing = paymongoBilling(payer);
     const app = boostAppOrigin(request);
     const query = `boostAttempt=${encodeURIComponent(attempt.id)}`;
     const providerResponse = await fetch("https://api.paymongo.com/v2/checkout_sessions", {
@@ -45,13 +50,13 @@ serve(async (request: Request) => {
         line_items: [{ name: `Gig boost: ${cleanPaymentString(attempt.service_title)}`.slice(0, 120),
           description: `${attempt.duration_days} days of marketplace recommendation priority`, amount: Math.round(attempt.amount * 100), currency: "PHP", quantity: 1 }],
         payment_method_types: ["card"], reference_number: attempt.reference_number, send_email_receipt: true,
+        ...(billing ? { billing } : {}),
         success_url: `${app}/profile?boostPayment=verifying&${query}`,
         cancel_url: `${app}/profile?boostPayment=cancelled&${query}`,
         metadata: { boost_attempt_id: attempt.id, service_id: String(attempt.service_id) },
       } } }),
     });
     const payload = asRecord(await providerResponse.json().catch(() => ({})));
-    const admin = createPaymentAdminClient();
     if (!providerResponse.ok) {
       await admin.from("service_ad_boost_attempts").update({ status: providerResponse.status >= 500 ? "created" : "failed",
         failure_message: "PayMongo could not create checkout.", updated_at: new Date().toISOString() }).eq("id", attempt.id);

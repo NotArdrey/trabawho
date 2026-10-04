@@ -6,6 +6,7 @@ import { ProfilePhotoDialog } from "./ProfilePhotoDialog";
 
 const defaultProps = {
   hasPhoto: true,
+  photoUrl: "https://example.com/my-photo.jpg",
   isOpen: true,
   isSaving: false,
   onImageSelection: vi.fn(),
@@ -21,6 +22,27 @@ describe("ProfilePhotoDialog", () => {
     expect(screen.getByRole("button", { name: /take a photo/i })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /choose from device/i })).toBeInTheDocument();
     expect(screen.getByText(/maximum file size is 2 mb/i)).toBeInTheDocument();
+    expect(screen.getByRole("img", { name: "Your current profile photo" })).toHaveAttribute("src", defaultProps.photoUrl);
+  });
+
+  it("shows a larger current photo in the dialog and can hide it again", async () => {
+    const user = userEvent.setup();
+    render(<ProfilePhotoDialog {...defaultProps} />);
+
+    await user.click(screen.getByRole("button", { name: "View larger" }));
+    expect(screen.getByRole("img", { name: "Your current profile, enlarged" })).toHaveAttribute("src", defaultProps.photoUrl);
+    expect(screen.getByRole("button", { name: "Hide larger view" })).toHaveAttribute("aria-expanded", "true");
+
+    await user.click(screen.getByRole("button", { name: "Hide larger view" }));
+    expect(screen.queryByRole("img", { name: "Your current profile, enlarged" })).not.toBeInTheDocument();
+  });
+
+  it("shows the default image without photo-only actions when no photo was uploaded", () => {
+    render(<ProfilePhotoDialog {...defaultProps} hasPhoto={false} photoUrl="/default-profile.svg" />);
+
+    expect(screen.getByRole("img", { name: "Default profile image" })).toHaveAttribute("src", "/default-profile.svg");
+    expect(screen.queryByRole("button", { name: "View larger" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Remove photo" })).not.toBeInTheDocument();
   });
 
   it("forwards a selected device image", () => {

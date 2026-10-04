@@ -416,6 +416,7 @@ function Profile({ appTheme = 'light', themeMode = 'system', onThemeChange, curr
           <ProfilePhotoDialog
             error={saveError}
             hasPhoto={hasCustomProfilePhoto}
+            photoUrl={profilePhoto}
             isOpen={isPhotoSourceOpen}
             isSaving={isSavingPhoto}
             onImageSelection={handleImageSelection}

@@ -3,7 +3,7 @@ import { isSupabaseConfigured, supabase } from "@/integrations/supabase";
 
 export type BookingActivityScope = "booking" | "support";
 
-const bookingTables = ["bookings", "conversations", "messages", "reviews", "booking_quotes", "booking_reschedule_requests", "payment_attempts", "booking_support_cases", "services", "service_slots"];
+const bookingTables = ["bookings", "conversations", "messages", "reviews", "booking_quotes", "booking_reschedule_requests", "payment_attempts", "booking_support_cases", "booking_case_replacement_visits", "services", "service_slots"];
 const supportTables = ["booking_support_cases", "booking_case_messages", "booking_case_notifications", "booking_case_replacement_visits", "booking_refunds"];
 
 export function subscribeToBookingActivity(onChange: () => void, scope: BookingActivityScope = "booking") {

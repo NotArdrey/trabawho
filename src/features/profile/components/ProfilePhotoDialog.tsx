@@ -1,5 +1,5 @@
-import { useRef, type ChangeEvent } from "react";
-import { Camera, ImagePlus, Info, Trash2 } from "lucide-react";
+import { useRef, useState, type ChangeEvent } from "react";
+import { Camera, Eye, ImagePlus, Info, Trash2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -15,6 +15,7 @@ import {
 interface ProfilePhotoDialogProps {
   error?: string;
   hasPhoto: boolean;
+  photoUrl: string;
   isOpen: boolean;
   isSaving: boolean;
   onImageSelection: (event: ChangeEvent<HTMLInputElement>) => void | Promise<void>;
@@ -25,6 +26,7 @@ interface ProfilePhotoDialogProps {
 function ProfilePhotoDialog({
   error,
   hasPhoto,
+  photoUrl,
   isOpen,
   isSaving,
   onImageSelection,
@@ -33,21 +35,66 @@ function ProfilePhotoDialog({
 }: ProfilePhotoDialogProps) {
   const cameraInputRef = useRef<HTMLInputElement>(null);
   const deviceInputRef = useRef<HTMLInputElement>(null);
+  const [isPreviewExpanded, setIsPreviewExpanded] = useState(false);
+
+  const handleOpenChange = (open: boolean) => {
+    if (isSaving) return;
+    if (!open) setIsPreviewExpanded(false);
+    onOpenChange(open);
+  };
 
   return (
-    <Dialog open={isOpen} onOpenChange={(open) => { if (!isSaving) onOpenChange(open); }}>
-      <DialogContent className="max-w-md gap-0 overflow-hidden p-0">
+    <Dialog open={isOpen} onOpenChange={handleOpenChange}>
+      <DialogContent className="max-h-[90dvh] max-w-md gap-0 overflow-y-auto p-0">
         <DialogHeader className="bg-muted/40 px-5 pb-5 pt-5 sm:px-6 sm:pt-6">
           <div className="mb-3 flex size-11 items-center justify-center rounded-xl bg-primary text-primary-foreground">
             <Camera className="size-5" aria-hidden="true" />
           </div>
           <DialogTitle className="text-2xl">Change profile photo</DialogTitle>
           <DialogDescription className="leading-6">
-            Choose how you would like to add a new profile photo.
+            View your current photo or choose a new one.
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4 px-5 py-5 sm:px-6">
+          <section aria-label="Current profile photo" className="rounded-xl border border-border bg-muted/30 p-4">
+            <div className="flex items-center gap-4">
+              <img
+                src={photoUrl}
+                alt={hasPhoto ? "Your current profile photo" : "Default profile image"}
+                className="size-20 shrink-0 rounded-full border border-border bg-background object-cover"
+              />
+              <div className="min-w-0 space-y-1">
+                <p className="font-semibold text-foreground">{hasPhoto ? "Your current photo" : "No photo added yet"}</p>
+                <p className="text-sm text-muted-foreground">
+                  {hasPhoto ? "Visible on your profile." : "Your profile uses the default image."}
+                </p>
+                {hasPhoto ? (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    className="h-11 px-2 text-primary hover:text-primary"
+                    aria-expanded={isPreviewExpanded}
+                    aria-controls="profile-photo-preview"
+                    onClick={() => setIsPreviewExpanded((expanded) => !expanded)}
+                  >
+                    <Eye aria-hidden="true" />
+                    {isPreviewExpanded ? "Hide larger view" : "View larger"}
+                  </Button>
+                ) : null}
+              </div>
+            </div>
+            {hasPhoto && isPreviewExpanded ? (
+              <div id="profile-photo-preview" className="mt-4 flex justify-center rounded-lg bg-background p-3">
+                <img
+                  src={photoUrl}
+                  alt="Your current profile, enlarged"
+                  className="max-h-[45dvh] max-w-full rounded-lg object-contain"
+                />
+              </div>
+            ) : null}
+          </section>
+
           <div className="grid gap-3 sm:grid-cols-2">
             <button
               type="button"

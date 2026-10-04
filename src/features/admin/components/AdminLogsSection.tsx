@@ -3,6 +3,7 @@ import { ClipboardList, RefreshCw } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { DataPagination } from "@/components/ui/data-pagination";
 import { SearchFilterBar } from "@/components/ui/search-filter-bar";
 import { fetchAdminAuditFeed } from "../services/adminAuditService";
 import { useAdminResource } from "../hooks/useAdminResource";
@@ -34,7 +35,7 @@ export default function AdminLogsSection() {
       <dl className="grid gap-3 text-sm sm:grid-cols-2"><div className="min-w-0"><dt className="text-xs font-medium text-muted-foreground">Target reference</dt><dd className="mt-1 break-all">{entry.target}</dd></div><div><dt className="text-xs font-medium text-muted-foreground">Recorded outcome</dt><dd className="mt-1 break-words">{entry.outcome}</dd></div></dl>
       {entry.reason && <p className="whitespace-pre-wrap break-words border-t pt-3 text-sm">{entry.reason}</p>}
     </CardContent></Card></li>)}</ol> : <Card><CardContent className="space-y-2 p-6"><ClipboardList aria-hidden="true" className="size-8 text-primary" /><h2 className="font-semibold">{isLoading ? "Loading audit history" : error ? "Audit history unavailable" : "No matching audit events"}</h2><p className="text-sm text-muted-foreground">{error ? "Use Refresh logs to retry." : search || source !== "all" ? "Clear the search or choose All activity." : "Recorded activity available to your account will appear here."}</p></CardContent></Card>}
-    {matches.length > PAGE_SIZE && <nav aria-label="Audit log pages" className="flex flex-wrap items-center justify-between gap-3"><p className="text-sm text-muted-foreground">Page {currentPage} of {lastPage}</p><div className="flex gap-2"><Button variant="outline" disabled={currentPage <= 1} onClick={() => setPage(currentPage - 1)}>Previous</Button><Button variant="outline" disabled={currentPage >= lastPage} onClick={() => setPage(currentPage + 1)}>Next</Button></div></nav>}
+    <DataPagination label="Audit log pages" page={currentPage} pageCount={lastPage} onPageChange={setPage} />
     {isLoading && data && <p role="status" className="text-sm text-muted-foreground">Refreshing audit history…</p>}
   </section>;
 }

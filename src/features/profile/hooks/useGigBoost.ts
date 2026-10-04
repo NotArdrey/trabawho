@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { getActiveAdBooster } from "@/shared/utils/serviceBoost";
-import { createBoostCheckout, fetchBoostServices, verifyBoostCheckout, type BoostService } from "../services/gigBoostService";
+import { createBoostCheckout, fetchBoostServices, forgetBoostCheckoutOperations, verifyBoostCheckout, type BoostService } from "../services/gigBoostService";
 import { buildBoostDraft, calculateBoostTotal, getBoostDailyRate, validateBoostSettings, type BoostDraft } from "../utils/gigBoost";
 
 export function useGigBoost(sellerId?: string) {
@@ -20,8 +20,8 @@ export function useGigBoost(sellerId?: string) {
   const [verifying, setVerifying] = useState(false);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
+  const [messageKind, setMessageKind] = useState<"info" | "warning" | "success">("info");
   const [clock, setClock] = useState(Date.now);
-  const [verificationRun, setVerificationRun] = useState(0);
   const submitLock = useRef(false);
   const attemptId = params.get("boostAttempt");
   const returnStatus = params.get("boostPayment");
@@ -61,13 +61,14 @@ export function useGigBoost(sellerId?: string) {
     let cancelled = false;
     let timer: number | undefined;
     let checks = 0;
+    const clearReturn = () => setParams((previous) => { const next = new URLSearchParams(previous); next.delete("boostPayment"); next.delete("boostAttempt"); return next; }, { replace: true });
     const verify = async () => {
       await Promise.resolve();
       if (cancelled) return;
-      if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(attemptId)) { setError("Invalid boost payment link."); return; }
+      if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(attemptId)) { setError("Invalid boost payment link."); setVerifying(false); return; }
       setVerifying(true);
       setError("");
-      setMessage("Verifying your PayMongo payment...");
+      if (checks === 0) { setMessageKind("info"); setMessage("Waiting for PayMongo to confirm your payment..."); }
       try {
         const result = await verifyBoostCheckout(attemptId);
         if (cancelled) return;
@@ -80,26 +81,34 @@ export function useGigBoost(sellerId?: string) {
           setMessage(stillActive
             ? "Payment verified. Your gig boost is active in marketplace recommendations."
             : "Payment verified. This boost has ended. You can purchase a new boost.");
+          setMessageKind(stillActive ? "success" : "warning");
           setVerifying(false);
-          setParams((previous) => { const next = new URLSearchParams(previous); next.delete("boostPayment"); next.delete("boostAttempt"); return next; }, { replace: true });
+          clearReturn();
           return;
         }
         if (result.requiresReview) {
           setError("Payment received. Contact support to review this gig before activation.");
           setMessage(""); setVerifying(false); return;
         }
-        if (returnStatus === "cancelled" || ["failed", "expired"].includes(result.status) || ++checks >= 20) {
-          setMessage("Payment has not been verified. Your gig boost is inactive. You can check payment again or retry checkout.");
-          setVerifying(false); return;
+        if (returnStatus === "cancelled" || ["failed", "expired"].includes(result.status)) {
+          forgetBoostCheckoutOperations(sellerId);
+          setMessageKind("warning");
+          setMessage(returnStatus === "cancelled" ? "Checkout cancelled. Your gig boost is inactive. You can review the payment and try again." : "Payment was not completed. Your gig boost is inactive. You can review the payment and try again.");
+          setVerifying(false); clearReturn(); return;
         }
-        timer = window.setTimeout(() => { void verify(); }, 3000);
+        checks++;
+        if (checks >= 20) { setMessageKind("info"); setMessage("Still waiting for PayMongo confirmation. Your boost remains inactive; this page will update automatically. Do not pay again while confirmation is pending."); }
+        timer = window.setTimeout(() => { void verify(); }, checks < 20 ? 3000 : 30_000);
       } catch (failure) {
-        if (!cancelled) { setError(failure instanceof Error ? failure.message : "Unable to verify payment."); setMessage(""); setVerifying(false); }
+        if (!cancelled) {
+          setError(failure instanceof Error ? `${failure.message} Retrying automatically.` : "Payment status is temporarily unavailable. Retrying automatically.");
+          setMessage(""); timer = window.setTimeout(() => { void verify(); }, 30_000);
+        }
       }
     };
     void verify();
     return () => { cancelled = true; window.clearTimeout(timer); };
-  }, [attemptId, returnStatus, sellerId, reload, setParams, verificationRun]);
+  }, [attemptId, returnStatus, sellerId, reload, setParams]);
 
   const selected = services.find((service) => String(service.id) === selectedId);
   const boost = getActiveAdBooster(selected, clock);
@@ -126,6 +135,6 @@ export function useGigBoost(sellerId?: string) {
     finally { setLoading(false); }
   };
   return { services, selectedId, setSelectedId, days, setDays, dailyRate, total, pricingError, draft, loading, saving, verifying,
-    error, message, boost, clock, review, checkout, cancel: () => { if (!saving) { setDraft(null); setError(""); } },
-    canVerify: Boolean(attemptId && returnStatus), checkPayment: () => setVerificationRun((run) => run + 1), retryLoad };
+    error, message, messageKind, boost, clock, review, checkout, cancel: () => { if (!saving) { setDraft(null); setError(""); } },
+    retryLoad };
 }

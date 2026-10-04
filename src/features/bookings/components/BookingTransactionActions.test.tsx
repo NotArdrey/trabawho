@@ -13,6 +13,10 @@ vi.mock("@/features/bookings/services/bookingTransactions", () => ({
 }));
 
 vi.mock("./BookingRefundProgress", () => ({ BookingRefundProgress: () => null }));
+vi.mock("./BookingReplacementSchedule", () => ({ BookingReplacementSchedule: ({ onScheduleChange }: {
+  onScheduleChange?: (schedule: { bookingId: string; caseId: string; status: "accepted"; startAt: string; endAt: string }) => void;
+}) => <button type="button" onClick={() => onScheduleChange?.({ bookingId: "booking-1", caseId: "case-1", status: "accepted",
+  startAt: "2026-10-05T09:00:00+08:00", endAt: "2026-10-05T10:00:00+08:00" })}>Simulate confirmed replacement</button> }));
 
 const booking = {
   id: "booking-1", paymentStatus: "paid", scheduleStatus: "confirmed",
@@ -22,6 +26,7 @@ const booking = {
 };
 const emptyRework = {
   refund_requested_at: null, latest_support_action: null, latest_support_target: null, latest_support_at: null,
+  resolution_status: null,
   rework_state: null, rework_appointment_at: null, rework_evidence_note: null,
   rework_delivered_at: null, rework_confirmed_at: null, rework_escalated_at: null,
 };
@@ -40,6 +45,29 @@ describe("BookingTransactionActions", () => {
     expect(await screen.findByText(report.reason)).toBeVisible();
     expect(screen.queryByRole("button", { name: "Retry loading report" })).not.toBeInTheDocument();
     expect(openBookingSupportCase).not.toHaveBeenCalled();
+  });
+
+  it("removes the competing open-dispute warning after a replacement is accepted", async () => {
+    vi.mocked(getBookingSupportCase).mockResolvedValue({
+      ...emptyRework, id: "case-1", case_type: "provider_no_show", reason: "The provider missed the visit.",
+      policy_route: "support_review", policy_reason: null, status: "under_review",
+      resolution_status: "replacement_accepted", created_at: new Date().toISOString(),
+      provider_response_action: null, provider_response_text: null, provider_responded_at: null,
+    });
+    render(<BookingTransactionActions booking={{ ...booking, disputeStatus: "open" }} viewerRole="client" onUpdated={vi.fn()} />);
+    await waitFor(() => expect(screen.queryByText("Support case open")).not.toBeInTheDocument());
+  });
+
+  it("uses the confirmed schedule when the case status has not caught up", async () => {
+    vi.mocked(getBookingSupportCase).mockResolvedValue({
+      ...emptyRework, id: "case-1", case_type: "provider_no_show", reason: "The provider missed the visit.",
+      policy_route: "support_review", policy_reason: null, status: "under_review", created_at: new Date().toISOString(),
+      provider_response_action: null, provider_response_text: null, provider_responded_at: null,
+    });
+    render(<BookingTransactionActions booking={{ ...booking, disputeStatus: "open" }} viewerRole="client" onUpdated={vi.fn()} />);
+    expect(await screen.findByText("Support case open")).toBeVisible();
+    fireEvent.click(screen.getByRole("button", { name: "Simulate confirmed replacement" }));
+    expect(screen.queryByText("Support case open")).not.toBeInTheDocument();
   });
 
   it("blocks work controls while the balance is unpaid", () => {

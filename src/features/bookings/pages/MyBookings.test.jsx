@@ -157,6 +157,21 @@ describe('MyBookings Redesign Component', () => {
     expect(screen.getByText('PHP 2,200')).toBeInTheDocument();
   });
 
+  test('pages bookings after filtering and resets to page one when searching', () => {
+    mockCurrentBookings = Array.from({ length: 18 }, (_, index) => ({
+      ...mockBookings[0], id: `booking-${index + 1}`, workerName: `Provider ${index + 1}`,
+    }));
+    renderBookings(<MyBookings currentView="my-bookings" />, '/bookings?scope=purchases&filter=all&page=2');
+    expect(screen.getByTestId('booking-card-booking-9')).toBeInTheDocument();
+    expect(screen.queryByTestId('booking-card-booking-1')).not.toBeInTheDocument();
+    expect(screen.getByText('Showing 9–16 of 18 matching bookings')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Next' }));
+    expect(screen.getByTestId('booking-card-booking-17')).toBeInTheDocument();
+    fireEvent.change(screen.getByRole('searchbox', { name: 'Search bookings' }), { target: { value: 'Provider 2' } });
+    expect(screen.getByTestId('booking-card-booking-2')).toBeInTheDocument();
+    expect(screen.getByTestId('location-probe')).not.toHaveTextContent('page=');
+  });
+
   test('allows searching bookings by provider or service name', () => {
     mockCurrentBookings = mockBookings;
 

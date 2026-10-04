@@ -22,6 +22,16 @@ export async function fetchBoostServices(sellerId: string): Promise<BoostService
 }
 
 const memory = new Map<string, { id: string; expires: number }>();
+export function forgetBoostCheckoutOperations(sellerId: string) {
+  const prefix = `trabawho:boost:${sellerId}:`;
+  for (const key of memory.keys()) if (key.startsWith(prefix)) memory.delete(key);
+  try {
+    for (let index = window.sessionStorage.length - 1; index >= 0; index--) {
+      const key = window.sessionStorage.key(index);
+      if (key?.startsWith(prefix)) window.sessionStorage.removeItem(key);
+    }
+  } catch { /* In-memory cleanup still allows a fresh checkout. */ }
+}
 function boostOperation(key: string) {
   let operation = memory.get(key);
   try {

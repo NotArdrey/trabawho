@@ -8,7 +8,7 @@ const caseId = "44444444-4444-4444-8444-444444444444";
 const reportedIssue = "The provider did not arrive for our confirmed repair appointment.";
 const createdAt = "2026-10-03T09:00:00Z";
 
-async function setup(context: BrowserContext, role: "client" | "provider" = "client") {
+async function setup(context: BrowserContext, role: "client" | "provider" = "client", acceptedReplacement = false) {
   const state = { opened: false, followup: false, closed: false, failQueue: false, submissions: 0 };
   const user = { id: userId, email: "fixture@example.test", role: "authenticated", aud: "authenticated", user_metadata: {}, app_metadata: {} };
   const token = `e30.${Buffer.from(JSON.stringify({ sub: userId, exp: Math.floor(Date.now() / 1000) + 3600 })).toString("base64url")}.signature`;
@@ -20,6 +20,7 @@ async function setup(context: BrowserContext, role: "client" | "provider" = "cli
     id: caseId, booking_id: bookingId, reporter_id: userId, case_type: "provider_no_show", reason: reportedIssue,
     policy_route: "support_review", policy_reason: null, storage_path: null, created_at: createdAt,
     status: state.closed ? "closed" : state.followup ? "under_review" : "open", closed_at: null, refund_requested_at: null,
+    resolution_status: acceptedReplacement ? "replacement_accepted" : null,
     latest_support_action: state.followup ? "request_information" : null,
     latest_support_target: state.followup ? "client" : null, latest_support_at: state.followup ? createdAt : null,
   });
@@ -54,8 +55,12 @@ async function setup(context: BrowserContext, role: "client" | "provider" = "cli
         { user_id: role === "provider" ? userId : providerId, full_name: "Case Provider", email: "provider@example.test", role: "worker", account_status: "active" }],
       services: [{ id: 1, seller_id: providerId, title: "Booked repair", metadata: {}, base_price: 500 }],
       sellers: [{ user_id: providerId, display_name: "Case Provider" }],
-      payment_attempts: [{ id: "payment-1", purpose: "initial", status: "paid", amount: 540, currency: "PHP", created_at: createdAt, paid_at: createdAt }],
+      payment_attempts: [{ id: "payment-1", purpose: "initial", status: "paid", payment_id: "pay_verified", amount: 540, currency: "PHP", created_at: createdAt, paid_at: createdAt }],
       booking_audit_events: state.opened ? [{ id: 1, event_type: "support_case_opened", actor_role: "buyer", reason: reportedIssue, created_at: createdAt }] : [],
+      booking_case_replacement_visits: acceptedReplacement ? [{ booking_id: bookingId, case_id: caseId, slot_id: 12,
+        status: "accepted", accepted_at: "2026-10-04T08:00:00Z" }] : [],
+      service_slots: acceptedReplacement ? [{ id: 12, start_ts: "2026-10-10T08:00:00+08:00",
+        end_ts: "2026-10-10T09:00:00+08:00" }] : [],
     };
     const data = rows[table] || [];
     // maybeSingle requests use the array media type; its caller converts the row.
@@ -65,6 +70,25 @@ async function setup(context: BrowserContext, role: "client" | "provider" = "cli
     <script type="module">import RefreshRuntime from '/@react-refresh';RefreshRuntime.injectIntoGlobalHook(window);window.$RefreshReg$=()=>{};window.$RefreshSig$=()=>(type)=>type;window.__vite_plugin_react_preamble_installed__=true;</script>
     </head><body><div id="root"></div><script type="module" src="/tests/e2e/fixtures/dispute-admin-journey.tsx"></script></body></html>` }));
   return state;
+}
+
+for (const role of ["client", "provider"] as const) {
+  for (const width of [390, 768, 1024, 1280, 1440]) {
+    test(`${role} sees the accepted replacement schedule on the case card at ${width}px`, async ({ page, context }) => {
+      const state = await setup(context, role, true);
+      state.opened = true;
+      await page.setViewportSize({ width, height: 900 });
+      await page.goto(`/__dispute-admin-journey?role=participant-${role}`);
+      await expect(page.getByRole("heading", { name: "Your new visit" })).toBeVisible();
+      await expect(page.getByText("Saturday, October 10, 2026")).toBeVisible();
+      await expect(page.getByText("8:00 AM–9:00 AM PHT")).toBeVisible();
+      await expect(page.getByText(/Both participants accepted this new schedule/)).toBeVisible();
+      await page.getByRole("button", { name: "View support case" }).click();
+      await expect(page.getByRole("link", { name: "Contact support about this visit" })).toBeVisible();
+      await expect(page.getByRole("button", { name: "Request refund review" })).toHaveCount(0);
+      expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+    });
+  }
 }
 
 for (const width of [390, 768, 1024, 1280, 1440]) {

@@ -48,6 +48,7 @@
     "test:e2e": "playwright test",
     "test:e2e:ai-redesign": "playwright test tests/e2e/ai-redesign-smoke.e2e.spec.js",
     "test:e2e:headed": "playwright test --headed",
+    "paymongo:test-checkout": "node scripts/paymongo-sandbox-checkout.mts",
     "check:file-sizes": "node scripts/check-file-sizes.mjs",
     "check:legacy": "node scripts/check-legacy-source.mjs",
     "check:styles": "node scripts/check-styles.mjs",

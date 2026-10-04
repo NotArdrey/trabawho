@@ -4,6 +4,7 @@ import { AlertCircle, ArrowRight, CircleCheck, Clock3, Inbox, RefreshCw } from "
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { DataPagination } from "@/components/ui/data-pagination";
 import { SearchFilterBar } from "@/components/ui/search-filter-bar";
 import { WorkflowPanel } from "@/components/ui/workflow-panel";
 import { caseNextActor } from "@/features/admin/domain/caseNextActor";
@@ -11,6 +12,8 @@ import { supportCaseNextStep } from "@/features/admin/domain/supportCaseNextStep
 import { adminCasePath } from "@/app/router/routes";
 import { useAdminSupportCases } from "@/features/admin/hooks/useAdminSupportCases";
 import type { SupportCase } from "@/features/admin/services/adminSupportService";
+
+const PAGE_SIZE = 8;
 
 function SupportCaseCard({ item, onOpen }: { item: SupportCase; onOpen: () => void }) {
   const closed = item.status === "closed" && !item.pendingReviewCount;
@@ -50,6 +53,7 @@ export default function AdminSupportCases() {
   const [params, setParams] = useSearchParams();
   const [search, setSearch] = useState(params.get("search") || "");
   const filter = ["all", "active", "closed"].includes(params.get("status") || "") ? params.get("status") || "active" : "active";
+  const requestedPage = Number(params.get("page"));
   const updateParam = (key: string, value: string, replace = false) => {
     const next = new URLSearchParams(params);
     if (value) next.set(key, value); else next.delete(key);
@@ -62,6 +66,15 @@ export default function AdminSupportCases() {
     const query = search.trim().toLowerCase();
     return !query || [item.booking_id, item.case_type, item.reason].some((value) => value.toLowerCase().includes(query));
   });
+  const pageCount = Math.max(1, Math.ceil(visible.length / PAGE_SIZE));
+  const currentPage = Number.isSafeInteger(requestedPage) && requestedPage > 0 ? Math.min(requestedPage, pageCount) : 1;
+  const pagedCases = visible.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+  const changeFilter = (key: string, value: string, replace = false) => {
+    const next = new URLSearchParams(params);
+    if (value) next.set(key, value); else next.delete(key);
+    next.delete("page");
+    setParams(next, { replace });
+  };
 
   return <section className="space-y-4" aria-labelledby="support-cases-title">
     <div className="flex flex-wrap items-start justify-between gap-3"><div><h1 id="support-cases-title" className="text-2xl font-bold">Booking support cases</h1><p className="mt-1 text-sm text-muted-foreground">Review booking history, record support follow-up, and approve verified booking refunds.</p></div><Button variant="outline" disabled={loading} onClick={refresh}><RefreshCw aria-hidden="true" />Refresh</Button></div>
@@ -73,18 +86,19 @@ export default function AdminSupportCases() {
         searchLabel="Search loaded support cases"
         searchPlaceholder="Search booking ID, issue or reason"
         searchValue={search}
-        onSearchValueChange={(value) => { setSearch(value); updateParam("search", value, true); }}
+        onSearchValueChange={(value) => { setSearch(value); changeFilter("search", value, true); }}
         activeValue={filter}
-        onActiveValueChange={(value) => updateParam("status", value)}
+        onActiveValueChange={(value) => changeFilter("status", value)}
         options={[
           { value: "active", label: "Active", count: cases.filter((item) => item.status !== "closed" || item.pendingReviewCount).length },
           { value: "all", label: "All", count: cases.length },
           { value: "closed", label: "Closed", count: cases.filter((item) => item.status === "closed" && !item.pendingReviewCount).length },
         ]}
-        resultLabel={`Showing ${visible.length} of ${cases.length} loaded cases`}
+        resultLabel={`Showing ${visible.length ? (currentPage - 1) * PAGE_SIZE + 1 : 0}–${Math.min(currentPage * PAGE_SIZE, visible.length)} of ${visible.length} matching cases`}
       />
       <p className="text-xs text-muted-foreground">Search applies to loaded cases only.</p>
-      {visible.length ? <div className="grid gap-3">{visible.map((item) => <SupportCaseCard key={item.id} item={item} onOpen={() => { void navigate(`${adminCasePath(item.id)}${location.search}`); }} />)}</div> : <p className="rounded-xl border bg-card p-6 text-sm text-muted-foreground">No cases match this search or status.</p>}
+      {visible.length ? <div className="grid gap-3">{pagedCases.map((item) => <SupportCaseCard key={item.id} item={item} onOpen={() => { void navigate(`${adminCasePath(item.id)}${location.search}`); }} />)}</div> : <p className="rounded-xl border bg-card p-6 text-sm text-muted-foreground">No cases match this search or status.</p>}
+      <DataPagination label="Support case pages" page={currentPage} pageCount={pageCount} onPageChange={(page) => updateParam("page", String(page))} />
     </>}
   </section>;
 }

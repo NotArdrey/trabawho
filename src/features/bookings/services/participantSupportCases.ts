@@ -1,6 +1,7 @@
 import { supabase } from "@/integrations/supabase";
 import type { Database } from "@/integrations/supabase/database.types";
 import { fetchBookingById } from "./bookingService";
+import { getActiveReplacementSchedules, type ActiveReplacementSchedule } from "./replacementSchedules";
 import type { BookingActionRecord } from "../types/booking-action-record";
 
 type CaseRow = Database["public"]["Tables"]["booking_support_cases"]["Row"];
@@ -11,6 +12,7 @@ export interface ParticipantSupportCase {
   counterpartName: string;
   viewerRole: "client" | "provider";
   unreadCount: number;
+  replacementSchedule?: ActiveReplacementSchedule;
 }
 
 export async function listParticipantSupportCases(): Promise<ParticipantSupportCase[]> {
@@ -45,6 +47,15 @@ export async function listParticipantSupportCases(): Promise<ParticipantSupportC
   const unreadByCase = new Map<string, number>();
   for (const notice of unreadResult.data || []) unreadByCase.set(notice.case_id, (unreadByCase.get(notice.case_id) || 0) + 1);
   const relevantBookings = bookings.filter((booking) => reports.some((report) => report.booking_id === booking.id));
+  const acceptedReports = reports.filter((report) => report.resolution_status === "replacement_accepted");
+  let replacementSchedules = new Map<string, ActiveReplacementSchedule>();
+  if (acceptedReports.length) {
+    try {
+      replacementSchedules = await getActiveReplacementSchedules(acceptedReports.map((report) => report.booking_id));
+    } catch {
+      // Keep the case list available; its card asks the member to retry the missing schedule.
+    }
+  }
   const titles = new Map<number, string>();
   const names = new Map<string, string>();
   for (let start = 0; start < relevantBookings.length; start += 100) {
@@ -60,8 +71,12 @@ export async function listParticipantSupportCases(): Promise<ParticipantSupportC
     const booking = bookings.find((link) => link.id === report.booking_id);
     if (!booking) return [];
     const viewerRole = booking.buyer_id === userId ? "client" : "provider";
+    const activeSchedule = replacementSchedules.get(report.booking_id);
+    const replacementSchedule = activeSchedule?.caseId === report.id ? activeSchedule : undefined;
     return [{ report, viewerRole, unreadCount: unreadByCase.get(report.id) || 0, serviceTitle: titles.get(booking.service_id) || "Booked service",
-      counterpartName: names.get(viewerRole === "client" ? booking.seller_id : booking.buyer_id) || (viewerRole === "client" ? "Provider" : "Client") }];
+      counterpartName: names.get(viewerRole === "client" ? booking.seller_id : booking.buyer_id) || (viewerRole === "client" ? "Provider" : "Client"),
+      replacementSchedule,
+    }];
   });
 }
 

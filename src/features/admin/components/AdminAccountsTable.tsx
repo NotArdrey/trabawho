@@ -1,12 +1,12 @@
 import { useState } from "react";
-import { ChevronLeft, ChevronRight, Search, UserRound } from "lucide-react";
+import { Search, UserRound } from "lucide-react";
 import { AlertDialog, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Pagination, PaginationContent, PaginationItem } from "@/components/ui/pagination";
+import { DataPagination } from "@/components/ui/data-pagination";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import type { AdminAccount } from "../types";
 
@@ -91,7 +91,7 @@ export default function AdminAccountsTable({ accounts, isLoading, error, onRetry
     {error && <div role="alert" className="flex flex-wrap items-center gap-3 rounded-lg border border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive"><span>{error}</span><Button type="button" variant="outline" onClick={onRetry}>Try again</Button></div>}
     {!isLoading && !error && <p className="text-sm font-medium text-muted-foreground" aria-live="polite">Showing {first}–{last} of {accounts.length} {filtered ? "matching " : ""}accounts</p>}
     {isLoading ? <p role="status" className="text-muted-foreground">Loading accounts…</p> : !error && accounts.length === 0 ? <Card><CardContent className="space-y-3 p-6"><h2 className="font-semibold">{filtered ? "No matching accounts" : "No accounts available"}</h2><p className="text-sm text-muted-foreground">{filtered ? "Try another search or clear the filters." : "Accounts will appear here when they are available."}</p>{filtered && <Button type="button" variant="outline" onClick={() => { setPage(1); onSearchChange(""); onRoleFilterChange("all"); }}>Clear filters</Button>}</CardContent></Card> : !error && <div className="grid gap-3">{visibleAccounts.map((account) => <AccountCard key={account.id} account={account} roleSavingId={roleSavingId} accessSaving={accessSaving} onOpenAccessAction={onOpenAccessAction} onRequestAction={setPending} />)}</div>}
-    {!isLoading && !error && pageCount > 1 && <Pagination aria-label="Account pages"><PaginationContent><PaginationItem><Button type="button" variant="outline" disabled={currentPage === 1} onClick={() => setPage(currentPage - 1)}><ChevronLeft aria-hidden="true" />Previous</Button></PaginationItem><PaginationItem><span className="px-3 text-sm text-muted-foreground" aria-live="polite">Page {currentPage} of {pageCount}</span></PaginationItem><PaginationItem><Button type="button" variant="outline" disabled={currentPage >= pageCount} onClick={() => setPage(currentPage + 1)}>Next<ChevronRight aria-hidden="true" /></Button></PaginationItem></PaginationContent></Pagination>}
+    {!isLoading && !error && <DataPagination label="Account pages" page={currentPage} pageCount={pageCount} onPageChange={setPage} />}
     <AlertDialog open={Boolean(pending)} onOpenChange={(open) => { if (!open) setPending(null); }}><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>{pending?.kind === "restore" ? "Restore account?" : pending?.role === "admin" ? "Grant admin access?" : "Set account to client?"}</AlertDialogTitle><AlertDialogDescription>{pending?.kind === "restore" ? `This will re-enable ${pending.account.name}'s access to TrabaWho.` : pending?.role === "admin" ? `This grants ${pending?.account.name} administrator access to account management and moderation.` : `This changes ${pending?.account.name} to a client and removes their current role's access.`}</AlertDialogDescription></AlertDialogHeader><p className="break-all rounded-lg bg-muted p-3 text-sm font-medium text-foreground">{pending?.account.email}</p><AlertDialogFooter><Button type="button" variant="outline" onClick={() => setPending(null)}>Cancel</Button><Button type="button" variant={pending?.kind === "role" && pending.role === "client" ? "destructive" : "primary"} onClick={confirmAction}>Confirm {pending?.kind === "restore" ? "restore" : "role change"}</Button></AlertDialogFooter></AlertDialogContent></AlertDialog>
   </section>;
 }

@@ -2,6 +2,7 @@ import { useState } from "react";
 import { RefreshCw, ShieldCheck } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { DataPagination } from "@/components/ui/data-pagination";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -33,7 +34,7 @@ export default function AdminIdentityReviews() {
         {item.status === "APPROVED" && <p className="text-sm">Confirmation email: {item.email_delivery_status.replaceAll("_", " ")}</p>}
         <Button className="w-full sm:w-auto" onClick={() => setSelected(item.id)}>{item.status === "PENDING_REVIEW" ? "Review identity" : "View identity decision"}</Button>
       </article>)}</div>
-      <nav aria-label="Identity review pages" className="flex flex-wrap items-center justify-between gap-3"><Button variant="outline" disabled={query.page <= 1} onClick={() => setQuery((current) => ({ ...current, page: current.page - 1 }))}>Previous page</Button><p className="text-sm">Page {query.page} of {Math.max(1, Math.ceil(result.total / result.pageSize))}</p><Button variant="outline" disabled={query.page * result.pageSize >= result.total} onClick={() => setQuery((current) => ({ ...current, page: current.page + 1 }))}>Next page</Button></nav>
+      <DataPagination label="Identity review pages" page={query.page} pageCount={Math.max(1, Math.ceil(result.total / result.pageSize))} onPageChange={(page) => setQuery((current) => ({ ...current, page }))} />
     </>}
     {selected && <IdentityReviewDialog key={selected} reviewId={selected} onClose={() => setSelected(null)} onSaved={state.refresh} />}
   </section>;

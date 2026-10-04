@@ -139,7 +139,7 @@ export async function openBookingSupportCase(
 export async function getBookingSupportCase(bookingId: string, caseId?: string) {
   const fields = "id, case_type, reason, policy_route, policy_reason, status, created_at, provider_response_action, provider_response_text, provider_responded_at, rework_state, rework_appointment_at, rework_evidence_note, rework_delivered_at, rework_confirmed_at, rework_escalated_at";
   const query = supabase.from("booking_support_cases")
-    .select(`${fields}, refund_requested_at, latest_support_action, latest_support_target, latest_support_at`)
+    .select(`${fields}, refund_requested_at, latest_support_action, latest_support_target, latest_support_at, resolution_status`)
     .eq("booking_id", bookingId);
   if (caseId) query.eq("id", caseId);
   const { data, error } = await query.order("created_at", { ascending: false }).limit(1).maybeSingle();
@@ -149,7 +149,7 @@ export async function getBookingSupportCase(bookingId: string, caseId?: string) 
     if (caseId) fallbackQuery.eq("id", caseId);
     const fallback = await fallbackQuery.order("created_at", { ascending: false }).limit(1).maybeSingle();
     if (fallback.error) throw new Error("The booking report could not be loaded.");
-    return fallback.data ? { ...fallback.data, refund_requested_at: null, latest_support_action: null, latest_support_target: null, latest_support_at: null } : null;
+    return fallback.data ? { ...fallback.data, refund_requested_at: null, latest_support_action: null, latest_support_target: null, latest_support_at: null, resolution_status: null } : null;
   }
   if (error) throw new Error("The booking report could not be loaded.");
   return data;

@@ -12,6 +12,7 @@ const report = {
   created_at: "2026-10-02T00:00:00Z", provider_response_action: "offer_rework" as const,
   provider_response_text: "I will inspect and redo the work.", provider_responded_at: "2026-10-02T01:00:00Z",
   refund_requested_at: null, latest_support_action: null, latest_support_target: null, latest_support_at: null,
+  resolution_status: null,
   rework_state: null, rework_appointment_at: null, rework_evidence_note: null,
   rework_delivered_at: null, rework_confirmed_at: null, rework_escalated_at: null,
 };
