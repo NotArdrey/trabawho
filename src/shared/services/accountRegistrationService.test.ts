@@ -27,7 +27,7 @@ describe('account registration transport and recovery', () => {
     invoke.mockResolvedValueOnce({ data: { state: 'approved-by-browser' }, error: null });
     await expect(registrationRequest('account-registration', {})).rejects.toThrow();
   });
-  it('restores the server-owned signup preference and rejects unsupported roles', async () => {
+  it('restores the server-owned account type and rejects unsupported roles', async () => {
     invoke.mockResolvedValueOnce({ data: { state: 'ready', signupRole: 'worker' }, error: null });
     await expect(registrationRequest('account-registration', { action: 'state' })).resolves.toMatchObject({ signupRole: 'worker' });
     invoke.mockResolvedValueOnce({ data: { state: 'ready', signupRole: 'admin' }, error: null });

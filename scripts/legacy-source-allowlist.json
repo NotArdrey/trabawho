@@ -15,7 +15,6 @@
   "src/features/bookings/hooks/useRatingController.js",
   "src/features/bookings/hooks/useRefundController.js",
   "src/features/bookings/pages/MyBookings.jsx",
-  "src/features/bookings/pages/MyBookings.test.jsx",
   "src/features/bookings/services/bookingService.js",
   "src/features/marketplace/components/ReviewsModal.jsx",
   "src/features/marketplace/components/ServiceCard.jsx",

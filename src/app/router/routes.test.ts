@@ -38,11 +38,15 @@ describe("application route policy", () => {
     expect(homePathForRole("client")).toBe("/dashboard");
   });
 
-  it("allows one worker account to use both client and provider routes", () => {
-    for (const path of ['/dashboard', '/bookings', '/services', '/worker/dashboard', '/worker/bookings']) {
-      expect(canAccessPath(path, 'worker')).toBe(true);
+  it("keeps Client and Worker activities on separate accounts", () => {
+    for (const path of ['/dashboard', '/bookings']) {
+      expect(canAccessPath(path, 'worker')).toBe(false);
+      expect(canAccessPath(path, 'client')).toBe(true);
     }
-    expect(canAccessPath('/seller/onboarding', 'client')).toBe(true);
+    for (const path of ['/worker/dashboard', '/worker/bookings', '/work', '/seller/onboarding']) {
+      expect(canAccessPath(path, 'worker')).toBe(true);
+      expect(canAccessPath(path, 'client')).toBe(false);
+    }
     expect(canAccessPath('/admin', 'worker')).toBe(false);
   });
 

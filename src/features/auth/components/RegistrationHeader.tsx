@@ -7,7 +7,7 @@ export function RegistrationHeader({ registration }: { registration: AccountRegi
   if (!state) return <RegistrationStepHeader page icon={UserRound} title="Create account" description="Use an email you can access. You’ll confirm it before verifying your identity." />;
   if (state === 'email_pending') return <RegistrationStepHeader page icon={Mail} title="Confirm your email"
     description={'Open the confirmation link sent to ' + (registration?.email || '') + '. Check spam too. Identity verification starts after your email is confirmed.'} />;
-  if (state === 'ready') return <RegistrationStepHeader page icon={BadgeCheck} title="Your account is ready" description="Your email and identity are verified. You can start booking, or set up offering your own services." />;
+  if (state === 'ready') return <RegistrationStepHeader page icon={BadgeCheck} title="Your account is ready" description={registration.signupRole === 'worker' ? 'Your Worker account email and identity are verified. Continue to your service setup.' : 'Your Client account email and identity are verified. You can start booking services.'} />;
   if (state === 'name_pending') return <RegistrationStepHeader page icon={FileCheck} title="Name on your verified ID" description="Didit approved your checks. Confirm the complete legal name from your ID to finish registration." />;
   if (state === 'identity_review') return <RegistrationStepHeader page icon={Clock} title="Identity review pending" description="An administrator must review your identity before you can access the marketplace. Allow up to seven days." />;
   return <RegistrationStepHeader page icon={ScanFace}

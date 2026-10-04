@@ -1,25 +1,27 @@
-import React from 'react';
+import type { ComponentType, ReactNode } from 'react';
+import { beforeEach, describe, expect, test, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { MemoryRouter, useLocation } from 'react-router-dom';
-import MyBookings from './MyBookings';
+import LegacyMyBookings from '@/features/bookings/pages/MyBookings';
+const MyBookings = LegacyMyBookings as unknown as ComponentType<Record<string, unknown>>;
 
 // Mock the navigation component to simplify testing
-vi.mock('../../../shared/components/DashboardNavigation', () => ({
+vi.mock('@/shared/components/DashboardNavigation', () => ({
   default: () => <nav data-testid="mock-dashboard-nav">Navigation</nav>,
 }));
 
 // Mock child modals
-vi.mock('../components/ChatWindow', () => ({
-  default: ({ viewerRole, onOpenSlotSelection }) => <div data-testid="mock-chat-window" data-viewer-role={viewerRole}>Chat<button onClick={onOpenSlotSelection}>Open schedule</button></div>,
+vi.mock('@/features/bookings/components/ChatWindow', () => ({
+  default: ({ viewerRole, onOpenSlotSelection }: { viewerRole: string; onOpenSlotSelection: () => void }) => <div data-testid="mock-chat-window" data-viewer-role={viewerRole}>Chat<button onClick={onOpenSlotSelection}>Open schedule</button></div>,
 }));
-vi.mock('../components/SlotSelectionModal', () => ({
-  default: ({ onConfirmSlot }) => <div data-testid="mock-slot-modal">Slots<button onClick={() => onConfirmSlot({ slotId: 42, date: '2026-10-10' })}>Review booking</button></div>,
+vi.mock('@/features/bookings/components/SlotSelectionModal', () => ({
+  default: ({ onConfirmSlot }: { onConfirmSlot: (slot: { slotId: number; date: string }) => void }) => <div data-testid="mock-slot-modal">Slots<button onClick={() => onConfirmSlot({ slotId: 42, date: '2026-10-10' })}>Review booking</button></div>,
 }));
-vi.mock('../components/PaymentModal', () => ({
+vi.mock('@/features/bookings/components/PaymentModal', () => ({
   default: () => <div data-testid="mock-payment-modal">Payment</div>,
 }));
-vi.mock('../components/BookingTermsModal', () => ({
-  default: ({ isOpen, onConfirm }) => (
+vi.mock('@/features/bookings/components/BookingTermsModal', () => ({
+  default: ({ isOpen, onConfirm }: { isOpen: boolean; onConfirm: () => void }) => (
     isOpen ? <button data-testid="mock-terms-modal" onClick={onConfirm}>Continue to payment</button> : null
   ),
 }));
@@ -56,13 +58,13 @@ const mockBookings = [
   },
 ];
 
-let mockCurrentBookings = [];
+let mockCurrentBookings: Array<{ id: string; status: string; [key: string]: unknown }> = [];
 let mockIsLoading = false;
 let mockListRole = '';
 const mockHandleOpenRating = vi.fn();
 
-vi.mock('../hooks', () => ({
-  useBookingListController: (_initialBookings, options) => {
+vi.mock('@/features/bookings/hooks', () => ({
+  useBookingListController: (_initialBookings: unknown, options: { listRole: string }) => {
     mockListRole = options.listRole;
     return ({
     bookings: mockCurrentBookings,
@@ -80,7 +82,7 @@ vi.mock('../hooks', () => ({
     handleApproveQuote: vi.fn(),
     handleRejectQuote: vi.fn(),
     handleStopServiceAccepted: vi.fn(),
-    getBooking: (id) => mockCurrentBookings.find((b) => String(b.id) === String(id)),
+    getBooking: (id: string) => mockCurrentBookings.find((b) => String(b.id) === String(id)),
     });
   },
   usePaymentController: () => ({
@@ -103,7 +105,7 @@ describe('MyBookings Redesign Component', () => {
     const location = useLocation();
     return <output data-testid="location-probe">{`${location.pathname}${location.search}`}</output>;
   };
-  const renderBookings = (component, initialEntry = '/bookings?scope=purchases') => render(
+  const renderBookings = (component: ReactNode, initialEntry = '/bookings?scope=purchases') => render(
     <MemoryRouter initialEntries={[initialEntry]}>{component}<LocationProbe /></MemoryRouter>
   );
 
@@ -338,44 +340,26 @@ describe('MyBookings Redesign Component', () => {
     expect(mockListRole).toBe('buyer');
   });
 
-  test('gives a provider-capable account the same client booking shell on the client route', () => {
-    mockCurrentBookings = mockBookings;
-
-    renderBookings(
-      <MyBookings currentView="my-bookings" sellerProfile={{ role: 'worker', userId: 'worker-1' }} />,
-      '/bookings?scope=incoming',
-    );
-
-    expect(screen.getByRole('heading', { name: 'My Bookings' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Incoming bookings' })).toHaveAttribute('aria-pressed', 'false');
-    expect(mockListRole).toBe('buyer');
-  });
-
-  test('moves a worker to the client route when opening purchased services', () => {
+  test('keeps Worker bookings incoming when an old URL requests purchased services', () => {
     mockCurrentBookings = mockBookings;
     renderBookings(
       <MyBookings currentView="worker-bookings" sellerProfile={{ role: 'worker', userId: 'worker-1' }} />,
-      '/worker/bookings?scope=incoming',
+      '/worker/bookings?scope=purchases',
     );
-
-    fireEvent.click(screen.getByRole('button', { name: 'Services I booked' }));
-    expect(screen.getByTestId('location-probe')).toHaveTextContent('/bookings?scope=purchases');
-    expect(screen.getByRole('button', { name: 'Services I booked' })).toHaveAttribute('aria-pressed', 'true');
-    expect(screen.getByRole('button', { name: 'Incoming bookings' })).toBeVisible();
-    expect(mockListRole).toBe('buyer');
-
-    fireEvent.click(screen.getByRole('button', { name: 'Incoming bookings' }));
-    expect(screen.getByTestId('location-probe')).toHaveTextContent('/worker/bookings?scope=incoming');
+    expect(screen.getByRole('heading', { name: 'Bookings' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Services I booked' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Incoming bookings' })).not.toBeInTheDocument();
+    expect(screen.getByTestId('location-probe')).toHaveTextContent('scope=incoming');
     expect(mockListRole).toBe('seller');
   });
 
-  test('uses the booking scope to set the chat participant role', () => {
+  test('uses the fixed account role for chat despite a purchased-services URL', () => {
     mockCurrentBookings = mockBookings;
     renderBookings(
       <MyBookings currentView="chat" selectedChatBookingId="b1" sellerProfile={{ role: 'worker', userId: 'worker-1' }} />,
       '/messages/b1?scope=purchases',
     );
 
-    expect(screen.getByTestId('mock-chat-window')).toHaveAttribute('data-viewer-role', 'buyer');
+    expect(screen.getByTestId('mock-chat-window')).toHaveAttribute('data-viewer-role', 'seller');
   });
 });

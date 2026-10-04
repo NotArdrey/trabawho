@@ -1,6 +1,6 @@
 import { assertEquals, assertThrows } from "https://deno.land/std@0.224.0/assert/mod.ts";
 import { AccountError, signupRole, verifiedDocument } from './accountRegistration.ts';
-Deno.test('signup preferences accept only client and worker with compatibility for older bundles', () => {
+Deno.test('account types accept only client and worker with compatibility for older bundles', () => {
   assertEquals(signupRole('client'), 'client');
   assertEquals(signupRole('worker'), 'worker');
   assertEquals(signupRole(undefined), 'client');

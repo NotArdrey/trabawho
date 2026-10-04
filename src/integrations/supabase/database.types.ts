@@ -16,7 +16,7 @@ export interface Database {
   public: {
     Tables: {
       account_registrations: Table<{
-        user_id: string; terms_accepted_at: string; pending_nonce_hash: string; pending_expires_at: string;
+        user_id: string; account_role: 'client' | 'worker'; terms_accepted_at: string; pending_nonce_hash: string; pending_expires_at: string;
         email_sent_at: string | null; identity_consent_at: string | null; current_session_id: string | null;
         creation_lease: string | null; creation_started_at: string | null; provider_status: string;
         source_legal_name: string | null; document_type: string | null; requested_legal_name: string | null;

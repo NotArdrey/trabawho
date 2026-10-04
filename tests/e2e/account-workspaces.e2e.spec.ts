@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test } from '@playwright/test';
 
 test.beforeEach(async ({ page }) => {
   await page.route('**/__account-workspaces*', route => route.fulfill({ contentType: 'text/html', body: `<html><head><meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -8,46 +8,36 @@ test.beforeEach(async ({ page }) => {
     "export function useRealtimeNotifications() { return { notifications: [], isLoading: false, error: '', actionError: '', markRead() {}, markAllRead() {}, retry() {} }; }" }));
 });
 
-async function useAccountAction(page: Page, width: number, name: string) {
-  if (width < 881) {
-    await page.getByRole('button', { name: 'Profile menu', exact: true }).click();
-    await page.getByRole('menuitem', { name, exact: true }).click();
-  } else await page.getByRole('button', { name, exact: true }).click();
-}
-
 for (const width of [390, 768, 1024, 1280, 1440]) {
-  test(`one worker account switches between booking and offering at ${width}px`, async ({ page }) => {
-    await page.setViewportSize({ width, height: 900 });
-    const accountRequests: string[] = [];
-    page.on('request', request => {
-      if (/\/(auth|functions)\/v1\//.test(request.url())) accountRequests.push(request.url());
+  for (const role of ['client', 'worker'] as const) {
+    test(`separate ${role} account stays in its role at ${width}px`, async ({ page }) => {
+      await page.setViewportSize({ width, height: 900 });
+      await page.addInitScript(() => {
+        localStorage.setItem('trabawho-worker-workspace:worker-account', 'client');
+        localStorage.setItem('trabawho-worker-workspace:client-account', 'provider');
+      });
+      const accountRequests: string[] = [];
+      page.on('request', request => {
+        if (/\/(auth|functions)\/v1\//.test(request.url())) accountRequests.push(request.url());
+      });
+      await page.goto('/__account-workspaces?role=' + role);
+      await expect(page.getByTestId('account-id')).toHaveText(role + '-account');
+      await expect(page.getByTestId('account-role')).toHaveText(role);
+      const navigation = page.getByRole('navigation', { name: width < 881 ? 'Mobile dashboard navigation' : 'Dashboard navigation', exact: true });
+      const tab = role === 'worker' ? 'My Work' : 'Browse';
+      await expect(navigation.getByRole('button', { name: width < 881 ? tab + ' tab' : tab, exact: true })).toBeVisible();
+      await expect(page.getByRole('button', { name: /Switch to (client|provider) workspace/ })).toHaveCount(0);
+      if (width < 881) await page.getByRole('button', { name: 'Profile menu', exact: true }).click();
+      await expect(page.getByRole('menuitem', { name: /Switch to (client|provider) workspace|Offer services/ })).toHaveCount(0);
+      if (width < 881) await page.keyboard.press('Escape');
+      await page.getByRole('button', { name: 'Other role route', exact: true }).click();
+      await expect(page).toHaveURL(role === 'worker' ? /\/worker\/dashboard$/ : /\/dashboard$/);
+      await page.getByRole('button', { name: 'Other role action', exact: true }).click();
+      await expect(page.getByTestId('current-route')).toHaveText(role === 'worker' ? '/worker/dashboard' : '/dashboard');
+      await expect(page.getByTestId('account-id')).toHaveText(role + '-account');
+      expect(accountRequests).toEqual([]);
+      expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+      if (width === 390 || width === 1440) await page.screenshot({ path: test.info().outputPath(role + '-account-' + width + '.png'), fullPage: true });
     });
-    await page.goto('/__account-workspaces');
-    await useAccountAction(page, width, 'Switch to client workspace');
-    await expect(page).toHaveURL(/\/dashboard$/);
-    await expect(page.getByTestId('account-id')).toHaveText('shared-account');
-    await expect(page.getByTestId('account-role')).toHaveText('worker');
-    const clientNavigation = page.getByRole('navigation', { name: width < 881 ? 'Mobile dashboard navigation' : 'Dashboard navigation', exact: true });
-    await expect(clientNavigation.getByRole('button', { name: width < 881 ? 'Browse tab' : 'Browse', exact: true })).toBeVisible();
-    await useAccountAction(page, width, 'Switch to provider workspace');
-    await expect(page).toHaveURL(/\/worker\/dashboard$/);
-    await expect(page.getByTestId('current-route')).toHaveText('/worker/dashboard');
-    const providerNavigation = page.getByRole('navigation', { name: width < 881 ? 'Mobile dashboard navigation' : 'Dashboard navigation', exact: true });
-    await expect(providerNavigation.getByRole('button', { name: width < 881 ? 'My Work tab' : 'My Work', exact: true })).toBeVisible();
-    await expect(page.getByTestId('account-id')).toHaveText('shared-account');
-    await expect(page.getByTestId('account-role')).toHaveText('worker');
-    expect(accountRequests).toEqual([]);
-    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
-    if (width === 390 || width === 1440) await page.screenshot({ path: test.info().outputPath('shared-account-' + width + '.png'), fullPage: true });
-  });
-
-  test(`existing client opens worker setup with the same account at ${width}px`, async ({ page }) => {
-    await page.setViewportSize({ width, height: 900 });
-    await page.goto('/__account-workspaces?role=client');
-    await useAccountAction(page, width, 'Offer services');
-    await expect(page).toHaveURL(/\/seller\/onboarding$/);
-    await expect(page.getByTestId('account-id')).toHaveText('shared-account');
-    await expect(page.getByTestId('account-role')).toHaveText('client');
-    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
-  });
+  }
 }

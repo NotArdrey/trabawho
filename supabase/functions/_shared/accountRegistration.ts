@@ -11,7 +11,7 @@ export class AccountError extends Error {
   constructor(message: string, public status = 400) { super(message); }
 }
 export function signupRole(value: unknown): 'client' | 'worker' {
-  // Older frontend bundles omit this preference. It never grants a profile role.
+  // Older frontend bundles omit the account type and continue to create Clients.
   if (value === undefined || value === 'client') return 'client';
   if (value === 'worker') return 'worker';
   throw new AccountError('Choose Client or Worker to continue.');
@@ -53,7 +53,7 @@ export async function registrationState(client: ReturnType<typeof accountClient>
     if (session.error) throw new AccountError("Verification session could not be loaded. Retry.", 503);
     sessionUrl = text(asRecord(asRecord(session.data).verification_data).session_url) || null;
   }
-  return { state, email: user.email, signupRole: user.app_metadata.signup_role === 'worker' ? 'worker' : 'client', legalName: row.source_legal_name, documentType: row.document_type,
+  return { state, email: user.email, signupRole: row.account_role === 'worker' ? 'worker' : 'client', legalName: row.source_legal_name, documentType: row.document_type,
     requestedName: row.requested_legal_name, nameIssue: row.name_issue, sessionId: row.current_session_id,
     sessionUrl, providerStatus: row.provider_status, providerSetupComplete: Boolean(row.provider_setup_completed_at) };
 }

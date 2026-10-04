@@ -11,9 +11,10 @@ export function IdentityResultStep({ flow, state, onDraftChange }: { flow: Accou
   const correction = useNameCorrection(flow, onDraftChange);
   const ready = state.state === 'ready';
   const namePending = state.state === 'name_pending';
-  const book = { href: '/dashboard', label: 'Start booking services' };
-  const offer = { href: '/seller/onboarding', label: 'Offer services' };
-  const nextActions = state.signupRole === 'worker' ? [book, offer] : [offer, book];
+  const worker = state.signupRole === 'worker';
+  const nextAction = worker
+    ? { href: state.providerSetupComplete ? '/worker/dashboard' : '/seller/onboarding', label: state.providerSetupComplete ? 'Open worker dashboard' : 'Offer services' }
+    : { href: '/dashboard', label: 'Start booking services' };
   return (
     <section className="space-y-6">
       {namePending && <div className="space-y-2 rounded-lg bg-muted/60 p-4">
@@ -46,10 +47,10 @@ export function IdentityResultStep({ flow, state, onDraftChange }: { flow: Accou
         </form>}
       </div>}
       {!correction.open && (ready ? <div className="space-y-3">
-        <p className="text-sm leading-6 text-muted-foreground">Use this same account to book and offer services. Enter a service address when you book. Complete provider setup before publishing a gig.</p>
-        {nextActions.map((action, index) => <Button key={action.href} variant={index === 1 ? 'primary' : 'outline'} asChild className="h-auto min-h-11 w-full whitespace-normal py-3">
-          <a href={action.href}>{action.label}{index === 1 && <ArrowRight aria-hidden="true" />}</a>
-        </Button>)}
+        <p className="text-sm leading-6 text-muted-foreground">{worker ? 'Complete worker setup before publishing a gig.' : 'Enter a service address when you book.'} To use the other role, sign out and register a separate account with a different email.</p>
+        <Button asChild className="h-auto min-h-11 w-full whitespace-normal py-3">
+          <a href={nextAction.href}>{nextAction.label}<ArrowRight aria-hidden="true" /></a>
+        </Button>
       </div> : <Button className="h-auto min-h-11 w-full whitespace-normal py-3" isLoading={flow.busy} onClick={() => void (namePending
         ? flow.identityAction('account-identity-name', { action: 'confirm_name', confirmed: true }) : flow.refresh())}>
         {namePending ? 'Confirm my legal name' : 'Refresh review status'}{namePending && <ArrowRight aria-hidden="true" />}

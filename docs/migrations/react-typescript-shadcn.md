@@ -4,6 +4,8 @@ Status: active
 
 ## Current checkpoint
 
+- Client and Worker are separate fixed account types. Signup requires an explicit choice; dashboard navigation and booking/chat scope use that type. Switching and Client-to-Worker setup controls are removed. The booking page shrinks and its regression suite is strict TypeScript. Two new local SQL migrations enforce fixed roles and allow one approved account per ID document per role; isolated PostgreSQL migration tests run in the quality gate. Deployment is pending; see the [Didit guide](../integrations/didit.md).
+
 - Vite, strict TypeScript for migrated files, Tailwind CSS, shadcn/ui configuration, Vitest, linting, file-size enforcement, typed route policy, and Vercel SPA deployment are active.
 - The application shell, public navigation, landing experience, loading state, notifications, shared confirmation dialog, route contracts, Supabase integration contract, pricing utility, profile-photo utility, and feature entry points are typed.
 - The landing and authentication presentation use the documented themes and image-forward composition. Authentication pages/controllers, account-owned registration, source-name confirmation and corrections, manual fallback, provider setup, and booking-address collection are strict TypeScript. The retired password-bearing signup transport and two oversized auth pages are removed; 160 unused authentication CSS rules are deleted. Legacy auth modals remain on their shrinking baselines. The explicitly authorized backend rollout is deployed; frontend publishing was excluded at the user's request. See the [Didit integration guide](../integrations/didit.md).

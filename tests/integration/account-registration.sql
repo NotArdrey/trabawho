@@ -12,7 +12,8 @@ begin
   if actor is null then raise exception 'A test administrator is required'; end if;
   insert into auth.users(id,instance_id,aud,role,email,encrypted_password,raw_app_meta_data,raw_user_meta_data,created_at,updated_at)
   select id,'00000000-0000-0000-0000-000000000000','authenticated','authenticated',id::text||'@account-test.invalid','',
-    '{"provider":"email","providers":["email"]}','{"registration_version":2}',now(),now() from unnest(array[u,u2,u3,u4]) id;
+    jsonb_build_object('provider','email','providers',jsonb_build_array('email'),'signup_role',case when id in (u,u3) then 'worker' else 'client' end),
+    '{"registration_version":2}',now(),now() from unnest(array[u,u2,u3,u4]) id;
   perform public.initialize_account_registration(u,'test');
   perform public.initialize_account_registration(u2,'test');
   perform public.initialize_account_registration(u3,'test');
@@ -26,8 +27,11 @@ begin
     perform public.claim_pending_account_email(u3,'test',null);
     raise exception 'Confirmation request bypassed the cooldown';
   exception when invalid_parameter_value then null; end;
-  if exists(select 1 from public.profiles where user_id in (u,u2,u3) and (full_name<>'' or is_worker or is_verified or address is not null)) then
-    raise exception 'Base accounts incorrectly collect a name, role, or address'; end if;
+  if exists(select 1 from public.profiles where user_id in (u,u2,u3) and (full_name<>'' or is_verified or address is not null)) then
+    raise exception 'Base accounts incorrectly collect a name or address'; end if;
+  if not exists(select 1 from public.profiles where user_id=u and role='worker' and is_worker and not is_client) or
+    not exists(select 1 from public.profiles where user_id=u2 and role='client' and is_client and not is_worker) then
+    raise exception 'Base account role was not fixed at signup'; end if;
   begin
     perform public.claim_account_identity_session(u,lease);
     raise exception 'Unconfirmed email could start Didit';
@@ -115,7 +119,7 @@ begin
   result:=public.apply_didit_identity_event(sid3,'hash',sid3,'APPROVED','{"timestamp":100}',
     jsonb_build_object('fullName',name,'documentType','passport'),'test-fingerprint-'||sid);
   if not exists(select 1 from public.profiles where user_id=u3 and verification_status='PENDING_REVIEW' and not is_verified) then
-    raise exception 'Cross-role duplicate bypassed review'; end if;
+    raise exception 'Same-role duplicate bypassed review'; end if;
   result:=public.apply_didit_identity_event(sid3||'-declined','hash',sid3,'DECLINED','{"timestamp":200}','{}',null);
   if not exists(select 1 from public.profiles where user_id=u3 and verification_status='DECLINED' and not is_verified) then
     raise exception 'Decline did not block access'; end if;

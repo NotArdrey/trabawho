@@ -32,7 +32,7 @@ export function SignupRoleChoice({ value, onChange, disabled, error }: Props) {
           </label>
         ))}
       </div>
-      <p id="registration-role-help" className="text-xs leading-5 text-muted-foreground">One account lets you book and offer services. Choose what you want to do first. Complete worker setup after email and identity verification.</p>
+      <p id="registration-role-help" className="text-xs leading-5 text-muted-foreground">Choose your account type. You may have one Client account and one separate Worker account, each with its own email. To use the other role, register a new account.</p>
       {error && <p id="registration-role-error" role="alert" className="text-sm text-destructive">{error}</p>}
     </fieldset>
   );

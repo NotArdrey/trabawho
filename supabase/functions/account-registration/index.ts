@@ -20,7 +20,7 @@ Deno.serve(async (request: Request) => {
         throw new AccountError("Enter a valid email, a password of at least 8 characters, and accept the Terms and Conditions.");
       await recordRegistrationAttempt(client, request, { action: "base_account", email });
       const created = await client.auth.admin.createUser({ email, password, email_confirm: false,
-        user_metadata: { registration_version: 2, role: "client" },
+        user_metadata: { registration_version: 2, role, is_worker: role === 'worker', is_client: role === 'client' },
         app_metadata: { identity_required: true, verification_status: "UNVERIFIED", signup_role: role } });
       if (created.error || !created.data.user) throw new AccountError("This account could not be created. If the email is already registered, sign in or resend confirmation.");
       const user = created.data.user; const nonce = createSessionNonce();

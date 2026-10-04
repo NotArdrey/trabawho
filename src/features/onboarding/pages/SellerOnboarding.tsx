@@ -36,7 +36,7 @@ export default function SellerOnboarding({ onBack, onComplete, verifiedName }: P
       </>}
       {flow.step === 3 && <>
         <fieldset className="space-y-2"><legend className="font-semibold">Booking mode</legend>{['with-slots', 'calendar-only'].map((mode) => <label key={mode} className="flex min-h-11 items-center gap-3 text-sm"><input type="radio" name="booking-mode" checked={values.bookingMode === mode} onChange={() => flow.update('bookingMode', mode)} />{mode === 'with-slots' ? 'Scheduled time slots' : 'Arrange a schedule through chat'}</label>)}</fieldset>
-        <p className="text-sm text-muted-foreground">You can configure available dates and time slots in My Work after saving. Booking remains available as a client too.</p>
+        <p className="text-sm text-muted-foreground">You can configure available dates and time slots in My Work after saving. To book services, sign in to a separate Client account.</p>
         <dl className="space-y-2 rounded-lg bg-muted p-4 text-sm"><dt className="font-semibold">Service area</dt><dd>{[flow.area.barangay, flow.area.city, flow.area.province].join(', ')}</dd><dt className="font-semibold">First gig</dt><dd>{values.serviceType}</dd><dt className="font-semibold">Pricing</dt><dd>{values.pricingModel === 'fixed' ? `PHP ${values.fixedPrice} ${values.rateBasis}` : 'Quote after inquiry'}</dd></dl>
       </>}
       <Button type="submit" isLoading={flow.busy} className="w-full">{flow.step < 3 ? 'Continue' : 'Save provider setup and publish gig'}</Button>
