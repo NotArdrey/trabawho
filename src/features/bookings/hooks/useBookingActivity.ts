@@ -1,7 +1,7 @@
 import { useEffect } from "react";
-import { subscribeToBookingActivity } from "../services/bookingActivity";
+import { subscribeToBookingActivity, type BookingActivityScope } from "../services/bookingActivity";
 
-export function useBookingActivity(refresh: () => Promise<unknown>, enabled = true) {
+export function useBookingActivity(refresh: () => Promise<unknown>, enabled = true, reconciliationMs = 15_000, scope: BookingActivityScope = "booking") {
   useEffect(() => {
     if (!enabled) return;
     let active = true;
@@ -22,9 +22,9 @@ export function useBookingActivity(refresh: () => Promise<unknown>, enabled = tr
       window.clearTimeout(timer);
       timer = window.setTimeout(() => { void run(); }, 250);
     };
-    const unsubscribe = subscribeToBookingActivity(queueRefresh);
+    const unsubscribe = subscribeToBookingActivity(queueRefresh, scope);
     // A connected channel can silently lack table publications. Reconcile visible screens too.
-    const reconciliation = window.setInterval(() => { void run(); }, 15_000);
+    const reconciliation = window.setInterval(() => { void run(); }, reconciliationMs);
     window.addEventListener("focus", queueRefresh);
     window.addEventListener("online", queueRefresh);
     document.addEventListener("visibilitychange", queueRefresh);
@@ -37,5 +37,5 @@ export function useBookingActivity(refresh: () => Promise<unknown>, enabled = tr
       document.removeEventListener("visibilitychange", queueRefresh);
       unsubscribe();
     };
-  }, [enabled, refresh]);
+  }, [enabled, refresh, reconciliationMs, scope]);
 }

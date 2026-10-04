@@ -107,7 +107,7 @@ export default function DashboardNavigation({
   const [showMobileSearch, setShowMobileSearch] = useState(false);
   const workspaceUserId = sellerProfile?.userId || sellerProfile?.user_id || "anonymous";
   const workspaceStorageKey = `trabawho-worker-workspace:${workspaceUserId}`;
-  const { notifications, isLoading, error, markRead, markAllRead, retry } = useRealtimeNotifications(sellerProfile?.userId || sellerProfile?.user_id);
+  const { notifications, isLoading, error, actionError, markRead, markAllRead, retry } = useRealtimeNotifications(sellerProfile?.userId || sellerProfile?.user_id);
 
   useEffect(() => {
     document.body.classList.add("gl-app-shell-active");
@@ -180,6 +180,7 @@ export default function DashboardNavigation({
     const notification = notifications.find((item) => item.id === id);
     markRead(id);
     setIsNotificationOpen(false);
+    if (notification?.href) { void navigate(notification.href); return; }
     if (notification?.type === "message") return (onOpenChatPage || onOpenMyBookings)?.();
     if (isWorkerAccount && !isAdminAccount) return onOpenMyWork?.();
     onOpenMyBookings?.();
@@ -248,7 +249,7 @@ export default function DashboardNavigation({
         {showGlobalSearch && <label className="relative hidden w-[min(560px,44vw)] items-center min-[881px]:flex"><span className="sr-only">Search</span><Search className="pointer-events-none absolute left-3 size-4 text-muted-foreground" aria-hidden /><input className="min-h-11 w-full rounded-lg border bg-background py-2 pl-9 pr-3 text-sm outline-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring" value={searchQuery} onChange={onSearchChange} onKeyDown={submitSearch} type="search" aria-label="Search services, providers, locations" placeholder="Search services, providers, locations" /></label>}
         <div className="ml-auto flex items-center gap-1">
           {showGlobalSearch && <Button type="button" variant="ghost" size="icon" className="min-[881px]:hidden" aria-label="Open search" aria-pressed={showMobileSearch} onClick={() => setShowMobileSearch((value) => !value)}><Search aria-hidden /></Button>}
-          <NotificationCenter notifications={notifications} open={isNotificationOpen} onOpenChange={(open) => { if (open) setIsProfileMenuOpen(false); setIsNotificationOpen(open); }} onMarkAllRead={markAllRead} onNotificationClick={handleNotificationClick} isLoading={isLoading} error={error} onRetry={retry} />
+          <NotificationCenter notifications={notifications} open={isNotificationOpen} onOpenChange={(open) => { if (open) setIsProfileMenuOpen(false); setIsNotificationOpen(open); }} onMarkAllRead={markAllRead} onNotificationClick={handleNotificationClick} isLoading={isLoading} error={error} actionError={actionError} onRetry={retry} />
           <DropdownMenu open={isProfileMenuOpen} onOpenChange={(open) => { if (open) setIsNotificationOpen(false); setIsProfileMenuOpen(open); }}>
             <DropdownMenuTrigger asChild><Button type="button" variant="ghost" size="icon" className="rounded-full p-0.5 min-[881px]:hidden" aria-label="Profile menu"><img className="size-10 rounded-full object-cover" src={profilePhotoUrl} alt="Profile" /></Button></DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-60">

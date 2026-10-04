@@ -19,11 +19,17 @@ for (const width of [390, 768, 1024, 1280, 1440]) {
     });
     await page.route("https://checkout.paymongo.com/boost-test", (route) => route.fulfill({ contentType: "text/html", body: "<h1>PayMongo boost checkout</h1>" }));
     await page.goto("/__boost-journey");
+    if (width >= 1024) {
+      const durationBox = await page.getByRole("combobox", { name: "Boost duration" }).boundingBox();
+      const priceBox = await page.getByText("PHP 50", { exact: true }).boundingBox();
+      expect(durationBox && priceBox && Math.abs(durationBox.y - priceBox.y) <= 1).toBe(true);
+    }
     await page.getByRole("button", { name: "Review boost payment" }).click();
     await expect(page.getByRole("dialog", { name: "Review gig boost payment" })).toBeVisible();
-    await expect(page.getByText("PHP 350", { exact: true })).toBeVisible();
-    await expect(page.getByRole("dialog")).toContainText("PHP 50 per day");
-    await expect(page.getByText("7 days", { exact: true })).toBeVisible();
+    await expect(page.getByRole("dialog").getByText("PHP 350", { exact: true })).toBeVisible();
+    await expect(page.getByRole("dialog")).toContainText("Price per day");
+    await expect(page.getByRole("dialog")).toContainText("PHP 50");
+    await expect(page.getByRole("dialog").getByText("7 days", { exact: true })).toBeVisible();
     await expect(page.getByRole("button", { name: "Continue to PayMongo" })).toBeDisabled();
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
     await page.getByRole("checkbox").check();
@@ -43,19 +49,21 @@ test("cancelled checkout leaves the gig inactive", async ({ page }) => {
   await expect(page.getByRole("button", { name: "Gig already boosted" })).toHaveCount(0);
 });
 
-test("invalid boost values show field feedback and preserve the entered values", async ({ page }) => {
+test("duration uses fixed, keyboard-accessible choices and updates the price", async ({ page }) => {
   await page.goto("/__boost-journey");
-  await page.getByLabel("Days", { exact: true }).fill("7.5");
-  await page.getByRole("button", { name: "Review boost payment" }).click();
-  await expect(page.getByLabel("Days", { exact: true })).toHaveAttribute("aria-invalid", "true");
-  await expect(page.getByLabel("Days", { exact: true })).toHaveValue("7.5");
+  const duration = page.getByRole("combobox", { name: "Boost duration" });
+  await duration.focus();
+  await page.keyboard.press("Enter");
+  await expect(page.getByRole("option")).toHaveText(["3 days", "7 days", "14 days", "30 days"]);
+  await page.getByRole("option", { name: "14 days" }).click();
+  await expect(duration).toHaveText("14 days");
   await expect(page.getByLabel("Budget PHP")).toHaveCount(0);
-  await expect(page.getByRole("dialog")).toHaveCount(0);
-  await page.getByLabel("Days", { exact: true }).fill("14");
-  await expect(page.getByRole("status")).toContainText("PHP 700 total for 14 days");
+  await expect(page.getByRole("status")).toContainText("Total price · 14 days");
+  await expect(page.getByRole("status")).toContainText("PHP 700");
   await page.getByRole("button", { name: "Review boost payment" }).click();
   await expect(page.getByRole("dialog")).toContainText("14 days");
   await expect(page.getByRole("dialog")).toContainText("PHP 700");
+  await expect(page.getByRole("dialog")).not.toContainText("budget");
 });
 
 test("paid return refreshes the gig only after verification", async ({ page }) => {

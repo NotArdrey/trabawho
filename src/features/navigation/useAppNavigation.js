@@ -19,11 +19,12 @@ import {
   syncWorkerSetup,
   uploadProfilePhoto,
   updateUserProfileFields,
-  updateUserPassword,
   resendSignupVerificationEmail,
   sendPasswordResetEmail,
   isAccountBlockedForLogin,
 } from '../../shared/services/authService';
+import { changePassword } from '@/features/profile/services/changePassword';
+import { assertEditableProfileFields } from '@/features/profile/domain/profileEditRules';
 import { getThemeTokens } from '../../shared/styles/themeTokens';
 import { getProfilePhotoUrl } from '../../shared/utils/profilePhoto';
 
@@ -658,6 +659,7 @@ export const useAppNavigation = () => {
   };
 
   const handleProfileUpdate = async (updatedProfileFields) => {
+    assertEditableProfileFields(updatedProfileFields || {});
     const currentUser = authUser || {
       id: sellerProfile?.userId,
       email: sellerProfile?.email,
@@ -686,12 +688,7 @@ export const useAppNavigation = () => {
   };
 
   const handlePasswordUpdate = async ({ currentPassword, newPassword }) => {
-    const currentUserEmail = authUser?.email || sellerProfile?.email;
-    await updateUserPassword({
-      email: currentUserEmail,
-      currentPassword,
-      newPassword,
-    });
+    await changePassword({ currentPassword, newPassword });
   };
 
   const handleBackToClientDashboard = () => {

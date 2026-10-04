@@ -199,6 +199,36 @@ for (const outcome of [
   });
 }
 
+test('failed confirmation request offers resend without claiming the email arrived', async ({ page }) => {
+  await page.route('**/functions/v1/create-didit-session', async (route) => {
+    if (route.request().method() === 'OPTIONS') { await route.fulfill({ status: 204, headers: corsHeaders }); return; }
+    const body = route.request().postDataJSON() as Record<string, unknown>;
+    await route.fulfill({ headers: corsHeaders, json: body.action === 'get_session'
+      ? { success: true, status: 'APPROVED' }
+      : { success: true, sessionId: 'email-failure-session', sessionNonce: 'email-failure-nonce', verificationUrl: 'https://verification.didit.me/demo' } });
+  });
+  await page.route('**/functions/v1/create-unverified-user', async (route) => {
+    if (route.request().method() === 'OPTIONS') { await route.fulfill({ status: 204, headers: corsHeaders }); return; }
+    await route.fulfill({ headers: corsHeaders, json: { success: true, identityStatus: 'APPROVED', emailDelivery: { sent: false } } });
+  });
+  let resendRequests = 0;
+  await page.route('**/auth/v1/resend', async (route) => {
+    if (route.request().method() === 'OPTIONS') { await route.fulfill({ status: 204, headers: corsHeaders }); return; }
+    resendRequests++;
+    await route.fulfill({ headers: corsHeaders, json: {} });
+  });
+  await security(page);
+  await fillLocation(page);
+  await consent(page);
+  await page.getByRole('button', { name: 'Start Didit Verification' }).click();
+  await expect(page.getByTestId('didit-session-panel')).toBeVisible();
+  await page.goto('/?check_verification=true#login');
+  await expect(page.getByText(/confirmation email could not be requested/i)).toBeVisible();
+  await page.getByRole('button', { name: 'Resend verification email' }).click();
+  await expect(page.getByText(/Confirmation email requested\. Check your inbox and spam folder\./)).toBeVisible();
+  expect(resendRequests).toBe(1);
+});
+
 test('a declined Didit return does not create an account', async ({ page }) => {
   let completions = 0;
   await page.route('**/functions/v1/create-didit-session', async (route) => {

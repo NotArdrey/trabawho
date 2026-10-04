@@ -5,9 +5,9 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
   AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { refundStatusLabels, useBookingRefunds } from "@/features/bookings";
 
-export function AdminRefundDecision({ bookingId, caseId, paidAmount, closed, incomplete, requestedAt, onSaved }: {
+export function AdminRefundDecision({ bookingId, caseId, paidAmount, closed, incomplete, requestedAt, onSaved, noShowBlockedReason }: {
   bookingId: string; caseId: string; paidAmount: number; closed: boolean; incomplete: boolean;
-  requestedAt?: string | null; onSaved: () => void;
+  requestedAt?: string | null; onSaved: () => void; noShowBlockedReason?: string;
 }) {
   const flow = useBookingRefunds(bookingId, caseId, onSaved);
   const availableAmount = Math.max(0, paidAmount - flow.refunds.filter((refund) => refund.status !== "succeeded").reduce((sum, refund) => sum + refund.amount, 0));
@@ -21,7 +21,8 @@ export function AdminRefundDecision({ bookingId, caseId, paidAmount, closed, inc
     {!closed && availableAmount > 0 && !flow.loading && <>
       <p>Refund all verified booking payments: <strong>PHP {availableAmount.toLocaleString("en-PH")}</strong>, including the collected platform fee. Funds return to the original payment method.</p>
       <label className="grid gap-1 font-medium">Refund approval reason<textarea className="min-h-24 rounded-md border bg-background p-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" value={reason} disabled={flow.pending} onChange={(event) => setReason(event.target.value)} placeholder="Explain the evidence and decision (at least 20 characters)" /></label>
-      <Button type="button" variant="destructive" className="w-fit" disabled={incomplete || Boolean(flow.error) || flow.pending || reason.trim().length < 20} onClick={() => setConfirming(true)}>Approve full refund</Button>
+      {noShowBlockedReason && <p className="text-sm text-amber-800 dark:text-amber-200">{noShowBlockedReason}</p>}
+      <Button type="button" variant="destructive" className="w-fit" disabled={incomplete || Boolean(noShowBlockedReason) || Boolean(flow.error) || flow.pending || reason.trim().length < 20} onClick={() => setConfirming(true)}>Approve full refund</Button>
     </>}
     {!flow.loading && !paidAmount && !flow.refunds.length && <p>No verified payments are available to refund.</p>}
     {(flow.error || flow.refunds.some((refund) => refund.status !== "succeeded")) && <Button type="button" variant="outline" disabled={flow.pending} className="w-fit" onClick={() => { void flow.run("check"); }}>Check refund status</Button>}

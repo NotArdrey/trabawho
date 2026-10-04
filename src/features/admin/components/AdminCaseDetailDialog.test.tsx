@@ -9,12 +9,15 @@ vi.mock("@/features/admin/services/adminSupportService", () => ({
 }));
 
 vi.mock("./AdminRefundDecision", () => ({ AdminRefundDecision: () => null }));
+vi.mock("./AdminReplacementProposal", () => ({ AdminReplacementProposal: () => null }));
+vi.mock("@/features/bookings/components/CaseConversation", () => ({ CaseConversation: () => null }));
+vi.mock("@/features/bookings/components/CaseReviewPanel", () => ({ CaseReviewPanel: () => null }));
 
 const item = {
   id: "case-1", booking_id: "booking-1", reporter_id: "client-1",
   case_type: "provider_no_show", reason: "Provider did not arrive at our scheduled appointment.",
   policy_route: "support_review", policy_reason: null, storage_path: null,
-  status: "under_review", created_at: "2026-10-02T08:00:00Z",
+  status: "under_review", resolution_status: "reviewing", created_at: "2026-10-02T08:00:00Z",
 } as SupportCase;
 
 const detail = {
@@ -25,8 +28,10 @@ const detail = {
     { user_id: "provider-1", full_name: "Demo Provider", email: "provider@example.test" }],
   service: { id: 44, title: "Computer repair" },
   payments: [{ id: "payment-1", purpose: "initial", status: "paid", amount: 495,
-    currency: "PHP", created_at: "2026-10-02T07:00:00Z", paid_at: "2026-10-02T07:05:00Z" }],
-  audit: [], caseActions: [], adminActions: [], delivery: [], unavailable: [],
+    currency: "PHP", payment_id: "pay_test_1", environment: "test", created_at: "2026-10-02T07:00:00Z", paid_at: "2026-10-02T07:05:00Z" }],
+  providerEvents: [{ event_id: "evt-1", event_type: "checkout_session.payment.paid", payment_attempt_id: "payment-1",
+    livemode: false, status: "processed", processed_at: "2026-10-02T07:05:00Z" }],
+  audit: [], caseActions: [], adminActions: [], delivery: [], caseMessages: [], unavailable: [],
 } as Awaited<ReturnType<typeof getSupportCaseDetail>>;
 
 describe("AdminCaseDetailDialog", () => {
@@ -87,7 +92,7 @@ describe("support follow-up save recovery", () => {
       operation_id: "op-1", created_at: "2026-10-02T14:18:00Z" });
     const onSaved = vi.fn();
     render(<AdminCaseDetailDialog item={item} onClose={vi.fn()} onSaved={onSaved} />);
-    await screen.findByRole("heading", { name: "Record a next step" });
+    await screen.findByRole("heading", { name: "Private admin note" });
     fireEvent.change(screen.getByRole("textbox", { name: "Reason and next step" }), {
       target: { value: "Please provide the booking attendance evidence." },
     });

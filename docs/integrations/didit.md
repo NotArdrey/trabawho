@@ -41,6 +41,75 @@ nodes must not override an overall decline or review, for example an AML warning
 V3 reports use plural arrays such as `id_verifications`, `liveness_checks`, and
 `face_matches`.
 
+## Planned registration redesign (not implemented)
+
+The current flow above remains deployed behavior. The next developer should
+replace it with one base-account journey, then role-specific marketplace setup:
+
+1. **Create the base account.** Collect email, password, Terms and Conditions
+   agreement, and only the information needed to start an account. Do not ask
+   every registrant to choose an ID type, type a legal name, or provide a full
+   service address. Do not preselect a consequential account role. Everyone may
+   book services; "Offer services" starts a separate provider setup before a gig
+   can be published. A role-intent choice may route the user to that setup, but
+   it must not be treated as proof of identity.
+2. **Confirm the email before paid/hosted identity work.** Provide a dedicated
+   confirmation state with resend, change-email, expiry, and delivery-error
+   recovery. Verify real inbox receipt and callback handling on the linked test
+   project before making this the first gate; SMTP configuration or an accepted
+   send request alone is not proof of delivery. Supabase supports signup
+   confirmation and explicit [resend](https://supabase.com/docs/reference/javascript/auth-resend).
+   Decide whether the UI uses a code or link, then test that exact template and
+   return path. A confirmed email must not bypass the identity gate.
+3. **Complete identity verification.** Explain the ID/selfie steps and obtain
+   identity consent immediately before redirecting to the configured Didit
+   workflow. Didit handles supported-document selection and capture. Treat the
+   top-level provider decision, not a browser callback or one approved node, as
+   authoritative. Preserve a clearly labeled manual-review fallback when the
+   configured workflow cannot verify a document. Do not request another ID
+   upload from someone who completed the Didit route.
+4. **Confirm the ID-derived legal name.** Extract the complete legal name and
+   document type from Didit's server-fetched report, retaining the original full
+   name rather than requiring an unreliable first/middle/last split. Display
+   "Name on your verified ID" for confirmation. If extraction is absent,
+   ambiguous, or disputed, hold access for human review and provide a correction
+   request; a user's edited value must never silently become verified. Keep the
+   verified source, any requested correction, and the review decision distinct
+   and auditable. Pre-entered names are not a second proof of identity; collect
+   one only if a separate product requirement needs it before verification.
+5. **Finish marketplace setup after the gates.** Ask a client for the precise
+   service address when creating a booking. Ask a prospective provider for a
+   service area and gig details during provider setup. Keep address purpose and
+   copy role-appropriate; do not describe a service address as an ID check.
+
+Access remains blocked until **email is confirmed and identity is approved**
+(Didit approval or approved manual review). Provider publication additionally
+requires provider setup. Show distinct email-pending, Didit-in-progress,
+identity-review, declined, and ready states, each with a truthful next action.
+Returning from Didit must resume the same server-linked signup safely across
+devices and retries; duplicate callbacks must not create duplicate accounts.
+
+This is a backend and migration change, not a field-hiding exercise. In
+particular, remove the signup password from browser-persisted session state,
+replace the temporary email/document-type assumptions with an account-linked
+verification session, move full-address validation to its point of use, map
+Didit's extracted name into the protected profile name, and keep all existing
+email/identity access checks effective throughout the transition. Today
+`AuthPage.jsx` defaults to `id_card`, `identityRegistrationService.ts` saves a
+signup state containing the password in `sessionStorage`, and
+`identityDomain.ts` can use the email prefix as `full_name` even when Didit has
+extracted a legal name. Review existing accounts before correcting those names;
+never silently overwrite an identity-reviewed record.
+
+Before release, test confirmed-email and failed-delivery recovery; Didit
+approved, in-review, declined, missing-name, correction, duplicate, abandoned,
+and cross-device returns; manual fallback; provider setup and booking-address
+deferral; and denial of dashboard or gig-publication access while any gate is
+pending. Run `npm run check`, the registration/identity Playwright journeys at
+the documented widths, backend identity tests, and a real inbox plus camera
+rehearsal. No migration, provider configuration, or email settings change is
+authorized by this documentation entry.
+
 ## Admin review
 
 Open **Admin portal → Identity reviews**. Search by email, filter status, and page
@@ -59,6 +128,19 @@ Approval sends Supabase signup confirmation when the email is unconfirmed.
 Delivery failure remains visible and can be retried. SMTP acceptance does not prove
 inbox delivery. Explicit resend has a one-minute cooldown and a delivery lease;
 retrying approval does not send duplicate mail. Rejection keeps access blocked and requires new valid evidence.
+
+For Didit-approved signup, account creation and the Supabase confirmation request
+are separate steps. A failed request must be shown with a resend path; an accepted
+request still needs Auth and SMTP-provider delivery checks if no message arrives.
+The current registration form does not collect a legal name before Didit and
+asks users to preselect a Didit ID type even though the hosted workflow provides
+that choice. The planned redesign above replaces both assumptions; do not
+represent the current flow as a user-confirmed identity name match.
+Account and profile screens now display the name without a self-service edit path.
+The `20261005111000` migration additionally rejects direct browser updates to
+name columns for identity-registered profiles; service-role identity review can
+still correct a record. A formal name-correction request and re-verification
+workflow is not built, so support must review any correction manually.
 Public retries cannot change a confirmed account's password; those accounts need
 support-assisted verification retry. Unconfirmed retries retain account restrictions.
 Restoring account access does not approve identity. TrabaWho's decision controls

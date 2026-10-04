@@ -31,6 +31,7 @@ import {
 import BrandWordmark from '@/shared/components/BrandWordmark';
 import PasswordField from '../components/PasswordField';
 import { RegistrationForm } from '../registration/RegistrationForm';
+import { canResendRegistrationEmail, registrationEmailStatus } from '../domain/registrationEmailStatus';
 
 const EMPTY_AUTH_FORM = {
   email: '',
@@ -205,9 +206,7 @@ function AuthPage({
             password: '',
             confirmPassword: '',
           }));
-          setLoginStatusMessage(isPending
-            ? 'Your account was created, but access is held until identity review is approved.'
-            : 'Your identity was approved. Confirm your email, then log in.');
+          setLoginStatusMessage(registrationEmailStatus(result, diditSession.status));
           logRegistrationDebug('auth_page:didit_return_finished', {
             result,
             diditStatus: diditSession.status,
@@ -348,9 +347,7 @@ function AuthPage({
       if (diditSession.status === 'APPROVED' || diditSession.status === 'PENDING_REVIEW') {
         const result = await finishDiditIdentitySignup(identitySession, diditSession.status);
         const isPending = result.identityStatus === 'PENDING_REVIEW' || diditSession.status === 'PENDING_REVIEW';
-        pendingLoginStatusRef.current = isPending
-          ? 'Your account was created, but access is held until identity review is approved.'
-          : 'Your identity was approved. Confirm your email, then log in.';
+        pendingLoginStatusRef.current = registrationEmailStatus(result, diditSession.status);
         setFormData((current) => ({
           ...current,
           email: identitySession.email || current.email,
@@ -493,6 +490,8 @@ function AuthPage({
     try {
       setIsResendingVerification(true);
       await onResendVerification?.(email);
+      setSubmitError('');
+      setLoginStatusMessage('Confirmation email requested. Check your inbox and spam folder.');
     } catch (error) {
       setSubmitError(error?.message || 'Unable to resend verification email.');
     } finally {
@@ -507,7 +506,7 @@ function AuthPage({
     handleModeChange('login');
   };
 
-  const shouldShowResend = isLoginMode && /verify your email|email not verified|email not confirmed/i.test(submitError || '');
+  const shouldShowResend = canResendRegistrationEmail(mode, submitError, loginStatusMessage);
 
   return (
     <main className="auth-page">

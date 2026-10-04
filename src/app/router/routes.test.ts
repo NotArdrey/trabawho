@@ -16,6 +16,7 @@ describe("application route policy", () => {
     expect(viewFromPathname("/bookings")).toBe("my-bookings");
     expect(viewFromPathname("/worker/bookings")).toBe("worker-bookings");
     expect(viewFromPathname("/support-cases")).toBe("support-cases");
+    expect(viewFromPathname("/admin/support-cases/ef8283c5-8f25-4560-b76a-4b229f4e85a8")).toBe("admin-dashboard");
     expect(pathForView("support-cases")).toBe("/support-cases");
     expect(viewFromPathname("/messages/booking-1")).toBe("chat");
     expect(getMessageBookingId("/messages/booking-1")).toBe("booking-1");
@@ -24,6 +25,8 @@ describe("application route policy", () => {
   it("applies role-specific protected route access", () => {
     expect(canAccessPath("/admin", "admin")).toBe(true);
     expect(canAccessPath("/admin", "client")).toBe(false);
+    expect(canAccessPath("/admin/support-cases/ef8283c5-8f25-4560-b76a-4b229f4e85a8", "admin")).toBe(true);
+    expect(canAccessPath("/admin/support-cases/ef8283c5-8f25-4560-b76a-4b229f4e85a8", "client")).toBe(false);
     expect(canAccessPath("/worker/dashboard", "worker")).toBe(true);
     expect(canAccessPath("/worker/dashboard", "client")).toBe(false);
     expect(canAccessPath("/worker/bookings", "worker")).toBe(true);

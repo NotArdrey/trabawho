@@ -10,6 +10,7 @@ export interface ParticipantSupportCase {
   serviceTitle: string;
   counterpartName: string;
   viewerRole: "client" | "provider";
+  unreadCount: number;
 }
 
 export async function listParticipantSupportCases(): Promise<ParticipantSupportCase[]> {
@@ -38,6 +39,11 @@ export async function listParticipantSupportCases(): Promise<ParticipantSupportC
     }
   }
   if (!reports.length) return [];
+  const unreadResult = await supabase.from("booking_case_notifications").select("case_id")
+    .in("case_id", reports.map((report) => report.id)).eq("recipient_id", userId).is("read_at", null);
+  if (unreadResult.error && unreadResult.error.code !== "PGRST205") throw new Error("Your case alerts could not be loaded. Try refreshing.");
+  const unreadByCase = new Map<string, number>();
+  for (const notice of unreadResult.data || []) unreadByCase.set(notice.case_id, (unreadByCase.get(notice.case_id) || 0) + 1);
   const relevantBookings = bookings.filter((booking) => reports.some((report) => report.booking_id === booking.id));
   const titles = new Map<number, string>();
   const names = new Map<string, string>();
@@ -54,7 +60,7 @@ export async function listParticipantSupportCases(): Promise<ParticipantSupportC
     const booking = bookings.find((link) => link.id === report.booking_id);
     if (!booking) return [];
     const viewerRole = booking.buyer_id === userId ? "client" : "provider";
-    return [{ report, viewerRole, serviceTitle: titles.get(booking.service_id) || "Booked service",
+    return [{ report, viewerRole, unreadCount: unreadByCase.get(report.id) || 0, serviceTitle: titles.get(booking.service_id) || "Booked service",
       counterpartName: names.get(viewerRole === "client" ? booking.seller_id : booking.buyer_id) || (viewerRole === "client" ? "Provider" : "Client") }];
   });
 }

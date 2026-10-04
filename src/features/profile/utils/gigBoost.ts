@@ -1,4 +1,5 @@
 export interface BoostDraft { serviceId: number; days: number; amount: number; serviceTitle: string }
+export const BOOST_DURATION_OPTIONS = [3, 7, 14, 30] as const;
 
 export function parseBoostDailyRate(value?: string): number {
   const text = value?.trim() || "50";
@@ -18,8 +19,8 @@ export const calculateBoostTotal = (days: number, dailyRate: number): number => 
 export function validateBoostSettings(daysText: string): { days?: string } {
   const days = Number(daysText);
   return {
-    ...(!/^\d+$/.test(daysText.trim()) || !Number.isInteger(days) || days < 1 || days > 365
-      ? { days: "Enter whole days between 1 and 365." } : {}),
+    ...(!BOOST_DURATION_OPTIONS.some((option) => option === days) || !/^\d+$/.test(daysText)
+      ? { days: "Choose a 3, 7, 14, or 30-day boost." } : {}),
   };
 }
 

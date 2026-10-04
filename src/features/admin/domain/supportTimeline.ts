@@ -14,7 +14,9 @@ export function supportTimeline(detail: Pick<SupportCaseDetail, "audit" | "caseA
     // retaining audit entries when their corresponding action is unavailable.
     ...detail.audit.filter((entry) => entry.event_type !== "admin_case_followup"
       || !entry.idempotency_key || !adminOperations.has(entry.idempotency_key))
-      .map((entry) => ({ id: `audit-${entry.id}`, at: entry.created_at, label: entry.event_type.replaceAll("_", " "), note: entry.reason })),
+      .map((entry) => ({ id: `audit-${entry.id}`, at: entry.created_at,
+        label: entry.event_type.startsWith("showcase_") ? "Demo seed · not payment evidence" : entry.event_type.replaceAll("_", " "),
+        note: entry.event_type.startsWith("showcase_") ? "Seeded demonstration history; verify provider payment attempts separately." : entry.reason })),
     ...detail.caseActions.map((entry) => ({ id: `case-${entry.id}`, at: entry.created_at, label: entry.action.replaceAll("_", " "), note: entry.note })),
     ...detail.adminActions.map((entry) => ({ id: `admin-${entry.id}`, at: entry.created_at, label: supportActionLabels[entry.action], note: entry.reason })),
   ].sort((a, b) => a.at.localeCompare(b.at));

@@ -13,7 +13,7 @@ import {
 } from "@/components/ui/dialog";
 
 interface BoostActivationDialogProps {
-  budget: number;
+  totalPrice: number;
   days: number;
   error?: string;
   isOpen: boolean;
@@ -25,7 +25,7 @@ interface BoostActivationDialogProps {
 
 const formatPhp = (amount: number) => `PHP ${amount.toLocaleString("en-PH", { maximumFractionDigits: 2 })}`;
 
-export function BoostActivationDialog({ budget, days, error, isOpen, isSaving, onCancel, onConfirm, serviceTitle }: BoostActivationDialogProps) {
+export function BoostActivationDialog({ totalPrice, days, error, isOpen, isSaving, onCancel, onConfirm, serviceTitle }: BoostActivationDialogProps) {
   const [agreed, setAgreed] = useState(false);
   return (
     <Dialog open={isOpen} onOpenChange={(open) => { if (!open && !isSaving) onCancel(); }}>
@@ -40,10 +40,10 @@ export function BoostActivationDialog({ budget, days, error, isOpen, isSaving, o
           <dl className="grid gap-3 rounded-xl bg-muted/45 p-4 text-sm">
             <div><dt className="text-muted-foreground">Gig</dt><dd className="mt-1 font-bold text-foreground">{serviceTitle}</dd></div>
             <div className="flex justify-between gap-4 border-t pt-3"><dt className="text-muted-foreground">Duration</dt><dd className="font-semibold text-foreground">{days} {days === 1 ? "day" : "days"}</dd></div>
-            <div className="flex justify-between gap-4 border-t pt-3"><dt className="text-muted-foreground">Daily rate</dt><dd className="font-semibold text-foreground">{formatPhp(budget / days)} per day</dd></div>
-            <div className="flex justify-between gap-4 border-t pt-3"><dt className="text-muted-foreground">Total due</dt><dd className="text-lg font-extrabold text-primary">{formatPhp(budget)}</dd></div>
+            <div className="flex justify-between gap-4 border-t pt-3"><dt className="text-muted-foreground">Price per day</dt><dd className="font-semibold text-foreground">{formatPhp(totalPrice / days)}</dd></div>
+            <div className="flex justify-between gap-4 border-t pt-3"><dt className="text-muted-foreground">Total due</dt><dd className="text-lg font-extrabold text-primary">{formatPhp(totalPrice)}</dd></div>
           </dl>
-          <p className="flex gap-2 rounded-xl border border-primary/20 bg-primary/5 p-4 text-sm leading-6 text-foreground"><ShieldCheck className="mt-0.5 size-5 shrink-0 text-primary" aria-hidden="true" /><span>The full budget covers all {days} days, starting after verified payment. Active boosts receive priority in recommendations; inquiries, bookings, and earnings are not guaranteed.</span></p>
+          <p className="flex gap-2 rounded-xl border border-primary/20 bg-primary/5 p-4 text-sm leading-6 text-foreground"><ShieldCheck className="mt-0.5 size-5 shrink-0 text-primary" aria-hidden="true" /><span>The price covers all {days} days, starting after verified payment. Active boosts receive priority in recommendations; inquiries, bookings, and earnings are not guaranteed.</span></p>
           <label htmlFor="boost-terms" className="flex min-h-11 cursor-pointer items-center gap-3 text-sm"><Checkbox id="boost-terms" checked={agreed} onChange={(event) => setAgreed(event.target.checked)} disabled={isSaving} />I agree to these boost settings and terms.</label>
           {error ? <p className="rounded-lg bg-destructive/10 p-3 text-sm font-medium text-destructive" role="alert">{error}</p> : null}
         </div>

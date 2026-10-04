@@ -23,7 +23,7 @@ afterEach(() => {
 });
 
 describe("AccountPrivacyPanel", () => {
-  it("keeps private settings collapsed until requested and saves existing personal information", async () => {
+  it("locks account names while saving contact and location only", async () => {
     const user = userEvent.setup();
     const onUpdateProfile = vi.fn().mockResolvedValue(undefined);
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: true, json: () => Promise.resolve([]) }));
@@ -33,14 +33,16 @@ describe("AccountPrivacyPanel", () => {
     expect(screen.queryByLabelText("First name")).not.toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: /Account & privacy/i }));
     expect(screen.getByLabelText("First name")).toHaveValue("Jose");
+    expect(screen.getByLabelText("First name")).toHaveAttribute("readonly");
+    expect(screen.getByLabelText("Last name")).toHaveAttribute("readonly");
 
-    await user.click(screen.getByRole("button", { name: "Save personal information" }));
+    await user.click(screen.getByRole("button", { name: "Save contact and location" }));
     await waitFor(() => expect(onUpdateProfile).toHaveBeenCalledWith(expect.objectContaining({
-      firstName: "Jose",
-      lastName: "Ramos",
       city: "Baliuag",
       barangay: "San Roque",
     })));
+    expect(onUpdateProfile.mock.calls[0][0]).not.toHaveProperty("firstName");
+    expect(onUpdateProfile.mock.calls[0][0]).not.toHaveProperty("fullName");
   });
 
   it("validates password confirmation and submits a corrected password", async () => {
@@ -65,5 +67,35 @@ describe("AccountPrivacyPanel", () => {
       currentPassword: "old-password",
       newPassword: "new-password",
     }));
+    expect(screen.getByLabelText("Current password")).toHaveValue("");
+  });
+
+  it("reads an autofilled current password from the submitted form", async () => {
+    const user = userEvent.setup();
+    const onUpdatePassword = vi.fn().mockResolvedValue(undefined);
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: true, json: () => Promise.resolve([]) }));
+    render(<AccountPrivacyPanel sellerProfile={profile} onUpdatePassword={onUpdatePassword} />);
+    await user.click(screen.getByRole("button", { name: /Account & privacy/i }));
+    const current = screen.getByLabelText("Current password");
+    if (!(current instanceof HTMLInputElement)) throw new Error("Expected password input");
+    current.value = "autofilled-password";
+    await user.type(screen.getByLabelText("New password"), "new-password");
+    await user.type(screen.getByLabelText("Confirm new password"), "new-password");
+    await user.click(screen.getByRole("button", { name: "Update password" }));
+    await waitFor(() => expect(onUpdatePassword).toHaveBeenCalledWith({ currentPassword: "autofilled-password", newPassword: "new-password" }));
+  });
+
+  it("preserves entered passwords when the update fails", async () => {
+    const user = userEvent.setup();
+    const onUpdatePassword = vi.fn().mockRejectedValue(new Error("Current password is incorrect."));
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: true, json: () => Promise.resolve([]) }));
+    render(<AccountPrivacyPanel sellerProfile={profile} onUpdatePassword={onUpdatePassword} />);
+    await user.click(screen.getByRole("button", { name: /Account & privacy/i }));
+    await user.type(screen.getByLabelText("Current password"), "wrong-password");
+    await user.type(screen.getByLabelText("New password"), "new-password");
+    await user.type(screen.getByLabelText("Confirm new password"), "new-password");
+    await user.click(screen.getByRole("button", { name: "Update password" }));
+    await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent("Current password is incorrect."));
+    expect(screen.getByLabelText("New password")).toHaveValue("new-password");
   });
 });

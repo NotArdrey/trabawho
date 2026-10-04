@@ -54,6 +54,54 @@ deployment steps, and the exact test commands are in the
 
 ## Case-handling experience
 
+### Actionable provider no-show workflow: demo/test schema deployed, rehearsal pending
+
+Migrations `20261005112000_actionable_support_cases.sql`,
+`20261005112100_case_replacement_and_refund.sql`, and
+`20261005112200_case_remedy_events_and_review.sql`, plus the corresponding
+client code, are in the working tree. The three migrations were applied to the
+confirmed demo/test project `dczhfpcfqlygpbqjctwf` on October 3, 2026;
+the unrelated pending email and identity migrations were not applied.
+Because those two have earlier timestamps, a later full-repository `db push`
+will report them as missing before the latest remote migration; review them
+separately rather than repairing migration history or assuming they deployed.
+Together they add admin ownership, a recipient-scoped case conversation,
+private photo access, persistent in-app case alerts, a 24-hour provider response
+target, a mutually accepted case-linked replacement visit, and a controlled
+further-review request. The original appointment stays in history. Starting
+replacement work still requires full verified payment and the accepted visit's
+time; provider notes/evidence and client confirmation are required before the
+case and booking complete. Admin no-show refund approval additionally requires
+a provider response or elapsed review target and processed PayMongo **test**
+payment events for every refundable attempt. The existing provider-backed
+refund processor still decides whether a refund succeeded.
+
+The 24-hour escalation is swept when the visible admin queue refreshes; it is
+not a guaranteed background deadline until a hosted scheduler is configured.
+Case messages and alerts are saved transactionally, so a failed save cannot
+claim delivery. Email remains secondary and unverified; the configured SMTP
+activation previously returned HTTP 403. The participant page now has a
+dedicated case-detail view, with the reported issue, next step, conversation,
+visit, refund progress, and review request separated. Existing internal admin
+follow-ups remain private notes and are labelled accordingly. Seeded showcase
+timeline entries are explicitly labelled as demonstration history, never as
+provider payment evidence.
+
+Local `npm run check` passed (401 tests), as did the existing admin/refund
+Playwright journeys (13 tests) and the new case-conversation journey at 390,
+768, 1024, 1280, and 1440px (5 tests). After deployment, the live admin
+support journey passed at all five widths (6 tests). `npm run check:schema`
+now reports zero schema mismatches; five unrelated or privileged tables remain
+unverified by its anonymous read-only checks. Signed-in admin reads of case
+messages, alerts, and visits succeeded; claiming an unassigned demo no-show
+case succeeded. A signed-in client received `42501` when attempting the same
+admin action and could read the case tables. This does not yet prove targeted
+message visibility, private-image access, concurrency, or full remedy rules.
+Rehearse client, provider, and admin actions on a genuinely paid test booking.
+No live replacement visit, email receipt, or PayMongo sandbox refund has been
+verified. Payouts, partial refunds, other dispute remedies, and production
+policy remain out of scope.
+
 Clients and workers can open **Support cases** from their desktop sidebar or
 mobile navigation at `/support-cases`. This participant view lists reports for
 their own bookings in either role, including closed cases. Each report links to
@@ -96,9 +144,105 @@ provider still sees zero booking and payment rows. The case detail browser
 journey passes at the five supported widths. This does not grant admin write
 access to booking or payment state.
 
-Use one queue with status and owner, then a case detail with a chronological, source-labelled timeline. Admins need clear **review**, **request evidence**, **contact parties**, and **resolve/escalate** actions, each with a reason and a visible result. Do not expose raw card data or private files beyond the assigned case. Prevent duplicate submissions and require server authorization and immutable history for exceptional actions.
+### In progress: focused support-case workspace and evidence review
 
-As product-design references, [Airbnb's Resolution Center](https://www.airbnb.com/help/article/767) exposes request status and escalation when parties do not agree, while its [issue guidance](https://www.airbnb.com/help/article/248) emphasizes documenting the problem and contacting the other party. TrabaWho should adopt the useful patterns, **not** Airbnb's deadlines, protections, or legal policy. Those require TrabaWho's own product and legal decisions.
+**Local frontend slice implemented; server policy and live rehearsal pending.**
+The admin queue now opens a bookmarkable `/admin/support-cases/:caseId` page.
+It loads the case by ID after refresh, preserves queue search/status in the
+return URL, offers one **Open case** action per card, and separates Summary,
+Evidence, Conversation, and Resolution. History and technical references are
+secondary details. Report, delivery, and case-message images now use a shared
+private in-app preview with signed-link loading, expiry/error states, and retry
+for admins and participants. These source changes have not been claimed as a
+deployed or fully rehearsed dispute workflow. The older dialog component
+remains in the codebase temporarily but is no longer the queue's entry point.
+Local `npm run check` passed (407 tests), as did the admin support and case
+conversation Playwright journeys (11 tests across the documented widths).
+These checks do not prove a live private-image preview, admin takeover, or a
+PayMongo sandbox refund.
+
+**Target behavior and work still to verify:**
+
+- Replace the admin case dialog with a dedicated, bookmarkable
+  `/admin/support-cases/:caseId` page and a clear return to
+  `/admin/support-cases`. Preserve queue search and status filters in the URL.
+  Load a case by its ID, not only from the currently loaded queue, so direct
+  links and refresh work. Show a safe unavailable/permission state for an
+  unknown or unauthorized case.
+- Give queue cards one consistently placed **Open case** action. Remove the
+  separate bottom **View evidence** action; evidence belongs in the case.
+  Show one plain-language case status, owner, next actor, and response target
+  rather than repeating overlapping status labels.
+- Organize the case into **Summary**, **Evidence**, **Conversation**, and
+  **Resolution** sections. Keep a compact case header and a contextual
+  **Next action** area visible without making every record one long scroll.
+  Summary holds the report, appointment, people, and payment-truth snapshot;
+  Evidence groups report, provider, delivery, and message attachments;
+  Conversation separates participant-visible updates from private admin notes;
+  Resolution presents the available replacement/refund decision and its
+  prerequisites. Put source-labelled history and technical IDs in a clearly
+  labelled secondary disclosure. Show one primary action for the current
+  state. On mobile, present one section at a time with an accessible section
+  selector and an easy-to-reach next action. Keep page scrolling visible.
+- Replace new-tab image opening in **both** admin and participant support
+  views with one private, in-app preview dialog. Fetch a short-lived signed
+  image URL on open, show the evidence source and timestamp, and handle
+  loading, access denial, expiry, broken images, and retry. Trap and restore
+  keyboard focus, support Escape, and fit images within small viewports without
+  hiding important controls. A download is an explicit secondary action, not
+  an automatic redirect.
+- Make ownership meaningful: an unassigned case offers **Take ownership** in
+  the Next action area, not as an unexplained button above the report. Require
+  the assigned admin for outbound case updates, private follow-ups, replacement
+  proposals, refund approval, and review decisions through server-side checks.
+  Another admin may take over only with a reason; record an immutable event,
+  notify the prior owner in-app, and reject stale concurrent owner changes.
+  Preserve unsent drafts or warn before leaving the case.
+- Clarify the existing PayMongo **test-mode** refund path. It already submits
+  approved refunds through the provider API; this overhaul does not replace
+  it or enable live-money refunds. Distinguish **payment verified**, **refund
+  approved**, **submitted to PayMongo**, and provider-reported **pending**,
+  **processing**, **succeeded**, or **failed**. Show the verified amount and
+  reason before confirmation. Seeded timeline history is never payment proof;
+  when provider payment evidence is missing, show **Payment verification
+  needed** and block approval. Do not say money was returned merely because an
+  admin approved the request. See [PayMongo refunds](https://docs.paymongo.com/docs/payment-acceptance-refunds)
+  and [refund statuses](https://docs.paymongo.com/reference/refund-resource).
+
+The first page slice hides case actions from a non-owner, but that is **not**
+authorization. Existing security-definer RPCs can still assign an unclaimed
+case while performing an action. Migration
+`20261005112300_case_owner_enforcement.sql` is written locally to guard admin
+messages, notes, replacement proposals, refund approvals, review decisions,
+and implicit ownership changes; it also adds reasoned, audited takeover and
+limits participant reads of internal support audit notes. It is **not applied
+or live-verified**. Direct RPC tests for wrong owner, unclaimed cases, stale
+takeovers, closed-case review, and prior-owner notification must pass before
+the UI can expose takeover or claim that owner enforcement is active. Drafts
+survive switching case sections, but leaving the page with unsent text still
+needs a warning. Do not apply the migration by itself: the admin page still
+needs the takeover form and an explicit ownership route for closed cases with
+pending further-review requests.
+
+Use established marketplace flows as **design references, not TrabaWho
+policies**: [Airbnb's issue guidance](https://www.airbnb.com/help/article/248)
+emphasizes documentation, communication, and escalation;
+[Taskrabbit's communication](https://support.taskrabbit.com/hc/en-us/articles/46260405727771-Communication-After-Task-Invite-Policy)
+and [rescheduling](https://support.taskrabbit.com/hc/en-us/articles/46260435128091-Schedule-Availability-Reschedule-Policy)
+guidance supports in-app records and mutual agreement; and
+[Upwork's work review flow](https://support.upwork.com/hc/en-us/articles/17974824831507--Review-and-pay-for-fixed-price-contracts-and-milestones)
+separates submission, review, and decisions. Do **not** copy their deadlines,
+escrow arrangement, liability findings, or refund policy.
+
+Before considering this planned overhaul complete, run `npm run check` and the
+relevant admin/participant Playwright journeys at 390, 768, 1024, 1280, and
+1440px. Cover direct links, Back/Forward, queue-filter preservation, focus and
+keyboard access, missing/unauthorized cases, draft loss, private evidence,
+expired preview URLs, non-owner and wrong-role rejection, takeover races,
+refund status/failure, and one primary action per state. Rehearse a genuinely
+paid PayMongo test booking through a provider-status check; record any step
+that cannot be verified. Production refunds, payouts, partial-refund policy,
+and other dispute remedies remain separate work.
 
 ## Edge-case matrix
 
@@ -135,3 +279,21 @@ are deployed to the `.env` TrabaWho demo/test project. Participant reads, privat
 column protection, approval role checks, status checks, and admin support browser
 journeys passed after deployment. Actual PayMongo sandbox refund issuance remains
 untested. See [PayMongo rollout and verification](../integrations/paymongo.md).
+
+## Participant case alerts and navigation: local changes
+
+The notification bell now reads booking-case notices alongside booking and chat
+updates. Case notices link to the exact participant case conversation; booking
+updates filter to the affected booking, and chat updates open the matching
+thread. Opening a case marks its notices read through the existing server RPC.
+The support-case list keeps its content visible during background refreshes
+and no longer inserts a recurring status line above the filters.
+
+Migration `20261005112400_case_open_participant_notifications.sql` is **local
+only, not deployed or live-verified**. It would notify the other booking
+participant when a new case opens; the reporter is not alerted about their own
+report. Existing participant-directed case messages and remedy events already
+write case notices. Private admin notes still do not notify participants. No
+historical notices are backfilled. Apply the migration only to the confirmed
+demo/test project after the pending support migrations and role/RLS checks are
+resolved, then verify client and provider alerts with separate accounts.

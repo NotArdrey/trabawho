@@ -1,6 +1,6 @@
 export function boostCheckoutAmount(days: number, configuredRate?: string): number {
-  if (!Number.isInteger(days) || days < 1 || days > 365) {
-    throw new Error("Enter whole days between 1 and 365.");
+  if (![3, 7, 14, 30].includes(days)) {
+    throw new Error("Choose a 3, 7, 14, or 30-day boost.");
   }
   const text = configuredRate?.trim() || "50";
   const rate = Number(text);

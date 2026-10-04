@@ -23,4 +23,9 @@ describe("support follow-up presentation", () => {
     expect(supportCaseNextStep(item)).toBe("Referred for refund review");
     expect(supportCaseNextStep({ ...item, status: "closed" })).toBe("Case closed");
   });
+  it("does not present a seeded showcase event as verified provider payment", () => {
+    const entries = supportTimeline({ audit: [{ ...data.audit[0], event_type: "showcase_upfront_payment_confirmed" }], caseActions: [], adminActions: [] });
+    expect(entries[0]).toMatchObject({ label: "Demo seed · not payment evidence",
+      note: "Seeded demonstration history; verify provider payment attempts separately." });
+  });
 });

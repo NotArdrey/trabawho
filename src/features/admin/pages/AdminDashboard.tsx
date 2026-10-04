@@ -1,5 +1,6 @@
 import AdminAnalytics from "../components/AdminAnalytics";
 import { useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import AdminIdentityReviews from "@/features/admin/identity/AdminIdentityReviews";
 import { Menu } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -12,6 +13,8 @@ import AdminLogsSection from "../components/AdminLogsSection";
 import AdminCommentsSection from "../components/AdminCommentsSection";
 import AdminSettings from "../components/AdminSettings";
 import AdminSupportCases from "../components/AdminSupportCases";
+import { AdminCasePage } from "./AdminCasePage";
+import { adminCasesPath, getAdminCaseId, paths } from "@/app/router/routes";
 import AccessActionModal from "../components/AccessActionModal";
 import { useAdminAccounts } from "../hooks/useAdminAccounts";
 import type { AdminSection } from "../types";
@@ -20,7 +23,16 @@ interface Props { appTheme?: string; themeMode?: "light" | "dark" | "system"; on
 const labels: Record<AdminSection, string> = { overview: "Overview", analytics: "Analytics", accounts: "Account management", identity: "Identity reviews", logs: "Audit logs", comments: "Reviews", cases: "Support cases", settings: "Settings" };
 
 export default function AdminDashboard({ appTheme = "light", themeMode = "system", onThemeChange, onLogout, onOpenDashboard, onOpenAccountSettings, adminIdentity }: Props) {
-  const [activeSection, setActiveSection] = useState<AdminSection>("overview");
+  const location = useLocation();
+  const navigate = useNavigate();
+  const [selectedSection, setSelectedSection] = useState<AdminSection>("overview");
+  const caseId = getAdminCaseId(location.pathname);
+  const activeSection = location.pathname === adminCasesPath || caseId ? "cases" : selectedSection;
+  const setActiveSection = (section: AdminSection) => {
+    setSelectedSection(section);
+    if (section === "cases") void navigate(adminCasesPath);
+    else if (location.pathname !== paths.admin) void navigate(paths.admin);
+  };
   const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
   const [isLogoutConfirmOpen, setIsLogoutConfirmOpen] = useState(false);
   const state = useAdminAccounts();
@@ -35,7 +47,7 @@ export default function AdminDashboard({ appTheme = "light", themeMode = "system
         {activeSection === "logs" && <AdminLogsSection />}
         {activeSection === "identity" && <AdminIdentityReviews />}
         {activeSection === "comments" && <AdminCommentsSection comments={state.comments} isLoading={state.isCommentsLoading} error={state.commentsError} total={state.reviewTotal} page={state.reviewPage} pageSize={state.reviewPageSize} search={state.reviewQuery} status={state.reviewStatus} rating={state.reviewRating} onSearchChange={state.setReviewQuery} onStatusChange={state.setReviewStatus} onRatingChange={state.setReviewRating} onPageChange={state.setReviewPage} onRetry={() => void state.refreshComments()} onOpenDeleteComment={state.setCommentDeleteTarget} />}
-        {activeSection === "cases" && <AdminSupportCases />}
+        {activeSection === "cases" && (caseId ? <AdminCasePage key={caseId} caseId={caseId} /> : <AdminSupportCases />)}
         {activeSection === "settings" && <AdminSettings appTheme={appTheme} identity={adminIdentity} onOpenAccountSettings={onOpenAccountSettings} onThemeChange={onThemeChange} themeMode={themeMode} />}
       </main>
     </div>

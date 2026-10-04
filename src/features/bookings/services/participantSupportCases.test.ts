@@ -10,13 +10,15 @@ function mockTables(tables: Record<string, Row[]>) {
   function createQuery(table: string) {
     let start = 0;
     let end: number | undefined;
-    let matches: { key: string; values: unknown[] } | undefined;
+    const matches: Array<{ key: string; values: unknown[] }> = [];
     const query = {
       select: vi.fn().mockReturnThis(), or: vi.fn().mockReturnThis(), order: vi.fn().mockReturnThis(),
-      in: vi.fn((key: string, values: unknown[]) => { matches = { key, values }; return query; }),
+      in: vi.fn((key: string, values: unknown[]) => { matches.push({ key, values }); return query; }),
+      eq: vi.fn((key: string, value: unknown) => { matches.push({ key, values: [value] }); return query; }),
+      is: vi.fn((key: string, value: unknown) => { matches.push({ key, values: [value] }); return query; }),
       range: vi.fn((first: number, last: number) => { start = first; end = last + 1; return query; }),
       then: (resolve: (result: { data: Row[]; error: null }) => void) => {
-        const rows = (tables[table] || []).filter((row) => !matches || matches.values.includes(row[matches.key]));
+        const rows = (tables[table] || []).filter((row) => matches.every((match) => match.values.includes(row[match.key])));
         resolve({ data: rows.slice(start, end), error: null });
       },
     };
@@ -49,12 +51,13 @@ describe("participant support cases", () => {
       ],
       services: [{ id: 1, title: "Purchased repair" }, { id: 2, title: "Provided repair" }],
       profiles: [{ user_id: "provider-1", full_name: "Repair Provider" }, { user_id: "client-1", full_name: "Repair Client" }],
+      booking_case_notifications: [{ case_id: "case-1", recipient_id: "member-1", read_at: null }],
     });
     const result = await listParticipantSupportCases();
     expect(queries.find((entry) => entry.table === "bookings")?.query.or)
       .toHaveBeenCalledWith("buyer_id.eq.member-1,seller_id.eq.member-1");
     expect(result).toMatchObject([
-      { report: { id: "case-1", status: "closed" }, viewerRole: "client", counterpartName: "Repair Provider", serviceTitle: "Purchased repair" },
+      { report: { id: "case-1", status: "closed" }, viewerRole: "client", unreadCount: 1, counterpartName: "Repair Provider", serviceTitle: "Purchased repair" },
       { report: { id: "case-2" }, viewerRole: "provider", counterpartName: "Repair Client", serviceTitle: "Provided repair" },
     ]);
   });

@@ -436,7 +436,9 @@ export const sendEmailConfirmation = async (email: string, redirectTo = "") => {
   }
 
   try {
-    const response = await fetch(`${supabaseUrl}/auth/v1/resend`, {
+    const endpoint = new URL("/auth/v1/resend", supabaseUrl);
+    if (redirectTo) endpoint.searchParams.set("redirect_to", redirectTo);
+    const response = await fetch(endpoint, {
       method: "POST",
       headers: {
         apikey: anonKey,
@@ -446,15 +448,15 @@ export const sendEmailConfirmation = async (email: string, redirectTo = "") => {
       body: JSON.stringify({
         type: "signup",
         email: normalizeEmail(email),
-        options: redirectTo ? { email_redirect_to: redirectTo } : undefined,
       }),
     });
 
     if (response.ok) return { sent: true, provider: "supabase_auth" };
-    const errorText = await response.text().catch(() => "");
-    return { sent: false, provider: "supabase_auth", error: errorText.slice(0, 500) };
+    console.error("identity_confirmation_request_rejected", { status: response.status });
+    return { sent: false, provider: "supabase_auth", error: "Supabase Auth rejected the confirmation request." };
   } catch (error) {
-    return { sent: false, provider: "supabase_auth", error: error instanceof Error ? error.message : String(error) };
+    console.error("identity_confirmation_request_failed", { type: error instanceof Error ? error.name : "unknown" });
+    return { sent: false, provider: "supabase_auth", error: "The confirmation request could not reach Supabase Auth." };
   }
 };
 

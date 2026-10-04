@@ -36,6 +36,13 @@ export const paths = {
   admin: "/admin",
 } as const satisfies Record<string, AppRoute | "/messages">;
 
+export const adminCasesPath = "/admin/support-cases";
+export function adminCasePath(caseId: string): string { return `${adminCasesPath}/${encodeURIComponent(caseId)}`; }
+export function getAdminCaseId(pathname: string): string | null {
+  const match = /^\/admin\/support-cases\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/i.exec(pathname);
+  return match ? match[1] : null;
+}
+
 const publicPaths = new Set<string>([
   paths.home,
   paths.services,
@@ -82,6 +89,7 @@ const viewPaths: Record<LegacyView, string> = {
 };
 
 export function viewFromPathname(pathname: string): LegacyView | null {
+  if (pathname === adminCasesPath || getAdminCaseId(pathname)) return "admin-dashboard";
   if (pathname === paths.messages || pathname.startsWith(`${paths.messages}/`)) return "chat";
   return exactViewPaths[pathname] ?? null;
 }
@@ -105,7 +113,7 @@ export function isKnownPath(pathname: string): boolean {
 }
 
 export function canAccessPath(pathname: string, role: UserRole): boolean {
-  if (pathname === paths.admin) return role === "admin";
+  if (pathname === paths.admin || pathname === adminCasesPath || getAdminCaseId(pathname)) return role === "admin";
   if (pathname === paths.workerDashboard || pathname === paths.workerBookings) return role === "worker" || role === "admin";
   return true;
 }

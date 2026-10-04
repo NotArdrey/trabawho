@@ -11,7 +11,7 @@ import { getProfilePhotoUrl, hasUploadedProfilePhoto } from '../../../shared/uti
 import { uploadPortfolioDocument } from '../../../shared/services/authService';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Camera, MapPin, Pencil, ShieldCheck, UserRoundCog } from 'lucide-react';
+import { Camera, LockKeyhole, MapPin, Pencil, ShieldCheck, UserRoundCog } from 'lucide-react';
 
 function Profile({ appTheme = 'light', themeMode = 'system', onThemeChange, currentView, searchQuery, onSearchChange, onLogout, onOpenSellerSetup, onOpenMyBookings, onOpenChatPage, sellerProfile, onOpenMyWork, onOpenProfile, onOpenAccountSettings, onOpenSettings, onOpenDashboard, onOpenBrowseServices, userLocation, onUpdateProfile, onUpdatePassword, onOpenAdminDashboard }) {
   const MAX_PROFILE_PHOTO_BYTES = 2 * 1024 * 1024;
@@ -327,7 +327,7 @@ function Profile({ appTheme = 'light', themeMode = 'system', onThemeChange, curr
             ) : (
               <div className="mt-3 flex max-w-full items-center justify-center gap-1">
                 <h1 className="min-w-0 break-words text-xl font-bold tracking-tight text-foreground sm:text-2xl">{displayName}</h1>
-                <Button type="button" variant="ghost" size="icon" className="text-primary" onClick={() => { setSaveError(''); setIsEditingName(true); }} aria-label="Edit profile name"><Pencil aria-hidden="true" /></Button>
+                <Button type="button" variant="ghost" size="icon" className="text-primary" onClick={() => setIsEditingName(true)} aria-label="Why is my profile name locked?"><LockKeyhole aria-hidden="true" /></Button>
               </div>
             )}
 

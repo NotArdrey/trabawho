@@ -26,4 +26,15 @@ describe("booking activity recovery", () => {
     renderHook(() => useBookingActivity(vi.fn(), false));
     expect(mocks.subscribe).not.toHaveBeenCalled();
   });
+
+  it("uses slower reconciliation for the support-only subscription", async () => {
+    const refresh = vi.fn().mockResolvedValue(undefined);
+    const { unmount } = renderHook(() => useBookingActivity(refresh, true, 60_000, "support"));
+    expect(mocks.subscribe).toHaveBeenCalledWith(expect.any(Function), "support");
+    await act(async () => { await vi.advanceTimersByTimeAsync(15_000); });
+    expect(refresh).not.toHaveBeenCalled();
+    await act(async () => { await vi.advanceTimersByTimeAsync(45_000); });
+    expect(refresh).toHaveBeenCalledOnce();
+    unmount();
+  });
 });

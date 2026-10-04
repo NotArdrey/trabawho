@@ -1,4 +1,4 @@
-import { Bell, BriefcaseBusiness, CalendarClock, CheckCheck, CreditCard, MessageSquareText } from "lucide-react";
+import { Bell, BriefcaseBusiness, CalendarClock, CheckCheck, CreditCard, LifeBuoy, MessageSquareText } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -13,6 +13,8 @@ export interface AppNotification {
   createdAt?: string;
   isRead: boolean;
   type?: string;
+  href?: string;
+  caseId?: string;
 }
 
 interface NotificationCenterProps {
@@ -23,12 +25,13 @@ interface NotificationCenterProps {
   onNotificationClick: (id: string) => void;
   isLoading?: boolean;
   error?: string;
+  actionError?: string;
   onRetry?: () => void;
 }
 
-const notificationIcons = { booking: CalendarClock, message: MessageSquareText, payment: CreditCard, work: BriefcaseBusiness } as const;
+const notificationIcons = { booking: CalendarClock, message: MessageSquareText, payment: CreditCard, work: BriefcaseBusiness, case: LifeBuoy } as const;
 
-function NotificationCenter({ notifications, open, onOpenChange, onMarkAllRead, onNotificationClick, isLoading = false, error = "", onRetry }: NotificationCenterProps) {
+function NotificationCenter({ notifications, open, onOpenChange, onMarkAllRead, onNotificationClick, isLoading = false, error = "", actionError = "", onRetry }: NotificationCenterProps) {
   const unreadCount = notifications.filter((notification) => !notification.isRead).length;
 
   return (
@@ -48,6 +51,7 @@ function NotificationCenter({ notifications, open, onOpenChange, onMarkAllRead, 
           </div>
           {unreadCount > 0 ? <Button type="button" variant="ghost" size="sm" onClick={onMarkAllRead}><CheckCheck aria-hidden="true" />Mark all read</Button> : null}
         </div>
+        {actionError && <p role="alert" className="border-b bg-destructive/10 px-4 py-2 text-sm text-destructive">{actionError}</p>}
 
         {isLoading ? (
           <div className="space-y-2 p-3" aria-label="Loading notifications" aria-live="polite">
@@ -61,9 +65,10 @@ function NotificationCenter({ notifications, open, onOpenChange, onMarkAllRead, 
           <div className="max-h-[min(28rem,70vh)] overflow-y-auto p-2">
             {notifications.map((notification) => {
               const NotificationIcon = notificationIcons[notification.type as keyof typeof notificationIcons] ?? Bell;
+              const isCase = notification.type === "case";
               return (
-                <button key={notification.id} type="button" className={cn("group flex min-h-20 w-full gap-3 rounded-lg border-0 px-3 py-3 text-left transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring", !notification.isRead && "bg-primary/8")} onClick={() => onNotificationClick(notification.id)}>
-                  <span className={cn("mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-lg bg-secondary text-muted-foreground", !notification.isRead && "bg-primary text-primary-foreground")}><NotificationIcon aria-hidden="true" className="size-4" /></span>
+                <button key={notification.id} type="button" className={cn("group flex min-h-20 w-full gap-3 rounded-lg border-0 px-3 py-3 text-left transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring", isCase ? notification.isRead ? "bg-primary/5" : "bg-primary/10" : !notification.isRead && "bg-primary/8")} onClick={() => onNotificationClick(notification.id)}>
+                  <span className={cn("mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-lg bg-secondary text-muted-foreground", isCase && notification.isRead && "bg-primary/10 text-primary", !notification.isRead && "bg-primary text-primary-foreground")}><NotificationIcon aria-hidden="true" className="size-4" /></span>
                   <span className="min-w-0 flex-1"><span className="flex items-start justify-between gap-3"><span className="text-sm font-semibold text-foreground">{notification.title}</span>{notification.time ? <span className="shrink-0 text-xs text-muted-foreground">{notification.time}</span> : null}</span><span className="mt-1 block text-sm leading-5 text-muted-foreground">{notification.message}</span></span>
                   {!notification.isRead ? <span className="mt-2 size-2 shrink-0 rounded-full bg-brand-highlight" aria-label="Unread" /> : null}
                 </button>

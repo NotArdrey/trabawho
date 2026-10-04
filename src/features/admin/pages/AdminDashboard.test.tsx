@@ -1,5 +1,8 @@
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { fireEvent, render as testingRender, screen, within } from "@testing-library/react";
+import { MemoryRouter } from "react-router-dom";
 import AdminDashboard from "./AdminDashboard";
+
+const render = (element: Parameters<typeof testingRender>[0]) => testingRender(<MemoryRouter>{element}</MemoryRouter>);
 
 vi.mock("../components/AdminAnalytics", () => ({ default: () => <section aria-label="Analytics">Live analytics</section> }));
 vi.mock("../services/adminAuditService", () => ({ fetchAdminAuditFeed: vi.fn().mockResolvedValue({ entries: [], unavailable: [], cappedSources: [] }) }));

@@ -5,7 +5,7 @@ describe("gig boost settings", () => {
   afterEach(() => vi.unstubAllEnvs());
   it("adjusts the total with duration at the default daily rate", () => {
     vi.stubEnv("VITE_AD_BOOST_DAILY_RATE_PHP", "");
-    expect(buildBoostDraft("12", "Cleaning", "1").amount).toBe(50);
+    expect(buildBoostDraft("12", "Cleaning", "3").amount).toBe(150);
     expect(buildBoostDraft("12", "Cleaning", "7").amount).toBe(350);
     expect(buildBoostDraft("12", "Cleaning", "14").amount).toBe(700);
   });
@@ -14,7 +14,7 @@ describe("gig boost settings", () => {
     expect(buildBoostDraft("12", "Cleaning", "7").amount).toBe(351.75);
     expect(calculateBoostTotal(3, 1.1)).toBe(3.3);
   });
-  it.each(["0", "7.5", "366", "1e2", "", "-1"])("rejects invalid duration %s", (days) => {
+  it.each(["0", "1", "7.5", "10", "31", "366", "1e2", "", "-1"])("rejects invalid duration %s", (days) => {
     expect(() => buildBoostDraft("12", "Cleaning", days)).toThrow();
   });
   it.each(["0", "-50", "NaN", "Infinity", "50.001", "1e2", "27397.27"])("rejects invalid configured pricing %s", (rate) => {

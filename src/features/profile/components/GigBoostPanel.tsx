@@ -1,38 +1,33 @@
-import { useState } from "react";
 import { Rocket } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { SelectField } from "@/components/forms";
 import { getActiveAdBooster } from "@/shared/utils/serviceBoost";
 import { useGigBoost } from "../hooks/useGigBoost";
-import { formatBoostDate, validateBoostSettings } from "../utils/gigBoost";
+import { BOOST_DURATION_OPTIONS, formatBoostDate } from "../utils/gigBoost";
 import { BoostActivationDialog } from "./BoostActivationDialog";
 
 export function GigBoostPanel({ sellerId }: { sellerId?: string }) {
   const flow = useGigBoost(sellerId);
-  const [touched, setTouched] = useState({ days: false });
-  const errors = validateBoostSettings(flow.days);
   const disabled = flow.loading || flow.saving || flow.verifying;
   return (
     <section aria-labelledby="gig-boost-heading" className="mt-6 min-w-0 border-t pt-6">
       <h2 id="gig-boost-heading" className="flex items-center gap-2 text-xl font-bold"><Rocket className="size-5 text-primary" aria-hidden="true" />Ad booster</h2>
       <p className="mt-2 text-sm text-muted-foreground">Boost one of your gigs in marketplace recommendations. Your boost starts after payment is verified.</p>
-      <div className="mt-4 grid min-w-0 gap-4 md:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)_minmax(0,1fr)]">
-        <SelectField label="Gig" id="boost-service" className="min-w-0 content-start" triggerClassName="min-h-11 min-w-0 [&>span]:truncate" value={flow.selectedId} onValueChange={flow.setSelectedId} disabled={disabled || !flow.services.length} placeholder={flow.loading ? "Loading gigs..." : "No active gigs found"} options={flow.services.map((service) => ({ value: String(service.id), label: `${service.title}${getActiveAdBooster(service, flow.clock).isBoosted ? " (Boosted)" : ""}` }))} />
-        <div className="grid content-start gap-2"><Label htmlFor="boost-days">Days</Label><Input id="boost-days" type="number" min="1" max="365" step="1" value={flow.days} disabled={disabled} aria-invalid={touched.days && Boolean(errors.days)} aria-describedby="boost-days-hint" onBlur={() => setTouched((value) => ({ ...value, days: true }))} onChange={(event) => flow.setDays(event.target.value)} /><p id="boost-days-hint" className={touched.days && errors.days ? "text-xs text-destructive" : "text-xs text-muted-foreground"}>{touched.days && errors.days ? errors.days : "1 to 365 whole days"}</p></div>
-        <div className="grid content-start gap-2"><p className="text-sm font-medium">Daily rate</p><p className="flex min-h-11 items-center rounded-md bg-muted px-3 text-sm font-semibold">{flow.pricingError ? "Unavailable" : `PHP ${flow.dailyRate.toLocaleString("en-PH", { maximumFractionDigits: 2 })} per day`}</p><p className="text-xs text-muted-foreground">Fixed rate for each selected day</p></div>
+      <div className="mt-4 grid min-w-0 gap-4 md:grid-cols-2 lg:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)_minmax(0,1fr)]">
+        <SelectField label="Gig" id="boost-service" className="min-w-0 content-start grid-rows-[1rem_2.75rem]" triggerClassName="min-w-0 [&>span]:truncate" value={flow.selectedId} onValueChange={flow.setSelectedId} disabled={disabled || !flow.services.length} placeholder={flow.loading ? "Loading gigs..." : "No active gigs found"} options={flow.services.map((service) => ({ value: String(service.id), label: `${service.title}${getActiveAdBooster(service, flow.clock).isBoosted ? " (Boosted)" : ""}` }))} />
+        <SelectField label="Boost duration" id="boost-days" className="min-w-0 content-start grid-rows-[1rem_2.75rem]" value={flow.days} onValueChange={flow.setDays} disabled={disabled} options={BOOST_DURATION_OPTIONS.map((days) => ({ value: String(days), label: `${days} days` }))} />
+        <div className="grid min-w-0 content-start grid-rows-[1rem_2.75rem] gap-2 md:col-span-2 lg:col-span-1"><span className="text-sm font-medium leading-none">Price per day</span><p className="flex min-h-11 items-center rounded-lg border border-border bg-muted/50 px-3 text-sm font-semibold text-foreground">{flow.pricingError ? "Unavailable" : `PHP ${flow.dailyRate.toLocaleString("en-PH", { maximumFractionDigits: 2 })}`}</p></div>
       </div>
-      <p className="mt-3 text-sm text-muted-foreground">Your total is the daily rate multiplied by the number of days, paid once. No additional booking platform fee.</p>
+      <p className="mt-3 text-sm text-muted-foreground">Pay once for the selected duration. No additional booking platform fee.</p>
       {flow.boost.boostEndsAt ? <p className="mt-3 text-sm font-semibold">This gig is boosted until {formatBoostDate(flow.boost.boostEndsAt)}.</p> : null}
-      {flow.total !== null && <p role="status" className="mt-3 rounded-lg bg-primary/5 p-3 text-sm font-semibold">PHP {flow.total.toLocaleString("en-PH", { maximumFractionDigits: 2 })} total for {Number(flow.days)} {Number(flow.days) === 1 ? "day" : "days"}. Starts after verified payment.</p>}
+      {flow.total !== null && <div role="status" className="mt-3 flex flex-wrap items-center justify-between gap-x-4 gap-y-1 rounded-lg border border-primary/20 bg-primary/5 p-3 text-sm"><span className="font-medium text-foreground">Total price · {flow.days} days</span><span className="font-bold text-primary">PHP {flow.total.toLocaleString("en-PH", { maximumFractionDigits: 2 })}</span><span className="w-full text-xs text-muted-foreground">Boost starts after verified payment.</span></div>}
       {flow.pricingError ? <p role="alert" className="mt-3 text-sm text-destructive">{flow.pricingError}</p> : null}
-      <Button type="button" className="mt-4 min-h-11 w-full" onClick={() => { setTouched({ days: true }); flow.review(); }} disabled={disabled || !flow.selectedId || flow.boost.isBoosted || Boolean(flow.pricingError)}>{flow.boost.isBoosted ? "Gig already boosted" : "Review boost payment"}</Button>
+      <Button type="button" className="mt-4 min-h-11 w-full" onClick={flow.review} disabled={disabled || !flow.selectedId || flow.boost.isBoosted || Boolean(flow.pricingError)}>{flow.boost.isBoosted ? "Gig already boosted" : "Review boost payment"}</Button>
       {flow.message ? <p role="status" className="mt-3 rounded-lg border bg-muted p-3 text-sm">{flow.message}</p> : null}
       {flow.error && !flow.draft ? <p role="alert" className="mt-3 text-sm text-destructive">{flow.error}</p> : null}
       {flow.canVerify ? <Button variant="outline" className="mt-3 min-h-11" disabled={flow.verifying} onClick={flow.checkPayment}>Check payment again</Button> : null}
       {flow.error && !flow.services.length ? <Button variant="outline" className="mt-3 min-h-11" disabled={flow.loading} onClick={() => { void flow.retryLoad(); }}>Reload gigs</Button> : null}
-      {flow.draft ? <BoostActivationDialog budget={flow.draft.amount} days={flow.draft.days} serviceTitle={flow.draft.serviceTitle} isOpen isSaving={flow.saving} error={flow.error} onCancel={flow.cancel} onConfirm={() => { void flow.checkout(); }} /> : null}
+      {flow.draft ? <BoostActivationDialog totalPrice={flow.draft.amount} days={flow.draft.days} serviceTitle={flow.draft.serviceTitle} isOpen isSaving={flow.saving} error={flow.error} onCancel={flow.cancel} onConfirm={() => { void flow.checkout(); }} /> : null}
     </section>
   );
 }

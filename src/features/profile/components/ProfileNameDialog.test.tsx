@@ -7,40 +7,25 @@ import { ProfileNameDialog } from "./ProfileNameDialog";
 const props = {
   firstName: "Jose",
   isOpen: true,
-  isSaving: false,
   lastName: "Ramos",
   middleName: "Miguel",
-  onFirstNameChange: vi.fn(),
-  onLastNameChange: vi.fn(),
-  onMiddleNameChange: vi.fn(),
   onOpenChange: vi.fn(),
-  onSave: vi.fn(),
 };
 
 describe("ProfileNameDialog", () => {
-  it("uses labeled name fields and clear actions", () => {
+  it("shows the protected name without edit fields", () => {
     render(<ProfileNameDialog {...props} />);
-    expect(screen.getByRole("heading", { name: "Edit profile name" })).toBeInTheDocument();
-    expect(screen.getByLabelText("First name")).toHaveValue("Jose");
-    expect(screen.getByLabelText("Middle name")).toHaveValue("Miguel");
-    expect(screen.getByLabelText("Last name")).toHaveValue("Ramos");
-    expect(screen.getByRole("button", { name: "Save changes" })).toBeEnabled();
+    expect(screen.getByRole("heading", { name: "Profile name is protected" })).toBeInTheDocument();
+    expect(screen.getByText("Jose Miguel Ramos")).toBeInTheDocument();
+    expect(screen.queryByRole("textbox")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Save changes" })).not.toBeInTheDocument();
   });
 
-  it("submits changes and closes through cancel", async () => {
+  it("closes the informational dialog", async () => {
     const user = userEvent.setup();
     const onOpenChange = vi.fn();
-    const onSave = vi.fn();
-    render(<ProfileNameDialog {...props} onOpenChange={onOpenChange} onSave={onSave} />);
-
-    await user.click(screen.getByRole("button", { name: "Save changes" }));
-    expect(onSave).toHaveBeenCalledOnce();
-    await user.click(screen.getByRole("button", { name: "Cancel" }));
+    render(<ProfileNameDialog {...props} onOpenChange={onOpenChange} />);
+    await user.click(screen.getByText("Close", { selector: "button" }));
     expect(onOpenChange).toHaveBeenCalledWith(false);
-  });
-
-  it("requires a first and last name", () => {
-    render(<ProfileNameDialog {...props} firstName="" />);
-    expect(screen.getByRole("button", { name: "Save changes" })).toBeDisabled();
   });
 });

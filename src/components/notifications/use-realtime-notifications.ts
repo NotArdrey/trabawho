@@ -1,78 +1,24 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import { isSupabaseConfigured, supabase, type Database, type Json } from "@/integrations/supabase";
+import { isSupabaseConfigured, supabase, type Database } from "@/integrations/supabase";
 import type { AppNotification } from "./notification-center";
+import { bookingNotification, caseNotification, messageNotification } from "./notification-items";
 
 type BookingRow = Database["public"]["Tables"]["bookings"]["Row"];
 type ConversationRow = Database["public"]["Tables"]["conversations"]["Row"];
 type MessageRow = Database["public"]["Tables"]["messages"]["Row"];
+type CaseMessageRow = Database["public"]["Tables"]["booking_case_messages"]["Row"];
 
 const MAX_NOTIFICATIONS = 30;
-
-function formatRelativeTime(value: string) {
-  const difference = new Date(value).getTime() - Date.now();
-  const formatter = new Intl.RelativeTimeFormat("en", { numeric: "auto" });
-  const minutes = Math.round(difference / 60_000);
-  if (Math.abs(minutes) < 60) return formatter.format(minutes, "minute");
-  const hours = Math.round(difference / 3_600_000);
-  if (Math.abs(hours) < 24) return formatter.format(hours, "hour");
-  return formatter.format(Math.round(difference / 86_400_000), "day");
-}
-
-function readableStatus(status: string) {
-  return status.replaceAll("_", " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
-}
-
-function hasReadBy(readBy: Json | null, userId: string) {
-  const matchesUser = (value: Json | undefined) => (typeof value === "string" || typeof value === "number") && String(value) === userId;
-  if (Array.isArray(readBy)) return readBy.some(matchesUser);
-  if (typeof readBy === "string") {
-    try {
-      return hasReadBy(JSON.parse(readBy) as Json, userId);
-    } catch {
-      return readBy === userId;
-    }
-  }
-  if (readBy && typeof readBy === "object") {
-    return Object.values(readBy).some(matchesUser);
-  }
-  return false;
-}
-
-function bookingNotification(row: BookingRow, readIds: Set<string>): AppNotification {
-  const id = `booking:${row.id}:${row.updated_at}`;
-  const status = readableStatus(row.status || "updated");
-  return {
-    id,
-    title: `Booking ${status}`,
-    message: `Booking ${row.id.slice(0, 8)} is now ${status.toLowerCase()}.`,
-    time: formatRelativeTime(row.updated_at),
-    createdAt: row.updated_at,
-    isRead: readIds.has(id),
-    type: "booking",
-  };
-}
-
-function messageNotification(row: MessageRow, userId: string, readIds: Set<string>): AppNotification {
-  const id = `message:${row.id}`;
-  const body = row.body?.trim();
-  return {
-    id,
-    title: "New message",
-    message: body ? (body.length > 90 ? `${body.slice(0, 87)}...` : body) : "You received a new attachment.",
-    time: formatRelativeTime(row.created_at),
-    createdAt: row.created_at,
-    isRead: readIds.has(id) || hasReadBy(row.read_by, userId),
-    type: "message",
-  };
-}
 
 function useRealtimeNotifications(providedUserId?: string) {
   const [resolvedUserId, setResolvedUserId] = useState("");
   const userId = providedUserId || resolvedUserId;
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
+  const [loadedForUserId, setLoadedForUserId] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
+  const [actionError, setActionError] = useState("");
   const [reloadKey, setReloadKey] = useState(0);
   const conversationIds = useRef(new Set<string>());
   const readIds = useRef(new Set<string>());
@@ -86,18 +32,14 @@ function useRealtimeNotifications(providedUserId?: string) {
     if (userId) localStorage.setItem(`trabawho-notifications-read:${userId}`, JSON.stringify([...ids].slice(-200)));
   }, [userId]);
 
-  const pushNotification = useCallback((notification: AppNotification) => {
-    setNotifications((current) => [notification, ...current.filter((item) => item.id !== notification.id)]
-      .sort((left, right) => String(right.createdAt).localeCompare(String(left.createdAt)))
-      .slice(0, MAX_NOTIFICATIONS));
-  }, []);
-
   useEffect(() => {
     if (!userId || !isSupabaseConfigured) {
       return undefined;
     }
 
     let active = true;
+    let loadSequence = 0;
+    let hasLoaded = false;
     try {
       const stored = JSON.parse(localStorage.getItem(`trabawho-notifications-read:${userId}`) || "[]") as unknown;
       readIds.current = new Set(Array.isArray(stored) ? stored.map(String) : []);
@@ -105,47 +47,63 @@ function useRealtimeNotifications(providedUserId?: string) {
       readIds.current = new Set();
     }
 
-    const loadNotifications = async () => {
-      setIsLoading(true);
-      setError("");
-      const [bookingResult, conversationResult] = await Promise.all([
+    const loadNotifications = async (foreground = false) => {
+      const sequence = ++loadSequence;
+      if (foreground) setIsLoading(true);
+      const [bookingResult, conversationResult, caseNoticeResult] = await Promise.all([
         supabase.from("bookings").select("*").or(`buyer_id.eq.${userId},seller_id.eq.${userId}`).order("updated_at", { ascending: false }).limit(20),
         supabase.from("conversations").select("*").or(`buyer_id.eq.${userId},seller_id.eq.${userId}`).order("created_at", { ascending: false }).limit(50),
+        supabase.from("booking_case_notifications").select("*").eq("recipient_id", userId).order("created_at", { ascending: false }).limit(30),
       ]);
       if (bookingResult.error) throw bookingResult.error;
       if (conversationResult.error) throw conversationResult.error;
+      if (caseNoticeResult.error && caseNoticeResult.error.code !== "PGRST205") throw caseNoticeResult.error;
 
       const conversations = (conversationResult.data || []) as ConversationRow[];
       conversationIds.current = new Set(conversations.map((row) => row.id));
       const ids = [...conversationIds.current];
-      const messageResult = ids.length
-        ? await supabase.from("messages").select("*").in("conversation_id", ids).neq("sender_id", userId).order("created_at", { ascending: false }).limit(30)
-        : { data: [], error: null };
+      const caseNotices = caseNoticeResult.error ? [] : caseNoticeResult.data || [];
+      const [messageResult, caseMessageResult] = await Promise.all([
+        ids.length
+          ? supabase.from("messages").select("*").in("conversation_id", ids).neq("sender_id", userId).order("created_at", { ascending: false }).limit(30)
+          : Promise.resolve({ data: [] as MessageRow[], error: null }),
+        caseNotices.length
+          ? supabase.from("booking_case_messages").select("*").in("id", [...new Set(caseNotices.map((notice) => notice.message_id))])
+          : Promise.resolve({ data: [] as CaseMessageRow[], error: null }),
+      ]);
       if (messageResult.error) throw messageResult.error;
-      if (!active) return;
+      if (!active || sequence !== loadSequence) return;
+      const byConversation = new Map(conversations.map((row) => [row.id, row]));
+      const byCaseMessage = new Map((caseMessageResult.error ? [] : caseMessageResult.data || []).map((row) => [row.id, row]));
 
       setNotifications([
-        ...((bookingResult.data || []) as BookingRow[]).map((row) => bookingNotification(row, readIds.current)),
-        ...((messageResult.data || []) as MessageRow[]).map((row) => messageNotification(row, userId, readIds.current)),
+        ...((bookingResult.data || []) as BookingRow[]).map((row) => bookingNotification(row, userId, readIds.current)),
+        ...((messageResult.data || []) as MessageRow[]).flatMap((row) => {
+          const conversation = byConversation.get(row.conversation_id);
+          return conversation ? [messageNotification(row, conversation, userId, readIds.current)] : [];
+        }),
+        ...caseNotices.map((notice) => caseNotification(notice, byCaseMessage.get(notice.message_id))),
       ].sort((left, right) => String(right.createdAt).localeCompare(String(left.createdAt))).slice(0, MAX_NOTIFICATIONS));
+      setLoadedForUserId(userId);
+      hasLoaded = true;
+      setError("");
+      if (caseNoticeResult.error || caseMessageResult.error) setActionError("Some support alerts could not be loaded. Try again shortly.");
       setIsLoading(false);
     };
 
-    void loadNotifications().catch(() => {
+    const reload = (foreground = false) => { void loadNotifications(foreground).catch(() => {
       if (active) {
-        setError("Notifications could not be loaded.");
+        if (hasLoaded) setActionError("Notifications could not be refreshed. Try again shortly.");
+        else setError("Notifications could not be loaded.");
         setIsLoading(false);
       }
-    });
+    }); };
+    reload(true);
 
     const channel = supabase
       .channel(`app-notifications-${userId}-${crypto.randomUUID()}`)
-      .on("postgres_changes", { event: "*", schema: "public", table: "bookings", filter: `buyer_id=eq.${userId}` }, (payload) => {
-        if (payload.eventType !== "DELETE") pushNotification(bookingNotification(payload.new as BookingRow, readIds.current));
-      })
-      .on("postgres_changes", { event: "*", schema: "public", table: "bookings", filter: `seller_id=eq.${userId}` }, (payload) => {
-        if (payload.eventType !== "DELETE") pushNotification(bookingNotification(payload.new as BookingRow, readIds.current));
-      })
+      .on("postgres_changes", { event: "*", schema: "public", table: "bookings", filter: `buyer_id=eq.${userId}` }, () => reload())
+      .on("postgres_changes", { event: "*", schema: "public", table: "bookings", filter: `seller_id=eq.${userId}` }, () => reload())
       .on("postgres_changes", { event: "INSERT", schema: "public", table: "conversations" }, (payload) => {
         const row = payload.new as ConversationRow;
         if (row.buyer_id === userId || row.seller_id === userId) conversationIds.current.add(row.id);
@@ -153,31 +111,51 @@ function useRealtimeNotifications(providedUserId?: string) {
       .on("postgres_changes", { event: "INSERT", schema: "public", table: "messages" }, (payload) => {
         const row = payload.new as MessageRow;
         if (row.sender_id !== userId && conversationIds.current.has(row.conversation_id)) {
-          pushNotification(messageNotification(row, userId, readIds.current));
+          reload();
         }
       })
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "booking_case_notifications", filter: `recipient_id=eq.${userId}` }, () => reload())
       .subscribe();
+    const reconciliation = window.setInterval(() => { if (document.visibilityState !== "hidden" && navigator.onLine) reload(); }, 30_000);
+    const onFocus = () => reload();
+    window.addEventListener("focus", onFocus);
 
     return () => {
       active = false;
+      window.clearInterval(reconciliation);
+      window.removeEventListener("focus", onFocus);
       void supabase.removeChannel(channel);
     };
-  }, [pushNotification, reloadKey, userId]);
+  }, [reloadKey, userId]);
 
   const markRead = useCallback((id: string) => {
+    setActionError("");
+    const caseId = notifications.find((item) => item.id === id)?.caseId;
+    if (caseId) {
+      setNotifications((current) => current.map((item) => item.caseId === caseId ? { ...item, isRead: true } : item));
+      void Promise.resolve(supabase.rpc("mark_booking_case_notifications_read", { p_case_id: caseId })).then(({ error: readError }) => {
+        if (readError) { setActionError("Case updates could not be marked read. Open the case and try again."); setReloadKey((value) => value + 1); }
+      }).catch(() => { setActionError("Case updates could not be marked read. Open the case and try again."); setReloadKey((value) => value + 1); });
+      return;
+    }
     readIds.current.add(id);
     persistReadIds(readIds.current);
     setNotifications((current) => current.map((item) => item.id === id ? { ...item, isRead: true } : item));
-  }, [persistReadIds]);
+  }, [notifications, persistReadIds]);
 
   const markAllRead = useCallback(() => {
-    notifications.forEach((item) => readIds.current.add(item.id));
+    setActionError("");
+    notifications.filter((item) => !item.caseId).forEach((item) => readIds.current.add(item.id));
     persistReadIds(readIds.current);
     setNotifications((current) => current.map((item) => ({ ...item, isRead: true })));
+    const caseIds = [...new Set(notifications.flatMap((item) => item.caseId && !item.isRead ? [item.caseId] : []))];
+    if (caseIds.length) void Promise.all(caseIds.map((caseId) => supabase.rpc("mark_booking_case_notifications_read", { p_case_id: caseId })))
+      .then((results) => { if (results.some((result) => result.error)) { setActionError("Some case updates could not be marked read. Open a case and try again."); setReloadKey((value) => value + 1); } })
+      .catch(() => { setActionError("Some case updates could not be marked read. Open a case and try again."); setReloadKey((value) => value + 1); });
   }, [notifications, persistReadIds]);
 
   const canLoad = Boolean(userId && isSupabaseConfigured);
-  return { notifications: canLoad ? notifications : [], isLoading: canLoad ? isLoading : false, error: canLoad ? error : "", markRead, markAllRead, retry: () => setReloadKey((value) => value + 1) };
+  return { notifications: canLoad && loadedForUserId === userId ? notifications : [], isLoading: canLoad ? !error && (isLoading || loadedForUserId !== userId) : false, error: canLoad ? error : "", actionError, markRead, markAllRead, retry: () => setReloadKey((value) => value + 1) };
 }
 
 export { useRealtimeNotifications };

@@ -15,7 +15,7 @@ export async function handleBookingRefundRequest(request: Request): Promise<Resp
     if (identityError || !identity.user) return paymentJsonResponse({ error: "Sign in to review refunds." }, 401);
     // The user-scoped query enforces case participation/admin access through RLS.
     const { data: caseRecord, error: caseError } = await user.from("booking_support_cases")
-      .select("id, booking_id").eq("id", caseId).maybeSingle();
+      .select("id, booking_id, case_type").eq("id", caseId).maybeSingle();
     if (caseError || !caseRecord) return paymentJsonResponse({ error: "Case not available to your account." }, 404);
     const { data: isAdmin } = await user.rpc("is_current_user_admin");
     if (action === "approve" && isAdmin !== true) return paymentJsonResponse({ error: "Administrator access required." }, 403);
@@ -28,7 +28,9 @@ export async function handleBookingRefundRequest(request: Request): Promise<Resp
       if (typeof expectedAmount !== "number" || !Number.isFinite(expectedAmount) || expectedAmount <= 0) {
         return paymentJsonResponse({ error: "Review the current refund amount before approving." }, 400);
       }
-      const { error } = await user.rpc("approve_booking_case_refund", { p_case_id: caseId, p_reason: reason, p_expected_amount: expectedAmount });
+      const { error } = await user.rpc(caseRecord.case_type === "provider_no_show"
+        ? "approve_no_show_case_refund" : "approve_booking_case_refund",
+      { p_case_id: caseId, p_reason: reason, p_expected_amount: expectedAmount });
       if (error) return paymentJsonResponse({ error: "This case cannot be refunded. Refresh it and verify its payments." }, 409);
     }
     const admin = createPaymentAdminClient();

@@ -21,7 +21,7 @@
   },
   {
     "path": "src/features/auth/pages/AuthPage.jsx",
-    "baselineLines": 733
+    "baselineLines": 732
   },
   {
     "path": "src/features/bookings/components/ChatWindow.jsx",
@@ -29,7 +29,7 @@
   },
   {
     "path": "src/features/navigation/useAppNavigation.js",
-    "baselineLines": 849
+    "baselineLines": 846
   },
   {
     "path": "src/features/auth/pages/IdentityRegistrationPage.jsx",

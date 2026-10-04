@@ -14,6 +14,15 @@ end-to-end verification.
 The admin-facing support queue, exception matrix, and moderation requirements
 are tracked in the [admin operations roadmap](admin-operations.md).
 
+The provider no-show conversation and replacement-visit schema is deployed to
+the demo/test project, but the full remedy has **not yet been rehearsed**.
+It keeps the original appointment, requires both participants to
+accept a replacement, and does not claim a refund until a provider-backed
+result exists. The 24-hour response escalation currently runs when the admin
+queue refreshes, not through a guaranteed background scheduler. See the
+[admin operations roadmap](admin-operations.md#actionable-provider-no-show-workflow-demotest-schema-deployed-rehearsal-pending)
+for verification status and remaining end-to-end checks.
+
 ## Current assessment
 
 The database already has useful foundations:

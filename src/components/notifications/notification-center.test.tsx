@@ -61,4 +61,10 @@ describe("NotificationCenter", () => {
     expect(screen.getByText("No notifications yet")).toBeVisible();
     expect(screen.queryByRole("button", { name: "Mark all read" })).not.toBeInTheDocument();
   });
+
+  it("keeps support updates visually identifiable after they are read", () => {
+    render(<NotificationCenter notifications={[{ id: "case-1", title: "Support update", message: "Support replied to your case.", isRead: true, type: "case" }]} open onOpenChange={vi.fn()} onMarkAllRead={vi.fn()} onNotificationClick={vi.fn()} />);
+    expect(screen.getByRole("button", { name: /Support update/ })).toHaveClass("bg-primary/5");
+    expect(screen.queryByLabelText("Unread")).not.toBeInTheDocument();
+  });
 });
