@@ -149,7 +149,9 @@ export function buildWeeklyScheduleFromSlots(values: unknown[] = [], value: unkn
     const block = { id: slot.id, startTime: timeInManila.format(start), endTime: timeInManila.format(end),
       capacity, slotsLeft: slot.status === "available" ? Math.max(0, capacity - booked) : 0, rawSlot: slot };
     days.add(day);
-    for (const key of [day, dateKey]) (dayBlocks[key] ??= []).push({ ...block });
+    // A published slot belongs to its exact Philippine date. Weekday buckets
+    // made a later Wednesday's slot look bookable on an earlier Wednesday.
+    (dayBlocks[dateKey] ??= []).push(block);
   }
   return { manualScheduling: false, operatingDays: [...days], dayBlocks };
 }

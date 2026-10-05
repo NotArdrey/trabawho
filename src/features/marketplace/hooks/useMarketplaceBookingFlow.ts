@@ -1,7 +1,7 @@
 import { useRef, useState } from "react";
 import { createPayMongoCheckout, redirectToPayMongo, startServiceConversation, type PaymentSelectionDetails } from "@/features/bookings";
 import { ensureLocalSandboxReady } from "@/shared/services/paymongoSandboxCheckout";
-import { isBookableClientAppointment, isFutureClientBookingDate } from "@/shared/domain/clientBookingDate";
+import { isBookableClientAppointment, isFutureClientBookingDate, philippineDateKey } from "@/shared/domain/clientBookingDate";
 import { createScheduleForProvider, getDisplayServiceType, getProviderQuoteAmount } from "../utils/serviceNormalizer";
 
 interface Provider extends Record<string, unknown> {
@@ -25,6 +25,7 @@ interface SlotSelection {
   date: string;
   dayKey: string | null;
   blockId: number | string;
+  selectedBlock?: Block;
   manualScheduling?: boolean;
 }
 interface PendingBooking {
@@ -98,18 +99,20 @@ export function useMarketplaceBookingFlow({ isPublic, services, schedulesByProvi
     setIsBookingCalendarOpen(true);
   };
 
-  const handleConfirmBooking = ({ workerId, date, dayKey, blockId, manualScheduling }: SlotSelection) => {
+  const handleConfirmBooking = ({ workerId, date, dayKey, blockId, selectedBlock: verifiedBlock, manualScheduling }: SlotSelection) => {
     const worker = services.find((item) => String(item.id) === String(workerId)) || selectedWorker;
-    if (!worker) return;
+    if (!worker) return false;
     const schedule = schedulesByProvider[String(workerId)] || createScheduleForProvider(worker) as unknown as Schedule;
     const selectedBlock: Block | undefined = manualScheduling
       ? { id: `manual-${workerId}-${date}`, startTime: "Manual", endTime: "Schedule", capacity: 1, slotsLeft: 1 }
-      : (schedule.dayBlocks?.[date] || schedule.dayBlocks?.[dayKey || ""] || []).find((block) => String(block.id) === String(blockId));
-    if (!isFutureClientBookingDate(date) || !selectedBlock || (selectedBlock.rawSlot?.start_ts && selectedBlock.rawSlot?.end_ts
-      && !isBookableClientAppointment(selectedBlock.rawSlot.start_ts, selectedBlock.rawSlot.end_ts))) {
-      setBookingError("That date is no longer available. Choose a date from tomorrow onward (PHT).");
+      : (verifiedBlock && String(verifiedBlock.id) === String(blockId) ? verifiedBlock : undefined)
+        || (schedule.dayBlocks?.[date] || []).find((block) => String(block.id) === String(blockId) && Number(block.slotsLeft) > 0);
+    const slot = selectedBlock?.rawSlot;
+    if (!isFutureClientBookingDate(date) || !selectedBlock || (!manualScheduling && (!slot?.id || !slot.start_ts || !slot.end_ts
+      || philippineDateKey(slot.start_ts) !== date || !isBookableClientAppointment(slot.start_ts, slot.end_ts)))) {
+      setBookingError("That time is no longer available on the selected date. Choose another available time.");
       refreshSchedules();
-      return;
+      return false;
     }
     setBookingError("");
     setPendingBooking({
@@ -121,6 +124,7 @@ export function useMarketplaceBookingFlow({ isPublic, services, schedulesByProvi
     });
     setIsBookingCalendarOpen(false);
     setIsPaymentModalOpen(true);
+    return true;
   };
 
   const handleSelectPayment = async (method: string, details: PaymentSelectionDetails) => {

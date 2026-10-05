@@ -42,8 +42,34 @@ for (const width of [390, 768, 1024, 1280, 1440]) {
     await page.getByRole("button", { name: "Open client calendar" }).click();
     await expect(page.getByRole("gridcell", { name: /1 slot available/i })).toBeEnabled();
     await page.getByRole("gridcell", { name: /1 slot available/i }).click();
-    await expect(page.getByRole("button", { name: /9:00 AM.*10:00 AM.*No spots left/i })).toBeDisabled();
-    await expect(page.getByRole("button", { name: /10:00 AM.*11:00 AM.*1 spot left/i })).toBeEnabled();
+    await expect(page.getByRole("button", { name: /9:00 AM.*10:00 AM.*Unavailable/i })).toBeDisabled();
+    await expect(page.getByRole("button", { name: /10:00 AM.*11:00 AM.*1 slot available/i })).toBeEnabled();
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  });
+
+  test(`fully booked date cannot use a later week's matching weekday slot at ${width}px`, async ({ page }) => {
+    const date = tomorrowKey();
+    const dateLabel = new Intl.DateTimeFormat("en-US", { month: "long", day: "numeric", year: "numeric", weekday: "long", timeZone: "UTC" })
+      .format(new Date(`${date}T00:00:00Z`));
+    const nextWeek = new Date(`${date}T00:00:00Z`);
+    nextWeek.setUTCDate(nextWeek.getUTCDate() + 7);
+    const laterDate = nextWeek.toISOString().slice(0, 10);
+    const available = { id: 3, service_id: 7, start_ts: new Date(`${laterDate}T13:00:00+08:00`).toISOString(),
+      end_ts: new Date(`${laterDate}T14:00:00+08:00`).toISOString(), capacity: 1, booked_count: 0 };
+    await page.route("**/rest/v1/rpc/list_available_service_slots", async (route) => {
+      await route.fulfill({ contentType: "application/json", body: JSON.stringify([available]) });
+    });
+    await page.setViewportSize({ width, height: 900 });
+    await page.goto(`/__availability-consistency?live=1&weekLater=1&date=${date}`);
+    await page.getByRole("button", { name: "Open client calendar" }).click();
+    await expect(page.getByRole("gridcell", { name: `${dateLabel}, no times offered` })).toBeDisabled();
+    await expect(page.getByRole("gridcell", { name: /1 slot available/i })).toBeEnabled();
+    await page.getByRole("gridcell", { name: /1 slot available/i }).click();
+    await page.getByRole("button", { name: /1:00 PM.*2:00 PM/i }).click();
+    await page.getByRole("button", { name: "Review booking" }).click();
+    await page.getByRole("button", { name: "Continue to payment" }).click();
+    await expect(page.locator("body")).toHaveAttribute("data-booked-date", laterDate);
+    await expect(page.locator("body")).toHaveAttribute("data-booked-slot-date", laterDate);
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
   });
 }

@@ -56,7 +56,8 @@ export function useLiveBookingSchedule(schedule: Schedule, rawServiceId: unknown
     const reload = () => { if (active) void refresh(); };
     queueMicrotask(reload);
     window.addEventListener("focus", reload);
-    return () => { active = false; requestId.current += 1; window.removeEventListener("focus", reload); };
+    const timer = window.setInterval(reload, 30_000);
+    return () => { active = false; requestId.current += 1; window.clearInterval(timer); window.removeEventListener("focus", reload); };
   }, [refresh]);
 
   const visibleSchedule = useMemo<Schedule>(() => {

@@ -28,7 +28,7 @@ describe("marketplace gig identity", () => {
       start_ts: "2026-10-05T16:30:00Z", end_ts: "2026-10-05T17:30:00Z", status: "available", capacity: 1,
     }], { bookingMode: "with-slots" });
     expect(schedule.dayBlocks["2026-10-06"]?.[0]).toMatchObject({ startTime: "00:30", endTime: "01:30" });
-    expect(schedule.dayBlocks["Tue"]?.[0]).toMatchObject({ id: 42 });
+    expect(schedule.dayBlocks["Tue"]).toBeUndefined();
     expect(schedule.dayBlocks["2026-10-05"]).toBeUndefined();
   });
 });

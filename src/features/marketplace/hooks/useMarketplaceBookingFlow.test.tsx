@@ -7,7 +7,8 @@ const api = vi.hoisted(() => ({ startServiceConversation: vi.fn(), createPayMong
 vi.mock("@/features/bookings", () => api);
 const provider = { id: 1, name: "Provider", bookingMode: "with-slots", projectRate: 1200, rawService: { id: 1, seller_id: "seller" } };
 const options = () => ({ isPublic: false, services: [provider], schedulesByProvider: {
-  "1": { dayBlocks: { "2026-10-06": [{ id: 2, startTime: "09:00", endTime: "10:00", rawSlot: { id: 2 } }] } },
+  "1": { dayBlocks: { "2026-10-06": [{ id: 2, startTime: "09:00", endTime: "10:00", slotsLeft: 1,
+    rawSlot: { id: 2, start_ts: "2026-10-06T01:00:00Z", end_ts: "2026-10-06T02:00:00Z" } }] } },
 }, refreshSchedules: vi.fn(), onOpenChatPage: vi.fn() });
 
 describe("marketplace booking flow", () => {
@@ -49,8 +50,30 @@ describe("marketplace booking flow", () => {
     act(() => { result.current.handleBookNow(provider); });
     act(() => { result.current.handleConfirmBooking({ workerId: 1, date: "2026-10-05", dayKey: "Mon", blockId: 2 }); });
     expect(result.current.isPaymentModalOpen).toBe(false);
-    expect(result.current.bookingError).toMatch(/tomorrow onward/i);
+    expect(result.current.bookingError).toMatch(/no longer available on the selected date/i);
     expect(opts.refreshSchedules).toHaveBeenCalledTimes(2);
+  });
+
+  it("never substitutes a slot from another date with the same weekday", () => {
+    const opts = options();
+    Object.assign(opts.schedulesByProvider["1"].dayBlocks, { Tue: [{ id: 9, startTime: "09:00", endTime: "10:00", slotsLeft: 1,
+      rawSlot: { id: 9, start_ts: "2026-10-13T01:00:00Z", end_ts: "2026-10-13T02:00:00Z" } }] });
+    const { result } = renderHook(() => useMarketplaceBookingFlow(opts));
+    act(() => { result.current.handleConfirmBooking({ workerId: 1, date: "2026-10-13", dayKey: "Tue", blockId: 9 }); });
+    expect(result.current.isPaymentModalOpen).toBe(false);
+    expect(result.current.pendingBooking).toBeNull();
+    expect(result.current.bookingError).toMatch(/no longer available on the selected date/i);
+  });
+
+  it("rejects a slot whose actual Philippine date differs from the selected date", () => {
+    const opts = options();
+    Object.assign(opts.schedulesByProvider["1"].dayBlocks, { "2026-10-13": [{ id: 9, startTime: "09:00", endTime: "10:00", slotsLeft: 1,
+      rawSlot: { id: 9, start_ts: "2026-10-20T01:00:00Z", end_ts: "2026-10-20T02:00:00Z" } }] });
+    const { result } = renderHook(() => useMarketplaceBookingFlow(opts));
+    act(() => { result.current.handleConfirmBooking({ workerId: 1, date: "2026-10-13", dayKey: "Tue", blockId: 9 }); });
+    expect(result.current.isPaymentModalOpen).toBe(false);
+    expect(result.current.pendingBooking).toBeNull();
+    expect(result.current.bookingError).toMatch(/no longer available on the selected date/i);
   });
 
   it("returns to refreshed times when another client claimed the slot at checkout", async () => {

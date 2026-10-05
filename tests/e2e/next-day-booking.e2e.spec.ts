@@ -18,7 +18,7 @@ for (const width of [390, 768, 1024, 1280, 1440]) test(`same-day booking stays u
   await page.getByRole("gridcell", { name: /Tuesday, October 6, 2026, 1 slot available/i }).click();
   await page.getByRole("button", { name: /9:00 AM.*10:00 AM/i }).click();
   await page.getByRole("button", { name: "Review booking" }).click();
-  await page.getByRole("button", { name: "Send booking request" }).click();
+  await page.getByRole("button", { name: "Continue to payment" }).click();
   await expect(page.locator("body")).toHaveAttribute("data-booked-date", "2026-10-06");
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
 });

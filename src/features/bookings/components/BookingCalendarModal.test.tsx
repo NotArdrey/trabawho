@@ -12,7 +12,7 @@ const schedule = {
   operatingDays: ["Thu"],
   manualScheduling: false,
   dayBlocks: {
-    Thu: [{ id: "midday", startTime: "12:00", endTime: "13:00", slotsLeft: 3 }],
+    "2026-09-10": [{ id: "midday", startTime: "12:00", endTime: "13:00", slotsLeft: 1 }],
   },
 };
 
@@ -33,32 +33,32 @@ describe("BookingCalendarModal", () => {
     render(<BookingCalendarModal isOpen worker={worker} schedule={schedule} onClose={vi.fn()} onConfirmBooking={onConfirmBooking} />);
 
     expect(screen.getByRole("button", { name: "Review booking" })).toBeEnabled();
-    await user.click(screen.getByRole("gridcell", { name: /Thursday, September 10, 2026, 3 slots available/i }));
+    await user.click(screen.getByRole("gridcell", { name: /Thursday, September 10, 2026, 1 slot available/i }));
     await user.click(screen.getByRole("button", { name: /12:00 PM–1:00 PM/i }));
     await user.click(screen.getByRole("button", { name: "Review booking" }));
 
-    expect(screen.getByRole("dialog", { name: "Confirm booking request" })).toBeInTheDocument();
+    expect(screen.getByRole("dialog", { name: "Review booking schedule" })).toBeInTheDocument();
     expect(screen.queryByRole("dialog", { name: "Choose a booking schedule" })).not.toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: "Send booking request" }));
-    expect(onConfirmBooking).toHaveBeenCalledWith({
+    await user.click(screen.getByRole("button", { name: "Continue to payment" }));
+    expect(onConfirmBooking).toHaveBeenCalledWith(expect.objectContaining({
       workerId: "provider-1",
       date: "2026-09-10",
       dayKey: "Thu",
       blockId: "midday",
       manualScheduling: false,
-    });
+    }));
   });
 
   it("clearly directs the user to select a required time", async () => {
     const user = userEvent.setup();
     render(<BookingCalendarModal isOpen worker={worker} schedule={schedule} onClose={vi.fn()} onConfirmBooking={vi.fn()} />);
 
-    await user.click(screen.getByRole("gridcell", { name: /Thursday, September 10, 2026, 3 slots available/i }));
+    await user.click(screen.getByRole("gridcell", { name: /Thursday, September 10, 2026, 1 slot available/i }));
     expect(screen.getByText("Required: select one of the available times above.")).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Review booking" }));
     expect(screen.getByRole("alert")).toHaveTextContent("Select a time before reviewing your booking.");
-    expect(screen.queryByRole("dialog", { name: "Confirm booking request" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("dialog", { name: "Review booking schedule" })).not.toBeInTheDocument();
   });
 
   it("closes through the shared dialog control", async () => {
@@ -81,7 +81,7 @@ describe("BookingCalendarModal", () => {
       />,
     );
 
-    expect(screen.getByText("No booking times are available right now")).toBeInTheDocument();
+    expect(screen.getByText("No booking slots are available right now")).toBeInTheDocument();
     expect(screen.getAllByText("No times").length).toBeGreaterThan(0);
     expect(screen.queryByText("Full")).not.toBeInTheDocument();
   });
@@ -102,6 +102,32 @@ describe("BookingCalendarModal", () => {
     expect(screen.getByText("Choose a date from tomorrow onward, Philippine time.")).toBeVisible();
   });
 
+  it("does not borrow next week's weekday slot for a date with no availability", async () => {
+    const user = userEvent.setup();
+    const slot = { id: 17, service_id: 7, start_ts: "2026-09-17T05:00:00Z", end_ts: "2026-09-17T06:00:00Z", capacity: 1, booked_count: 0 };
+    availability.fetchPublicServiceSlots.mockResolvedValue([slot]);
+    render(<BookingCalendarModal isOpen worker={{ ...worker, rawService: { id: 7 } }} schedule={{ operatingDays: ["Thu"], dayBlocks: {
+      Thu: [{ id: 17, startTime: "13:00", endTime: "14:00", slotsLeft: 1, rawSlot: slot }],
+      "2026-09-17": [{ id: 17, startTime: "13:00", endTime: "14:00", slotsLeft: 1, rawSlot: slot }],
+    } }} onClose={vi.fn()} onConfirmBooking={vi.fn()} />);
+
+    await waitFor(() => expect(availability.fetchPublicServiceSlots).toHaveBeenCalledOnce());
+    expect(screen.getByRole("gridcell", { name: /Thursday, September 10, 2026, no times offered/i })).toBeDisabled();
+    await user.click(screen.getByRole("gridcell", { name: /Thursday, September 17, 2026, 1 slot available/i }));
+    expect(screen.getByRole("button", { name: /1:00 PM.*2:00 PM/i })).toBeEnabled();
+  });
+
+  it("disables a date when its only slot belongs to another Philippine date", async () => {
+    const slot = { id: 17, service_id: 7, start_ts: "2026-09-17T05:00:00Z", end_ts: "2026-09-17T06:00:00Z", capacity: 1, booked_count: 0 };
+    availability.fetchPublicServiceSlots.mockResolvedValue([slot]);
+    render(<BookingCalendarModal isOpen worker={{ ...worker, rawService: { id: 7 } }} schedule={{ dayBlocks: {
+      "2026-09-10": [{ id: 17, startTime: "13:00", endTime: "14:00", slotsLeft: 1, rawSlot: slot }],
+    } }} onClose={vi.fn()} onConfirmBooking={vi.fn()} />);
+
+    await waitFor(() => expect(availability.fetchPublicServiceSlots).toHaveBeenCalledOnce());
+    expect(screen.getByRole("gridcell", { name: /Thursday, September 10, 2026, no times offered/i })).toBeDisabled();
+  });
+
   it("hides an already reserved time while leaving another time on the same date selectable", async () => {
     const user = userEvent.setup();
     const slot = { id: 11, service_id: 7, start_ts: "2026-09-10T02:00:00Z", end_ts: "2026-09-10T03:00:00Z", capacity: 1, booked_count: 0 };
@@ -113,7 +139,7 @@ describe("BookingCalendarModal", () => {
 
     await waitFor(() => expect(screen.queryByRole("status", { name: /checking/i })).not.toBeInTheDocument());
     await user.click(screen.getByRole("gridcell", { name: /Thursday, September 10, 2026, 1 slot available/i }));
-    expect(screen.getByRole("button", { name: /9:00 AM.*10:00 AM.*No spots left/i })).toBeDisabled();
+    expect(screen.getByRole("button", { name: /9:00 AM.*10:00 AM.*Unavailable/i })).toBeDisabled();
     expect(screen.getByRole("button", { name: /10:00 AM.*11:00 AM/i })).toBeEnabled();
   });
 
@@ -131,7 +157,7 @@ describe("BookingCalendarModal", () => {
     await user.click(screen.getByRole("button", { name: /10:00 AM.*11:00 AM/i }));
     await user.click(screen.getByRole("button", { name: "Review booking" }));
     expect(await screen.findByRole("alert")).toHaveTextContent("That time was just reserved");
-    expect(screen.queryByRole("dialog", { name: "Confirm booking request" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("dialog", { name: "Review booking schedule" })).not.toBeInTheDocument();
     expect(onConfirmBooking).not.toHaveBeenCalled();
   });
 
@@ -148,8 +174,8 @@ describe("BookingCalendarModal", () => {
     await user.click(screen.getByRole("gridcell", { name: /Thursday, September 10, 2026, 1 slot available/i }));
     await user.click(screen.getByRole("button", { name: /10:00 AM.*11:00 AM/i }));
     await user.click(screen.getByRole("button", { name: "Review booking" }));
-    expect(await screen.findByRole("dialog", { name: "Confirm booking request" })).toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: "Send booking request" }));
+    expect(await screen.findByRole("dialog", { name: "Review booking schedule" })).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Continue to payment" }));
     expect(await screen.findByRole("alert")).toHaveTextContent("That time was just reserved");
     expect(onConfirmBooking).not.toHaveBeenCalled();
   });

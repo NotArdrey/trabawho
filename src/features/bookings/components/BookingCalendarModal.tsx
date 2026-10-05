@@ -56,6 +56,7 @@ interface ConfirmedBooking {
   date: string;
   dayKey: string | null;
   blockId: number | string;
+  selectedBlock?: ScheduleBlock;
   manualScheduling?: boolean;
 }
 
@@ -64,7 +65,7 @@ interface BookingCalendarModalProps {
   onClose?: () => void;
   worker: BookingWorker | null;
   schedule: BookingSchedule | null;
-  onConfirmBooking: (booking: ConfirmedBooking) => void;
+  onConfirmBooking: (booking: ConfirmedBooking) => boolean | void;
 }
 
 interface DateMeta {
@@ -133,27 +134,16 @@ function getDateMeta(schedule: BookingSchedule, dateValue: string): DateMeta {
     });
   };
 
-  const exactBlocks = schedule.dayBlocks?.[dateValue];
-  if (exactBlocks) {
-    const dayBlocks = uniqueBlocks(exactBlocks);
-    const slotCount = dayBlocks.reduce((sum, block) => sum + Math.max(0, block.slotsLeft || 0), 0);
-    return {
-      canBookDate: slotCount > 0 || Boolean(schedule.manualScheduling),
-      slotCount: slotCount || (schedule.manualScheduling ? 1 : 0),
-      isOperatingDay: true,
-      dayBlocks,
-      manualScheduling: schedule.manualScheduling,
-    };
-  }
-
   const dayKey = getDayKeyFromDate(dateValue);
-  const isOperatingDay = Boolean(dayKey && (schedule.operatingDays || []).includes(dayKey));
-  const dayBlocks = dayKey && isOperatingDay ? uniqueBlocks(schedule.dayBlocks?.[dayKey] || []) : [];
-  if (!isOperatingDay) return { canBookDate: false, slotCount: 0, isOperatingDay, dayBlocks };
-  if (schedule.manualScheduling) return { canBookDate: true, slotCount: 1, isOperatingDay, dayBlocks, manualScheduling: true };
-
+  const dayBlocks = uniqueBlocks(schedule.dayBlocks?.[dateValue] || []).filter((block) =>
+    !block.rawSlot?.start_ts || philippineDateKey(block.rawSlot.start_ts) === dateValue);
+  if (schedule.manualScheduling) {
+    const isOperatingDay = Boolean(dayBlocks.length || (dayKey && schedule.operatingDays?.includes(dayKey)));
+    return { canBookDate: isOperatingDay, slotCount: isOperatingDay ? 1 : 0, isOperatingDay, dayBlocks, manualScheduling: true };
+  }
+  // Fixed appointments never inherit a different date's weekday slots.
   const slotCount = dayBlocks.reduce((sum, block) => sum + Math.max(0, block.slotsLeft || 0), 0);
-  return { canBookDate: slotCount > 0, slotCount, isOperatingDay, dayBlocks, manualScheduling: false };
+  return { canBookDate: slotCount > 0, slotCount, isOperatingDay: dayBlocks.length > 0, dayBlocks, manualScheduling: false };
 }
 
 function BookingCalendarDialog({ onClose, worker, schedule, onConfirmBooking }: Omit<BookingCalendarModalProps, "isOpen"> & { worker: BookingWorker; schedule: BookingSchedule }) {
@@ -212,13 +202,15 @@ function BookingCalendarDialog({ onClose, worker, schedule, onConfirmBooking }: 
       return;
     }
     if (!await verify(selectedBlock)) { setIsReviewOpen(false); return; }
-    onConfirmBooking({
+    const accepted = onConfirmBooking({
       workerId: worker.id,
       date: selectedDate,
       dayKey: getDayKeyFromDate(selectedDate),
       blockId: selectedBlockId,
+      selectedBlock,
       manualScheduling: visibleSchedule.manualScheduling,
     });
+    if (accepted === false) setAvailabilityError("That time is no longer available on the selected date. Choose another time.");
     setIsReviewOpen(false);
   };
 
@@ -270,8 +262,8 @@ function BookingCalendarDialog({ onClose, worker, schedule, onConfirmBooking }: 
               <div className="flex gap-3 rounded-xl border border-brand-highlight/30 bg-brand-highlight-soft p-4" role="status">
                 <AlertCircle className="mt-0.5 size-5 shrink-0 text-brand-highlight-foreground" aria-hidden="true" />
                 <div>
-                  <p className="font-semibold text-foreground">No booking times are available right now</p>
-                  <p className="mt-1 text-sm leading-5 text-muted-foreground">All published times may be reserved, or this provider has not added future times. Check again later or choose another provider.</p>
+                  <p className="font-semibold text-foreground">No booking slots are available right now</p>
+                  <p className="mt-1 text-sm leading-5 text-muted-foreground">All published slots may be reserved, or this provider has not added future slots. Check again later or choose another provider.</p>
                 </div>
               </div>
             ) : null}
@@ -299,7 +291,7 @@ function BookingCalendarDialog({ onClose, worker, schedule, onConfirmBooking }: 
                       : meta.slotCount > 0
                         ? `${meta.slotCount} ${meta.slotCount === 1 ? "slot" : "slots"} available`
                         : meta.isOperatingDay
-                          ? "fully booked"
+                          ? "no available times"
                           : "no times offered";
 
                     return (
@@ -321,9 +313,9 @@ function BookingCalendarDialog({ onClose, worker, schedule, onConfirmBooking }: 
                       >
                         <span className="text-sm font-bold sm:text-base">{cell.date.getDate()}</span>
                         <span className={cn("hidden text-[11px] font-medium sm:block", selected ? "text-primary-foreground/85" : "text-muted-foreground")}>
-                          {tooSoon ? "Unavailable" : meta.manualScheduling ? "Open" : meta.slotCount ? `${meta.slotCount} left` : meta.isOperatingDay ? "Full" : "No times"}
+                          {tooSoon ? "Unavailable" : meta.manualScheduling ? "Open" : meta.slotCount ? `${meta.slotCount} left` : meta.isOperatingDay ? "Unavailable" : "No times"}
                         </span>
-                        {!disabled && !selected ? <span className="size-1.5 rounded-full bg-primary sm:hidden" aria-hidden="true" /> : null}
+                        {!disabled ? <span className={cn("text-[10px] font-semibold leading-none sm:hidden", selected ? "text-primary-foreground/85" : "text-primary")} aria-hidden="true">{meta.manualScheduling ? "Open" : `${meta.slotCount} left`}</span> : null}
                         {selected ? <Check className="absolute right-1.5 top-1.5 size-4" aria-hidden="true" /> : null}
                       </button>
                     );
@@ -331,6 +323,7 @@ function BookingCalendarDialog({ onClose, worker, schedule, onConfirmBooking }: 
                 </div>
               </div>
               <p className="mt-3 text-sm text-muted-foreground">Choose a date from tomorrow onward, Philippine time.</p>
+              <p className="mt-1 text-sm text-muted-foreground">Dates with no available slots are disabled. Your booking will not move to another date automatically.</p>
               {missingStep === "date" ? <p role="alert" className="mt-2 text-sm font-semibold text-destructive">Choose a date from tomorrow onward.</p> : null}
             </section>
 
@@ -356,7 +349,7 @@ function BookingCalendarDialog({ onClose, worker, schedule, onConfirmBooking }: 
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="flex size-7 items-center justify-center rounded-full bg-primary text-sm font-bold text-primary-foreground" aria-hidden="true">2</span>
                   <Clock className="size-5 text-primary" aria-hidden="true" />
-                  <h3 id="available-times-heading" className="font-semibold text-foreground">Select an available time</h3>
+                  <h3 id="available-times-heading" className="font-semibold text-foreground">Select an available slot</h3>
                   <span className="rounded-full bg-brand-highlight-soft px-2 py-1 text-xs font-bold text-brand-highlight-foreground">Required</span>
                 </div>
                 <p className="mt-2 text-sm text-muted-foreground">
@@ -387,7 +380,7 @@ function BookingCalendarDialog({ onClose, worker, schedule, onConfirmBooking }: 
                         onClick={() => { setSelectedBlockId(block.id); setMissingStep(null); setAvailabilityError(""); }}
                         aria-pressed={selected}
                       >
-                        <span><span className="block font-semibold">{formatTime(block.startTime)}–{formatTime(block.endTime)}</span><span className={cn("mt-1 block text-xs", selected ? "text-primary-foreground/80" : "text-muted-foreground")}>{full ? "No spots left" : `${block.slotsLeft} ${block.slotsLeft === 1 ? "spot" : "spots"} left`}</span></span>
+                        <span><span className="block font-semibold">{formatTime(block.startTime)}–{formatTime(block.endTime)}</span><span className={cn("mt-1 block text-xs", selected ? "text-primary-foreground/80" : "text-muted-foreground")}>{full ? "Unavailable" : `${block.slotsLeft} ${block.slotsLeft === 1 ? "slot" : "slots"} available`}</span></span>
                         <span className="flex shrink-0 items-center gap-2 text-sm font-semibold">
                           {selected ? <><span>Selected</span><CheckCircle2 className="size-5" aria-hidden="true" /></> : <><span>Select</span><span className="size-5 rounded-full border-2 border-muted-foreground/50" aria-hidden="true" /></>}
                         </span>
@@ -399,7 +392,7 @@ function BookingCalendarDialog({ onClose, worker, schedule, onConfirmBooking }: 
             )}
           </div>
 
-          <DialogFooter className="sticky bottom-0 bg-background px-4 pb-4 pt-4 sm:px-6 sm:pb-6">
+          <DialogFooter className="sticky bottom-0 flex-col bg-background px-4 pb-4 pt-4 sm:flex-row sm:px-6 sm:pb-6">
             <div className={cn("mr-auto flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium", canReview ? "bg-primary/5 text-foreground" : "bg-brand-highlight-soft text-brand-highlight-foreground")}>
               {canReview ? <CheckCircle2 className="size-4 shrink-0" aria-hidden="true" /> : <AlertCircle className="size-4 shrink-0" aria-hidden="true" />}
               <p>{confirmHint}</p>
@@ -417,10 +410,10 @@ function BookingCalendarDialog({ onClose, worker, schedule, onConfirmBooking }: 
                 <CalendarCheck className="size-5" aria-hidden="true" />
               </span>
               <div>
-                <p className="mb-1 text-xs font-bold uppercase tracking-wide text-primary-foreground/75">Final step</p>
-                <DialogTitle className="text-2xl text-primary-foreground">Confirm booking request</DialogTitle>
+                <p className="mb-1 text-xs font-bold uppercase tracking-wide text-primary-foreground/75">Next step</p>
+                <DialogTitle className="text-2xl text-primary-foreground">Review booking schedule</DialogTitle>
                 <DialogDescription className="mt-1.5 text-primary-foreground/80">
-                  Check the schedule below before sending it to the provider.
+                  Check the exact date and slot below before continuing to payment.
                 </DialogDescription>
               </div>
             </div>
@@ -449,13 +442,13 @@ function BookingCalendarDialog({ onClose, worker, schedule, onConfirmBooking }: 
 
             <div className="flex gap-3 rounded-xl bg-primary/5 p-4 text-sm leading-5 text-muted-foreground">
               <ShieldCheck className="mt-0.5 size-5 shrink-0 text-primary" aria-hidden="true" />
-              <p>Sending this request does not charge you. The provider will receive the booking details and confirm the next step.</p>
+              <p>No payment is taken at this step. You will review payment options before reserving this exact slot for checkout.</p>
             </div>
           </div>
 
           <DialogFooter className="bg-muted/40 px-6 py-4">
             <Button className="w-full sm:w-auto" variant="outline" onClick={() => setIsReviewOpen(false)}>Back to schedule</Button>
-            <Button className="w-full sm:w-auto" onClick={() => void confirmBooking()} disabled={checking}><Send aria-hidden="true" />{checking ? "Checking time…" : "Send booking request"}</Button>
+            <Button className="w-full sm:w-auto" onClick={() => void confirmBooking()} disabled={checking}><Send aria-hidden="true" />{checking ? "Checking slot…" : "Continue to payment"}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
