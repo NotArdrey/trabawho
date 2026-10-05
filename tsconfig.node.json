@@ -10,5 +10,5 @@
     "noEmit": true,
     "types": ["node"]
   },
-  "include": ["vite.config.mts", "scripts/*.mts", "scripts/*.ts", "api/*.ts", "src/shared/domain/paymongoSandboxAccess.ts"]
+  "include": ["vite.config.mts", "scripts/*.mts", "scripts/*.ts", "api/*.ts", "src/shared/domain/paymongoSandboxAccess.ts", "supabase/functions/_shared/authEmailTemplates.ts", "supabase/functions/_shared/emailNotifications.ts", "supabase/functions/_shared/emailLayout.ts"]
 }

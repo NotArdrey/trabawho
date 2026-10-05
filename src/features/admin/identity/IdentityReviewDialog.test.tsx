@@ -17,6 +17,7 @@ describe("identity review decisions", () => {
     expect(screen.getByText(/12 Main Street, Almeida, Balaoan, La Union/)).toBeVisible();
     await user.click(screen.getByRole("button", { name: "Approve identity" }));
     expect(screen.getByRole("alert")).toHaveTextContent(/20 to 2000/);
+    expect(screen.getByRole("alert")).toHaveFocus();
     await user.type(screen.getByLabelText("Decision reason"), "The document and selfie match the applicant.");
     await user.click(screen.getByRole("button", { name: "Approve identity" }));
     expect(screen.getByRole("alert")).toHaveTextContent(/reviewed the identity evidence/);
@@ -26,6 +27,7 @@ describe("identity review decisions", () => {
     await user.click(screen.getByRole("button", { name: "Confirm approval" }));
     expect(mocks.decide).toHaveBeenCalledWith(expect.objectContaining({ decision: "APPROVED", evidenceReviewed: true, reason: "The document and selfie match the applicant." }));
     expect(await screen.findByRole("status")).toHaveTextContent(/confirm their email/);
+    expect(screen.getByRole("status")).toHaveFocus();
   });
   it("preserves the reason and operation ID when a failed decision is retried", async () => {
     const user = userEvent.setup(); mocks.decide.mockRejectedValue(new Error("The request failed."));
@@ -34,6 +36,7 @@ describe("identity review decisions", () => {
     await user.click(screen.getByRole("button", { name: "Reject identity" }));
     await user.click(screen.getByRole("button", { name: "Confirm rejection" }));
     expect(await screen.findByRole("alert")).toHaveTextContent("The request failed.");
+    expect(screen.getByRole("alert")).toHaveFocus();
     await user.click(screen.getByRole("button", { name: "Confirm rejection" }));
     expect(mocks.decide.mock.calls[0]).toEqual(mocks.decide.mock.calls[1]);
   });

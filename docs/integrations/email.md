@@ -46,6 +46,35 @@ rollback integration suites passed, including email recipients, leases, privacy,
 identity decisions, and name protection. A real camera verification still needs
 separate rehearsal.
 
+## Email design
+
+System notifications and the six Supabase Auth templates share the TrabaWho
+wordmark, white card, blue action button, readable details, and plain-language
+instructions. Presentation tables and inline styles support email clients without
+loading app CSS, images, fonts, or scripts. Notifications retain a plain-text part.
+Identity updates explain the review and email-confirmation steps separately;
+they omit internal account UUIDs. Authentication templates preserve Supabase's
+`{{ .ConfirmationURL }}` and `{{ .Token }}` placeholders and include a fallback link.
+
+Run `npm run email:design` to generate reviewable HTML in `exports/email-design`.
+After verification, run `npm run email:design -- --apply` to deploy the notification
+worker and update only Auth subjects and template content using the environment
+PAT. SMTP credentials, confirmation gates, redirect settings, schedules, and stored
+data are preserved. The command rejects an active email hook or custom callback
+templates that need their own integration. Re-running `email:configure` also
+includes the shared layout in the worker deployment.
+
+Verify with the existing Deno email suites and
+`npx playwright test tests/e2e/email-design.e2e.spec.ts`. These checks render emails
+and mock delivery; they do not send diagnostic messages to real inboxes.
+
+The shared notification layout and all six Auth designs were deployed on
+2026-10-05. Auth subjects and HTML were read back and matched the generated
+templates; SMTP, confirmation gates, and redirects were unchanged. The full
+project checks, 12 Deno email tests, and email layouts/preferences at all five
+documented widths passed. Browser previews were reviewed on mobile and desktop;
+actual inbox rendering has not been checked for this design.
+
 ## Events and preferences
 
 Database triggers enqueue new booking and lifecycle/payment/delivery/dispute/

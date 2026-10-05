@@ -37,6 +37,7 @@
   },
   "scripts": {
     "email:configure": "node scripts/configure-system-email.mts",
+    "email:design": "node scripts/configure-email-design.mts",
     "ai:stitch:mcp": "node scripts/ai-ui-agent/stitch-mcp-bridge.mjs",
     "ai:stitch:redesign": "node scripts/ai-ui-agent/stitch-redesign.mjs",
     "dev": "vite",

@@ -1,5 +1,6 @@
 import { assert, assertEquals, assertThrows } from 'https://deno.land/std@0.224.0/assert/mod.ts';
 import { buildNotificationEmail, canEmail, deliveryFailure, type EmailEvent, type EmailKind } from './emailNotifications.ts';
+import { authEmailTemplates } from './authEmailTemplates.ts';
 
 const event: EmailEvent = { id: 'event-1', recipient_id: 'user-1', kind: 'booking', attempts: 1,
   lease_token: 'lease-1', payload: { status: 'confirmed', payment_status: 'paid', reference: 'booking-1' } };
@@ -25,6 +26,27 @@ Deno.test('emails exclude private bodies and notes and render Philippine schedul
 Deno.test('unsafe application URLs are rejected', () => {
   assertThrows(() => buildNotificationEmail(event, 'javascript:alert(1)'));
   assertThrows(() => buildNotificationEmail(event, 'http://public.example'));
+});
+Deno.test('identity notifications distinguish review from confirmation and omit internal user IDs', () => {
+  const pending = buildNotificationEmail({ ...event, kind: 'identity', payload: { status: 'PENDING_REVIEW', reference: 'internal-user-id' } }, 'https://trabawho.example');
+  assert(pending.text.includes('administrator') && pending.html.includes('confirmation, when available, arrives separately'));
+  assert(!pending.text.includes('internal-user-id') && !pending.html.includes('internal-user-id'));
+  const approved = buildNotificationEmail({ ...event, kind: 'identity', payload: { status: 'APPROVED' } }, 'https://trabawho.example');
+  assert(approved.text.includes('separate confirmation email'));
+  assert(!approved.html.includes('Confirm my email'));
+});
+Deno.test('Auth designs preserve secure link and code placeholders with a distinct confirmation action', () => {
+  const templates = authEmailTemplates();
+  assertEquals(Object.keys(templates).length, 12);
+  for (const kind of ['confirmation', 'recovery', 'invite', 'magic_link', 'email_change']) {
+    const html = templates[`mailer_templates_${kind}_content`];
+    assert(html.includes('href="{{ .ConfirmationURL }}"'));
+    assert(!html.includes('.TokenHash') && !html.includes('javascript:'));
+    assert(html.includes('role="presentation"') && html.includes('name="viewport"'));
+  }
+  assert(templates.mailer_templates_confirmation_content.includes('Confirm my email'));
+  assert(templates.mailer_templates_reauthentication_content.includes('{{ .Token }}'));
+  assert(!templates.mailer_templates_reauthentication_content.includes('.ConfirmationURL'));
 });
 Deno.test('optional notifications respect confirmed email and preferences; security alerts remain enabled', () => {
   assertEquals(canEmail('booking', false, true), false);
