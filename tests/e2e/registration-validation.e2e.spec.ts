@@ -26,7 +26,8 @@ for(const width of [390,768,1024,1280,1440]) test(`base account defers identity 
   const stored=await page.evaluate(()=>JSON.stringify(sessionStorage));
   expect(stored).not.toContain('Password123!'); expect(stored).not.toContain('password');
   await page.reload();
-  await expect(page.getByRole('heading',{name:'Verify your identity',exact:true})).toBeVisible();
+  await expect(page.getByRole('heading',{name:'Create your account',exact:true})).toBeVisible();
+  await expect(page.getByLabel('Email',{exact:true})).toHaveValue('');
   await expectNoRegistrationOverflow(page);
 });
 test('signup requires an explicit choice and supports changing it with the keyboard', async ({ page }) => {

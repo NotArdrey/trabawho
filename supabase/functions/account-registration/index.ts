@@ -32,6 +32,11 @@ Deno.serve(async (request: Request) => {
       ? await createRegistrationDraft(request,client,body) : await createLegacyRegistration(request,client,body));
     const draft = await ownedDraft(client,body);
     if (draft && !draft.finalized_at) {
+      if (body.action === 'discard') {
+        const result = await client.rpc('discard_registration_draft', { p_id: String(draft.id) });
+        if (result.error) throw new AccountError('Registration could not be reset. Retry.',503);
+        return jsonResponse(result.data ? { state: 'identity_pending' } : await finalizeRegistrationDraft(client,String(draft.id)));
+      }
       if (body.action !== 'state') throw new AccountError('Complete identity verification before requesting confirmation.',409);
       return jsonResponse(await finalizeRegistrationDraft(client,String(draft.id)));
     }

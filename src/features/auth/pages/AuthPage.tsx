@@ -11,6 +11,7 @@ import PasswordField from '../components/PasswordField';
 import { ResendConfirmationButton } from '../components/ResendConfirmationButton';
 import { AccountRegistrationJourney } from '../components/AccountRegistrationJourney';
 import { AuthVisual } from '../components/AuthVisual';
+import { DiditReturn } from '../components/DiditReturn';
 import { useAuthPageController, type AuthPageProps } from '../hooks/useAuthPageController';
 import { useAuthPageNavigation } from '../hooks/useAuthPageNavigation';
 
@@ -19,6 +20,7 @@ export default function AuthPage({ mode = 'login', onModeChange, onBack, onSubmi
   const navigation = useAuthPageNavigation();
   const [registrationStarted, setRegistrationStarted] = useState(false);
   const title = mode === 'register' ? 'Create account' : mode === 'forgot' ? 'Reset Password' : 'Sign in';
+  if (mode === 'register' && new URLSearchParams(window.location.search).get('didit_return') === '1') return <DiditReturn />;
   return (
     <main className="min-h-dvh bg-background px-4 py-4 text-foreground sm:px-8 sm:py-6">
       <div className="mx-auto max-w-7xl space-y-6">

@@ -1,8 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { pendingAccount, registrationRequest, RegistrationRequestError, savePendingAccount, resumeRegistration, signInForRegistration, subscribeToRegistrationAuth, resendFromSignIn } from './accountRegistrationService';
+import { clearPendingAccount, pendingAccount, registrationRequest, RegistrationRequestError, savePendingAccount, resumeRegistration, signInForRegistration, subscribeToRegistrationAuth, resendFromSignIn } from './accountRegistrationService';
 const { invoke, getSession, signInWithPassword, onAuthStateChange, setSession } = vi.hoisted(() => ({ invoke: vi.fn(), getSession: vi.fn(), signInWithPassword: vi.fn(), onAuthStateChange: vi.fn(), setSession: vi.fn() }));
 vi.mock('@/integrations/supabase', () => ({ supabase: { functions: { invoke }, auth: { getSession, signInWithPassword, onAuthStateChange, setSession } } }));
-beforeEach(() => { vi.resetAllMocks(); sessionStorage.clear(); });
+beforeEach(() => { vi.resetAllMocks(); sessionStorage.clear(); clearPendingAccount(); });
 describe('account registration transport and recovery', () => {
   it('requests confirmation through the identity-gated server endpoint', async () => {
     invoke.mockResolvedValue({data:{requested:true},error:null});
@@ -17,7 +17,7 @@ describe('account registration transport and recovery', () => {
     expect(setSession).not.toHaveBeenCalled();
     expect(pendingAccount()?.userId).toBe('pending');
   });
-  it('retains pending recovery on refresh while signed out', async () => {
+  it('keeps the current registration in memory while checking server state', async () => {
     savePendingAccount({ userId: 'pending', nonce: 'recovery', email: 'pending@example.com' });
     getSession.mockResolvedValue({ data: { session: null }, error: null });
     invoke.mockResolvedValue({ data: { state: 'identity_pending', signupName: 'Applicant Name' }, error: null });
@@ -104,12 +104,13 @@ describe('account registration transport and recovery', () => {
     expect(pendingAccount()).toBeNull(); expect(onSignOut).toHaveBeenCalledOnce();
     stop(); expect(unsubscribe).toHaveBeenCalledOnce();
   });
-  it('removes legacy credentials and persists only an expiring account recovery capability', () => {
+  it('removes old progress and keeps recovery only in memory', () => {
     sessionStorage.setItem('trabawho.identitySignup.v1', JSON.stringify({ password: 'secret-old' }));
     savePendingAccount({ userId: 'account', nonce: 'recovery', email: 'person@example.com' });
     expect(sessionStorage.getItem('trabawho.identitySignup.v1')).toBeNull();
     expect(pendingAccount()).toEqual({ userId: 'account', nonce: 'recovery', email: 'person@example.com' });
     expect(JSON.stringify(sessionStorage)).not.toContain('password');
+    expect(sessionStorage.getItem('trabawho.pendingAccount.v2')).toBeNull();
   });
   it('ignores malformed pending recovery data', () => {
     sessionStorage.setItem('trabawho.pendingAccount.v2', '{"userId":2}');

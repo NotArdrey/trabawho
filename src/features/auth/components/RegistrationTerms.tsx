@@ -14,7 +14,7 @@ export function RegistrationTerms({ disabled }: { disabled: boolean }) {
           <DialogTitle>Terms and Conditions</DialogTitle>
           <DialogDescription>Read these terms before agreeing to create your TrabaWho account.</DialogDescription>
         </DialogHeader>
-        <p className="text-sm leading-6 text-muted-foreground">TrabaWho processes account, booking, contact, and verification information under the Data Privacy Act of 2012. You agree to provide accurate information and use the marketplace responsibly. Identity evidence is used to verify access; identity consent is requested separately before capture.</p>
+        <p className="text-sm leading-6 text-muted-foreground">TrabaWho processes account, booking, contact, and verification information under the Data Privacy Act of 2012. You agree to provide accurate information and use the marketplace responsibly. Before ID capture or manual submission, the verification action explains how your ID and selfie are used to review access.</p>
         <DialogFooter><DialogClose asChild><Button variant="outline">Close terms</Button></DialogClose></DialogFooter>
       </DialogContent>
     </Dialog>

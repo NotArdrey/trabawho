@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { corsHeaders, mockAccountJourney } from './helpers/registration';
+import { corsHeaders, fillRegistration, mockAccountJourney } from './helpers/registration';
 import { DEMO_ADMIN_EMAIL, DEMO_PASSWORD } from './helpers/supabase.js';
 
 test('login, logout, then new signup does not restore the previous pending account', async ({ page }) => {
@@ -36,17 +36,16 @@ for (const width of [390, 1440]) test(`abandoned signup can start another accoun
   const flow = await mockAccountJourney(page);
   await page.route('**/auth/v1/logout*', async (route) => route.fulfill({ headers: corsHeaders, status: 204 }));
   await page.goto('/register');
-  await page.evaluate(() => sessionStorage.setItem('trabawho.pendingAccount.v2', JSON.stringify({ userId: 'previous', nonce: 'old-capability', email: 'old@example.com', signupName: 'Old Applicant' })));
-  await page.reload();
+  await fillRegistration(page);
   await expect(page.getByRole('heading', { name: 'Verify your identity', exact: true })).toBeVisible();
-  await page.getByRole('button', { name: 'Back', exact: true }).click();
-  await page.getByRole('button', { name: 'Use a different account', exact: true }).click();
+  const requestsBeforeReload = flow.requests.length;
+  await page.reload();
   await expect(page.getByRole('heading', { name: 'Create your account', exact: true })).toBeFocused();
   await expect(page.getByLabel('Email', { exact: true })).toHaveValue('');
   await expect(page.getByLabel('Password', { exact: true })).toHaveValue('');
   expect(await page.evaluate(() => sessionStorage.getItem('trabawho.pendingAccount.v2'))).toBeNull();
-  expect(flow.requests.length).toBeGreaterThan(0);
-  expect(flow.requests.every(item => item.body.action === 'state')).toBe(true);
+  expect(flow.requests.length).toBe(requestsBeforeReload);
+  expect(flow.requests.some(item => item.body.action === 'resend')).toBe(false);
   await page.reload();
   await expect(page.getByRole('heading', { name: 'Create your account', exact: true })).toBeVisible();
 });

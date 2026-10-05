@@ -40,7 +40,6 @@ test('keyboard navigation preserves a draft when leaving is cancelled', async ({
 test('manual Previous navigation preserves evidence and associates corrective errors', async ({ page }) => {
   const flow = await mockAccountJourney(page, { state: 'identity_pending' });
   await page.goto('/register');
-  await page.getByRole('checkbox', { name: /I consent to identity/ }).check();
   await page.getByRole('button', { name: 'Submit manually' }).click();
   await fillManualEvidence(page);
   await page.getByRole('button', { name: 'Back to verification options', exact: true }).click();

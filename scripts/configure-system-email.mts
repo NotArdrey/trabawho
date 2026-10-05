@@ -46,7 +46,9 @@ try {
       EMAIL_WORKER_SECRET: workerSecret, TRABAWHO_APP_URL: url.origin }).map(([name, value]) => ({ name, value }))),
   });
   const entrypoint = 'supabase/functions/send-system-emails/index.ts';
-  const files = [entrypoint, 'supabase/functions/send-system-emails/handler.ts', 'supabase/functions/_shared/emailNotifications.ts', 'supabase/functions/_shared/emailLayout.ts'];
+  const files = [entrypoint, 'supabase/functions/send-system-emails/handler.ts', 'supabase/functions/_shared/emailNotifications.ts', 'supabase/functions/_shared/emailLayout.ts',
+    'supabase/functions/_shared/identityConfirmation.ts', 'supabase/functions/_shared/identityReviewError.ts',
+    'supabase/functions/_shared/confirmationEmail.ts', 'supabase/functions/_shared/identityDomain.ts'];
   const form = new FormData();
   form.set('metadata', JSON.stringify({ name: 'send-system-emails', entrypoint_path: entrypoint, verify_jwt: false }));
   for (const file of files) form.append('file', new Blob([fs.readFileSync(file)], { type: 'application/typescript' }), file);

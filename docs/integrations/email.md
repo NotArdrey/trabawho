@@ -77,6 +77,28 @@ actual inbox rendering has not been checked for this design.
 
 ## Events and preferences
 
+Admin approval sends a secure Supabase Auth confirmation link to the account's
+current email. Approval never confirms an unconfirmed email automatically,
+including pending accounts from older registration versions. Approval and decline
+also enqueue identity status notifications, which remain enabled for unconfirmed
+accounts. The scheduled worker retries a failed approval confirmation before
+finishing that approval's queue event, and checks the current review, account
+status, and document expiry. A saved decision remains successful when immediate
+email delivery fails. Sent confirmations are not duplicated on ordinary retries.
+
+The confirmation retry and decision-handling correction was deployed to Supabase
+on 2026-10-05 with `send-system-emails` version 6 and
+`account-admin-identity-review` version 5. The registration migration preserves
+inbox confirmation after admin approval, including older unconfirmed accounts.
+The live rollback suites passed, and Gmail SMTP, Auth confirmation settings, and
+the active minute scheduler were verified. No diagnostic email was sent during
+this rollout; inbox delivery is not claimed by these checks.
+
+Run `node scripts/inspect-registration-email.mts` for a read-only diagnostic of
+SMTP configuration, queue counts, scheduled jobs, and review delivery states.
+It prints no credentials, recipient addresses, or identity evidence. SMTP
+acceptance and an empty failure queue do not establish inbox receipt.
+
 Database triggers enqueue new booking and lifecycle/payment/delivery/dispute/
 schedule updates, incoming messages, payment outcomes, refunds, quotes,
 rescheduling, public support progress, published reviews, identity/account status,

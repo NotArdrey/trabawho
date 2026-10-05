@@ -18,6 +18,7 @@ export async function mockAccountJourney(page: Page, initial: JourneyState | nul
       signupRole = body.signupRole === 'worker' ? 'worker' : 'client';
       state = { state: 'identity_pending', email: String(body.email), signupName: '', signupRole };
     }
+    if(name==='account-registration' && body.action==='discard') state={state:'identity_pending'};
     if(name==='account-registration' && body.action==='save_name') state = { ...state, state: 'identity_pending', signupName: String(body.signupName) };
     if(name==='account-registration' && body.action==='state' && body.userId && !state) state={state:'identity_pending',email:String(body.email),signupName:typeof body.signupName === 'string' ? body.signupName : ''};
     if(name==='account-didit-session') state=body.action==='get_session'?next:{state:'identity_in_progress',sessionId:'didit-owned',sessionUrl:'https://verification.didit.me/session/test'};

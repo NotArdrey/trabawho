@@ -41,6 +41,7 @@ export async function finalizeRegistrationDraft(client: DraftClient, id: string)
   let draft = await readDraft(client,id);
   if (!draft) throw new AccountError('Registration could not be found.',404);
   if (draft.finalized_at) return deliverAccountConfirmation(client,id);
+  if (Date.parse(text(draft.expires_at)) < Date.now()) return { ...draftState(draft), state: 'declined' };
   if (!['APPROVED','PENDING_REVIEW'].includes(text(draft.provider_status))) return draftState(draft);
   const lease = crypto.randomUUID();
   const claimed = await client.rpc('claim_registration_draft',{p_id:id,p_lease:lease,p_operation:'finalize'});

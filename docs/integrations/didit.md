@@ -7,6 +7,44 @@ Official references: [Create Session](https://docs.didit.me/sessions-api/create-
 
 ## Implementation and rollout
 
+The registration reset and admin-review correction was deployed to Supabase on
+2026-10-05 with `20261006121000_registration_review_and_reset.sql`. The active
+function versions are `account-registration` 9, `account-didit-session` 8,
+`account-manual-review` 7, `account-identity-name` 7,
+`account-admin-identity-review` 5, `didit-webhook` 30, and `send-system-emails` 6.
+Existing confirmed accounts retain access. The older rollout records below
+document the previous behavior.
+
+The live migration was read back and matched the local SQL. Rollback-only
+`registration-drafts.sql`, `account-registration.sql`, and `account-roles.sql`
+passed; all deployed endpoints rejected unsigned requests. SMTP configuration
+and the scheduled email worker were preserved. The 81 registration/admin browser
+journeys passed locally. A real camera scan and inbox receipt remain unverified.
+The corrected frontend is included in the subsequent push to `main`.
+
+`node scripts/deploy-registration-fix.mts` validates every local dependency and
+prints the deployment manifest without remote changes. Add `--apply` to apply
+only this migration, record it in history, and deploy the seven function bundles.
+The script rejects an existing version with a different migration name or SQL.
+Publish the verified frontend build after the backend. SMTP settings are preserved.
+
+The requested flow is now **Account details → Didit or manual evidence → Admin
+review → Decision email → Email confirmation after approval → Sign in**. All new
+Didit submissions need admin review, including provider-approved checks. Identity
+actions explain ID/selfie processing beside their buttons and record consent when
+selected; there is no separate identity consent checkbox.
+
+Browser registration progress and recovery capabilities are held only in memory.
+Reloading or leaving starts a fresh form. Didit runs in a camera-enabled embedded
+dialog, following its [official iframe integration](https://github.com/didit-protocol/iframe-example).
+The active frame's origin and message source are checked before querying the trusted
+server result. The flow does not rely on window handles, which Didit's opener
+isolation can sever. Closing an unfinished scan
+resets all form state and discards the draft's encrypted credentials. Completed
+submissions remain in the admin queue. Callback parameters cannot approve them.
+The database normalizes numeric and ISO provider timestamps before ordering
+events, preventing report dates from causing the result-saving error.
+
 The initial registration redesign is implemented in the repository. Its six migrations
 and eight new or updated backend functions are deployed on the linked Supabase
 project. The new account-owned endpoints run alongside the earlier endpoints.
@@ -79,10 +117,11 @@ email. Didit extracts the legal name. There is no separate applicant-name page,
 email-confirmation page, video upload, address, or Worker qualification collection.
 Back appears below the primary action, and account-access tabs hide after starting.
 Manual verification collects the name on ID, document type/number, expiration
-or no-expiration choice, front, back when applicable, selfie holding ID, and consent.
+or no-expiration choice, front, back when applicable, and selfie holding ID. The
+verification action explains and records agreement to ID/selfie processing.
 After trusted Didit approval or a complete manual submission, the backend creates
-the Auth account, fixed role, profile, and identity records. Duplicates, ambiguous
-names, and provider review decisions create restricted pending accounts. Confirmation
+the Auth account, fixed role, profile, and identity records in pending admin review.
+Duplicates and ambiguous names remain visible to the reviewer. Confirmation
 email is sent automatically only after local identity approval. New accounts must
 use the link in their inbox; identity approval never confirms their email.
 The submitted wizard shows inbox instructions or the pending-review result.
@@ -126,17 +165,17 @@ claims and database uniqueness enforce one approved document per role even when
 approval requests compete. Finalized accounts retain both the identity and email
 marketplace gates. SMTP failure leaves the saved account available for retry.
 
-The pending draft/account UUID, expiring recovery capability, and email are stored
-in session storage. The retired password-bearing state is removed. Recovery allows
-registration actions only; it grants no marketplace access. The page polls active
-identity sessions and pending reviews while visible, including after returning
-from Didit. A signed Didit webhook can finish account creation even if the browser
-has closed. Confirmation callbacks return to `/register`. Manual approval triggers
-confirmation delivery through the admin handler. Sign-in resend uses a server
-identity/expiry/access check and gives the same response for unknown or blocked
-emails. Existing V2 creation requests and applicant-name actions remain compatible
-with already published bundles. Existing account decisions and legacy confirmation
-behavior are preserved; new V3 requests require real inbox confirmation.
+The pending draft/account UUID, recovery capability, and email are held in memory
+for the current registration page. Retired browser storage is removed. Recovery
+allows registration actions only and grants no marketplace access. Reloading or
+leaving starts over. The page checks trusted Didit results and pending reviews
+while visible. Discarded drafts cannot finalize from late callbacks. Completed
+submissions can finish through a signed webhook and notify the applicant by email.
+Confirmation callbacks return to `/register`. Admin approval sends the confirmation
+link; its durable notification event retries failed delivery. Sign-in resend checks
+identity, expiry, and account access, returning the same response for unknown or
+blocked emails. Existing confirmed accounts retain access. Pending V2 and V3
+accounts both need their actual inbox link after approval.
 
 ## Identity and name confirmation
 
@@ -145,9 +184,9 @@ account, checks expiry/access restrictions, and requires identity consent before
 creating a hosted workflow. Didit handles document selection, ID capture,
 liveness, face matching, and legal-name extraction. V3 sessions belong to the
 private draft until account creation; V2 sessions remain account-owned. Database
-leases serialize creation. Retries reuse an existing pending session. Draft
-returns resume in the browser with its recovery capability; after account and
-email completion, sign-in supports resumption on another device.
+leases serialize creation within a single attempt. Closing an unfinished Didit
+tab resets registration; reloading does not resume a draft. Completed accounts
+support sign-in on another device after inbox confirmation.
 
 Existing ID-photo upload is controlled by the Didit workflow's **ID verification
 → Advanced → Document upload** option, not a TrabaWho form field or session
@@ -157,8 +196,8 @@ conditionally because the configured workflow has not been changed by this code.
 See [Didit's document upload guidance](https://help.didit.me/documents-coverage/document-upload-problems).
 Manual review remains the clearly labeled upload fallback.
 
-V3 identity approval sends the confirmation email without confirming it. Existing
-V2 identity approval retains its atomic confirmation behavior for compatibility.
+Administrator identity approval sends the confirmation email without confirming
+it, including older pending accounts.
 Confirming email alone does not approve identity or open marketplace access.
 
 The browser return bridge preserves an allowlisted `/register` destination.
@@ -169,7 +208,8 @@ V3 reports use plural arrays such as `id_verifications`, `liveness_checks`, and
 `face_matches`.
 
 Server-fetched reports supply the complete legal name and document type. V3
-finalization stores a complete, unambiguous legal name automatically. Earlier
+submissions retain the extracted source name for an administrator to review. The
+protected profile name is saved only with human approval. Earlier
 account-owned sessions retain **Name on your verified ID** confirmation through
 `account-identity-name`. The protected
 `full_name` uses the complete source value without a forced first/middle/last
@@ -268,7 +308,7 @@ Server-only secrets are `DIDIT_API_KEY`, `DIDIT_WORKFLOW_ID`,
 `IDENTITY_ALLOWED_ORIGINS`. Supabase supplies its URL, anonymous key, and service
 role key. Browser configuration contains only the public URL/key. Auth email
 confirmation remains enabled globally. V3 identity approval leaves email unconfirmed;
-V2 final-approval confirmation remains compatible with existing accounts. The confirmation
+Older pending accounts also require an inbox link after approval. The confirmation
 allowlist must include the application origin's `/register` route; existing `/**`
 entries also cover it.
 

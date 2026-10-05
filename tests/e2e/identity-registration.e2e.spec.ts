@@ -6,10 +6,9 @@ for(const width of [390,768,1024,1280,1440]) {
     const flow=await mockAccountJourney(page,{state:'identity_pending'});
     await page.goto('/register');
     await expect(page.getByRole('heading',{name:'Verify your identity',exact:true})).toBeVisible();
-    await expect(page.getByRole('button',{name:'Verify with Didit'})).toBeDisabled();
-    await page.getByRole('checkbox',{name:/I consent to identity/}).check();
+    await expect(page.getByRole('button',{name:'Verify with Didit'})).toBeEnabled();
     await page.getByRole('button',{name:'Verify with Didit'}).click();
-    await expect(page.getByRole('link',{name:/Continue in Didit/})).toHaveAttribute('href',/didit\.me/);
+    await expect(page.getByRole('button',{name:/Continue in Didit/})).toBeEnabled();
     await page.getByRole('button',{name:'Check verification status'}).click();
     await expect(page.getByRole('heading',{name:'Name on your verified ID'})).toBeVisible();
     await expect(page.getByText('Maria Isabel de la Cruz Santos',{exact:true})).toBeVisible();
@@ -46,7 +45,6 @@ test('a disputed legal name stays a correction request for human review',async({
 test('manual fallback submits evidence for the existing confirmed account without credentials or address',async({page})=>{
   const flow=await mockAccountJourney(page,{state:'identity_pending'});
   await page.goto('/register');
-  await page.getByRole('checkbox',{name:/I consent to identity/}).check();
   await page.getByRole('button',{name:'Submit manually'}).click();
   await fillManualEvidence(page);
   await page.getByRole('button',{name:'Submit for human review'}).click();
@@ -65,7 +63,6 @@ test('cross-device return resumes the server-linked session without local signup
 test('worker intent survives verification responses from older identity endpoints', async ({ page }) => {
   await mockAccountJourney(page, { state: 'identity_pending', signupRole: 'worker' });
   await page.goto('/register');
-  await page.getByRole('checkbox', { name: /I consent to identity/ }).check();
   await page.getByRole('button', { name: 'Verify with Didit' }).click();
   await page.getByRole('button', { name: 'Check verification status' }).click();
   await page.getByRole('button', { name: 'Confirm my legal name' }).click();

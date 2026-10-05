@@ -55,8 +55,10 @@ begin
   exception when insufficient_privilege then null; end;
   perform public.confirm_account_identity_name(u);
   perform public.confirm_account_identity_name(u);
-  if not exists(select 1 from auth.users where id=u and email_confirmed_at is not null) then
-    raise exception 'Final identity approval did not confirm email atomically'; end if;
+  if exists(select 1 from auth.users where id=u and email_confirmed_at is not null) or
+    exists(select 1 from public.profiles where user_id=u and is_verified) then
+    raise exception 'Final identity approval bypassed the inbox confirmation link'; end if;
+  update auth.users set email_confirmed_at=now() where id=u;
   if not exists(select 1 from public.profiles where user_id=u and is_verified and full_name=name and first_name is null) then
     raise exception 'Name confirmation did not open access using the complete source name'; end if;
   if (select count(*) from public.identity_name_actions where user_id=u and action='CONFIRMED')<>1 then
@@ -88,6 +90,9 @@ begin
   exception when invalid_parameter_value then null; end;
   result:=public.decide_account_identity_review(review,actor,'APPROVED','The evidence supports a verified name.',op,'Reviewed Legal Name');
   result:=public.decide_account_identity_review(review,actor,'APPROVED','The evidence supports a verified name.',op,'Reviewed Legal Name');
+  if exists(select 1 from auth.users where id=u2 and email_confirmed_at is not null) then
+    raise exception 'Admin approval bypassed the inbox confirmation link'; end if;
+  update auth.users set email_confirmed_at=now() where id=u2;
   if not exists(select 1 from public.profiles where user_id=u2 and full_name='Reviewed Legal Name' and is_verified) then
     raise exception 'Reviewed legal name was not applied'; end if;
   result:=public.apply_didit_identity_event(sid2||'-after-review','hash',sid2,'APPROVED',

@@ -41,7 +41,7 @@ for (const width of [390, 768, 1024, 1280, 1440]) {
   });
 }
 
-test('account details go directly to identity without a name or email step', async ({ page }) => {
+test('account details go directly to identity and reloading starts a fresh registration', async ({ page }) => {
   const flow = await mockAccountJourney(page);
   await page.goto('/register');
   await fillRegistration(page);
@@ -50,18 +50,18 @@ test('account details go directly to identity without a name or email step', asy
   await expect(page.getByLabel('Complete name', { exact: true })).toHaveCount(0);
   await expect(page.getByRole('heading', { name: 'Confirm your email', exact: true })).toHaveCount(0);
   await page.reload();
-  await expect(page.getByRole('heading', { name: 'Verify your identity', exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Create your account', exact: true })).toBeVisible();
+  await expect(page.getByLabel('Email',{exact:true})).toHaveValue('');
+  expect(flow.requests.map(item=>item.body.action)).toEqual(['create']);
 });
 
-test('Back from identity keeps the name and consent without requesting email', async ({ page }) => {
+test('Back from identity keeps account details without requesting email', async ({ page }) => {
   const flow = await mockAccountJourney(page, { state: 'identity_pending', email: 'person@example.com', signupName: 'Ana Santos' });
   await page.goto('/register');
-  await page.getByRole('checkbox', { name: /I consent to identity/ }).check();
   await page.getByRole('button', { name: 'Back', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Continue your registration', exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Resend confirmation email', exact: true })).toHaveCount(0);
   await page.getByRole('button', { name: 'Continue to identity', exact: true }).click();
-  await expect(page.getByRole('checkbox', { name: /I consent to identity/ })).toBeChecked();
   expect(flow.requests.map((item) => item.body.action)).toEqual(['state']);
 });
 
@@ -70,7 +70,6 @@ for (const width of [390, 1440]) test(`hidden scrollbar preserves scrolling and 
   await page.setViewportSize({ width, height: 640 });
   await mockAccountJourney(page, { state: 'identity_pending', signupName: 'Ana Santos' });
   await page.goto('/register');
-  await page.getByRole('checkbox', { name: /I consent to identity/ }).check();
   await page.getByRole('button', { name: 'Submit manually' }).click();
   const panel = page.getByTestId('auth-task-panel');
   await expect(panel).toHaveCSS('scrollbar-width', 'none');
@@ -119,7 +118,6 @@ test('a legacy confirmed account resumes its session after identity approval', a
   });
   await page.goto('/register');
   await fillRegistration(page);
-  await page.getByRole('checkbox', { name: /I consent to identity/ }).check();
   await page.getByRole('button', { name: 'Verify with Didit' }).click();
   await page.getByRole('button', { name: 'Check verification status' }).click();
   await expect(page.getByRole('heading', { name: 'Name on your verified ID' })).toBeVisible();

@@ -1,6 +1,7 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.104.1';
 import nodemailer from 'npm:nodemailer@10.0.13';
 import { buildNotificationEmail, canEmail, deliveryFailure, type EmailEvent } from '../_shared/emailNotifications.ts';
+import { deliverIdentityConfirmation } from '../_shared/identityConfirmation.ts';
 
 const json = (value: Record<string, unknown>, status = 200) => new Response(JSON.stringify(value), {
   status, headers: { 'Content-Type': 'application/json' },
@@ -38,7 +39,7 @@ export async function handleSystemEmails(request: Request, mailerFactory = creat
   let failed = 0;
   let skipped = 0;
   for (const event of events) {
-    let outcome: Record<string, unknown>;
+    let outcome: Record<string, unknown> | null = null;
     try {
       const [account, preferences] = await Promise.all([
         client.auth.admin.getUserById(event.recipient_id),
@@ -49,13 +50,27 @@ export async function handleSystemEmails(request: Request, mailerFactory = creat
       if (!recipient?.email || !canEmail(event.kind, preferences.data?.email_enabled !== false, !!recipient.email_confirmed_at)) {
         outcome = { status: 'skipped', last_error: null }; skipped++;
       } else {
-        const result = await mailer.sendMail({
-          from: { name: 'TrabaWho', address: user }, to: recipient.email,
-          messageId: `<${event.id}@trabawho.notifications>`,
-          ...buildNotificationEmail(event, appUrl),
-        });
-        if (!result.accepted?.length) throw new Error('SMTP did not accept the recipient.');
-        outcome = { status: 'sent', sent_at: new Date().toISOString(), last_error: null }; sent++;
+        // The identity event is durable: retry the inbox link if the immediate
+        // admin request failed, before marking its approval notification sent.
+        if (event.kind === 'identity' && event.payload.status === 'APPROVED' && !recipient.email_confirmed_at) {
+          const review = await client.from('manual_identity_reviews').select('id').eq('user_id',event.recipient_id)
+            .eq('status','APPROVED').order('reviewed_at',{ascending:false}).limit(1).maybeSingle();
+          if (review.error) throw new Error('Approval review could not be loaded.');
+          if (review.data) {
+            const confirmation = await deliverIdentityConfirmation(client,String(review.data.id));
+            if (confirmation.required && !confirmation.sent) throw new Error('Confirmation delivery is pending.');
+            if (!confirmation.required) { outcome = { status: 'skipped', last_error: null }; skipped++; }
+          }
+        }
+        if (!outcome) {
+          const result = await mailer.sendMail({
+            from: { name: 'TrabaWho', address: user }, to: recipient.email,
+            messageId: `<${event.id}@trabawho.notifications>`,
+            ...buildNotificationEmail(event, appUrl),
+          });
+          if (!result.accepted?.length) throw new Error('SMTP did not accept the recipient.');
+          outcome = { status: 'sent', sent_at: new Date().toISOString(), last_error: null }; sent++;
+        }
       }
     } catch {
       outcome = deliveryFailure(event.attempts); failed++;

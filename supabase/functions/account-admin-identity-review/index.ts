@@ -45,7 +45,10 @@ Deno.serve(async (req: Request) => {
       if (["23514", "23505"].includes(error.code)) throw new ReviewError("This review or account has changed. Refresh before deciding.", 409);
       throw new ReviewError("The decision could not be saved. Retry.", 503);
     }
-    const emailDelivery = body.decision === "APPROVED" ? await deliverIdentityConfirmation(client, reviewId) : null;
+    const emailDelivery = body.decision === "APPROVED" ? await deliverIdentityConfirmation(client, reviewId).catch(() => {
+      console.error('approved_identity_confirmation_pending');
+      return { sent: false, required: true, status: 'failed' };
+    }) : null;
     return jsonResponse({ success: true, ...asRecord(data), emailDelivery });
   } catch (error) {
     if (error instanceof ReviewError) return jsonResponse({ success: false, error: error.message }, error.status);

@@ -29,8 +29,18 @@ begin
     perform public.finalize_registration_draft(u,lease);
     perform public.finalize_registration_draft(u,lease);
     if not exists(select 1 from public.profiles where user_id=u and role=requested_role and
-      verification_status='APPROVED' and not is_verified and full_name=document->>'fullName') then
-      raise exception 'Approved draft did not store the legal identity with blocked access'; end if;
+      verification_status='PENDING_REVIEW' and not is_verified) then
+      raise exception 'Didit approval bypassed administrator review'; end if;
+    select id into review from public.manual_identity_reviews where user_id=u and status='PENDING_REVIEW';
+    if review is null then raise exception 'Didit submission did not create a review'; end if;
+    begin
+      perform public.claim_pending_account_email(u,'test-nonce');
+      raise exception 'Didit approval sent email before administrator review';
+    exception when insufficient_privilege then null; end;
+    perform public.decide_account_identity_review(review,actor,'APPROVED',
+      'Verified the legal name and document against supplied evidence.',gen_random_uuid(),document->>'fullName');
+    if not exists(select 1 from public.profiles where user_id=u and verification_status='APPROVED' and not is_verified) then
+      raise exception 'Administrator approval did not preserve email confirmation gate'; end if;
     if exists(select 1 from auth.users where id=u and email_confirmed_at is not null) then
       raise exception 'Identity approval confirmed email without the inbox link'; end if;
     if not exists(select 1 from public.registration_drafts where id=u and finalized_at is not null and password_ciphertext is null) then

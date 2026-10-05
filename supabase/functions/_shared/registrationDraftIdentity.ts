@@ -39,7 +39,8 @@ export async function draftDidit(request: Request, client: DraftClient, draft: R
   try {
     const callback = new URL(`${Deno.env.get('SUPABASE_URL')}/functions/v1/verification-redirect`);
     const returnUrl = identityReturnUrl(body.redirectTo,Deno.env.get('TRABAWHO_APP_URL') || '',Deno.env.get('IDENTITY_ALLOWED_ORIGINS') || '');
-    returnUrl.pathname='/register';returnUrl.hash='';
+    returnUrl.pathname='/register';returnUrl.hash='';returnUrl.search='';
+    returnUrl.searchParams.set('didit_return','1');
     callback.searchParams.set('redirect_to',returnUrl.toString());
     const response = await fetch('https://verification.didit.me/v3/session/',{method:'POST',
       headers:{'Content-Type':'application/json','x-api-key':apiKey},signal:AbortSignal.timeout(12000),

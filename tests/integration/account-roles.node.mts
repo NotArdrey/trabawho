@@ -20,6 +20,7 @@ before(async () => {
     '20261006106000_fixed_account_roles.sql', '20261006107000_identity_duplicates_per_role.sql',
     '20261006108000_identity_before_email_confirmation.sql',
     '20261006111000_registration_drafts.sql', '20261006112000_registration_draft_events.sql',
+    '20261006121000_registration_review_and_reset.sql',
   ]) {
     if (file === '20261006106000_fixed_account_roles.sql') {
       for (let i = 0; i < 2; i++) {
@@ -34,6 +35,8 @@ before(async () => {
     }
     await db.exec(migration(file));
   }
+  await db.exec(`create trigger promote_identity_profile_after_email_confirm after update of email_confirmed_at on auth.users
+    for each row execute function public.promote_identity_profile_after_email_confirm()`);
 });
 after(async () => { await db.close(); });
 
@@ -163,7 +166,7 @@ test('Client accounts cannot create provider profiles; Worker accounts cannot cr
 });
 
 
-test('unconfirmed accounts complete identity first and confirmation is atomic with final approval', async () => {
+test('unconfirmed older accounts still require their inbox link after identity approval', async () => {
   const id = await account('client', false);
   await approve(id, 'identity-first-' + id);
   const email = () => db.query('select email_confirmed_at from auth.users where id=$1', [id]);
@@ -171,14 +174,14 @@ test('unconfirmed accounts complete identity first and confirmation is atomic wi
   await assert.rejects(db.query("update public.profiles set is_verified=true,verification_status='APPROVED' where user_id=$1", [id]), /identity verification/);
   assert.equal((await email()).rows[0].email_confirmed_at, null);
   await db.query('select public.confirm_account_identity_name($1)', [id]);
-  assert.ok((await email()).rows[0].email_confirmed_at);
-  assert.equal((await db.query('select is_verified from public.profiles where user_id=$1', [id])).rows[0].is_verified, true);
+  assert.equal((await email()).rows[0].email_confirmed_at,null);
+  assert.equal((await db.query('select is_verified from public.profiles where user_id=$1', [id])).rows[0].is_verified, false);
   await db.exec("select set_config('test.role','authenticated',false)");
   try { await db.query('update public.profiles set full_name=full_name where user_id=$1', [id]); }
   finally { await db.exec("select set_config('test.role','service_role',false)"); }
 });
 
-test('unconfirmed manual review confirms email only after administrator approval', async () => {
+test('approval and rejection of older manual registrations never confirm their email', async () => {
   for (const decision of ['APPROVED', 'DECLINED']) {
     const id = await account('worker', false);
     const review = await db.query<{ id: string }>('select public.submit_account_manual_review($1,$2,$3,$4) as id',
@@ -186,8 +189,8 @@ test('unconfirmed manual review confirms email only after administrator approval
     assert.equal((await db.query('select email_confirmed_at from auth.users where id=$1', [id])).rows[0].email_confirmed_at, null);
     await db.query('select public.decide_account_identity_review($1,$2,$3,$4,$5,$6)',
       [review.rows[0].id, await admin(), decision, 'Document and selfie evidence reviewed by administrator.', crypto.randomUUID(), decision === 'APPROVED' ? document.fullName : null]);
-    assert.equal(Boolean((await db.query('select email_confirmed_at from auth.users where id=$1', [id])).rows[0].email_confirmed_at), decision === 'APPROVED');
-    assert.equal((await db.query('select is_verified from public.profiles where user_id=$1', [id])).rows[0].is_verified, decision === 'APPROVED');
+    assert.equal((await db.query('select email_confirmed_at from auth.users where id=$1', [id])).rows[0].email_confirmed_at,null);
+    assert.equal((await db.query('select is_verified from public.profiles where user_id=$1', [id])).rows[0].is_verified,false);
   }
 });
 
@@ -203,7 +206,7 @@ async function draftAuth(id:string,role:string) {
   await db.query('insert into auth.users(id,email,raw_app_meta_data) values($1,$2,$3)',
     [id,id+'@test.invalid',{registration_version:3,registration_draft_id:id,signup_role:role}]);
 }
-for (const role of ['client','worker'] as const) test(`V3 ${role} draft finalizes an approved identity without confirming email or allowing marketplace access`, async()=>{
+for (const role of ['client','worker'] as const) test(`V3 ${role} Didit approval waits for an admin, then requires inbox confirmation`, async()=>{
   const {id,lease}=await draft(role);
   assert.equal((await db.query('select id from auth.users where id=$1',[id])).rows.length,0);
   assert.equal((await db.query('select user_id from public.profiles where user_id=$1',[id])).rows.length,0);
@@ -211,12 +214,23 @@ for (const role of ['client','worker'] as const) test(`V3 ${role} draft finalize
   await draftAuth(id,role);
   await db.query('select public.finalize_registration_draft($1,$2)',[id,lease]);
   const profile=await db.query('select role,verification_status,is_verified,full_name from public.profiles where user_id=$1',[id]);
-  assert.deepEqual(profile.rows[0],{role,verification_status:'APPROVED',is_verified:false,full_name:document.fullName});
+  assert.deepEqual(profile.rows[0],{role,verification_status:'PENDING_REVIEW',is_verified:false,full_name:''});
   assert.equal((await db.query('select email_confirmed_at from auth.users where id=$1',[id])).rows[0].email_confirmed_at,null);
   assert.equal((await db.query('select password_ciphertext from public.registration_drafts where id=$1',[id])).rows[0].password_ciphertext,null);
   await db.query('select public.finalize_registration_draft($1,$2)',[id,lease]);
   assert.equal((await db.query('select user_id from public.account_registrations where user_id=$1',[id])).rows.length,1);
+  await assert.rejects(db.query('select public.claim_pending_account_email($1,$2)',[id,'nonce']),/after identity approval/);
+  const review=await db.query<{id:string}>('select id from public.manual_identity_reviews where user_id=$1',[id]);
+  assert.equal(review.rows.length,1);
+  await db.query('select public.decide_account_identity_review($1,$2,$3,$4,$5,$6)',
+    [review.rows[0].id,await admin(),'APPROVED','Verified name and document against submitted evidence.',crypto.randomUUID(),document.fullName]);
+  assert.equal((await db.query('select email_confirmed_at from auth.users where id=$1',[id])).rows[0].email_confirmed_at,null);
+  assert.equal((await db.query('select is_verified from public.profiles where user_id=$1',[id])).rows[0].is_verified,false);
+  await db.query('select public.claim_pending_account_email($1,$2)',[id,'nonce']);
   if (role==='worker') await assert.rejects(db.query('select public.complete_account_provider_setup($1,$2)',[id,providerSetup]),/verification/);
+  await db.query('update auth.users set email_confirmed_at=now() where id=$1',[id]);
+  assert.equal((await db.query('select is_verified from public.profiles where user_id=$1',[id])).rows[0].is_verified,true);
+  assert.equal((await db.query('select full_name from public.profiles where user_id=$1',[id])).rows[0].full_name,document.fullName);
 });
 test('V3 manual submission permits IDs without a back side and keeps email blocked until admin approval',async()=>{
   const {id,lease}=await draft('worker','PENDING_REVIEW',{front:'front.png',selfie:'selfie.png'});
@@ -248,10 +262,10 @@ test('V3 duplicate identity is held for review while opposite-role registration 
   for(const role of ['client','worker'] as const) {
     const {id,lease,session}=await draft(role,'PENDING');
     await db.query('select public.apply_registration_draft_event($1,$2,$3,$4,$5,$6,$7)',[crypto.randomUUID(),'hash',session,'APPROVED',{timestamp:100},document,fingerprint]);
-    assert.equal((await db.query('select provider_status from public.registration_drafts where id=$1',[id])).rows[0].provider_status,role==='client'?'PENDING_REVIEW':'APPROVED');
+    assert.equal((await db.query('select provider_status from public.registration_drafts where id=$1',[id])).rows[0].provider_status,'PENDING_REVIEW');
     await draftAuth(id,role);
     await db.query('select public.finalize_registration_draft($1,$2)',[id,lease]);
-    assert.equal((await db.query('select verification_status from public.profiles where user_id=$1',[id])).rows[0].verification_status,role==='client'?'PENDING_REVIEW':'APPROVED');
+    assert.equal((await db.query('select verification_status from public.profiles where user_id=$1',[id])).rows[0].verification_status,'PENDING_REVIEW');
   }
 });
 test('V3 pending and expired drafts cannot obtain an account creation lease or finalize',async()=>{
@@ -261,4 +275,30 @@ test('V3 pending and expired drafts cannot obtain an account creation lease or f
   await assert.rejects(db.query('select public.finalize_registration_draft($1,$2)',[id,lease]),/Identity must finish/);
   await db.query("update public.registration_drafts set provider_status='APPROVED',expires_at=now()-interval '1 day' where id=$1",[id]);
   await assert.rejects(db.query('select public.finalize_registration_draft($1,$2)',[id,lease]),/Identity must finish/);
+});
+
+test('Didit report ISO created_at is normalized and webhook timestamp controls event ordering',async()=>{
+  const {id,session}=await draft('client','PENDING');
+  await db.query('select public.apply_registration_draft_event($1,$2,$3,$4,$5,$6,$7)',
+    [crypto.randomUUID(),'hash',session,'PENDING',{created_at:'2026-10-05T08:00:00Z',timestamp:1791187201},document,'fp-'+id]);
+  assert.equal((await db.query('select event_timestamp from public.registration_drafts where id=$1',[id])).rows[0].event_timestamp,1791187201);
+  await db.query('select public.apply_registration_draft_event($1,$2,$3,$4,$5,$6,$7)',
+    [crypto.randomUUID(),'hash',session,'APPROVED',{created_at:'2026-10-05T08:00:00Z',timestamp:1791187202},document,'fp-'+id]);
+  assert.equal((await db.query('select provider_status from public.registration_drafts where id=$1',[id])).rows[0].provider_status,'PENDING_REVIEW');
+  const iso=await db.query<{payload:{created_at:number}}>("select public.normalize_didit_event_payload('{\"created_at\":\"2026-10-05T08:00:00Z\"}') as payload");
+  assert.equal(iso.rows[0].payload.created_at,1791187200);
+});
+
+test('discarding an unfinished draft erases credentials and prevents late approved callbacks creating an account',async()=>{
+  const {id,session,lease}=await draft('client','PENDING');
+  await db.query('select public.discard_registration_draft($1)',[id]);
+  const discarded=await db.query('select provider_status,password_ciphertext from public.registration_drafts where id=$1',[id]);
+  assert.deepEqual(discarded.rows[0],{provider_status:'ABANDONED',password_ciphertext:null});
+  const event=await db.query<{result:null}>('select public.apply_registration_draft_event($1,$2,$3,$4,$5,$6,$7) as result',
+    [crypto.randomUUID(),'hash',session,'APPROVED',{timestamp:200},document,'fp-'+id]);
+  assert.equal(event.rows[0].result,null);
+  await assert.rejects(db.query('select public.finalize_registration_draft($1,$2)',[id,lease]),/Identity must finish/);
+  assert.equal((await db.query('select id from auth.users where id=$1',[id])).rows.length,0);
+  const submitted=await draft('client','PENDING_REVIEW');
+  assert.equal((await db.query<{result:boolean}>('select public.discard_registration_draft($1) as result',[submitted.id])).rows[0].result,false);
 });

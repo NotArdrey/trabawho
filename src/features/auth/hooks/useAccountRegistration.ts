@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { pendingAccount, registrationRequest, RegistrationRequestError, registrationSignOut, resumeRegistration, savePendingAccount, signInForRegistration, subscribeToRegistrationAuth,
+import { clearPendingAccount, pendingAccount, registrationRequest, RegistrationRequestError, registrationSignOut, resumeRegistration, savePendingAccount, signInForRegistration, subscribeToRegistrationAuth,
   type AccountRegistration, type PendingAccount, type SignupRole } from '@/shared/services/accountRegistrationService';
 
 export function useAccountRegistration() {
@@ -11,6 +11,7 @@ export function useAccountRegistration() {
   const [restoreFailed, setRestoreFailed] = useState(false);
   const [restoreNeedsSignIn, setRestoreNeedsSignIn] = useState(false);
   const authEpoch = useRef(0);
+  useEffect(() => () => { authEpoch.current += 1; clearPendingAccount(); }, []);
   useEffect(() => subscribeToRegistrationAuth(() => {
     authEpoch.current += 1;
     setRegistration(null); setPending(null); setError(''); setMessage(''); setRestoreFailed(false); setRestoreNeedsSignIn(false);
@@ -88,13 +89,31 @@ export function useAccountRegistration() {
     setRegistration((previous) => ({ ...previous, ...result, signupRole: result.signupRole ?? previous?.signupRole }));
   });
   const identityAction = (name: string, body: Record<string, unknown>) => run(async () => {
+    const epoch = authEpoch.current;
     const result = await registrationRequest(name, { ...body, ...pending });
+    if (epoch !== authEpoch.current) return;
     setRegistration((previous) => ({ ...result, signupRole: result.signupRole ?? previous?.signupRole, signupName: result.signupName ?? previous?.signupName }));
     if (result.state === 'ready' && pending) {
       const resumed = await resumeRegistration();
       if (resumed) setRegistration((previous) => ({ ...resumed, signupRole: resumed.signupRole ?? previous?.signupRole }));
       setPending(pendingAccount());
     }
+  });
+  const finishDiditAttempt = (closed: boolean) => run(async () => {
+    const epoch = authEpoch.current;
+    const result = await registrationRequest('account-didit-session', { action: 'get_session', ...pending }).catch((cause: unknown) => {
+      if (closed && pending) return null;
+      throw cause;
+    });
+    if (epoch !== authEpoch.current) return;
+    if (closed && pending && (!result || ['identity_pending', 'identity_in_progress', 'declined'].includes(result.state))) {
+      const discarded = await registrationRequest('account-registration', { action: 'discard', ...pending }).catch(() => null);
+      if (epoch !== authEpoch.current) return;
+      if (discarded && discarded.state !== 'identity_pending') { setRegistration(discarded); return; }
+      clearPendingAccount(); setPending(null); setRegistration(null); setRestoreFailed(false);
+      setMessage(result ? 'Verification was not completed. Start your registration again.'
+        : 'Registration was reset. If you completed verification, check your inbox for the review decision.');
+    } else if (result) setRegistration((previous) => ({ ...result, signupRole: result.signupRole ?? previous?.signupRole }));
   });
   const resume = (email: string, password: string) => run(async () => {
     const state = await signInForRegistration(email, password);
@@ -118,7 +137,7 @@ export function useAccountRegistration() {
   }, [registrationState, pending, refresh]);
   return { registration: registration || (pending ? { state: 'identity_pending' as const, email: pending.email, signupName: pending.signupName || '' } : null), busy, error, message,
     completingSession: registrationState === 'ready' && Boolean(pending),
-    create, saveName, emailAction, identityAction, resume, refresh, startNewRegistration, initializing, restoreFailed, restoreNeedsSignIn, retryRestore };
+    create, saveName, emailAction, identityAction, finishDiditAttempt, resume, refresh, startNewRegistration, initializing, restoreFailed, restoreNeedsSignIn, retryRestore };
 }
 
 export type AccountRegistrationFlow = ReturnType<typeof useAccountRegistration>;

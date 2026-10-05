@@ -48,7 +48,10 @@ export function buildNotificationEmail(event: EmailEvent, appUrl: string) {
     } else if (status === 'approved') {
       title = 'Identity review approved';
       intro = 'The identity review has been approved. If your email is not yet confirmed, look for the separate confirmation email and use its secure link to finish registration.';
-    } else if (['declined', 'expired', 'abandoned'].includes(status)) {
+    } else if (status === 'declined') {
+      title = 'Registration declined';
+      intro = 'Your identity review was declined. Your account cannot access the marketplace. Contact TrabaWho support to review the decision and the next steps.';
+    } else if (['expired', 'abandoned'].includes(status)) {
       title = 'Identity verification needs attention';
       intro = 'Identity verification is incomplete. Open TrabaWho to see the result and the available next steps.';
     } else {

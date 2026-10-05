@@ -1,9 +1,9 @@
-import { createAdminClient, sendEmailConfirmation } from "./identityRegistration.ts";
+import { createAdminClient } from "./identityRegistration.ts";
 import { asRecord } from "./identityDomain.ts";
 export type AdminClient = ReturnType<typeof createAdminClient>;
-export class ReviewError extends Error {
-  constructor(message: string, public status: number) { super(message); }
-}
+import { ReviewError } from "./identityReviewError.ts";
+export { ReviewError } from "./identityReviewError.ts";
+export { deliverIdentityConfirmation } from "./identityConfirmation.ts";
 export const reviewColumns = "id,user_id,submitted_by_email,submitted_app_role,document_type,source,status,created_at,expected_decision_by,duplicate_reason,duplicate_match_count,reviewed_at,review_notes,decision_email_sent_at,email_delivery_status,email_delivery_error,verified_full_legal_name,didit_session_id";
 
 export async function requireIdentityAdmin(req: Request, client: AdminClient): Promise<string> {
@@ -90,26 +90,4 @@ export async function loadIdentityReviewDetail(client: AdminClient, reviewId: st
     .select('source_legal_name,requested_legal_name,name_issue,reviewed_legal_name').eq('user_id', review.user_id).maybeSingle();
   if (registration.error) throw new ReviewError('Name review details could not be loaded. Retry.', 503);
   return { review: summary, profile: profileResult.data, history: historyResult.data, images, warnings, didit, registration: registration.data };
-}
-
-export async function deliverIdentityConfirmation(client: AdminClient, reviewId: string, resend = false) {
-  const result = await client.from("manual_identity_reviews").select("user_id,submitted_by_email,status,decision_email_sent_at,email_delivery_status").eq("id", reviewId).single();
-  const review = asRecord(result.data);
-  if (result.error || review.status !== "APPROVED") throw new ReviewError("Email confirmation is available after approval.", 409);
-  const user = await client.auth.admin.getUserById(String(review.user_id));
-  if (user.error) throw new ReviewError("The account could not be loaded. Retry email delivery.", 503);
-  if (user.data.user.email_confirmed_at) return { sent: false, required: false, status: "not_required" };
-  if (review.decision_email_sent_at && !resend) return { sent: true, required: true, status: "sent" };
-  const lease = await client.rpc("claim_identity_email_delivery", { p_review_id: reviewId, p_resend: resend });
-  if (lease.error) throw new ReviewError("Email delivery could not be started. Retry.", 503);
-  if (lease.data !== true) return { sent: false, required: true, status: review.decision_email_sent_at ? "rate_limited" : "sending" };
-  const appUrl = Deno.env.get("TRABAWHO_APP_URL") || "";
-  const delivery = await sendEmailConfirmation(String(review.submitted_by_email), appUrl ? `${new URL(appUrl).origin}/register` : "");
-  const saved = await client.from("manual_identity_reviews").update({
-    email_delivery_status: delivery.sent ? "sent" : "failed",
-    decision_email_sent_at: delivery.sent ? new Date().toISOString() : null,
-    email_delivery_error: delivery.sent ? null : "Confirmation email could not be sent. Check Supabase Auth mail settings and retry.",
-  }).eq("id", reviewId);
-  if (saved.error) throw new ReviewError("Approval is saved. Refresh to check email delivery.", 503);
-  return { sent: delivery.sent, required: true, status: delivery.sent ? "sent" : "failed" };
 }
