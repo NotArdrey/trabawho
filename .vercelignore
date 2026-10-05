@@ -11,6 +11,11 @@ test-results
 /supabase/*
 !/supabase/functions
 /supabase/functions/*
+!/supabase/functions/_shared
+/supabase/functions/_shared/*
+!/supabase/functions/_shared/authEmailTemplates.ts
+!/supabase/functions/_shared/emailNotifications.ts
+!/supabase/functions/_shared/emailLayout.ts
 !/supabase/functions/trabawho-chatbot
 /supabase/functions/trabawho-chatbot/*
 !/supabase/functions/trabawho-chatbot/vision.ts
