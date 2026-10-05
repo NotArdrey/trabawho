@@ -34,7 +34,7 @@ export async function handleBookingRefundRequest(request: Request): Promise<Resp
     const admin = createPaymentAdminClient();
     const { data: refunds, error: loadError } = await admin.from("booking_refunds")
       .select("id, payment_attempt_id, provider_refund_id, submitted_at, status, amount, currency")
-      .eq("booking_id", caseRecord.booking_id);
+      .eq("booking_id", caseRecord.booking_id).eq("case_id", caseId);
     if (loadError) return paymentJsonResponse({ error: "Refund records could not be loaded." }, 503);
     let needsRetry = false;
     let providerRejected = false;

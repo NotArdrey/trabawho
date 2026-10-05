@@ -19,7 +19,7 @@ export function AdminRefundDecision({ bookingId, caseId, paidAmount, closed, inc
     {flow.loading && <p role="status">Loading refunds...</p>}
     {flow.refunds.map((refund) => <div key={refund.id} className="border-t pt-2"><p>{refund.currency} {refund.amount.toLocaleString("en-PH")} · {refundStatusLabels[refund.status]}</p>{refund.provider_refund_id && <p className="break-all text-xs">Reference: {refund.provider_refund_id}</p>}</div>)}
     {!closed && availableAmount > 0 && !flow.loading && <>
-      <p>Complete a sandbox refund decision for verified test payments: <strong>PHP {availableAmount.toLocaleString("en-PH")}</strong>, including the collected platform fee. This closes the demo case; no real money is returned.</p>
+      <p>Complete a sandbox refund decision for verified test payments: <strong>PHP {availableAmount.toLocaleString("en-PH")}</strong>, including the collected platform fee. The case closes only after all refundable attempts resolve; no real money is returned.</p>
       <label className="grid gap-1 font-medium">Refund approval reason<textarea className="min-h-24 rounded-md border bg-background p-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" value={reason} disabled={flow.pending} onChange={(event) => setReason(event.target.value)} placeholder="Explain the evidence and decision (at least 20 characters)" /></label>
       {noShowBlockedReason && <p className="text-sm text-amber-800 dark:text-amber-200">{noShowBlockedReason}</p>}
       <Button type="button" variant="destructive" className="w-fit" disabled={incomplete || Boolean(noShowBlockedReason) || Boolean(flow.error) || flow.pending || reason.trim().length < 20} onClick={() => setConfirming(true)}>Approve test refund</Button>
@@ -30,7 +30,7 @@ export function AdminRefundDecision({ bookingId, caseId, paidAmount, closed, inc
     {flow.message && <p role="status">{flow.message}</p>}
     {flow.error && <p role="alert" className="text-destructive">{flow.error}</p>}
     <AlertDialog open={confirming} onOpenChange={setConfirming}><AlertDialogContent><AlertDialogHeader>
-      <AlertDialogTitle>Simulate this refund in full?</AlertDialogTitle><AlertDialogDescription>Record a PHP {availableAmount.toLocaleString("en-PH")} sandbox refund after your review. The booking and case will close for the demo. PayMongo will not return real money; this decision cannot be undone.</AlertDialogDescription>
+      <AlertDialogTitle>Simulate this refund in full?</AlertDialogTitle><AlertDialogDescription>Record a PHP {availableAmount.toLocaleString("en-PH")} sandbox refund after your review. The refund case closes only after every paid attempt is resolved. A cancelled appointment stays cancelled. PayMongo will not return real money; this decision cannot be undone.</AlertDialogDescription>
       </AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>Keep reviewing</AlertDialogCancel><AlertDialogAction onClick={() => { void flow.run("approve", reason, availableAmount); }}>Confirm test refund</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
   </section>;
 }

@@ -50,7 +50,7 @@ export function BookingRequestReviewDialog({ description, onClose, onDecision, o
           <AlertDialogDescription>{description}</AlertDialogDescription>
         </AlertDialogHeader>
         <div className="grid gap-2">
-          <Label htmlFor="review-note">Note to client (optional)</Label>
+          <Label htmlFor="review-note">Note to the other participant (optional)</Label>
           <textarea id="review-note" value={note} onChange={(event) => setNote(event.target.value)} rows={3} maxLength={500} className="min-h-24 rounded-md border border-input bg-background px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring" />
           {error ? <p className="text-sm font-semibold text-destructive" role="alert">{error}</p> : null}
         </div>

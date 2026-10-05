@@ -35,7 +35,7 @@ export function CancelBookingDialog({
 
   const confirm = async () => {
     if (!reason.trim()) {
-      setError("Tell the provider why you need to cancel.");
+      setError("Tell the other participant why you need to cancel.");
       return;
     }
     try {
@@ -58,7 +58,7 @@ export function CancelBookingDialog({
           <AlertDialogTitle>Cancel {serviceName}</AlertDialogTitle>
           <AlertDialogDescription>
             {hasVerifiedPayment
-              ? "This sends a cancellation request for provider review. Any refund remains pending until the request is reviewed."
+              ? "The other participant must agree before the visit is cancelled. Payment is reviewed separately by support; this does not return money."
               : "This cancels the unpaid booking immediately and releases the reserved time."}
           </AlertDialogDescription>
         </AlertDialogHeader>

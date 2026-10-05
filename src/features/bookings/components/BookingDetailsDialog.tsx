@@ -14,6 +14,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { BookingReplacementSchedule } from "@/features/bookings/components/BookingReplacementSchedule";
+import { BookingRefundStage } from "@/features/bookings/components/BookingRefundStage";
 import type { ActiveReplacementSchedule } from "@/features/bookings/services/replacementSchedules";
 import { isShowcasePaymentReference } from "@/features/bookings/utils/bookingPaymentPresentation";
 import { formatBookingCreatedAt } from "@/features/bookings/utils/bookingCreatedAt";
@@ -62,6 +63,7 @@ export interface BookingDetails {
   totalChargedAmount?: number | string;
   transactionFeeAmount?: number | string;
   workerName?: string;
+  status?: string;
 }
 
 interface BookingDetailsDialogProps {
@@ -148,18 +150,20 @@ export function BookingDetailsDialog({ booking, isProviderView, onClose, onMessa
   const clientDetail = clientComplete ? "Completed" : booking.deliveryStatus === "seller_claimed" ? "Awaiting client" : "Waiting for delivery";
   const total = booking.totalChargedAmount || booking.quoteAmount || 0;
   const normalizedStatus = statusLabel.toLowerCase();
-  const paymentDue = ["unpaid", "pending", "pending_provider", "partially_paid"].includes(booking.paymentStatus || "")
-    || normalizedStatus.includes("payment pending");
   const cancelled = normalizedStatus.includes("cancel") || normalizedStatus.includes("refund");
+  const paymentDue = !cancelled && (["unpaid", "pending", "pending_provider", "partially_paid"].includes(booking.paymentStatus || "")
+    || normalizedStatus.includes("payment pending"));
   const completed = normalizedStatus.includes("complete") || clientComplete;
-  const nextStep = booking.refundSimulated
-    ? { title: "Sandbox refund process complete", detail: "Support completed the refund decision for this test booking. No real money was returned by PayMongo.", complete: false }
+  const nextStep = cancelled
+    ? booking.refundSimulated
+      ? { title: "Visit cancelled; test refund simulated", detail: "The appointment ended and support closed its test refund review. PayMongo did not return real money.", complete: false }
+      : booking.paymentStatus === "refund_pending"
+        ? { title: "Visit cancelled; refund review in progress", detail: "The time is released. Support is verifying the payment separately; no money has been returned.", complete: false }
+        : { title: "This booking is no longer active", detail: "The appointment was cancelled and its time released.", complete: false }
     : replacementActive
     ? { title: "Replacement visit confirmed", detail: "The agreed new appointment is active. The support case stays open until replacement work is completed and confirmed.", complete: true }
     : booking.disputeStatus === "open"
     ? { title: "Support case open", detail: "Completion is paused while the case is reviewed. Check the support case for messages, a replacement visit, or refund progress.", complete: false }
-    : cancelled
-    ? { title: "This booking is no longer active", detail: "Review the payment and reference details below for your records.", complete: false }
     : completed
       ? { title: "Service completed", detail: "The appointment and payment details below are your booking record.", complete: true }
       : paymentDue
@@ -175,7 +179,7 @@ export function BookingDetailsDialog({ booking, isProviderView, onClose, onMessa
           <div className="flex items-start gap-3">
             <span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-primary text-primary-foreground"><ReceiptText className="size-5" aria-hidden="true" /></span>
             <div className="min-w-0 flex-1">
-              <div className="mb-2 flex flex-wrap items-center gap-2"><span className="text-xs font-bold uppercase tracking-wide text-primary">Booking details</span><Badge variant={statusVariant(statusLabel)}>{booking.refundSimulated ? "Refund simulated" : statusLabel}</Badge></div>
+              <div className="mb-2 flex flex-wrap items-center gap-2"><span className="text-xs font-bold uppercase tracking-wide text-primary">Booking details</span><Badge variant={statusVariant(statusLabel)}>{statusLabel}</Badge><BookingRefundStage booking={{ status: booking.status || statusLabel, paymentStatus: booking.paymentStatus, refundSimulated: booking.refundSimulated }} /></div>
               <DialogTitle className="text-2xl">{booking.serviceType || "Service booking"}</DialogTitle>
               <DialogDescription className="mt-1 flex items-center gap-1.5"><UserRound className="size-4" aria-hidden="true" />{isProviderView ? booking.clientName : booking.workerName}</DialogDescription>
               {bookedOn ? <p className="mt-2 text-sm text-muted-foreground">Booked on <time dateTime={booking.createdAt || undefined} className="font-semibold text-foreground">{bookedOn}</time></p> : null}
@@ -211,7 +215,7 @@ export function BookingDetailsDialog({ booking, isProviderView, onClose, onMessa
                 <div className="flex justify-between gap-3 py-2.5"><dt className="text-sm text-muted-foreground">Method</dt><dd className="text-right text-sm font-bold text-foreground">{demoPayment ? "Demo booking — no charge" : paymentLabel(booking.paymentMethod)}</dd></div>
                 <div className="flex justify-between gap-3 py-2.5"><dt className="text-sm text-muted-foreground">{isProviderView ? "Booking amount" : "Service price"}</dt><dd className="font-bold text-foreground">{formatPhp(booking.quoteAmount)}</dd></div>
                 {!isProviderView && Number(booking.transactionFeeAmount || 0) > 0 ? <div className="flex justify-between gap-3 py-2.5"><dt className="text-sm text-muted-foreground">Platform fee</dt><dd className="font-bold text-foreground">{formatPhp(booking.transactionFeeAmount)}</dd></div> : null}
-                {booking.paymentPlan === "downpayment" && <><div className="flex justify-between gap-3 py-2.5"><dt className="text-sm text-muted-foreground">Deposit + platform fee</dt><dd className="font-bold text-foreground">{formatPhp(booking.upfrontRequiredAmount)}</dd></div><div className="flex justify-between gap-3 py-2.5"><dt className="text-sm text-muted-foreground">Verified paid</dt><dd className="font-bold text-emerald-700 dark:text-emerald-300">{formatPhp(booking.amountPaid)}</dd></div><div className="flex justify-between gap-3 py-2.5"><dt className="text-sm text-muted-foreground">Balance before work</dt><dd className="font-bold text-foreground">{formatPhp(booking.balanceDueAmount)}</dd></div></>}
+                {booking.paymentPlan === "downpayment" && <><div className="flex justify-between gap-3 py-2.5"><dt className="text-sm text-muted-foreground">Deposit + platform fee</dt><dd className="font-bold text-foreground">{formatPhp(booking.upfrontRequiredAmount)}</dd></div><div className="flex justify-between gap-3 py-2.5"><dt className="text-sm text-muted-foreground">Verified paid</dt><dd className="font-bold text-emerald-700 dark:text-emerald-300">{formatPhp(booking.amountPaid)}</dd></div>{!cancelled && <div className="flex justify-between gap-3 py-2.5"><dt className="text-sm text-muted-foreground">Balance before work</dt><dd className="font-bold text-foreground">{formatPhp(booking.balanceDueAmount)}</dd></div>}</>}
                 {!isProviderView ? <div className="flex items-end justify-between gap-3 py-3"><dt className="text-sm font-semibold text-foreground">{demoPayment ? "Illustrative total" : paymentDue ? "Total payment" : "Total charged"}</dt><dd className={demoPayment ? "text-lg font-extrabold text-foreground" : "text-lg font-extrabold text-emerald-700 dark:text-emerald-300"}>{formatPhp(total)}</dd></div> : null}
               </dl>
             </section>
@@ -229,7 +233,7 @@ export function BookingDetailsDialog({ booking, isProviderView, onClose, onMessa
 
           {booking.paymentReference ? <section className="flex gap-3 rounded-xl bg-primary/5 p-4" aria-labelledby="booking-reference-heading"><FileText className="mt-0.5 size-5 shrink-0 text-primary" aria-hidden="true" /><div className="min-w-0"><h3 id="booking-reference-heading" className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{demoPayment ? "Demo booking reference" : booking.paymentReference.startsWith("pay_") ? "PayMongo payment ID" : "Payment reference"}</h3><p className="mt-1 break-all font-mono text-sm font-bold text-foreground">{booking.paymentReference}</p></div></section> : null}
           {booking.completedAt ? <p className="text-sm text-muted-foreground">Completed on <strong className="text-foreground">{new Date(booking.completedAt).toLocaleDateString("en-PH")}</strong></p> : null}
-          {booking.paymentPlan === "downpayment" && booking.balanceDueAt && Number(booking.balanceDueAmount || 0) > 0 && <p className="text-sm text-muted-foreground">Balance due before <strong className="text-foreground">{new Date(booking.balanceDueAt).toLocaleString("en-PH")}</strong>.</p>}
+          {!cancelled && booking.paymentPlan === "downpayment" && booking.balanceDueAt && Number(booking.balanceDueAmount || 0) > 0 && <p className="text-sm text-muted-foreground">Balance due before <strong className="text-foreground">{new Date(booking.balanceDueAt).toLocaleString("en-PH")}</strong>.</p>}
           {booking.completionDueAt && booking.deliveryStatus === "seller_claimed" && <p className="text-sm text-muted-foreground">Client review ends {new Date(booking.completionDueAt).toLocaleString("en-PH")} if no case is open.</p>}
           {booking.warrantyPolicyCode === "repair_workmanship_7d" && <p className="text-sm text-muted-foreground">Designated repair-workmanship reporting: <strong className="text-foreground">{booking.warrantyDurationDays || 7} days after completion</strong>{booking.completedAt ? `, through ${new Date(new Date(booking.completedAt).getTime() + (booking.warrantyDurationDays || 7) * 24 * 60 * 60_000).toLocaleString("en-PH")}` : ""}. {booking.warrantyCoverageSummary || "In-window reports request rework; exceptions receive support review."} No refund is automatic.</p>}
           {booking.warrantyEligible && !booking.warrantyPolicyCode && <p className="text-sm text-muted-foreground">This earlier booking has a legacy repair-issue report flag. Any report will receive support review; no automatic rework or refund is promised.</p>}

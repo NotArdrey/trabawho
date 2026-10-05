@@ -14,6 +14,7 @@ async function run(input: { admin?: boolean; providerId?: string; action?: strin
   const recorded: Record<string, unknown>[] = [];
   const simulated: Record<string, unknown>[] = [];
   let approvals = 0;
+  let loadedCaseId: string | null = null;
   globalThis.fetch = async (url, options) => {
     const request = new Request(url, options);
     const path = new URL(request.url).pathname;
@@ -22,7 +23,10 @@ async function run(input: { admin?: boolean; providerId?: string; action?: strin
     if (path === "/rest/v1/booking_support_cases") return json({ id: caseId, booking_id: "booking-1" });
     if (path === "/rest/v1/rpc/is_current_user_admin") return json(input.admin === true);
     if (path === "/rest/v1/rpc/approve_booking_case_refund") { approvals++; return json({ bookingId: "booking-1" }); }
-    if (path === "/rest/v1/booking_refunds") return json([{ id: "refund-1", payment_attempt_id: "attempt-1", amount: 464, currency: "PHP", status: "approved", submitted_at: null, provider_refund_id: input.providerId || null }]);
+    if (path === "/rest/v1/booking_refunds") {
+      loadedCaseId = new URL(request.url).searchParams.get("case_id");
+      return json([{ id: "refund-1", payment_attempt_id: "attempt-1", amount: 464, currency: "PHP", status: "approved", submitted_at: null, provider_refund_id: input.providerId || null }]);
+    }
     if (path === "/rest/v1/rpc/simulate_booking_case_refund") { simulated.push(asRecord(await request.json())); return json({ id: "refund-1", status: "simulated" }); }
     if (path === "/rest/v1/rpc/claim_booking_refund") return json(input.locked ? null : { id: "refund-1", provider_refund_id: input.providerId || null });
     if (path === "/rest/v1/payment_attempts") return json({ payment_id: "pay_deposit", environment: "test" });
@@ -42,7 +46,7 @@ async function run(input: { admin?: boolean; providerId?: string; action?: strin
       method: "POST", headers: { Authorization: "Bearer test-user", "Content-Type": "application/json" },
       body: JSON.stringify({ caseId, action: input.action || "check", reason: "Reviewed the evidence and approved the customer refund.", expectedAmount: 464, amount: 999999 }),
     }));
-    return { status: response.status, body: asRecord(await response.json()), providerRequests, recorded, simulated, approvals };
+    return { status: response.status, body: asRecord(await response.json()), providerRequests, recorded, simulated, approvals, loadedCaseId };
   } finally { globalThis.fetch = originalFetch; }
 }
 
@@ -55,6 +59,7 @@ Deno.test("client cannot approve or submit an unapproved refund", async () => {
 Deno.test("admin completes the reviewed test refund without calling PayMongo", async () => {
   const result = await run({ admin: true, action: "approve" });
   assert(result.status === 200 && result.approvals === 1, "Approval failed");
+  assert(result.loadedCaseId === `eq.${caseId}`, "Refund processing escaped the owning case");
   assert(result.providerRequests.length === 0, "Sandbox simulation called PayMongo");
   assert(result.simulated.length === 1 && result.simulated[0].p_refund_id === "refund-1", "Reviewed refund not simulated");
 });

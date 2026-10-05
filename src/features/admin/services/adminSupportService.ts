@@ -34,9 +34,18 @@ export async function claimSupportCase(caseId: string) {
 export async function listSupportCases(): Promise<SupportCase[]> {
   const sweep = await supabase.rpc("escalate_overdue_booking_cases", {});
   if (sweep.error && sweep.error.code !== "PGRST202") throw new Error("Overdue cases could not be checked. Try refreshing.");
-  const { data, error } = await supabase.from("booking_support_cases")
-    .select("*").order("created_at", { ascending: false }).limit(50);
-  if (error) throw new Error("Support cases could not be loaded. Try refreshing.");
+  const activeCases: SupportCase[] = [];
+  for (let offset = 0; ; offset += 500) {
+    const page = await supabase.from("booking_support_cases").select("*").neq("status", "closed")
+      .order("created_at", { ascending: false }).order("id", { ascending: false }).range(offset, offset + 499);
+    if (page.error) throw new Error("Active support cases could not be loaded. Try refreshing.");
+    activeCases.push(...(page.data || []));
+    if ((page.data?.length || 0) < 500) break;
+  }
+  const recentResult = await supabase.from("booking_support_cases").select("*").eq("status", "closed")
+    .order("created_at", { ascending: false }).limit(50);
+  if (recentResult.error) throw new Error("Support case history could not be loaded. Try refreshing.");
+  const data = [...activeCases, ...(recentResult.data || [])];
   const reviews = await supabase.from("booking_case_review_requests").select("case_id")
     .eq("status", "pending").limit(100);
   if (reviews.error && reviews.error.code !== "PGRST205") throw new Error("Further-review requests could not be loaded. Try refreshing.");

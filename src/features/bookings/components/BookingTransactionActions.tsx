@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useId, useRef, useState } from "react";
+import { Link } from "react-router-dom";
 import { CheckCircle2, FileCheck2, Flag, LoaderCircle, Play, RefreshCw } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -14,6 +15,7 @@ import { BookingRefundProgress } from "./BookingRefundProgress";
 import { isBookingFullyFunded } from "../utils/bookingPaymentGuard";
 import { isShowcasePaymentReference } from "../utils/bookingPaymentPresentation";
 import { getStartWorkAvailability } from "../utils/startWorkAvailability";
+import { paths } from "@/app/router/routes";
 import type { BookingActionRecord } from "../types/booking-action-record";
 import {
   deliverBookingWithEvidence, getBookingDeliveryEvidence, getBookingSupportCase, openBookingSupportCase, respondToRepairClaim, startBookingWork,
@@ -175,6 +177,7 @@ export function BookingTransactionActions({ booking, supportCaseId, viewerRole, 
     {startWork.visible && startWork.reason && <p id={`${checklistId}-start-reason`} className="order-last col-span-2 w-full text-left text-sm leading-5 text-muted-foreground sm:basis-full sm:text-right">{startWork.reason}</p>}
     {(booking.disputeStatus === "open" || booking.disputeStatus === "closed") && caseLoadError && <div role="alert" className="col-span-2 grid gap-2 text-sm text-destructive sm:basis-full"><p>{caseLoadError}</p><Button type="button" variant="outline" className="w-fit" onClick={() => { setCaseLoadError(""); setCaseReload((value) => value + 1); }}><RefreshCw aria-hidden="true" />Retry loading report</Button></div>}
     {booking.disputeStatus === "open" && !replacementAccepted && <div className="col-span-2 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950 sm:basis-full dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-100"><p className="font-semibold">{currentCase?.case_type === "refund_review" ? "Payment review open" : currentCase?.policy_route === "rework_request" ? viewerRole === "provider" ? "Client requested repair rework" : "Repair rework requested" : "Support case open"}</p><p className="mt-1">{currentCase?.reason || "Completion is paused while this report is reviewed."}</p>{currentCase?.policy_reason && <p className="mt-1 text-xs">{currentCase.policy_reason}</p>}{currentCase?.provider_response_action && <div className="mt-3 border-t border-amber-300 pt-3 dark:border-amber-800"><p className="font-semibold">{currentCase.provider_response_action === "offer_rework" ? "Provider offered rework" : "Provider requested support review"}</p><p className="mt-1">{currentCase.provider_response_text}</p><p className="mt-1 text-xs">This response does not close the case or change payment.</p></div>}</div>}
+    {currentCase?.case_type === "refund_review" && <Button asChild type="button" variant="outline" className="col-span-2 w-fit sm:basis-full"><Link to={`${paths.supportCases}?case=${currentCase.id}`}>View refund support case</Link></Button>}
     {canRespond && <Button type="button" variant="outline" disabled={pending} onClick={() => { setResponseAction("offer_rework"); setResponseText(""); setError(""); setDialog("response"); }}>Respond to repair claim</Button>}
     {currentCase && currentCase.status !== "closed" && <div className="col-span-2 min-w-0 sm:basis-full"><RepairCaseResolution bookingId={booking.id} caseRecord={currentCase} viewerRole={viewerRole} onCaseChanged={(updatedBooking, updatedCase) => { setCaseSummary({ bookingId: booking.id, data: updatedCase }); onUpdated(updatedBooking); }} /></div>}
     {currentCase?.latest_support_action && <p className="col-span-2 text-sm sm:basis-full">Support update: {currentCase.latest_support_action === "refund_review_needed" ? "Referred for refund review" : currentCase.latest_support_action === "request_information" ? `Information needed from ${currentCase.latest_support_target === "both" ? "both parties" : currentCase.latest_support_target || "the booking participants"}` : currentCase.latest_support_action === "rework_arranged" ? "Rework arranged" : "Reschedule review needed"}.</p>}

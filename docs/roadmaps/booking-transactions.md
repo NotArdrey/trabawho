@@ -577,15 +577,19 @@ Priority: P1
 
 Priority: P0 before live payments
 
-The pending `20261006115000_queue_pending_refund_reviews.sql` migration closes a
-test-workflow gap: approved paid cancellations and payments received after a
-checkout hold expires now create a system-origin support case atomically when
-the booking becomes `refund_pending`. It backfills existing pending exceptions
-without duplicating active cases. Admins can review verified test payments and
-use the existing simulated-refund decision; no PayMongo money is claimed to be
-returned. The migration is local until separately deployed and rehearsed with
-both cancellation and late-payment bookings. Manual or unverified receipts
-remain blocked from refund approval and require support investigation.
+The `20261006115000_queue_pending_refund_reviews.sql` and
+`20261006120000_reliable_paid_cancellation_refunds.sql` migrations are applied
+to the connected test project. Either participant may request a paid
+cancellation; only the other may approve it. Approval immediately cancels the
+visit and releases its time, while a dedicated refund-review case remains open.
+The follow-up migration backfills cancelled visits missed by the first queue
+pass without creating duplicate open refund cases. Support may record a full
+verified sandbox refund, with each payment attempt checked separately. The
+cancelled visit remains cancelled after simulation; only its refund-owning case
+closes after all paid attempts resolve. No PayMongo money is claimed returned.
+Manual or unverified receipts remain open for investigation. The Edge Function
+processes refunds only for the selected case. The frontend changes still need
+deployment to the test site before an end-to-end live-account rehearsal.
 
 - [ ] Add versioned cancellation policies and snapshot the applicable policy on
       the booking.

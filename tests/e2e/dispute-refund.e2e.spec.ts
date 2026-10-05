@@ -44,6 +44,24 @@ for (const width of [390, 768, 1024, 1280, 1440]) {
     await expect(page.getByText("Refund reference: ref_verified")).toBeVisible();
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   });
+  for (const role of ["client", "provider"]) {
+    test(`cancelled ${role} booking separates visit and refund at ${width}px`, async ({ page }) => {
+      await page.setViewportSize({ width, height: 1000 });
+      await page.route("**/rest/v1/booking_support_cases?*", (route) => route.fulfill({ json: {
+        id: caseId, case_type: "refund_review", reason: "A paid cancellation was approved for support review.",
+        status: "under_review", resolution_status: "reviewing", refund_requested_at: null,
+      } }));
+      await page.route("**/rest/v1/booking_refunds?*", (route) => route.fulfill({ json: [] }));
+      await page.goto(`/__refund-journey?role=cancelled-${role}`);
+      await expect(page.getByText("Refund review in progress")).toBeVisible();
+      await expect(page.getByRole("link", { name: "View refund support case" })).toHaveAttribute("href", `/support-cases?case=${caseId}`);
+      await page.getByRole("button", { name: "View details" }).click();
+      await expect(page.getByRole("dialog")).toContainText("Visit cancelled; refund review in progress");
+      await expect(page.getByRole("button", { name: /Pay balance/i })).toHaveCount(0);
+      await expect(page.getByText("Balance before work")).toHaveCount(0);
+      expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+    });
+  }
 }
 test("a paid booking without a provider-verified attempt does not offer refund review", async ({ page }) => {
   let paymentChecks = 0;

@@ -31,7 +31,8 @@ export function matchesBookingHubFilter(booking: FilterableBooking, filter: stri
   if (filter === "all") return true;
   if (filter === "completed") return COMPLETED.includes(booking.status);
   if (filter === "cancelled") return CANCELLED.includes(booking.status);
-  if (filter === "refunds") return Boolean(booking.refundStatus) || ["Refund Processing", "Refunded"].includes(booking.status);
+  if (filter === "refunds") return Boolean(booking.refundStatus) || ["refund_pending", "refunded"].includes(booking.paymentStatus || "")
+    || ["Refund Processing", "Refunded"].includes(booking.status);
   if (filter === "delivered") return !TERMINAL.includes(booking.status) && (booking.deliveryStatus === "seller_claimed" || booking.status === "Service Delivered");
   if (filter === "scheduled") return ["Payment Confirmed", "Service Scheduled", "Active Service"].includes(booking.status);
   if (filter === "payment-due") return isBookingPaymentDue(booking);

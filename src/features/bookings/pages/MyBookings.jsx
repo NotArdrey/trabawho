@@ -31,6 +31,10 @@ import { BookingRequestReviewDialog } from '../components/BookingRequestReviewDi
 import { PaymentReturnStatus } from '../components/PaymentReturnStatus';
 import { BookingCardFooter } from '../components/BookingCardFooter';
 import { BookingCardSchedule } from '../components/BookingCardSchedule';
+import { BookingCancellationReviewAction } from '../components/BookingCancellationReviewAction';
+import { BookingRefundStage } from '../components/BookingRefundStage';
+import { canRequestBookingCancellation } from '../utils/bookingCancellationPresentation';
+import { getStatusMeta } from '../utils/bookingStatusMeta';
 import { findProviderBookingConflicts } from '../utils/providerBookingConflicts';
 import { useProviderReplacementSchedules } from '../hooks/useProviderReplacementSchedules';
 import { isShowcasePaymentReference } from '../utils/bookingPaymentPresentation';
@@ -116,40 +120,6 @@ const getAvatarInitials = (name = '') => {
     return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
   }
   return name.slice(0, 2).toUpperCase() || 'TW';
-};
-
-const getStatusMeta = (status) => {
-  if (status === 'Completed Service') {
-    return { className: 'booking-status-completed', icon: CheckCircle2, label: 'Completed' };
-  }
-  if (status === 'Service Scheduled' || status === 'Payment Confirmed') {
-    return { className: 'booking-status-completed', icon: ShieldCheck, label: status };
-  }
-  if (status === 'Payment Pending' || status === 'Slot Selected - Payment Pending') {
-    return { className: 'booking-status-pending', icon: CreditCard, label: 'Payment Pending' };
-  }
-  if (status === 'Cash Verification Pending') {
-    return { className: 'booking-status-pending', icon: Clock, label: 'Cash Verification' };
-  }
-  if (status === 'Refund Processing' || status === 'Refunded') {
-    return { className: 'booking-status-cancelled', icon: RotateCcw, label: status };
-  }
-  if (status === 'Refund Pending' || status === 'Cancellation Requested') {
-    return { className: 'booking-status-pending', icon: Clock, label: status };
-  }
-  if (status === 'Reservation Expired') {
-    return { className: 'booking-status-pending', icon: CalendarX2, label: 'Choose New Time' };
-  }
-  if (status === 'Cancelled' || status === 'Cancelled (Cash)') {
-    return { className: 'booking-status-cancelled', icon: AlertCircle, label: 'Cancelled' };
-  }
-  if (status === 'Awaiting Slot Selection') {
-    return { className: 'booking-status-active', icon: CalendarDays, label: 'Select Slot' };
-  }
-  if (status === 'Negotiating') {
-    return { className: 'booking-status-active', icon: MessageCircle, label: 'Negotiating' };
-  }
-  return { className: 'booking-status-active', icon: CalendarCheck, label: status || 'Active' };
 };
 
 const MyBookings = ({
@@ -377,7 +347,7 @@ const MyBookings = ({
     pushHeaderNotification(
       result.outcome === 'review_required' ? 'Cancellation Requested' : 'Booking Cancelled',
       result.outcome === 'review_required'
-        ? 'The provider will review your request. Your payment has not been changed.'
+        ? 'The other participant will review your request. Payment has not changed.'
         : 'The reserved time is now available again.'
     );
   }, [bookingListCtrl, cancelBookingId, pushHeaderNotification]);
@@ -586,7 +556,7 @@ const MyBookings = ({
     const quoteCanCheckout = isQuoteCheckoutAvailable(booking);
     const statusMeta = getStatusMeta(scheduleHasPassed ? 'Reservation Expired' : booking.status);
     const StatusIcon = statusMeta.icon;
-    const canPayNow = !shouldLoadSellerBookings && (
+    const canPayNow = !shouldLoadSellerBookings && !['Cancelled', 'Cancelled (Cash)'].includes(booking.status) && (
       ['Payment Pending', 'Slot Selected - Payment Pending'].includes(booking.status)
       || booking.paymentStatus === 'partially_paid') && !scheduleHasPassed && quoteCanCheckout;
     const hasPrimaryWorkflowAction = canPayNow
@@ -621,8 +591,9 @@ const MyBookings = ({
           <div>
             <span className={`booking-status-badge ${statusMeta.className}`}>
               <StatusIcon size={14} aria-hidden="true" />
-              {booking.refundSimulated ? 'Refund simulated' : statusMeta.label}
+              {statusMeta.label}
             </span>
+            <BookingRefundStage booking={booking} />
           </div>
         </div>
 
@@ -650,7 +621,7 @@ const MyBookings = ({
           platformFee={!shouldLoadSellerBookings && booking.transactionFeeAmount > 0 ? formatPhp(booking.transactionFeeAmount) : undefined}
           totalPayment={!shouldLoadSellerBookings && booking.totalChargedAmount > 0 ? formatPhp(booking.totalChargedAmount) : undefined}
           demoPayment={isShowcasePaymentReference(booking.paymentReference)}
-          paymentProgress={booking.paymentPlan === 'downpayment' ? {
+          paymentProgress={booking.paymentPlan === 'downpayment' && !['Cancelled', 'Cancelled (Cash)'].includes(booking.status) ? {
             paid: formatPhp(booking.amountPaid),
             balance: formatPhp(booking.balanceDueAmount),
           } : undefined}
@@ -662,7 +633,7 @@ const MyBookings = ({
             setSelectedBookingId(booking.id);
             setScheduleAction(scheduleHasPassed ? 'checkout' : 'reschedule'); setUiState('slots');
           } : undefined}
-          onCancel={!shouldLoadSellerBookings && booking.disputeStatus !== 'open' && !['Completed Service', 'Cancelled', 'Cancelled (Cash)', 'Refunded'].includes(booking.status) ? () => setCancelBookingId(booking.id) : undefined}
+          onCancel={canRequestBookingCancellation(booking, shouldLoadSellerBookings) ? () => setCancelBookingId(booking.id) : undefined}
         >
             {canPayNow && (
               <Button
@@ -675,12 +646,8 @@ const MyBookings = ({
               </Button>
             )}
 
-            {shouldLoadSellerBookings && booking.cancellationStatus === 'requested' && (
-              <Button type="button" onClick={() => setReviewRequest({ kind: 'cancellation', bookingId: booking.id })}>
-                <CalendarX2 size={16} aria-hidden="true" />
-                Review cancellation
-              </Button>
-            )}
+            <BookingCancellationReviewAction booking={booking} isProvider={shouldLoadSellerBookings}
+              onReview={() => setReviewRequest({ kind: 'cancellation', bookingId: booking.id })} />
 
             {shouldLoadSellerBookings && booking.rescheduleRequest && (
               <Button type="button" onClick={() => setReviewRequest({ kind: 'reschedule', bookingId: booking.id, requestId: booking.rescheduleRequest.id })}>

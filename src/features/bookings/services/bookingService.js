@@ -3,6 +3,7 @@ import { getProfilePhotoUrl } from '../../../shared/utils/profilePhoto';
 import { calculateBookingPricing } from '../utils/bookingPricing';
 import { insertBookingMessage } from './messagePersistence';
 import { persistBookingReview } from './reviewPersistence';
+import { uiStatusFromDb } from '@/features/bookings/utils/bookingStatus';
 const getCleanString = (value) => (typeof value === 'string' ? value.trim() : '');
 const getNullableString = (value) => {
   const clean = getCleanString(value);
@@ -196,51 +197,6 @@ const buildSelectedSlot = (booking = {}, metadata = {}) => {
   };
 };
 
-const uiStatusFromDb = (booking = {}, metadata = {}) => {
-  if (booking.dispute_status === 'open') return 'Dispute Open';
-  if (booking.cancellation_status === 'requested') return 'Cancellation Requested';
-  if (booking.payment_status === 'refund_pending') return 'Refund Pending';
-  if (booking.status === 'completed') return 'Completed Service';
-  if (booking.status === 'refunded') return 'Refunded';
-  if (booking.status === 'cancelled') {
-    return metadata.payment_method === 'after-service-cash' ? 'Cancelled (Cash)' : 'Cancelled';
-  }
-  if (booking.delivery_status === 'seller_claimed') return 'Service Delivered';
-  if (booking.schedule_status === 'expired') return 'Reservation Expired';
-  if (booking.schedule_status === 'held') return 'Payment Pending';
-  if (['gcash-advance', 'paymongo-card'].includes(metadata.payment_method)) {
-    if (booking.payment_status === 'paid') return 'Payment Confirmed';
-    if (booking.payment_status === 'partially_paid') return 'Downpayment Paid';
-    return 'Payment Pending';
-  }
-  if (metadata.ui_status) return metadata.ui_status;
-  if (metadata.uiStatus) return metadata.uiStatus;
-
-  if (metadata.refund_status === 'requested' || metadata.refund_status === 'approved-awaiting-client-confirmation') {
-    return 'Refund Processing';
-  }
-
-  if (metadata.cash_confirmation_status === 'pending-worker-review') return 'Cash Verification Pending';
-  if (metadata.cash_confirmation_status === 'denied') return 'Cash Verification Denied';
-
-  switch (booking.status) {
-    case 'pending':
-      return metadata.quote_approved ? 'Awaiting Slot Selection' : 'Negotiating';
-    case 'confirmed':
-      return metadata.payment_method ? 'Service Scheduled' : 'Slot Selected - Payment Pending';
-    case 'in_progress':
-      return 'Active Service';
-    case 'completed':
-      return 'Completed Service';
-    case 'cancelled':
-      return metadata.payment_method === 'after-service-cash' ? 'Cancelled (Cash)' : 'Cancelled';
-    case 'refunded':
-      return 'Refunded';
-    default:
-      return 'Negotiating';
-  }
-};
-
 const dbStatusFromUiStatus = (status, fallback = 'pending') => {
   switch (status) {
     case 'Awaiting Slot Selection':
@@ -328,6 +284,7 @@ export const mapBookingRowToUiBooking = (booking = {}, context = {}) => {
     scheduleStatus: booking.schedule_status || (selectedSlot ? 'confirmed' : 'unscheduled'),
     holdExpiresAt: booking.hold_expires_at || null,
     cancellationStatus: booking.cancellation_status || 'none',
+    cancellationRequestedBy: booking.cancellation_requested_by || null,
     cancellationReason: booking.cancellation_reason || null,
     rescheduleRequest,
     paymentMethod,
