@@ -1,7 +1,7 @@
 import { createClient } from "@supabase/supabase-js";
 import type chromiumPackage from "@sparticuz/chromium";
 
-import { completeSandboxCheckout } from "../scripts/paymongo-sandbox-checkout";
+import { completeSandboxCheckout, sandboxSessionPaid } from "../scripts/paymongo-sandbox-checkout";
 import {
   ownsOpenSandboxCheckout, sandboxCheckoutEnabled, sandboxReturnUrlAllowed,
   type SandboxCheckoutRequest,
@@ -56,11 +56,13 @@ export default {
       return json({ error: "Start a new test checkout before using one-click payment." }, 400);
     }
 
-    const table = checkout.kind === "booking" ? "payment_attempts" : "service_ad_boost_attempts";
-    const ownerColumn = checkout.kind === "booking" ? "buyer_id" : "seller_id";
-    const { data: attempt, error: attemptError } = await userClient.from(table)
-      .select(`id,${ownerColumn},checkout_session_id,checkout_url,environment,status,expires_at`)
-      .eq("id", checkout.attemptId).maybeSingle();
+    const { data: attempt, error: attemptError } = await (checkout.kind === "booking"
+      ? userClient.from("payment_attempts")
+        .select("id,buyer_id,booking_id,amount,currency,checkout_session_id,checkout_url,environment,status,expires_at")
+        .eq("id", checkout.attemptId).maybeSingle()
+      : userClient.from("service_ad_boost_attempts")
+        .select("id,seller_id,amount,currency,checkout_session_id,checkout_url,environment,status,expires_at")
+        .eq("id", checkout.attemptId).maybeSingle());
     if (attemptError || !ownsOpenSandboxCheckout(attempt, checkout, auth.user.id)) {
       return json({ error: "This test checkout is unavailable. Start a new payment from your account." }, 403);
     }
@@ -85,7 +87,24 @@ export default {
       return json({ returnUrl }, 200);
     } catch (error) {
       console.error("sandbox_checkout_failed", error instanceof Error ? error.name : "unknown");
-      return json({ error: "Sandbox checkout did not finish. Check payment status before retrying; a test payment may already be processing." }, 502);
+      // PayMongo can complete the test charge even when its hosted page never
+      // navigates back. Check the exact owned session before reporting failure.
+      try {
+        if (await sandboxSessionPaid({ amount: Number(attempt!.amount), currency: String(attempt!.currency),
+          attemptId: checkout.attemptId, checkoutSessionId: checkout.checkoutSessionId,
+          checkoutUrl: checkout.checkoutUrl, kind: checkout.kind, secret: secret! })) {
+          const url = new URL(checkout.kind === "booking" ? "/bookings" : "/profile", appOrigin);
+          url.searchParams.set(checkout.kind === "booking" ? "payment" : "boostPayment", "verifying");
+          if (checkout.kind === "booking") {
+            url.searchParams.set("booking", String(attempt && "booking_id" in attempt ? attempt.booking_id : ""));
+            url.searchParams.set("attempt", checkout.attemptId);
+          } else url.searchParams.set("boostAttempt", checkout.attemptId);
+          return json({ returnUrl: url.toString() }, 200);
+        }
+      } catch (checkError) {
+        console.error("sandbox_checkout_recheck_failed", checkError instanceof Error ? checkError.name : "unknown");
+      }
+      return json({ error: "PayMongo did not confirm this test payment. Check payment status before retrying, or use the hosted checkout for this attempt." }, 502);
     } finally { activeSessions.delete(checkout.checkoutSessionId); }
   },
 };

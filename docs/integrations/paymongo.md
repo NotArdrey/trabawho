@@ -255,24 +255,30 @@ Clients request review from the booking card's **Refund review** section. Both
 participants see the support next step, approved amounts, provider references,
 and pending, sent, failed, or review-required states. Private admin reasons are
 excluded from participant column grants. A referral still does not issue money.
-Administrators use **Approve full refund** with a required reason and confirmation.
+Administrators use **Approve test refund** with a required reason and confirmation.
 The server calculates each amount from verified payment attempts and rejects a
 changed total after the admin confirmation, including any
 collected platform fee. This is a discretionary sandbox remedy, not a production
 cancellation or fee-refund policy. No unpaid balance is refunded.
 
-Each payment attempt has one refund record and a stable PayMongo idempotency key.
-Uncertain submissions retain that key; a 60-second lease prevents concurrent
-submissions. An unknown submission older than 23 hours requires manual provider
-review instead of risking a duplicate after the provider's key retention window.
-Known refunds are retrieved through the provider API using **Check refund status**.
-Failed refunds require support/provider investigation; no new charge or replacement
-refund is created automatically. The UI refreshes saved progress every 30 seconds
-and on focus. There is no refund webhook or background provider reconciliation in
-this change. A booking closes only when every recorded refund succeeds and no
-verified payment remains unrefunded. PayMongo's succeeded state means the refund
-was sent to its payment partner, not that the client has already seen the credit;
-see [PayMongo refund states](https://docs.paymongo.com/reference/refund-resource).
+For test-mode payments, the server completes the approved decision as a labeled
+**sandbox refund simulation**. It verifies the original PayMongo payment event,
+records a separate `simulated` refund state and audit event, closes the test case,
+and never calls PayMongo's Refund API or claims that money was returned. This is
+for QA/demo only; a live refund requires a separate live-payment launch review.
+Seeded no-charge bookings and manual receipts are not payment evidence; their
+support cases can still be reviewed, but they cannot enter the refund route.
+Historical provider refund references can still be checked read-only.
+
+Each payment attempt has one refund record. Historical provider submissions keep
+their stable idempotency key, 60-second lease, and 23-hour manual-review cutoff;
+known provider references are checked read-only. New test approvals do not start
+a provider submission. Failed or ambiguous historical results stay open for
+support review. The UI refreshes saved progress every 30 seconds and on focus.
+A test booking closes only after every recorded refund is `simulated` or already
+provider-verified and no verified payment remains unrefunded. A provider
+`succeeded` result means the refund was sent to its payment partner, not that the
+client has already seen the credit; see [PayMongo refund states](https://docs.paymongo.com/reference/refund-resource).
 
 Work controls also check numeric amounts rather than trusting a `paid` label.
 The database rejects work, delivery, or completion while a balance is outstanding,

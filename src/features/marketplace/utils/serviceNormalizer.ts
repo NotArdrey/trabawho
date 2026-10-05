@@ -1,5 +1,6 @@
 import { getActiveAdBooster } from "@/shared/utils/serviceBoost";
 import { getProfilePhotoUrl } from "@/shared/utils/profilePhoto";
+import { philippineDateKey } from "@/shared/domain/clientBookingDate";
 export { getActiveAdBooster } from "@/shared/utils/serviceBoost";
 
 type RecordValue = Record<string, unknown>;
@@ -129,6 +130,8 @@ export function buildWeeklyScheduleFromSlots(values: unknown[] = [], value: unkn
   const dayBlocks: Record<string, ScheduleBlock[]> = {};
   const days = new Set<string>();
   const seenWindows = new Set<string>();
+  const timeInManila = new Intl.DateTimeFormat("en-GB", { timeZone: "Asia/Manila", hour: "2-digit", minute: "2-digit", hourCycle: "h23" });
+  const dayInManila = new Intl.DateTimeFormat("en-US", { timeZone: "Asia/Manila", weekday: "short" });
   for (const value of values) {
     const slot = record(value);
     const start = new Date(text(slot.start_ts));
@@ -137,14 +140,16 @@ export function buildWeeklyScheduleFromSlots(values: unknown[] = [], value: unkn
     const windowKey = `${text(slot.service_id)}:${start.getTime()}:${end.getTime()}`;
     if (seenWindows.has(windowKey)) continue;
     seenWindows.add(windowKey);
-    const day = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][start.getDay()];
+    const dateKey = philippineDateKey(start);
+    if (!dateKey) continue;
+    const day = dayInManila.format(start);
     const meta = record(slot.metadata);
     const booked = number(meta.booked_count || meta.bookedCount) || 0;
     const capacity = number(slot.capacity) || 1;
-    const block = { id: slot.id, startTime: start.toTimeString().slice(0, 5), endTime: end.toTimeString().slice(0, 5),
+    const block = { id: slot.id, startTime: timeInManila.format(start), endTime: timeInManila.format(end),
       capacity, slotsLeft: slot.status === "available" ? Math.max(0, capacity - booked) : 0, rawSlot: slot };
     days.add(day);
-    for (const key of [day, start.toISOString().slice(0, 10)]) (dayBlocks[key] ??= []).push({ ...block });
+    for (const key of [day, dateKey]) (dayBlocks[key] ??= []).push({ ...block });
   }
   return { manualScheduling: false, operatingDays: [...days], dayBlocks };
 }

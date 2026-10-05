@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const { complete, getUser, readAttempt, fromTable, selectColumns, browserPath } = vi.hoisted(() => ({
-  complete: vi.fn(), getUser: vi.fn(), readAttempt: vi.fn(), fromTable: vi.fn(), selectColumns: vi.fn(), browserPath: vi.fn(),
+const { complete, paid, getUser, readAttempt, fromTable, selectColumns, browserPath } = vi.hoisted(() => ({
+  complete: vi.fn(), paid: vi.fn(), getUser: vi.fn(), readAttempt: vi.fn(), fromTable: vi.fn(), selectColumns: vi.fn(), browserPath: vi.fn(),
 }));
 vi.mock("@sparticuz/chromium", () => ({ default: { executablePath: browserPath, args: ["--no-sandbox"] } }));
 vi.mock("@supabase/supabase-js", () => ({ createClient: () => ({
@@ -10,7 +10,7 @@ vi.mock("@supabase/supabase-js", () => ({ createClient: () => ({
     selectColumns(columns); return { eq: () => ({ maybeSingle: readAttempt }) };
   } }; },
 }) }));
-vi.mock("../scripts/paymongo-sandbox-checkout", () => ({ completeSandboxCheckout: complete }));
+vi.mock("../scripts/paymongo-sandbox-checkout", () => ({ completeSandboxCheckout: complete, sandboxSessionPaid: paid }));
 
 import handler from "./paymongo-sandbox";
 
@@ -18,7 +18,8 @@ const origin = "https://app.example";
 const checkout = { kind: "booking", attemptId: "00000000-0000-0000-0000-000000000001",
   checkoutSessionId: "cs_test123", checkoutUrl: "https://checkout.paymongo.com/test123" };
 const attempt = { id: checkout.attemptId, buyer_id: "buyer-1", checkout_session_id: checkout.checkoutSessionId,
-  checkout_url: checkout.checkoutUrl, environment: "test", status: "awaiting_payment", expires_at: "2099-01-01T00:00:00Z" };
+  checkout_url: checkout.checkoutUrl, booking_id: "booking-1", amount: 551, currency: "PHP",
+  environment: "test", status: "awaiting_payment", expires_at: "2099-01-01T00:00:00Z" };
 
 function post(body: unknown, headers: Record<string, string> = {}) {
   return new Request(`${origin}/__trabawho_paymongo_sandbox_checkout`, {
@@ -36,6 +37,7 @@ describe("deployed test checkout endpoint", () => {
     getUser.mockResolvedValue({ data: { user: { id: "buyer-1" } }, error: null });
     readAttempt.mockResolvedValue({ data: attempt, error: null });
     complete.mockResolvedValue(`${origin}/bookings?payment=verifying`);
+    paid.mockResolvedValue(false);
     browserPath.mockResolvedValue("/tmp/chromium");
   });
   afterEach(() => { vi.unstubAllEnvs(); vi.clearAllMocks(); });
@@ -71,7 +73,26 @@ describe("deployed test checkout endpoint", () => {
     expect((await handler.fetch(post(boost))).status).toBe(200);
     expect(fromTable).toHaveBeenCalledWith("service_ad_boost_attempts");
     expect(selectColumns).toHaveBeenCalledWith(expect.stringContaining("seller_id"));
+    expect(selectColumns).not.toHaveBeenCalledWith(expect.stringContaining("booking_id"));
     expect(complete).toHaveBeenCalledWith(boost.checkoutUrl, "sk_test_example", boost.checkoutSessionId,
       { executablePath: "/tmp/chromium", args: ["--no-sandbox"] });
+  });
+
+  it("recovers a paid test session when the hosted page did not return", async () => {
+    complete.mockRejectedValueOnce(new Error("navigation timed out"));
+    paid.mockResolvedValueOnce(true);
+    const response = await handler.fetch(post(checkout));
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ returnUrl: `${origin}/bookings?payment=verifying&booking=booking-1&attempt=${checkout.attemptId}` });
+    expect(paid).toHaveBeenCalledWith(expect.objectContaining({ attemptId: checkout.attemptId,
+      checkoutSessionId: checkout.checkoutSessionId, amount: 551, kind: "booking" }));
+  });
+
+  it("does not claim success or retry a charge when the session is not paid", async () => {
+    complete.mockRejectedValueOnce(new Error("navigation timed out"));
+    const response = await handler.fetch(post(checkout));
+    expect(response.status).toBe(502);
+    expect(paid).toHaveBeenCalledOnce();
+    expect(complete).toHaveBeenCalledOnce();
   });
 });

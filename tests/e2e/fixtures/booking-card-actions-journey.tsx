@@ -10,6 +10,7 @@ const root = document.getElementById("root");
 if (root) createRoot(root).render(<main className="mx-auto max-w-7xl p-4">
   <article className="rounded-xl border bg-background p-4">
     <BookingCardFooter amountLabel="Service price" amount="PHP 650" platformFee="PHP 52"
+      createdAt="2026-10-05T05:07:00Z"
       totalPayment="PHP 702" paymentProgress={{ paid: "PHP 377", balance: "PHP 325" }}
       messageLabel="Message provider" messageIsPrimary={false}
       onViewDetails={() => {}} onMessage={() => {}} onReschedule={() => {}} onCancel={() => {}}>

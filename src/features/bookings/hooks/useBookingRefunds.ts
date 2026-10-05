@@ -31,7 +31,9 @@ export function useBookingRefunds(bookingId: string, caseId: string, onChanged?:
       if (action === "request") { await requestCaseRefund(caseId); setMessage("Refund review requested. Support must approve it before money is returned."); }
       else {
         const result = await processCaseRefunds(caseId, reason, expectedAmount);
-        setMessage(result.needsRetry ? "Processing could not finish. Check the saved status and try again shortly."
+        setMessage(result.simulatedCount > 0 ? "Sandbox refund process completed for the demo. No real money was returned by PayMongo."
+          : result.providerRejected ? "PayMongo rejected this refund request. No refund is confirmed; support must review the payment reference before retrying."
+          : result.needsRetry ? "Processing could not finish. Check the saved status and try again shortly."
           : "Refund status checked. The recorded result is shown below.");
       }
       await reload();

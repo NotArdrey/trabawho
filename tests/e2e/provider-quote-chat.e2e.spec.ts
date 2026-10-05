@@ -56,6 +56,19 @@ test("a standalone message thread does not expose a quote that cannot be sent", 
   await expect(page.getByRole("button", { name: "Create quote" })).toHaveCount(0);
 });
 
+test("an expired unpaid reservation lets the provider send a fresh quote", async ({ page }) => {
+  await page.goto("/__provider-quote-chat?expired");
+  await expect(page.getByText(/previous reservation expired/)).toBeVisible();
+  await page.getByRole("button", { name: "Create quote" }).click();
+  await page.getByRole("spinbutton", { name: "Service price (PHP)" }).fill("950");
+  await page.getByRole("textbox", { name: "Included work" }).fill("A new garden cleanup appointment");
+  await page.getByLabel("Starts (PHT)").fill("2099-10-06T10:00");
+  await page.getByLabel("Ends (PHT)").fill("2099-10-06T11:00");
+  await page.getByRole("button", { name: "Review quote" }).click();
+  await page.getByRole("button", { name: "Send quote" }).click();
+  await expect(page.getByRole("heading", { name: "Provider quote" })).toBeVisible();
+});
+
 test("quote action stays singular as the chat rerenders", async ({ page }) => {
   const duplicateKeyWarnings: string[] = [];
   page.on("console", (message) => {

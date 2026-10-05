@@ -22,6 +22,13 @@ describe("dispute refund progress", () => {
     expect(screen.queryByText("Refund review")).not.toBeInTheDocument();
     expect(hasVerifiedRefundPayment).not.toHaveBeenCalled();
   });
+  it("shows a system-queued payment exception without asking the client to request it again", async () => {
+    render(<BookingRefundProgress {...props} systemQueued />);
+    expect(await screen.findByText("Support review queued")).toBeVisible();
+    expect(screen.getByText(/No refund has been completed/)).toBeVisible();
+    expect(screen.queryByRole("button", { name: "Request refund review" })).not.toBeInTheDocument();
+    expect(hasVerifiedRefundPayment).not.toHaveBeenCalled();
+  });
   it("holds the request while payment verification cannot be checked and allows retry", async () => {
     vi.mocked(hasVerifiedRefundPayment).mockRejectedValueOnce(new Error("offline")).mockResolvedValueOnce(true);
     render(<BookingRefundProgress {...props} />);
@@ -48,6 +55,14 @@ describe("dispute refund progress", () => {
     expect(await screen.findByText(/PHP 464.00/)).toHaveTextContent("Refund sent to original payment method");
     expect(screen.getByText(/ref_verified/)).toBeVisible();
     expect(screen.queryByRole("button", { name: "Request refund review" })).not.toBeInTheDocument();
+  });
+  it("labels a completed sandbox refund without claiming that money was returned", async () => {
+    vi.mocked(getBookingRefunds).mockResolvedValue([{ id: "refund-1", case_id: "case-1", payment_attempt_id: "attempt-1",
+      amount: 464, currency: "PHP", status: "simulated", provider_refund_id: null, updated_at: "2026-10-05T08:00:00Z" }]);
+    render(<BookingRefundProgress {...props} canRequest={false} />);
+    expect(await screen.findByText(/Sandbox refund simulated — no money returned/)).toBeVisible();
+    expect(screen.getByText(/PayMongo did not return real money/)).toBeVisible();
+    expect(screen.queryByRole("button", { name: "Check refund status" })).not.toBeInTheDocument();
   });
   it("summarizes split refunds while keeping each provider reference visible", async () => {
     vi.mocked(getBookingRefunds).mockResolvedValue([

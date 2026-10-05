@@ -163,14 +163,36 @@ export async function submitSandboxCheckoutAndWaitForReturn(page: Page): Promise
   const isAppReturn = (url: URL) =>
     (url.pathname === "/bookings" && url.searchParams.get("payment") === "verifying") ||
     (url.pathname === "/profile" && url.searchParams.get("boostPayment") === "verifying");
-  const [returnRequest] = await Promise.all([
-    page.waitForRequest((request) => {
+  const returnRequest = page.waitForRequest((request) => {
       try { return request.isNavigationRequest() && isAppReturn(new URL(request.url())); }
       catch { return false; }
-    }, { timeout: 120_000 }),
-    submitSandboxCheckout(page),
-  ]);
-  return returnRequest.url();
+    }, { timeout: 90_000 }).then((request) => request.url());
+  const returnNavigation = page.waitForURL((url) => isAppReturn(url), { timeout: 90_000 })
+    .then(() => page.url());
+  await submitSandboxCheckout(page);
+  return Promise.any([returnRequest, returnNavigation]);
+}
+
+/** Read-only recovery after a hosted-page timeout; never submits a second charge. */
+export async function sandboxSessionPaid(input: {
+  amount: number; attemptId: string; checkoutSessionId: string; checkoutUrl: string;
+  currency: string; kind: "booking" | "boost"; secret: string;
+}, request: typeof fetch = fetch): Promise<boolean> {
+  const response = await request(`https://api.paymongo.com/v1/checkout_sessions/${input.checkoutSessionId}`, {
+    headers: { Authorization: `Basic ${Buffer.from(`${input.secret}:`).toString("base64")}` },
+  });
+  if (!response.ok) return false;
+  const session = await response.json() as { data?: { id?: unknown; attributes?: {
+    checkout_url?: unknown; livemode?: unknown; metadata?: Record<string, unknown>;
+    payments?: { id?: unknown; attributes?: Record<string, unknown> }[];
+  } } };
+  const attributes = session.data?.attributes;
+  const referenceKey = input.kind === "booking" ? "payment_attempt_id" : "boost_attempt_id";
+  if (session.data?.id !== input.checkoutSessionId || attributes?.livemode !== false
+    || attributes.checkout_url !== input.checkoutUrl || attributes.metadata?.[referenceKey] !== input.attemptId) return false;
+  return Boolean(attributes.payments?.some((payment) => payment.id && payment.attributes?.status === "paid"
+    && payment.attributes.amount === Math.round(input.amount * 100)
+    && payment.attributes.currency === input.currency));
 }
 
 export async function completeSandboxCheckout(

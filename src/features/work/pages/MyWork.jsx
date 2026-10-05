@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import DashboardNavigation from '../../../shared/components/DashboardNavigation';
 import WorkProviderSummary from '../components/WorkProviderSummary';
+import { ActiveServicePicker } from '@/features/work/components/ActiveServicePicker';
 import { countCompletedBookings } from '../utils/bookingSummary';
 import WorkSectionFilter from '../components/WorkSectionFilter';
 import WorkPaymentQueues from '../components/WorkPaymentQueues';
@@ -721,52 +722,16 @@ const MyWork = ({ appTheme = 'light', themeMode = 'system', onThemeChange, curre
           </div>
         )}
 
-        {!isLoadingSellerData && hasSellerRecord && (workerServices || []).length > 1 && (
-          <div
-            style={{
-              width: '100%',
-              maxWidth: '1100px',
-              margin: '0 auto 16px',
-              padding: '12px 14px',
-              borderRadius: '8px',
-              border: `1px solid ${themeTokens.border}`,
-              background: themeTokens.surface,
-              boxShadow: themeTokens.shadowSoft,
-              boxSizing: 'border-box',
-            }}
-          >
-            <label
-              style={{
-                display: 'grid',
-                gap: '6px',
-                color: themeTokens.textPrimary,
-                fontSize: '13px',
-                fontWeight: 800,
-              }}
-            >
-              Active Service
-              <select
-                aria-label="Active service"
-                value={activeServiceIndex}
-                onChange={(event) => setActiveServiceIndex(Number(event.target.value))}
-                style={{
-                  width: '100%',
-                  borderRadius: '8px',
-                  border: `1px solid ${themeTokens.inputBorder}`,
-                  background: themeTokens.inputBg,
-                  color: themeTokens.inputText,
-                  padding: '10px 12px',
-                  fontWeight: 700,
-                }}
-              >
-                {(workerServices || []).map((service, index) => (
-                  <option key={service.raw?.id || `${service.serviceType}-${index}`} value={index}>
-                    {service.serviceType || service.raw?.title || `Service ${index + 1}`}
-                  </option>
-                ))}
-              </select>
-            </label>
-          </div>
+        {!isLoadingSellerData && hasSellerRecord && (workerServices || []).length > 0 && (
+          <ActiveServicePicker
+            services={workerServices}
+            selectedIndex={activeServiceIndex}
+            onSelect={setActiveServiceIndex}
+            onEditService={handleOpenProfileEdit}
+            serviceId={currentProfile?.raw?.id}
+            sellerId={sellerId}
+            onDeleted={refreshWorkData}
+          />
         )}
 
         {showSetupBanner && (
@@ -810,10 +775,6 @@ const MyWork = ({ appTheme = 'light', themeMode = 'system', onThemeChange, curre
               duration={currentDurationLabel}
               payment={currentPaymentLabel}
               booster={currentBoostLabel}
-              onEditProfile={handleOpenProfileEdit}
-              serviceId={currentProfile?.raw?.id}
-              sellerId={sellerId}
-              onDeleted={refreshWorkData}
             />
 
             <WorkSectionFilter value={workSectionFilter} options={workSectionOptions} onValueChange={setWorkSectionFilter} />

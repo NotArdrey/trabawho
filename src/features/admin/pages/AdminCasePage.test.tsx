@@ -30,7 +30,7 @@ const item = {
 const detail = {
   booking: { id: "booking-1", buyer_id: "client-1", seller_id: "provider-1", service_id: 1,
     status: "confirmed", start_ts: "2026-10-03T08:00:00Z", end_ts: "2026-10-03T09:00:00Z",
-    total_amount: 900, currency: "PHP", payment_reference: null, schedule_status: "confirmed", work_started_at: null },
+    total_amount: 900, currency: "PHP", payment_reference: null, schedule_status: "confirmed", work_started_at: null, metadata: null },
   people: [], service: { id: 1, title: "Repair" }, payments: [], providerEvents: [],
   audit: [], caseActions: [], adminActions: [], delivery: [], caseMessages: [], unavailable: [],
 } as Awaited<ReturnType<typeof getSupportCaseDetail>>;
@@ -87,6 +87,22 @@ describe("AdminCasePage", () => {
     fireEvent.click(screen.getByText("History and technical references"));
     expect(disclosure).toHaveAttribute("open");
     expect(screen.getByText("Case: ef8283c5-8f25-4560-b76a-4b229f4e85a8")).toBeVisible();
+  });
+
+  it("shows collected history even after a verified attempt becomes refunded", async () => {
+    vi.mocked(getSupportCaseDetail).mockResolvedValue({ ...detail,
+      booking: { ...detail.booking, status: "refunded" },
+      payments: [{ id: "attempt-1", purpose: "initial", status: "refunded", amount: 551,
+        currency: "PHP", created_at: "2026-10-03T08:00:00Z", paid_at: "2026-10-03T08:01:00Z",
+        payment_id: "pay_1", environment: "test" }],
+      providerEvents: [{ event_id: "event-1", event_type: "checkout_session.payment.paid",
+        payment_attempt_id: "attempt-1", livemode: false, status: "processed",
+        processed_at: "2026-10-03T08:01:00Z" }],
+    });
+    renderCase();
+    expect((await screen.findAllByText("PHP 551", { selector: "strong" })).length).toBe(2);
+    expect(screen.getByText(/Recorded as refunded:/)).toHaveTextContent("PHP 551");
+    expect(screen.queryByText(/No confirmed PayMongo payment is linked/)).not.toBeInTheDocument();
   });
 
   it("groups evidence and separates participant conversation from private notes", async () => {

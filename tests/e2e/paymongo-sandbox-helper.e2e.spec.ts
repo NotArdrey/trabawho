@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { checkoutSessionId, fillSandboxCard, submitSandboxCheckout,
-  submitSandboxCheckoutAndWaitForReturn, verifySandboxCheckout } from "../../scripts/paymongo-sandbox-checkout.ts";
+  sandboxSessionPaid, submitSandboxCheckoutAndWaitForReturn, verifySandboxCheckout } from "../../scripts/paymongo-sandbox-checkout.ts";
 
 test("rejects a non-PayMongo or non-test checkout before card entry", async () => {
   expect(() => checkoutSessionId("https://example.com/cs_abc123")).toThrow(/Only PayMongo/);
@@ -25,6 +25,22 @@ test("accepts an opaque v2 link only with its provider session ID and matching p
   await expect(verifySandboxCheckout(checkoutUrl, "sk_test_secret", "cs_checkout123", request)).resolves.toBeUndefined();
   await expect(verifySandboxCheckout(`${checkoutUrl}-different`, "sk_test_secret", "cs_checkout123", request))
     .rejects.toThrow(/different checkout session/);
+});
+
+test("recovers only a paid matching test checkout after a missing browser return", async () => {
+  const input = { amount: 551, attemptId: "attempt-1", checkoutSessionId: "cs_test123",
+    checkoutUrl: "https://checkout.paymongo.com/opaque", currency: "PHP", kind: "booking" as const,
+    secret: "sk_test_secret" };
+  const attributes = { checkout_url: input.checkoutUrl, livemode: false,
+    metadata: { payment_attempt_id: input.attemptId },
+    payments: [{ id: "pay_test123", attributes: { status: "paid", amount: 55100, currency: "PHP" } }] };
+  const response = (value: typeof attributes) => () => Promise.resolve(new Response(JSON.stringify({
+    data: { id: input.checkoutSessionId, attributes: value },
+  }), { status: 200 }));
+  expect(await sandboxSessionPaid(input, response(attributes))).toBe(true);
+  expect(await sandboxSessionPaid(input, response({ ...attributes,
+    metadata: { payment_attempt_id: "another-attempt" } }))).toBe(false);
+  expect(await sandboxSessionPaid(input, response({ ...attributes, livemode: true }))).toBe(false);
 });
 
 test("rejects a non-local origin before trying to access the sandbox key", async ({ request }) => {
