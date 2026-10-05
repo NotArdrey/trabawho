@@ -128,6 +128,10 @@ const isValidSlot = (slot: AvailabilitySlot) => Boolean(
   && slot.endTime.slice(0, 5) > slot.startTime.slice(0, 5)
 );
 
+const overlapsAnotherSlot = (slot: AvailabilitySlot, slots: AvailabilitySlot[]) =>
+  isValidSlot(slot) && slots.some((other) => other.id !== slot.id && isValidSlot(other)
+    && slot.startTime < other.endTime && slot.endTime > other.startTime);
+
 function CreateServiceModal({ isOpen, newService, onChange, onClose, onSubmit, mode = "create", bookingExtras, validateBooking }: CreateServiceModalProps) {
   const [step, setStep] = useState(0);
   const [expandedDays, setExpandedDays] = useState<Partial<Record<DayKey, boolean>>>({ Mon: true });
@@ -152,6 +156,8 @@ function CreateServiceModal({ isOpen, newService, onChange, onClose, onSubmit, m
     (total, dayKey) => total + availability[dayKey].filter((slot) => !isValidSlot(slot)).length,
     0,
   );
+  const hasOverlappingSlots = DAYS.some((dayKey) =>
+    availability[dayKey].some((slot) => overlapsAnotherSlot(slot, availability[dayKey])));
 
   const updateAvailability = (updater: (next: Availability) => void) => {
     const next = getAvailabilitySnapshot(availability);
@@ -227,6 +233,10 @@ function CreateServiceModal({ isOpen, newService, onChange, onClose, onSubmit, m
     }
     if (targetStep === 1 && showAvailability && invalidSlotCount > 0) {
       setLocalError("Check the highlighted schedule entries. End time must follow start time.");
+      return false;
+    }
+    if (targetStep === 1 && showAvailability && hasOverlappingSlots) {
+      setLocalError("Times on the same day cannot overlap. Adjust or remove the highlighted slots.");
       return false;
     }
     if (targetStep === 0 && String(newService.durationMinutes).trim() && (!Number.isInteger(Number(newService.durationMinutes)) || Number(newService.durationMinutes) <= 0)) {
@@ -338,7 +348,7 @@ function CreateServiceModal({ isOpen, newService, onChange, onClose, onSubmit, m
                       <button type="button" className="flex min-h-12 w-full items-center justify-between gap-3 rounded-md px-1 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" onClick={() => setExpandedDays((previous) => ({ ...previous, [dayKey]: !previous[dayKey] }))} aria-expanded={expanded}><span className="inline-flex items-center gap-2 font-semibold">{expanded ? <ChevronDown className="size-4" aria-hidden="true" /> : <ChevronRight className="size-4" aria-hidden="true" />}{DAY_LABELS[dayKey]}</span><span className="text-xs font-medium text-muted-foreground">{slots.length} {slots.length === 1 ? "slot" : "slots"}</span></button>
                       {expanded ? <div className="space-y-3 pb-4 pl-6">
                         {slots.length === 0 ? <p className="py-2 text-sm text-muted-foreground">No times added for {DAY_LABELS[dayKey]}.</p> : null}
-                        {slots.map((slot) => <div key={slot.id} className={cn("grid gap-3 rounded-lg bg-background p-3 sm:grid-cols-[1fr_1fr_auto] sm:items-end", !isValidSlot(slot) && "bg-destructive/5")}>
+                        {slots.map((slot) => <div key={slot.id} className={cn("grid gap-3 rounded-lg bg-background p-3 sm:grid-cols-[1fr_1fr_auto] sm:items-end", (!isValidSlot(slot) || overlapsAnotherSlot(slot, slots)) && "bg-destructive/5")}>
                           <div className="space-y-2"><Label htmlFor={`${slot.id}-start`}>Start</Label><Input id={`${slot.id}-start`} type="time" value={slot.startTime} onChange={(event) => handleSlotChange(dayKey, slot.id, "startTime", event.target.value)} /></div>
                           <div className="space-y-2"><Label htmlFor={`${slot.id}-end`}>End</Label><Input id={`${slot.id}-end`} type="time" value={slot.endTime} onChange={(event) => handleSlotChange(dayKey, slot.id, "endTime", event.target.value)} /></div>
                           <Button type="button" size="icon" variant="ghost" className="text-muted-foreground hover:text-destructive" onClick={() => handleRemoveSlot(dayKey, slot.id)} aria-label={`Remove ${DAY_LABELS[dayKey]} slot`}><Trash2 aria-hidden="true" /></Button>

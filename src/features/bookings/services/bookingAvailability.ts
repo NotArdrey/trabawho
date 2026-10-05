@@ -13,7 +13,13 @@ export async function fetchPublicServiceSlots(serviceId: number | string) {
   const { data, error } = await supabase.rpc("list_available_service_slots", { p_service_ids: [Number(serviceId)] });
 
   if (error) throw error;
-  return (data ?? []).map((slot) => {
+  const unique = new Set<string>();
+  return (data ?? []).filter((slot) => {
+    const key = `${slot.service_id}:${slot.start_ts}:${slot.end_ts}`;
+    if (unique.has(key)) return false;
+    unique.add(key);
+    return true;
+  }).map((slot) => {
     return {
       booked_count: 0,
       capacity: 1,

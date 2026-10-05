@@ -81,4 +81,13 @@ describe("BookingCalendarModal", () => {
     expect(screen.getAllByText("No times").length).toBeGreaterThan(0);
     expect(screen.queryByText("Full")).not.toBeInTheDocument();
   });
+
+  it("offers one time when legacy rows repeat the same window", async () => {
+    const user = userEvent.setup();
+    render(<BookingCalendarModal isOpen worker={worker} schedule={{ manualScheduling: false, operatingDays: ["Thu"],
+      dayBlocks: { "2026-09-10": ["first", "duplicate"].map((id) => ({ id, startTime: "09:00", endTime: "10:00", slotsLeft: 1 })) },
+    }} onClose={vi.fn()} onConfirmBooking={vi.fn()} />);
+    await user.click(screen.getByRole("gridcell", { name: /Thursday, September 10, 2026, 1 slot available/i }));
+    expect(screen.getAllByRole("button", { name: /9:00 AM.*10:00 AM/i })).toHaveLength(1);
+  });
 });

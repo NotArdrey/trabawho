@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { getDisplayServiceType, normalizeServiceRecord } from "./serviceNormalizer";
+import { buildWeeklyScheduleFromSlots, getDisplayServiceType, normalizeServiceRecord } from "./serviceNormalizer";
 
 describe("marketplace gig identity", () => {
   const sellers = { user_id: "provider-1", display_name: "Jose Ramos", search_meta: { service_type: "Provider category" } };
@@ -16,5 +16,11 @@ describe("marketplace gig identity", () => {
   it("uses service metadata before provider categories for legacy gigs without titles", () => {
     expect(normalizeServiceRecord({ metadata: { service_type: "Electrical repair" }, sellers }).serviceType).toBe("Electrical repair");
     expect(normalizeServiceRecord({ sellers }).serviceType).toBe("Provider category");
+  });
+  it("shows one marketplace choice for duplicate published windows", () => {
+    const values = [12, 13].map((id) => ({ id, service_id: 4,
+      start_ts: "2026-10-05T01:00:00Z", end_ts: "2026-10-05T02:00:00Z", status: "available", capacity: 1 }));
+    const schedule = buildWeeklyScheduleFromSlots(values, { bookingMode: "with-slots" });
+    expect(schedule.dayBlocks["2026-10-05"]).toHaveLength(1);
   });
 });

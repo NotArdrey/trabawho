@@ -128,11 +128,15 @@ export function buildWeeklyScheduleFromSlots(values: unknown[] = [], value: unkn
   if (provider.actionType === "inquire" || provider.bookingMode === "calendar-only") return createScheduleForProvider(provider);
   const dayBlocks: Record<string, ScheduleBlock[]> = {};
   const days = new Set<string>();
+  const seenWindows = new Set<string>();
   for (const value of values) {
     const slot = record(value);
     const start = new Date(text(slot.start_ts));
     const end = new Date(text(slot.end_ts));
     if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) continue;
+    const windowKey = `${text(slot.service_id)}:${start.getTime()}:${end.getTime()}`;
+    if (seenWindows.has(windowKey)) continue;
+    seenWindows.add(windowKey);
     const day = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][start.getDay()];
     const meta = record(slot.metadata);
     const booked = number(meta.booked_count || meta.bookedCount) || 0;

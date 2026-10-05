@@ -43,7 +43,7 @@
     "typecheck": "tsc -b --pretty false",
     "lint": "eslint . --max-warnings 0",
     "test": "vitest run",
-    "test:standards": "node --test scripts/standards-guards.test.mjs scripts/supabase-contracts.test.mts scripts/system-email-config.test.mts tests/integration/account-roles.node.mts tests/integration/registration-endpoint.node.mts tests/integration/account-access.node.mts",
+    "test:standards": "node --test scripts/standards-guards.test.mjs scripts/supabase-contracts.test.mts scripts/system-email-config.test.mts tests/integration/account-roles.node.mts tests/integration/registration-endpoint.node.mts tests/integration/account-access.node.mts tests/integration/service-availability.node.mts",
     "test:watch": "vitest",
     "test:e2e": "playwright test",
     "test:e2e:ai-redesign": "playwright test tests/e2e/ai-redesign-smoke.e2e.spec.ts",

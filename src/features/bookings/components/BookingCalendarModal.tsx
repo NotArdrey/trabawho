@@ -119,21 +119,32 @@ function getDayKeyFromDate(dateString: string) {
 function getDateMeta(schedule: BookingSchedule, dateValue: string): DateMeta {
   if (!dateValue) return { canBookDate: false, slotCount: 0, isOperatingDay: false, dayBlocks: [] };
 
+  const uniqueBlocks = (blocks: ScheduleBlock[]) => {
+    const seen = new Set<string>();
+    return blocks.filter((block) => {
+      const window = `${block.startTime}:${block.endTime}`;
+      if (seen.has(window)) return false;
+      seen.add(window);
+      return true;
+    });
+  };
+
   const exactBlocks = schedule.dayBlocks?.[dateValue];
   if (exactBlocks) {
-    const slotCount = exactBlocks.reduce((sum, block) => sum + Math.max(0, block.slotsLeft || 0), 0);
+    const dayBlocks = uniqueBlocks(exactBlocks);
+    const slotCount = dayBlocks.reduce((sum, block) => sum + Math.max(0, block.slotsLeft || 0), 0);
     return {
       canBookDate: slotCount > 0 || Boolean(schedule.manualScheduling),
       slotCount: slotCount || (schedule.manualScheduling ? 1 : 0),
       isOperatingDay: true,
-      dayBlocks: exactBlocks,
+      dayBlocks,
       manualScheduling: schedule.manualScheduling,
     };
   }
 
   const dayKey = getDayKeyFromDate(dateValue);
   const isOperatingDay = Boolean(dayKey && (schedule.operatingDays || []).includes(dayKey));
-  const dayBlocks = dayKey && isOperatingDay ? schedule.dayBlocks?.[dayKey] || [] : [];
+  const dayBlocks = dayKey && isOperatingDay ? uniqueBlocks(schedule.dayBlocks?.[dayKey] || []) : [];
   if (!isOperatingDay) return { canBookDate: false, slotCount: 0, isOperatingDay, dayBlocks };
   if (schedule.manualScheduling) return { canBookDate: true, slotCount: 1, isOperatingDay, dayBlocks, manualScheduling: true };
 

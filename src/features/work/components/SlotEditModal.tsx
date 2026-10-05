@@ -15,6 +15,7 @@ import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 
 interface SlotData {
+  id?: number | string;
   capacity?: number | string;
   date?: string;
   endTime?: string;
@@ -26,6 +27,7 @@ interface SlotData {
 interface SlotEditModalProps {
   appTheme?: string;
   dayLabel?: string;
+  existingEntries?: SlotData[];
   isOpen: boolean;
   modalTitle?: string;
   mode: string;
@@ -48,6 +50,7 @@ function SlotEditModal({
   isOpen,
   mode,
   slotData,
+  existingEntries = [],
   dayLabel,
   modalTitle,
   submitLabel,
@@ -75,6 +78,10 @@ function SlotEditModal({
         setError("Maximum bookings must be at least one.");
         return;
       }
+      if (existingEntries.some((entry) => entry.date === date && (slotData?.id == null || String(entry.id) !== String(slotData.id)))) {
+        setError("This date is already available. Edit the existing date instead of adding it again.");
+        return;
+      }
     } else {
       if (!startTime || !endTime) {
         setError("Choose both a start and end time.");
@@ -84,13 +91,20 @@ function SlotEditModal({
         setError("End time must be later than start time.");
         return;
       }
+      if (existingEntries.some((entry) => entry.startTime && entry.endTime
+        && (slotData?.id == null || String(entry.id) !== String(slotData.id))
+        && startTime < entry.endTime && endTime > entry.startTime)) {
+        setError("This time overlaps an existing slot. Edit that slot or choose another time.");
+        return;
+      }
     }
 
     try {
       setIsSaving(true);
-      await onSave(isCalendarMode
+      const saved = await onSave(isCalendarMode
         ? { date, maxBookings: Number(maxBookings), note: note.trim() }
         : { startTime, endTime, capacity: 1 });
+      if (saved === false) setError("This slot could not be saved. Check for an overlapping time and try again.");
     } finally {
       setIsSaving(false);
     }
@@ -104,7 +118,7 @@ function SlotEditModal({
         <DialogHeader className="px-6 pb-5 pt-6">
           <DialogTitle>{resolvedTitle}</DialogTitle>
           <DialogDescription>
-            {isCalendarMode ? "Choose when clients can request this service." : `Set the booking window for ${dayLabel || "this day"}. You can accept one booking at a time across all your services.`}
+            {isCalendarMode ? "Choose when clients can request this service." : `Set the booking window for ${dayLabel || "this day"} in Philippine time (PHT). You can accept one booking at a time across all your services.`}
           </DialogDescription>
         </DialogHeader>
 

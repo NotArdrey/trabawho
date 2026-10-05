@@ -303,6 +303,7 @@ export const useWorkSchedule = ({ sellerId, currentProfile } = {}) => {
       : await handleSaveWeeklySlot(updatedData);
 
     if (saved !== false) closeSlotModal();
+    return saved;
   }, [closeSlotModal, handleSaveCalendarSlot, handleSaveWeeklySlot, scheduleMode]);
 
   const { deleteConfirmTarget, setDeleteConfirmTarget, handleDeleteSlot, handleConfirmDelete, isDeletingSlot } = useWorkSlotDeletion({

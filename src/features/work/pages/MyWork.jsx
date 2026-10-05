@@ -1167,12 +1167,12 @@ const MyWork = ({ appTheme = 'light', themeMode = 'system', onThemeChange, curre
           </p>
         )}
       </ConfirmActionModal>
-      
       {/* SLOT EDIT MODAL */}
       {editSlotModalOpen && <SlotEditModal
         isOpen={editSlotModalOpen}
         mode={scheduleMode}
         slotData={editSlotData}
+        existingEntries={scheduleMode === 'calendar-only' ? calendarAvailability : weeklySchedule[editSlotDayKey] || []}
         dayLabel={editSlotDayKey || 'Calendar Date'}
         modalTitle={
           scheduleMode === 'calendar-only'

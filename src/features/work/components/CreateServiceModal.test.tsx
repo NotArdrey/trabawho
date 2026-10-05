@@ -39,4 +39,20 @@ describe("CreateServiceModal", () => {
     expect(screen.getByText(/one booking at a time across all your services/i)).toBeInTheDocument();
     expect(screen.queryByRole("spinbutton", { name: "Capacity" })).not.toBeInTheDocument();
   });
+
+  it("keeps overlapping weekly times from being published", () => {
+    const onSubmit = vi.fn();
+    render(<CreateServiceModal isOpen newService={{
+      title: "Home cleaning", shortDescription: "A thorough home clean", description: "",
+      basePrice: 500, priceType: "fixed", rateBasis: "per-project", durationMinutes: 60,
+      bookingMode: "with-slots", availability: { Mon: [
+        { id: "first", startTime: "09:00", endTime: "10:00", capacity: 1 },
+        { id: "second", startTime: "09:30", endTime: "10:30", capacity: 1 },
+      ] },
+    }} onChange={vi.fn()} onClose={vi.fn()} onSubmit={onSubmit} />);
+    fireEvent.click(screen.getByRole("button", { name: "Continue" }));
+    fireEvent.click(screen.getByRole("button", { name: "Continue" }));
+    expect(screen.getByRole("alert")).toHaveTextContent(/cannot overlap/i);
+    expect(onSubmit).not.toHaveBeenCalled();
+  });
 });

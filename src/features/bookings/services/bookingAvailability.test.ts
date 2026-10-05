@@ -19,4 +19,10 @@ describe("public booking availability", () => {
     rpc.mockResolvedValue({ data: null, error: { message: "unavailable" } });
     await expect(fetchPublicServiceSlots(4)).rejects.toEqual({ message: "unavailable" });
   });
+
+  it("shows one choice for legacy duplicate rows with the same time window", async () => {
+    rpc.mockResolvedValue({ data: [12, 13].map((id) => ({ id, service_id: 4,
+      start_ts: "2026-10-06T09:00:00Z", end_ts: "2026-10-06T10:00:00Z", capacity: 1 })), error: null });
+    await expect(fetchPublicServiceSlots(4)).resolves.toEqual([expect.objectContaining({ id: 12 })]);
+  });
 });
