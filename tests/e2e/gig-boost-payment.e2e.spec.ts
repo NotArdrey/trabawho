@@ -36,6 +36,7 @@ test("one-click sandbox boost payment skips the hosted form and returns for veri
     shortcutCalls += 1;
     expect(route.request().postDataJSON()).toEqual({
       checkoutUrl: "https://checkout.paymongo.com/opaque-boost-token#public-key", checkoutSessionId: "cs_boost123",
+      attemptId: attempt, kind: "boost",
     });
     return route.fulfill({ json: { returnUrl: new URL(`/profile?boostPayment=verifying&boostAttempt=${attempt}`, page.url()).toString() } });
   });

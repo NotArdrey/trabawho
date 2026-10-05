@@ -10,5 +10,5 @@
     "noEmit": true,
     "types": ["node"]
   },
-  "include": ["vite.config.mts", "scripts/*.mts"]
+  "include": ["vite.config.mts", "scripts/*.mts", "api/*.ts", "src/shared/domain/paymongoSandboxAccess.ts"]
 }

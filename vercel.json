@@ -1,7 +1,15 @@
 {
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
+  "functions": {
+    "api/paymongo-sandbox.ts": {
+      "maxDuration": 180,
+      "includeFiles": "node_modules/@sparticuz/chromium/**"
+    }
+  },
   "rewrites": [
+    { "source": "/__trabawho_paymongo_sandbox_ready", "destination": "/api/paymongo-sandbox" },
+    { "source": "/__trabawho_paymongo_sandbox_checkout", "destination": "/api/paymongo-sandbox" },
     { "source": "/(.*)", "destination": "/index.html" }
   ]
 }

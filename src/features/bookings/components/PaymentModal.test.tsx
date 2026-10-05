@@ -1,6 +1,6 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import PaymentModal from "./PaymentModal";
 
@@ -13,6 +13,7 @@ const booking = {
 };
 
 describe("PaymentModal", () => {
+  afterEach(() => { vi.unstubAllEnvs(); vi.unstubAllGlobals(); });
   it("reviews terms only after the payment summary and returns to it when cancelled", async () => {
     const user = userEvent.setup();
     const onSelectPayment = vi.fn().mockResolvedValue(undefined);
@@ -64,6 +65,13 @@ describe("PaymentModal", () => {
     render(<PaymentModal booking={booking} onSelectPayment={onSelectPayment} onCancel={vi.fn()} />);
     await user.click(screen.getByRole("button", { name: "One-click sandbox test payment" }));
     expect(onSelectPayment).toHaveBeenCalledWith("paymongo-card", expect.objectContaining({ testCheckout: true }));
+  });
+
+  it("shows one-click checkout on an enabled deployed sandbox", async () => {
+    vi.stubEnv("DEV", false);
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: true }));
+    render(<PaymentModal booking={booking} onSelectPayment={vi.fn()} onCancel={vi.fn()} />);
+    expect(await screen.findByRole("button", { name: "One-click sandbox test payment" })).toBeVisible();
   });
 
   it("supports canceling from the footer", async () => {

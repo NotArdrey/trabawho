@@ -126,7 +126,7 @@ export function useGigBoost(sellerId?: string) {
     try {
       if (oneClickTest) await ensureLocalSandboxReady();
       const result = await createBoostCheckout(sellerId, draft);
-      if (oneClickTest) await completeLocalSandboxCheckout(result.checkoutUrl, result.checkoutSessionId);
+      if (oneClickTest) await completeLocalSandboxCheckout(result.checkoutUrl, result.checkoutSessionId, result.attemptId, "boost");
       else window.location.assign(result.checkoutUrl);
     }
     catch (failure) { setError(failure instanceof Error ? failure.message : "Unable to start checkout."); }

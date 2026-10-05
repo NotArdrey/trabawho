@@ -170,6 +170,6 @@ export async function createPayMongoCheckout(booking: CheckoutBooking): Promise<
 }
 
 export async function redirectToPayMongo(checkout: PayMongoCheckout, options: { oneClickTest?: boolean } = {}) {
-  if (options.oneClickTest) return completeLocalSandboxCheckout(checkout.checkoutUrl, checkout.checkoutSessionId);
+  if (options.oneClickTest) return completeLocalSandboxCheckout(checkout.checkoutUrl, checkout.checkoutSessionId, checkout.paymentAttemptId);
   window.location.assign(checkout.checkoutUrl);
 }

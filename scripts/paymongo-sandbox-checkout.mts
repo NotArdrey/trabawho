@@ -1,5 +1,4 @@
-import { chromium, type Frame, type Locator, type Page } from "@playwright/test";
-import { loadEnv } from "vite";
+import { chromium, type Frame, type Locator, type Page } from "playwright-core";
 
 type ProviderSession = {
   data?: { id?: unknown; attributes?: { checkout_url?: unknown; livemode?: unknown } };
@@ -164,35 +163,16 @@ export async function submitSandboxCheckoutAndWaitForReturn(page: Page): Promise
   return returnRequest.url();
 }
 
-export async function completeSandboxCheckout(rawUrl: string, secret: string, sessionId?: string): Promise<string> {
+export async function completeSandboxCheckout(
+  rawUrl: string, secret: string, sessionId?: string,
+  browserOptions: { executablePath?: string; args?: string[] } = {},
+): Promise<string> {
   await verifySandboxCheckout(rawUrl, secret, sessionId);
-  const browser = await chromium.launch({ headless: true });
+  const browser = await chromium.launch({ headless: true, ...browserOptions });
   try {
     const page = await browser.newPage();
     await page.goto(rawUrl, { waitUntil: "domcontentloaded" });
     await fillSandboxCard(page);
     return await submitSandboxCheckoutAndWaitForReturn(page);
   } finally { await browser.close(); }
-}
-
-async function main() {
-  const rawUrl = process.argv[2] || process.env.PAYMONGO_TEST_CHECKOUT_URL;
-  if (!rawUrl) throw new Error("Pass the test checkout URL or set PAYMONGO_TEST_CHECKOUT_URL.");
-  const sessionId = process.argv[3] || process.env.PAYMONGO_TEST_CHECKOUT_SESSION_ID;
-  const env = loadEnv("development", process.cwd(), "");
-  const secret = process.env.PAYMONGO_SECRET_KEY || env.PAYMONGO_SECRET_KEY || "";
-  await verifySandboxCheckout(rawUrl, secret, sessionId);
-  const browser = await chromium.launch({ headless: false });
-  try {
-    const page = await browser.newPage();
-    await page.goto(rawUrl, { waitUntil: "domcontentloaded" });
-    await fillSandboxCard(page);
-    console.info("Submitting a PayMongo test card and waiting for the app return...");
-    await submitSandboxCheckoutAndWaitForReturn(page);
-    console.info("Checkout returned to the application. Verify the booking or boost is marked paid by the webhook/reconciliation.");
-  } finally { await browser.close(); }
-}
-
-if (process.argv[1]?.replaceAll("\\", "/").endsWith("/paymongo-sandbox-checkout.mts")) {
-  main().catch((error: unknown) => { console.error(error instanceof Error ? error.message : "Sandbox checkout failed."); process.exitCode = 1; });
 }

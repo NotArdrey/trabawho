@@ -73,12 +73,24 @@ activate the client redirect before both functions are reachable.
 
 ### Faster QA checkout for bookings and gig boosts
 
-When running the app through the local Vite development server, booking payment
-review and gig-boost review offer **One-click sandbox test payment**. The local
-server checks the checkout with `PAYMONGO_SECRET_KEY=sk_test_...`, then fills
-PayMongo's successful test card in a headless browser. The user stays in the
-app; after PayMongo redirects, the normal signed-webhook/server reconciliation
-verifies the booking or boost. The button is absent from production builds.
+The local Vite development server offers **One-click sandbox test payment** for
+bookings and gig boosts. A deployed *test-only* Vercel app offers the same action
+only when its sandbox endpoint is explicitly enabled and has a `sk_test_...`
+key. The endpoint confirms the signed-in account owns the exact, unexpired
+checkout attempt, retrieves the session from PayMongo, and refuses live mode
+before filling PayMongo's successful test card in a headless browser. The user
+stays in the app; the normal signed-webhook/server reconciliation still verifies
+the booking or boost. A deployment without the enabled test endpoint shows only
+hosted checkout.
+
+For the Vercel test deployment, configure server-only
+`PAYMONGO_SANDBOX_ONE_CLICK_ENABLED=true` and `PAYMONGO_SECRET_KEY=sk_test_...`.
+The deployed function also needs the existing `VITE_SUPABASE_URL` and
+`VITE_SUPABASE_ANON_KEY` to verify the user and read only their own checkout
+attempt. Redeploy after changing these variables. Never enable this endpoint
+with live payment credentials or on a customer-facing live-money deployment.
+The PayMongo secret used by Vercel must match the test environment used by the
+Supabase checkout functions. Keep all secrets out of `VITE_*` variables.
 The checkout function supplies PayMongo's session ID separately from its hosted
 URL; the helper retrieves that exact test session and checks that its URL matches
 before entering any card details. Deploy both checkout Edge Functions when

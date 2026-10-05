@@ -21,6 +21,7 @@ import {
 } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 import { calculateBookingPricing } from "@/features/bookings/utils/bookingPricing";
+import { useSandboxCheckoutAvailable } from "@/shared/hooks/useSandboxCheckoutAvailable";
 import BookingTermsModal from "./BookingTermsModal";
 import { ServiceAddressFields } from '@/shared/components/ServiceAddressFields';
 import { emptyServiceAddress, serviceAddressValid, type ServiceAddress } from '@/shared/domain/serviceAddress';
@@ -140,12 +141,13 @@ export default function PaymentModal({
   requireBookingTerms = false,
   collectServiceAddress = booking.bookingMode === 'calendar-only' && booking.paymentStatus !== 'partially_paid',
 }: PaymentModalProps) {
+  const sandboxAvailable = useSandboxCheckoutAvailable();
   const allowsPayMongo = true;
   const isRequestBooking = booking.bookingMode === "calendar-only" || booking.isRequestBooking;
   const baseAmount = Number(booking.quoteAmount || 0) || 0;
   const pricing = calculateBookingPricing(baseAmount, transactionFeeRate ?? booking.transactionFeeRate ?? undefined);
   const isPayingRemainingBalance = booking.paymentStatus === "partially_paid";
-  const showHostedCheckoutAction = !import.meta.env.DEV || !isPayingRemainingBalance;
+  const showHostedCheckoutAction = !sandboxAvailable || !isPayingRemainingBalance;
   const [selectedMethod, setSelectedMethod] = useState<PaymentMethod | null>(allowsPayMongo ? "paymongo-card" : null);
   const [paymentPlan, setPaymentPlan] = useState<PaymentPlan>(isRequestBooking && booking.paymentPlan !== "downpayment" ? "full" : "downpayment");
   const processingRef = useRef(false);
@@ -310,7 +312,7 @@ export default function PaymentModal({
               <p className="rounded-xl bg-destructive/10 p-4 text-sm font-medium text-destructive">No payment method is available for this booking.</p>
             )}
 
-            {import.meta.env.DEV && <p className="mt-3 text-sm text-muted-foreground">Testing locally? Use the one-click sandbox button below to pay with PayMongo&apos;s test card without filling its form. No real money moves.</p>}
+            {sandboxAvailable && <p className="mt-3 text-sm text-muted-foreground">Testing this sandbox app? Use the one-click test button below to pay with PayMongo&apos;s test card without filling its form. No real money moves.</p>}
 
           </section>
 
@@ -340,11 +342,11 @@ export default function PaymentModal({
             <p className="mt-0.5 text-xl font-extrabold text-emerald-600 dark:text-emerald-400">{formatPhp(amountDueNow)}</p>
           </div>
           <Button type="button" variant="outline" onClick={onCancel} disabled={isProcessing}>Cancel</Button>
-          {showHostedCheckoutAction && <Button type="button" variant={import.meta.env.DEV ? "outline" : "primary"} onClick={() => beginPayment(false)} disabled={!selectedMethod} isLoading={isProcessing}>
+          {showHostedCheckoutAction && <Button type="button" variant={sandboxAvailable ? "outline" : "primary"} onClick={() => beginPayment(false)} disabled={!selectedMethod} isLoading={isProcessing}>
             {isProcessing ? <LoaderCircle className="animate-spin" aria-hidden="true" /> : <Send aria-hidden="true" />}
             {isProcessing ? "Opening checkout..." : confirmLabel}
           </Button>}
-          {import.meta.env.DEV && <Button type="button" className={showHostedCheckoutAction ? "col-span-2" : "w-full sm:w-auto"} disabled={!selectedMethod} isLoading={isProcessing}
+          {sandboxAvailable && <Button type="button" className={showHostedCheckoutAction ? "col-span-2" : "w-full sm:w-auto"} disabled={!selectedMethod} isLoading={isProcessing}
             onClick={() => beginPayment(true)}><CreditCard aria-hidden="true" />One-click sandbox test payment</Button>}
         </DialogFooter>
           </>

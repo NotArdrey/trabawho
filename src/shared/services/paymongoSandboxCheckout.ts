@@ -1,6 +1,8 @@
-/** Runs the local, test-key-only PayMongo checkout helper. Never ship this path as a live payment shortcut. */
+import { supabase } from "@/integrations/supabase";
+import type { SandboxCheckoutKind } from "@/shared/domain/paymongoSandboxAccess";
+
+/** Uses a test-key-only helper. Deployed access requires a server-side opt-in and attempt ownership. */
 export async function ensureLocalSandboxReady() {
-  if (!import.meta.env.DEV) throw new Error("One-click test payment is available only in local development.");
   const response = await fetch("/__trabawho_paymongo_sandbox_ready", { cache: "no-store" });
   if (response.ok) return;
   const payload: unknown = await response.json().catch(() => ({}));
@@ -8,12 +10,20 @@ export async function ensureLocalSandboxReady() {
   throw new Error(typeof result.error === "string" ? result.error : "One-click test payment is not configured. Use hosted test checkout instead.");
 }
 
-export async function completeLocalSandboxCheckout(checkoutUrl: string, checkoutSessionId?: string) {
-  if (!import.meta.env.DEV) throw new Error("One-click test payment is available only in local development.");
+export async function completeLocalSandboxCheckout(
+  checkoutUrl: string, checkoutSessionId?: string, attemptId?: string, kind: SandboxCheckoutKind = "booking",
+) {
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  if (!import.meta.env.DEV) {
+    if (!attemptId || !checkoutSessionId) throw new Error("Start a new test checkout before using one-click payment.");
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session?.access_token) throw new Error("Sign in again before testing payment.");
+    headers.Authorization = `Bearer ${session.access_token}`;
+  }
   const response = await fetch("/__trabawho_paymongo_sandbox_checkout", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ checkoutUrl, checkoutSessionId }),
+    headers,
+    body: JSON.stringify({ checkoutUrl, checkoutSessionId, attemptId, kind }),
   });
   const payload: unknown = await response.json().catch(() => ({}));
   const result = payload && typeof payload === "object" ? payload as Record<string, unknown> : {};

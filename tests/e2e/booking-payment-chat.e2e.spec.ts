@@ -17,7 +17,7 @@ test.beforeEach(async ({ page }) => {
   });
 });
 
-test("one-click sandbox requires local setup before creating a booking hold", async ({ page }) => {
+test("one-click sandbox never creates a booking hold when setup is missing", async ({ page }) => {
   let checkoutCalls = 0;
   await page.route("**/__trabawho_paymongo_sandbox_ready", (route) => route.fulfill({
     status: 503, json: { error: "Add PAYMONGO_SECRET_KEY=sk_test_... to the ignored .env.local, then restart the dev server." },
@@ -27,8 +27,14 @@ test("one-click sandbox requires local setup before creating a booking hold", as
     return route.fulfill({ status: 500 });
   });
   await page.goto("/__booking-journey");
-  await page.getByRole("button", { name: "One-click sandbox test payment" }).click();
-  await expect(page.getByRole("alert")).toContainText("PAYMONGO_SECRET_KEY");
+  await expect(page.getByRole("dialog", { name: "Choose payment" })).toBeVisible();
+  const shortcut = page.getByRole("button", { name: "One-click sandbox test payment" });
+  if (await shortcut.isVisible()) {
+    await shortcut.click();
+    await expect(page.getByRole("alert")).toContainText("PAYMONGO_SECRET_KEY");
+  } else {
+    await expect(page.getByRole("button", { name: "Reserve and continue" })).toBeVisible();
+  }
   expect(checkoutCalls).toBe(0);
 });
 
@@ -42,6 +48,7 @@ test("one-click sandbox booking payment skips the hosted form and returns for ve
     shortcutCalls += 1;
     expect(route.request().postDataJSON()).toEqual({
       checkoutUrl: "https://checkout.paymongo.com/opaque-booking-token#public-key", checkoutSessionId: "cs_test123",
+      attemptId: "attempt-1", kind: "booking",
     });
     return route.fulfill({ json: { returnUrl: new URL("/bookings?payment=verifying&booking=booking-1&attempt=attempt-1", page.url()).toString() } });
   });
