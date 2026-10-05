@@ -16,7 +16,7 @@ const schedule = {
 describe("BookingCalendarModal", () => {
   beforeEach(() => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
-    vi.setSystemTime(new Date("2026-09-10T08:00:00"));
+    vi.setSystemTime(new Date("2026-09-09T08:00:00Z"));
   });
 
   afterEach(() => {
@@ -89,5 +89,12 @@ describe("BookingCalendarModal", () => {
     }} onClose={vi.fn()} onConfirmBooking={vi.fn()} />);
     await user.click(screen.getByRole("gridcell", { name: /Thursday, September 10, 2026, 1 slot available/i }));
     expect(screen.getAllByRole("button", { name: /9:00 AM.*10:00 AM/i })).toHaveLength(1);
+  });
+
+  it("disables the whole current Philippine date, including later hours", () => {
+    vi.setSystemTime(new Date("2026-09-10T09:00:00Z"));
+    render(<BookingCalendarModal isOpen worker={worker} schedule={schedule} onClose={vi.fn()} onConfirmBooking={vi.fn()} />);
+    expect(screen.getByRole("gridcell", { name: /Thursday, September 10, 2026, booking available from tomorrow onward/i })).toBeDisabled();
+    expect(screen.getByText("Choose a date from tomorrow onward, Philippine time.")).toBeVisible();
   });
 });

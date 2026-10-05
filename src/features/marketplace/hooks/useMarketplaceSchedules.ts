@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 
 import { supabase } from "@/integrations/supabase";
+import { isBookableClientAppointment } from "@/shared/domain/clientBookingDate";
 import { buildWeeklyScheduleFromSlots } from "@/features/marketplace/utils/serviceNormalizer";
 import type { createScheduleForProvider } from "@/features/marketplace/utils/serviceNormalizer";
 
@@ -31,7 +32,7 @@ export function useMarketplaceSchedules(services: MarketplaceProvider[]) {
       const { data, error } = await supabase.rpc("list_available_service_slots", { p_service_ids: serviceIds });
       if (!active || error) return;
 
-      const slotsByService = (data ?? []).reduce<Record<string, typeof data>>((result, slot) => {
+      const slotsByService = (data ?? []).filter((slot) => isBookableClientAppointment(slot.start_ts, slot.end_ts)).reduce<Record<string, typeof data>>((result, slot) => {
         (result[String(slot.service_id)] ??= []).push(slot);
         return result;
       }, {});

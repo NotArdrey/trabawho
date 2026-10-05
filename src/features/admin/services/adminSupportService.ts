@@ -60,7 +60,7 @@ export async function listSupportCases(): Promise<SupportCase[]> {
 
 export async function getSupportCaseDetail(item: SupportCase) {
   const [bookingResult, paymentsResult, auditResult, caseActionsResult, adminActionsResult, deliveryResult, messagesResult] = await Promise.all([
-    supabase.from("bookings").select("id, buyer_id, seller_id, service_id, status, start_ts, end_ts, total_amount, currency, payment_reference, schedule_status, work_started_at").eq("id", item.booking_id).single(),
+    supabase.from("bookings").select("id, buyer_id, seller_id, service_id, status, start_ts, end_ts, total_amount, currency, payment_reference, schedule_status, work_started_at, metadata").eq("id", item.booking_id).single(),
     supabase.from("payment_attempts").select("id, purpose, status, amount, currency, created_at, paid_at, payment_id, environment").eq("booking_id", item.booking_id).order("created_at", { ascending: true }),
     supabase.from("booking_audit_events").select("id, event_type, actor_role, reason, idempotency_key, created_at").eq("booking_id", item.booking_id).order("created_at", { ascending: true }).limit(100),
     supabase.from("booking_case_actions").select("id, action, note, appointment_at, created_at").eq("case_id", item.id).order("created_at", { ascending: true }),
@@ -88,7 +88,7 @@ export async function getSupportCaseDetail(item: SupportCase) {
     adminActions: adminActionsResult.data || [],
     delivery: deliveryResult.data || [],
     caseMessages: messagesResult.data || [],
-    unavailable: [paymentsResult.error && "Payment attempts", item.case_type === "provider_no_show" && eventResult?.error && "Provider payment events", auditResult.error && "Booking history",
+    unavailable: [paymentsResult.error && "Payment attempts", eventResult?.error && "Provider payment events", auditResult.error && "Booking history",
       caseActionsResult.error && "Rework history", adminActionsResult.error && "Support actions",
       deliveryResult.error && "Delivery evidence", peopleResult.error && "Participant names",
       serviceResult.error && "Service title"].filter((value): value is string => Boolean(value)),

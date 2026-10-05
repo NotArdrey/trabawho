@@ -1,7 +1,7 @@
 import { useState } from "react";
-import { render, screen } from "@testing-library/react";
+import { act, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { fetchPublicServiceSlots } from "@/features/bookings/services/bookingAvailability";
 import BookingTermsModal from "./BookingTermsModal";
@@ -24,6 +24,8 @@ function BookingFlowHarness() {
 
 describe("SlotSelectionModal", () => {
   beforeEach(() => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    vi.setSystemTime(new Date("2026-10-05T09:00:00Z"));
     mockedFetchSlots.mockResolvedValue([{
       booked_count: 1,
       capacity: 3,
@@ -32,6 +34,32 @@ describe("SlotSelectionModal", () => {
       service_id: 7,
       start_ts: "2026-10-10T09:00:00+08:00",
     }]);
+  });
+  afterEach(() => vi.useRealTimers());
+
+  it("hides today's expired and later slots at 5 PM Philippine time", async () => {
+    mockedFetchSlots.mockResolvedValue([
+      { booked_count: 0, capacity: 1, id: 1, service_id: 7, start_ts: "2026-10-05T09:00:00+08:00", end_ts: "2026-10-05T10:00:00+08:00" },
+      { booked_count: 0, capacity: 1, id: 2, service_id: 7, start_ts: "2026-10-05T18:00:00+08:00", end_ts: "2026-10-05T19:00:00+08:00" },
+      { booked_count: 0, capacity: 1, id: 3, service_id: 7, start_ts: "2026-10-06T09:00:00+08:00", end_ts: "2026-10-06T10:00:00+08:00" },
+    ]);
+    render(<SlotSelectionModal booking={{ serviceId: 7 }} onCancel={vi.fn()} onConfirmSlot={vi.fn()} />);
+    expect(await screen.findByRole("button", { name: /Tue, Oct 6/i })).toBeVisible();
+    expect(screen.queryByRole("button", { name: /Mon, Oct 5/i })).not.toBeInTheDocument();
+  });
+
+  it("clears a selected time when the modal remains open past Philippine midnight", async () => {
+    vi.setSystemTime(new Date("2026-10-05T15:59:00Z"));
+    const user = userEvent.setup();
+    mockedFetchSlots.mockResolvedValue([{ booked_count: 0, capacity: 1, id: 3, service_id: 7,
+      start_ts: "2026-10-06T09:00:00+08:00", end_ts: "2026-10-06T10:00:00+08:00" }]);
+    render(<SlotSelectionModal booking={{ serviceId: 7 }} onCancel={vi.fn()} onConfirmSlot={vi.fn()} />);
+    await user.click(await screen.findByRole("button", { name: /Tue, Oct 6/i }));
+    await user.click(screen.getByRole("button", { name: /9:00 AM.*10:00 AM/i }));
+    expect(screen.getByRole("button", { name: "Review booking" })).toBeEnabled();
+    act(() => { vi.setSystemTime(new Date("2026-10-05T16:01:00Z")); window.dispatchEvent(new Event("focus")); });
+    expect(screen.getByRole("button", { name: "Review booking" })).toBeDisabled();
+    expect(screen.getByText(/No times are available right now/i)).toBeVisible();
   });
 
   it("requires an explicit date and time before continuing", async () => {
@@ -106,5 +134,20 @@ describe("SlotSelectionModal", () => {
     await user.click(screen.getByRole("button", { name: "Review booking" }));
     await user.click(screen.getByRole("button", { name: "Request reschedule" }));
     expect(await screen.findByRole("alert")).toHaveTextContent("This booking can no longer be rescheduled");
+  });
+
+  it("blocks a slot taken by another booking while the chooser was open", async () => {
+    const user = userEvent.setup();
+    const onConfirmSlot = vi.fn();
+    mockedFetchSlots.mockResolvedValueOnce([{ booked_count: 0, capacity: 1, id: 42,
+      service_id: 7, start_ts: "2026-10-10T09:00:00+08:00", end_ts: "2026-10-10T10:00:00+08:00" }])
+      .mockResolvedValueOnce([]);
+    render(<SlotSelectionModal booking={{ serviceId: 7 }} onCancel={vi.fn()} onConfirmSlot={onConfirmSlot} />);
+    await user.click(await screen.findByRole("button", { name: /Sat, Oct 10/i }));
+    await user.click(screen.getByRole("button", { name: /9:00 AM.*10:00 AM/i }));
+    await user.click(screen.getByRole("button", { name: "Review booking" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("That time was just booked or changed");
+    expect(screen.queryByRole("heading", { name: "Review your booking" })).not.toBeInTheDocument();
+    expect(onConfirmSlot).not.toHaveBeenCalled();
   });
 });

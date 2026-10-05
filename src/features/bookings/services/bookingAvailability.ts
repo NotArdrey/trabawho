@@ -1,4 +1,5 @@
 import { supabase } from "@/integrations/supabase";
+import { isBookableClientAppointment } from "@/shared/domain/clientBookingDate";
 
 export interface AvailableServiceSlot {
   booked_count: number;
@@ -15,6 +16,7 @@ export async function fetchPublicServiceSlots(serviceId: number | string) {
   if (error) throw error;
   const unique = new Set<string>();
   return (data ?? []).filter((slot) => {
+    if (!isBookableClientAppointment(slot.start_ts, slot.end_ts)) return false;
     const key = `${slot.service_id}:${slot.start_ts}:${slot.end_ts}`;
     if (unique.has(key)) return false;
     unique.add(key);

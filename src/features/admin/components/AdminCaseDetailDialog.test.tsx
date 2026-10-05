@@ -23,7 +23,7 @@ const item = {
 const detail = {
   booking: { id: "booking-1", buyer_id: "client-1", seller_id: "provider-1", service_id: 44,
     status: "confirmed", start_ts: "2026-10-02T08:00:00Z", end_ts: "2026-10-02T09:00:00Z",
-    total_amount: 900, currency: "PHP", payment_reference: null, schedule_status: "confirmed", work_started_at: null },
+    total_amount: 900, currency: "PHP", payment_reference: null, schedule_status: "confirmed", work_started_at: null, metadata: null },
   people: [{ user_id: "client-1", full_name: "Demo Client", email: "client@example.test" },
     { user_id: "provider-1", full_name: "Demo Provider", email: "provider@example.test" }],
   service: { id: 44, title: "Computer repair" },
@@ -44,7 +44,7 @@ describe("AdminCaseDetailDialog", () => {
     render(<AdminCaseDetailDialog item={item} onClose={vi.fn()} onSaved={vi.fn()} />);
     expect(await screen.findByText("Demo Provider")).toBeVisible();
     expect(screen.getByText(/initial: PHP 495 · paid/i)).toBeVisible();
-    expect(screen.getByText(/Approved refunds are submitted to PayMongo and remain pending until verified/)).toBeVisible();
+    expect(screen.getByText(/Test refunds complete the case as a labeled sandbox simulation/)).toBeVisible();
   });
 
   it("records a support referral once and keeps money unchanged", async () => {

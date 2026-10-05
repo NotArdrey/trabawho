@@ -1,35 +1,23 @@
 import { beforeEach, expect, it, vi } from "vitest";
-import { supabase } from "@/integrations/supabase";
 import { hasVerifiedRefundPayment } from "./bookingRefunds";
 
-vi.mock("@/integrations/supabase", () => ({ supabase: { from: vi.fn() } }));
+const { rpc } = vi.hoisted(() => ({ rpc: vi.fn() }));
+vi.mock("@/integrations/supabase", () => ({ supabase: { rpc } }));
 
-const query = { select: vi.fn(), eq: vi.fn(), in: vi.fn(), not: vi.fn(), limit: vi.fn() };
+beforeEach(() => { vi.clearAllMocks(); });
 
-beforeEach(() => {
-  vi.clearAllMocks();
-  query.select.mockReturnValue(query);
-  query.eq.mockReturnValue(query);
-  query.in.mockReturnValue(query);
-  query.not.mockReturnValue(query);
-  vi.mocked(supabase, { deep: true }).from.mockReturnValue(query);
-});
-
-it("matches the refund request's provider-backed payment requirement", async () => {
-  query.limit.mockResolvedValue({ data: [{ id: "attempt-1" }], error: null });
+it("uses the server-owned provider verification result", async () => {
+  rpc.mockResolvedValueOnce({ data: true, error: null });
   await expect(hasVerifiedRefundPayment("booking-1")).resolves.toBe(true);
-  expect(query.eq).toHaveBeenCalledWith("booking_id", "booking-1");
-  expect(query.in).toHaveBeenCalledWith("status", ["paid", "late_paid"]);
-  expect(query.not).toHaveBeenCalledWith("payment_id", "is", null);
-  expect(query.limit).toHaveBeenCalledWith(1);
+  expect(rpc).toHaveBeenCalledWith("has_verified_refund_payment", { p_booking_id: "booking-1" });
 });
 
-it("treats a booking without a verified attempt as ineligible", async () => {
-  query.limit.mockResolvedValue({ data: [], error: null });
+it("treats a booking without a verified provider event as ineligible", async () => {
+  rpc.mockResolvedValueOnce({ data: false, error: null });
   await expect(hasVerifiedRefundPayment("booking-1")).resolves.toBe(false);
 });
 
 it("does not imply ineligibility when verification could not be loaded", async () => {
-  query.limit.mockResolvedValue({ data: null, error: { message: "offline" } });
+  rpc.mockResolvedValueOnce({ data: null, error: { message: "offline" } });
   await expect(hasVerifiedRefundPayment("booking-1")).rejects.toThrow(/could not be checked/);
 });

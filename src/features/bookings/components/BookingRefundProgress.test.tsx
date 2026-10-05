@@ -49,6 +49,14 @@ describe("dispute refund progress", () => {
     expect(screen.getByText(/ref_verified/)).toBeVisible();
     expect(screen.queryByRole("button", { name: "Request refund review" })).not.toBeInTheDocument();
   });
+  it("labels a completed sandbox refund without claiming that money was returned", async () => {
+    vi.mocked(getBookingRefunds).mockResolvedValue([{ id: "refund-1", case_id: "case-1", payment_attempt_id: "attempt-1",
+      amount: 464, currency: "PHP", status: "simulated", provider_refund_id: null, updated_at: "2026-10-05T08:00:00Z" }]);
+    render(<BookingRefundProgress {...props} canRequest={false} />);
+    expect(await screen.findByText(/Sandbox refund simulated — no money returned/)).toBeVisible();
+    expect(screen.getByText(/PayMongo did not return real money/)).toBeVisible();
+    expect(screen.queryByRole("button", { name: "Check refund status" })).not.toBeInTheDocument();
+  });
   it("summarizes split refunds while keeping each provider reference visible", async () => {
     vi.mocked(getBookingRefunds).mockResolvedValue([
       { id: "refund-1", case_id: "case-1", payment_attempt_id: "attempt-1", amount: 325, currency: "PHP", status: "succeeded", provider_refund_id: "ref_first", updated_at: "2026-10-03T08:00:00Z" },

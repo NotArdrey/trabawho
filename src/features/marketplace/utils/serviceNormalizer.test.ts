@@ -23,4 +23,12 @@ describe("marketplace gig identity", () => {
     const schedule = buildWeeklyScheduleFromSlots(values, { bookingMode: "with-slots" });
     expect(schedule.dayBlocks["2026-10-05"]).toHaveLength(1);
   });
+  it("groups a slot after UTC midnight by its Philippine date and time", () => {
+    const schedule = buildWeeklyScheduleFromSlots([{ id: 42, service_id: 4,
+      start_ts: "2026-10-05T16:30:00Z", end_ts: "2026-10-05T17:30:00Z", status: "available", capacity: 1,
+    }], { bookingMode: "with-slots" });
+    expect(schedule.dayBlocks["2026-10-06"]?.[0]).toMatchObject({ startTime: "00:30", endTime: "01:30" });
+    expect(schedule.dayBlocks["Tue"]?.[0]).toMatchObject({ id: 42 });
+    expect(schedule.dayBlocks["2026-10-05"]).toBeUndefined();
+  });
 });

@@ -10,6 +10,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
+import { formatBookingCreatedAt } from "@/features/bookings/utils/bookingCreatedAt";
 
 interface BookingCardFooterProps {
   amountLabel: string;
@@ -19,6 +20,7 @@ interface BookingCardFooterProps {
   totalPayment?: string;
   demoPayment?: boolean;
   paymentProgress?: { paid: string; balance: string };
+  createdAt?: string | null;
   requestDate?: string;
   messageLabel: string;
   messageIsPrimary: boolean;
@@ -37,6 +39,7 @@ export function BookingCardFooter({
   totalPayment,
   demoPayment = false,
   paymentProgress,
+  createdAt,
   requestDate,
   messageLabel,
   messageIsPrimary,
@@ -51,6 +54,7 @@ export function BookingCardFooter({
   const requestedOn = parsedRequestDate && !Number.isNaN(parsedRequestDate.getTime())
     ? parsedRequestDate.toLocaleDateString("en-PH", { day: "numeric", month: "short", year: "numeric" })
     : requestDate;
+  const bookedOn = formatBookingCreatedAt(createdAt);
 
   return (
     <footer className="grid min-w-0 gap-4 border-t border-border/70 pt-4">
@@ -61,10 +65,10 @@ export function BookingCardFooter({
             <dd className={cn("mt-1 font-bold tabular-nums", emphasizeAmount ? "text-lg text-emerald-700 dark:text-emerald-300" : "text-sm text-foreground")}>{amount}</dd>
           </div>
 
-          {requestedOn && (
+          {(bookedOn || requestedOn) && (
             <div className="min-w-0 rounded-lg bg-primary/10 px-3 py-2 text-primary">
-              <dt className="flex items-center gap-1 text-xs font-medium"><CalendarDays className="size-3.5" aria-hidden="true" />Requested on</dt>
-              <dd className="mt-1 text-sm font-bold">{requestedOn}</dd>
+              <dt className="flex items-center gap-1 text-xs font-medium"><CalendarDays className="size-3.5" aria-hidden="true" />{bookedOn ? "Booked on" : "Requested on"}</dt>
+              <dd className="mt-1 text-sm font-bold">{bookedOn ? <time dateTime={createdAt || undefined}>{bookedOn}</time> : requestedOn}</dd>
             </div>
           )}
 

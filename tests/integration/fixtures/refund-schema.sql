@@ -14,15 +14,24 @@ create table public.bookings (
   schedule_status text default 'confirmed', hold_expires_at timestamptz,
   work_started_at timestamptz, completed_at timestamptz, delivered_at timestamptz, balance_due_at timestamptz, start_ts timestamptz,
   slot_id bigint, warranty_eligible boolean default false, schedule_version integer default 1,
-  total_charged_amount numeric(12,2), amount_paid numeric(12,2), balance_due_amount numeric(12,2), metadata jsonb
+  total_charged_amount numeric(12,2), amount_paid numeric(12,2), balance_due_amount numeric(12,2),
+  metadata jsonb, updated_at timestamptz default now()
 );
 create table public.booking_support_cases (
-  id uuid primary key, booking_id uuid references public.bookings(id), status text default 'open', closed_at timestamptz
+  id uuid primary key, booking_id uuid references public.bookings(id), status text default 'open',
+  resolution_status text, closed_at timestamptz
 );
 create table public.booking_support_admin_actions (id bigint generated always as identity, case_id uuid, action text,
   target_party text, reason text, created_at timestamptz default now());
 create table public.payment_attempts (id uuid primary key, booking_id uuid, status text, payment_id text,
-  amount numeric(12,2), environment text default 'test');
+  amount numeric(12,2), currency text default 'PHP', environment text default 'test', updated_at timestamptz default now());
+create table public.payment_provider_events (payment_attempt_id uuid,
+  event_type text default 'checkout_session.payment.paid', status text,
+  livemode boolean, processed_at timestamptz);
+create table public.booking_case_messages (id uuid primary key default gen_random_uuid(),
+  case_id uuid, author_id uuid, author_role text, audience text, body text, operation_id uuid);
+create table public.booking_case_notifications (case_id uuid, message_id uuid, recipient_id uuid,
+  unique (case_id, message_id, recipient_id));
 create table public.booking_audit_events (id bigint generated always as identity, booking_id uuid, event_type text,
   actor_id uuid, actor_role text, reason text, idempotency_key text, event_data jsonb,
   unique (booking_id, event_type, idempotency_key));

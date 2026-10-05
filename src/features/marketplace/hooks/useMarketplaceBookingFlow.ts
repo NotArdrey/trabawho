@@ -1,6 +1,7 @@
 import { useRef, useState } from "react";
 import { createPayMongoCheckout, redirectToPayMongo, startServiceConversation, type PaymentSelectionDetails } from "@/features/bookings";
 import { ensureLocalSandboxReady } from "@/shared/services/paymongoSandboxCheckout";
+import { isBookableClientAppointment, isFutureClientBookingDate } from "@/shared/domain/clientBookingDate";
 import { createScheduleForProvider, getDisplayServiceType, getProviderQuoteAmount } from "../utils/serviceNormalizer";
 
 interface Provider extends Record<string, unknown> {
@@ -16,7 +17,7 @@ interface Block {
   endTime: string;
   capacity?: number;
   slotsLeft?: number;
-  rawSlot?: { id?: number | string };
+  rawSlot?: { id?: number | string; start_ts?: string; end_ts?: string };
 }
 interface Schedule { dayBlocks?: Record<string, Block[]> }
 interface SlotSelection {
@@ -102,6 +103,12 @@ export function useMarketplaceBookingFlow({ isPublic, services, schedulesByProvi
     const selectedBlock: Block | undefined = manualScheduling
       ? { id: `manual-${workerId}-${date}`, startTime: "Manual", endTime: "Schedule", capacity: 1, slotsLeft: 1 }
       : (schedule.dayBlocks?.[date] || schedule.dayBlocks?.[dayKey || ""] || []).find((block) => String(block.id) === String(blockId));
+    if (!isFutureClientBookingDate(date) || !selectedBlock || (selectedBlock.rawSlot?.start_ts && selectedBlock.rawSlot?.end_ts
+      && !isBookableClientAppointment(selectedBlock.rawSlot.start_ts, selectedBlock.rawSlot.end_ts))) {
+      setBookingError("That date is no longer available. Choose a date from tomorrow onward (PHT).");
+      refreshSchedules();
+      return;
+    }
     setPendingBooking({
       workerId, serviceId: worker.rawService?.id, sellerId: worker.rawService?.seller_id,
       rawService: worker.rawService, workerName: worker.name, serviceType: getDisplayServiceType(worker),
@@ -120,12 +127,18 @@ export function useMarketplaceBookingFlow({ isPublic, services, schedulesByProvi
     setIsBookingSubmitting(true);
     setBookingError("");
     try {
+      if (!isFutureClientBookingDate(pendingBooking.selectedSlot.date)) {
+        throw new Error("That date is no longer bookable. Choose another time from tomorrow onward (PHT).");
+      }
       if (details.testCheckout) await ensureLocalSandboxReady();
+      if (!isFutureClientBookingDate(pendingBooking.selectedSlot.date)) {
+        throw new Error("That date is no longer bookable. Choose another time from tomorrow onward (PHT).");
+      }
       await redirectToPayMongo(await createPayMongoCheckout({ ...pendingBooking, paymentPlan: details.paymentPlan, serviceAddress: details.serviceAddress }),
         { oneClickTest: details.testCheckout });
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unable to reserve this booking.";
-      if (/time (?:is|was).*(?:unavailable|booked)|slot.*(?:unavailable|full)/i.test(message)) {
+      if (/time (?:is|was).*(?:unavailable|booked)|slot.*(?:unavailable|full)|date is no longer bookable/i.test(message)) {
         setIsPaymentModalOpen(false);
         setPendingBooking(null);
         refreshSchedules();
