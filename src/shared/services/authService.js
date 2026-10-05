@@ -913,10 +913,7 @@ export const signUpWithEmail = async (formData = {}) => {
   };
 };
 
-export const signOutUser = async () => {
-  const { error } = await supabase.auth.signOut();
-  if (error) throw error;
-};
+export { signOutUser } from '@/shared/services/authSessionService';
 
 export const resendSignupVerificationEmail = async (email) => {
   const normalizedEmail = normalizeEmail(email);

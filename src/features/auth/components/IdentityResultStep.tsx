@@ -40,17 +40,21 @@ export function IdentityResultStep({ flow, state, onDraftChange }: { flow: Accou
               aria-describedby="requested-name-help" onChange={(event) => correction.setRequested(event.target.value)} />
             <p id="requested-name-help" className="text-xs leading-5 text-muted-foreground">Your correction stays separate from the name on your ID. It becomes verified only after human review.</p>
           </div>
-          <div className="flex flex-col gap-2 sm:flex-row">
-            <Button type="button" variant="ghost" disabled={flow.busy} onClick={() => correction.setOpen(false)}><ArrowLeft aria-hidden="true" />Previous</Button>
+          <div className="flex flex-col gap-2">
             <Button type="submit" className="h-auto min-h-11 flex-1 whitespace-normal py-3" isLoading={flow.busy}>Request name review</Button>
+            <Button type="button" variant="ghost" disabled={flow.busy} onClick={() => correction.setOpen(false)}><ArrowLeft aria-hidden="true" />Previous</Button>
           </div>
         </form>}
       </div>}
       {!correction.open && (ready ? <div className="space-y-3">
         <p className="text-sm leading-6 text-muted-foreground">{worker ? 'Complete worker setup before publishing a gig.' : 'Enter a service address when you book.'} To use the other role, sign out and register a separate account with a different email.</p>
-        <Button asChild className="h-auto min-h-11 w-full whitespace-normal py-3">
+        {flow.completingSession ? <>
+          <Button className="h-auto min-h-11 w-full whitespace-normal py-3" isLoading={!flow.error} disabled={flow.busy}
+            onClick={() => void flow.refresh()}>{flow.error ? 'Retry finishing setup' : 'Finishing your account setup'}</Button>
+          {flow.error && <Button asChild variant="ghost" className="w-full"><a href="/sign-in">Sign in to continue</a></Button>}
+        </> : <Button asChild className="h-auto min-h-11 w-full whitespace-normal py-3">
           <a href={nextAction.href}>{nextAction.label}<ArrowRight aria-hidden="true" /></a>
-        </Button>
+        </Button>}
       </div> : <Button className="h-auto min-h-11 w-full whitespace-normal py-3" isLoading={flow.busy} onClick={() => void (namePending
         ? flow.identityAction('account-identity-name', { action: 'confirm_name', confirmed: true }) : flow.refresh())}>
         {namePending ? 'Confirm my legal name' : 'Refresh review status'}{namePending && <ArrowRight aria-hidden="true" />}

@@ -1,12 +1,14 @@
+import { registrationUser } from "../_shared/pendingRegistrationAccess.ts";
 import { corsHeaders, jsonResponse } from "../_shared/identityRegistration.ts";
 import { asRecord } from "../_shared/identityDomain.ts";
-import { accountClient, AccountError, accountUser, registrationState, requireConfirmed, text } from "../_shared/accountRegistration.ts";
+import { accountClient, AccountError, registrationState, text } from "../_shared/accountRegistration.ts";
 Deno.serve(async (request: Request) => {
   if (request.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   if (request.method !== "POST") return jsonResponse({ error: "Method not allowed" }, 405);
   try {
-    const client = accountClient(); const user = await accountUser(request, client); requireConfirmed(user);
+    const client = accountClient();
     const body = asRecord(await request.json());
+    const user = await registrationUser(request, client, body);
     if (body.action !== "confirm_name" && body.action !== "request_correction") throw new AccountError("Choose a supported identity action.");
     if (body.action === "confirm_name" && body.confirmed !== true) throw new AccountError("Confirm the name on your verified ID.");
     const saved = await client.rpc("confirm_account_identity_name", { p_user_id: user.id,

@@ -20,10 +20,18 @@ export async function accountUser(request: Request, client: ReturnType<typeof ac
   const token = text(request.headers.get("authorization")).replace(/^Bearer\s+/i, "");
   const { data, error } = await client.auth.getUser(token);
   if (error || !data.user) throw new AccountError("Sign in to continue your registration.", 401);
-  const profile = await client.from("profiles").select("account_status").eq("user_id", data.user.id).single();
-  if (profile.error || asRecord(profile.data).account_status !== "active")
-    throw new AccountError("Account access is restricted. Contact support.", 403);
+  await requireActiveAccount(client, data.user.id);
   return data.user;
+}
+export async function requireActiveAccount(client: ReturnType<typeof accountClient>, userId: string) {
+  const readProfile = () => client.from("profiles").select("account_status").eq("user_id", userId).maybeSingle();
+  let profile = await readProfile();
+  // Retry a failed read once; missing or restricted profiles must never be retried into access.
+  if (profile.error) profile = await readProfile();
+  if (profile.error) throw new AccountError("Account access could not be checked. Retry shortly.", 503);
+  if (!profile.data) throw new AccountError("Your account profile is unavailable. Contact support.", 409);
+  if (asRecord(profile.data).account_status !== "active")
+    throw new AccountError("Account access is restricted. Contact support.", 403);
 }
 export async function registrationRow(client: ReturnType<typeof accountClient>, userId: string) {
   const result = await client.from("account_registrations").select("*").eq("user_id", userId).maybeSingle();
@@ -41,8 +49,7 @@ export async function registrationState(client: ReturnType<typeof accountClient>
   const value = asRecord(profile.data);
   const status = text(value.verification_status);
   const expired = text(value.id_document_expiry) && text(value.id_document_expiry) < new Date().toISOString().slice(0, 10);
-  const state = !user.email_confirmed_at ? "email_pending"
-    : expired || ["DECLINED", "ABANDONED", "EXPIRED"].includes(status) ? "declined"
+  const state = expired || ["DECLINED", "ABANDONED", "EXPIRED"].includes(status) ? "declined"
     : status === "APPROVED" && value.is_verified === true && (row.name_confirmed_at || row.reviewed_legal_name) ? "ready"
     : status === "PENDING_REVIEW" ? "identity_review"
     : row.provider_status === "APPROVED" && row.source_legal_name && !row.name_issue ? "name_pending"
@@ -53,7 +60,7 @@ export async function registrationState(client: ReturnType<typeof accountClient>
     if (session.error) throw new AccountError("Verification session could not be loaded. Retry.", 503);
     sessionUrl = text(asRecord(asRecord(session.data).verification_data).session_url) || null;
   }
-  return { state, email: user.email, signupRole: row.account_role === 'worker' ? 'worker' : 'client', legalName: row.source_legal_name, documentType: row.document_type,
+  return { state, email: user.email, signupName: text(user.user_metadata.signup_name), signupRole: row.account_role === 'worker' ? 'worker' : 'client', legalName: row.source_legal_name, documentType: row.document_type,
     requestedName: row.requested_legal_name, nameIssue: row.name_issue, sessionId: row.current_session_id,
     sessionUrl, providerStatus: row.provider_status, providerSetupComplete: Boolean(row.provider_setup_completed_at) };
 }
@@ -71,7 +78,6 @@ export function verifiedDocument(payload: unknown) {
   return { ...document, nameAmbiguous: new Set(names).size > 1 || partialName || !/\p{L}/u.test(document.fullName) };
 }
 export async function pollAccountIdentity(client: ReturnType<typeof accountClient>, user: User) {
-  requireConfirmed(user);
   const row = await registrationRow(client, user.id);
   const sessionId = text(row?.current_session_id);
   if (!sessionId) return registrationState(client, user);

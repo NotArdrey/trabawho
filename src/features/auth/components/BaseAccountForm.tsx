@@ -8,6 +8,7 @@ import type { AccountRegistrationFlow } from '../hooks/useAccountRegistration';
 import type { DraftListener } from '../hooks/useRegistrationDraft';
 import PasswordField from './PasswordField';
 import { SignupRoleChoice } from './SignupRoleChoice';
+import { RegistrationTerms } from './RegistrationTerms';
 
 export function BaseAccountForm({ flow, onDraftChange }: { flow: AccountRegistrationFlow; onDraftChange?: DraftListener }) {
   const form = useBaseAccountForm(flow.create, onDraftChange);
@@ -33,19 +34,15 @@ export function BaseAccountForm({ flow, onDraftChange }: { flow: AccountRegistra
         placeholder="Re-enter your password" autoComplete="new-password" required disabled={flow.busy} value={form.confirmPassword}
         onChange={(event) => form.setConfirmPassword(event.target.value)} />
       <div className="space-y-2">
-        <label htmlFor="account-terms" className="flex min-h-11 cursor-pointer items-start gap-3 py-3 text-sm leading-5">
-          <Checkbox id="account-terms" required disabled={flow.busy} checked={form.terms} aria-invalid={Boolean(form.errors.acceptedTerms)}
+        <div className="flex min-h-11 items-center gap-3 text-sm leading-5">
+          <Checkbox id="account-terms" aria-label="I agree to the Terms and Conditions" required disabled={flow.busy} checked={form.terms} aria-invalid={Boolean(form.errors.acceptedTerms)}
             aria-describedby={form.errors.acceptedTerms ? 'account-terms-error' : undefined} onChange={(event) => form.setTerms(event.target.checked)} />
-          I agree to the Terms and Conditions
-        </label>
+          <div className="flex flex-wrap items-center gap-x-1"><label htmlFor="account-terms" className="flex min-h-11 cursor-pointer items-center">I agree to the</label><RegistrationTerms disabled={flow.busy} /></div>
+        </div>
         {form.errors.acceptedTerms && <p id="account-terms-error" role="alert" className="text-sm text-destructive">{form.errors.acceptedTerms}</p>}
-        <details>
-          <summary className="min-h-11 cursor-pointer rounded-lg py-3 text-sm font-medium text-primary">Read Terms and Conditions</summary>
-          <p className="pb-3 text-sm leading-6 text-muted-foreground">TrabaWho processes account, booking, contact, and verification information under the Data Privacy Act of 2012. You agree to provide accurate information and use the marketplace responsibly. Identity evidence is used to verify access; identity consent is requested separately before capture.</p>
-        </details>
       </div>
       <Button type="submit" isLoading={flow.busy} className="h-auto min-h-11 w-full whitespace-normal py-3">Create account<ArrowRight aria-hidden="true" /></Button>
-      <p className="text-xs leading-5 text-muted-foreground">Next, confirm your email, then verify your identity with Didit or submit evidence for admin review.</p>
+      <p className="text-xs leading-5 text-muted-foreground">Creating your account sends a confirmation email. Next, enter your name, confirm your email, and verify your identity.</p>
     </form>
   );
 }

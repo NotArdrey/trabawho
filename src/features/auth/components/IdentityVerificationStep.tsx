@@ -8,15 +8,16 @@ import { useIdentityStep } from '../hooks/useIdentityStep';
 import type { DraftListener } from '../hooks/useRegistrationDraft';
 import { ManualAccountReview } from './ManualAccountReview';
 
-export function IdentityVerificationStep({ flow, state, onDraftChange }: { flow: AccountRegistrationFlow; state: AccountRegistration; onDraftChange?: DraftListener }) {
+export function IdentityVerificationStep({ flow, state, onDraftChange, active = true }: { flow: AccountRegistrationFlow; state: AccountRegistration; onDraftChange?: DraftListener; active?: boolean }) {
   const controls = useIdentityStep();
   const container = useRef<HTMLElement>(null);
   const inProgress = state.state === 'identity_in_progress';
   useEffect(() => {
+    if (!active) return;
     const heading = controls.manual ? container.current?.querySelector<HTMLElement>('[data-manual-review] [data-registration-heading]')
-      : container.current?.parentElement?.querySelector<HTMLElement>('[data-registration-heading]');
+      : container.current?.closest('[data-registration-journey]')?.querySelector<HTMLElement>('[data-registration-heading]');
     heading?.focus();
-  }, [controls.manual]);
+  }, [controls.manual, active]);
   return (
     <section ref={container} className="space-y-6">
       <div data-identity-choice hidden={controls.manual} className="space-y-6">
@@ -44,13 +45,13 @@ export function IdentityVerificationStep({ flow, state, onDraftChange }: { flow:
         </div>
       </div>
       <div data-manual-review hidden={!controls.manual} className="space-y-6">
-        <Button variant="ghost" disabled={flow.busy} onClick={() => controls.setManual(false)}><ArrowLeft aria-hidden="true" />Previous</Button>
         <ManualAccountReview busy={flow.busy} canSubmit={controls.consent} onDraftChange={onDraftChange}
           submit={async (body) => { await flow.identityAction('account-manual-review', body); }}
           consentContent={<label htmlFor="fallback-identity-consent" className="flex min-h-11 cursor-pointer items-start gap-3 py-3 text-sm leading-5">
             <Checkbox id="fallback-identity-consent" disabled={flow.busy} checked={controls.consent} onChange={(event) => controls.setConsent(event.target.checked)} />
             I consent to manual review of my ID and selfie.
           </label>} />
+        <Button variant="ghost" className="w-full" disabled={flow.busy} onClick={() => controls.setManual(false)}><ArrowLeft aria-hidden="true" />Previous</Button>
       </div>
     </section>
   );

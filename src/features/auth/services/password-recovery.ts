@@ -1,4 +1,5 @@
 import { supabase } from "@/integrations/supabase";
+import { signOutUser } from '@/shared/services/authSessionService';
 
 export async function completePasswordRecovery(newPassword: string): Promise<void> {
   const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
@@ -11,8 +12,8 @@ export async function completePasswordRecovery(newPassword: string): Promise<voi
     throw new Error("Your password could not be updated. Request a new reset link and try again.");
   }
 
-  const { error: signOutError } = await supabase.auth.signOut();
-  if (signOutError) {
+  try { await signOutUser(); }
+  catch {
     throw new Error("Your password was updated, but this recovery session could not be closed. Close this browser tab before signing in.");
   }
 }

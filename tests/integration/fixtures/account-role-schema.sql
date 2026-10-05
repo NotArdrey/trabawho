@@ -19,6 +19,7 @@ create table public.profiles (
   is_client boolean default true, is_worker boolean default false, identity_role text,
   identity_required boolean default true, verification_status text default 'UNVERIFIED',
   is_verified boolean default false, account_status text default 'active', id_document_expiry date,
+  disabled_reason text, suspended_reason text, suspended_until timestamptz, disabled_at timestamptz, suspended_at timestamptz,
   id_verified_at timestamptz, identity_reviewed_at timestamptz, didit_session_id text,
   province text, city text, barangay text, address text, updated_at timestamptz default now()
 );
