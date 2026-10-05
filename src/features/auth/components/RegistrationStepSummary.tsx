@@ -7,7 +7,7 @@ export function RegistrationStepSummary({ state, step, busy, onContinue }: {
 }) {
   return <div className="space-y-4">
     <p className="break-words text-sm leading-6">{state.email}</p>
-    {step === 'account' && <p className="text-sm leading-6 text-muted-foreground">Your account already exists. You can correct its email on the email confirmation step.</p>}
+    {step === 'account' && <p className="text-sm leading-6 text-muted-foreground">Your sign-up has started. Continue with your name and identity verification to finish setup.</p>}
     <Button disabled={busy} className="w-full" onClick={onContinue}>
       {step === 'account' ? 'Continue to name' : 'Continue to identity'}<ArrowRight aria-hidden="true" />
     </Button>

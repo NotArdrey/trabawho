@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { supabase } from '@/integrations/supabase';
-import { clearPendingAccount } from '@/shared/services/pendingAccountRecovery';
+import { clearPendingAccount, pendingAccount } from '@/shared/services/pendingAccountRecovery';
 import { signOutUser } from '@/shared/services/authSessionService';
 export { clearPendingAccount, pendingAccount, savePendingAccount, type PendingAccount } from '@/shared/services/pendingAccountRecovery';
 
@@ -14,6 +14,7 @@ const stateSchema = z.object({
   emailDelivery: z.object({ sent: z.boolean() }).optional(),
   signupRole: z.enum(['client', 'worker']).optional(),
   signupName: z.string().optional(),
+  session: z.object({ access_token: z.string(), refresh_token: z.string() }).optional(),
 });
 export type AccountRegistration = z.infer<typeof stateSchema>;
 export type SignupRole = NonNullable<AccountRegistration['signupRole']>;
@@ -39,7 +40,17 @@ export async function registrationRequest(name: string, body: Record<string, unk
 export async function resumeRegistration() {
   const session = await supabase.auth.getSession();
   if (session.error) throw new Error('Your session could not be restored. Sign in again.');
-  if (!session.data.session) return null;
+  if (!session.data.session) {
+    const pending = pendingAccount();
+    if (!pending) return null;
+    const state = await registrationRequest('account-registration', { action: 'state', ...pending });
+    if (state.state === 'ready' && state.session) {
+      const signedIn = await supabase.auth.setSession(state.session);
+      if (signedIn.error) throw new Error('Your account is ready. Sign in to continue.');
+      clearPendingAccount();
+    }
+    return state;
+  }
   clearPendingAccount();
   return registrationRequest('account-registration', { action: 'state' });
 }

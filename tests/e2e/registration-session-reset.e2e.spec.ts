@@ -38,13 +38,15 @@ for (const width of [390, 1440]) test(`abandoned signup can start another accoun
   await page.goto('/register');
   await page.evaluate(() => sessionStorage.setItem('trabawho.pendingAccount.v2', JSON.stringify({ userId: 'previous', nonce: 'old-capability', email: 'old@example.com', signupName: 'Old Applicant' })));
   await page.reload();
-  await expect(page.getByRole('heading', { name: 'Confirm your email', exact: true })).toBeVisible();
-  await page.getByRole('button', { name: 'Register another account', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Verify your identity', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Back', exact: true }).click();
+  await page.getByRole('button', { name: 'Back', exact: true }).click();
+  await page.getByRole('button', { name: 'Use a different account', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Create account', exact: true })).toBeFocused();
   await expect(page.getByLabel('Email', { exact: true })).toHaveValue('');
   await expect(page.getByLabel('Password', { exact: true })).toHaveValue('');
   expect(await page.evaluate(() => sessionStorage.getItem('trabawho.pendingAccount.v2'))).toBeNull();
-  expect(flow.requests).toEqual([]);
+  expect(flow.requests.map(item => item.body.action)).toEqual(['state']);
   await page.reload();
   await expect(page.getByRole('heading', { name: 'Create account', exact: true })).toBeVisible();
 });

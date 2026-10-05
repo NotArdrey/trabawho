@@ -16,9 +16,10 @@ export async function mockAccountJourney(page: Page, initial: JourneyState | nul
     requests.push({name,body});
     if(name==='account-registration' && body.action==='create') {
       signupRole = body.signupRole === 'worker' ? 'worker' : 'client';
-      state = { state: 'email_pending', email: String(body.email), signupRole };
+      state = { state: 'identity_pending', email: String(body.email), signupName: '', signupRole };
     }
-    if(name==='account-registration' && body.action==='save_name') state = { ...state, state: 'email_pending', signupName: String(body.signupName) };
+    if(name==='account-registration' && body.action==='save_name') state = { ...state, state: 'identity_pending', signupName: String(body.signupName) };
+    if(name==='account-registration' && body.action==='state' && body.userId && !state) state={state:'identity_pending',email:String(body.email),signupName:typeof body.signupName === 'string' ? body.signupName : ''};
     if(name==='account-didit-session') state=body.action==='get_session'?next:{state:'identity_in_progress',sessionId:'didit-owned',sessionUrl:'https://verification.didit.me/session/test'};
     if(name==='account-identity-name') state=body.action==='request_correction'?{...state,state:'identity_review',requestedName:String(body.requestedName),nameIssue:'Applicant requested a correction.'}:{state:'ready'};
     if(name==='account-manual-review') state={state:'identity_review',nameIssue:'Manual evidence needs review.'};
@@ -37,7 +38,7 @@ export async function fillRegistration(page: Page, email = 'person@example.com',
 }
 export async function fillSignupName(page: Page, name = 'Maria Isabel de la Cruz Santos') {
   await page.getByLabel('Complete name', { exact: true }).fill(name);
-  await page.getByRole('button', { name: 'Continue to email', exact: true }).click();
+  await page.getByRole('button', { name: 'Continue to identity', exact: true }).click();
 }
 export async function fillManualEvidence(page: Page) {
   await page.getByLabel('Name on ID',{exact:true}).fill('Manual User');

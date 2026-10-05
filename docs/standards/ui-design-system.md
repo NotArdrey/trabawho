@@ -32,7 +32,7 @@ Visual interest must reinforce hierarchy or explain the product. Use brand color
 ## Layout and imagery
 
 - Use image-forward editorial layouts for public acquisition, authentication, and onboarding when photography helps establish the service context.
-- On wide authentication-style screens, prefer an approximately 55–60% visual column and 40–45% task column. The form remains readable and independently scrollable when its content is long.
+- On wide authentication-style screens, prefer an approximately 55–60% visual column and 40–45% task column. The form remains readable and independently scrollable when its content is long. Registration hides the scrollbar at the product owner's request while preserving native scrolling and keyboard access.
 - Use one strong, relevant image rather than multiple competing photographs. Apply a restrained overlay only to maintain text contrast.
 - Text placed over photography needs a deliberate content block or clearly controlled contrast. Supporting benefits must be visually noticeable, concise, and structured rather than presented as faint miscellaneous text.
 - Decorative visuals must never block interaction, reduce legibility, or create horizontal overflow. Hide or substantially simplify nonessential photography on small screens so the user reaches the task immediately.

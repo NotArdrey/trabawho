@@ -18,6 +18,7 @@ before(async () => {
     '20261006102000_booking_address_checkout.sql', '20261006103000_pending_registration_email.sql',
     '20261006104000_registration_event_gate_hardening.sql', '20261006105000_registration_retry_hardening.sql',
     '20261006106000_fixed_account_roles.sql', '20261006107000_identity_duplicates_per_role.sql',
+    '20261006108000_identity_before_email_confirmation.sql',
   ]) {
     if (file === '20261006106000_fixed_account_roles.sql') {
       for (let i = 0; i < 2; i++) {
@@ -42,9 +43,9 @@ async function admin() {
   return id;
 }
 
-async function account(role: 'client' | 'worker') {
+async function account(role: 'client' | 'worker', confirmed = true) {
   const id = crypto.randomUUID();
-  await db.query("insert into auth.users(id,email,email_confirmed_at,raw_app_meta_data) values($1,$2,now(),$3)", [id, id + '@test.invalid', { signup_role: role }]);
+  await db.query("insert into auth.users(id,email,email_confirmed_at,raw_app_meta_data) values($1,$2,$3,$4)", [id, id + '@test.invalid', confirmed ? new Date().toISOString() : null, { signup_role: role }]);
   await db.query('select public.initialize_account_registration($1,$2)', [id, 'test-nonce']);
   return id;
 }
@@ -158,4 +159,33 @@ test('Client accounts cannot create provider profiles; Worker accounts cannot cr
   await assert.rejects(db.query('select public.start_booking_checkout_with_address()'), /Client account/);
   await db.query("select set_config('test.uid',$1,false)", [client]);
   await assert.rejects(db.query('select public.start_booking_checkout_with_address()'), /verification/);
+});
+
+
+test('unconfirmed accounts complete identity first and confirmation is atomic with final approval', async () => {
+  const id = await account('client', false);
+  await approve(id, 'identity-first-' + id);
+  const email = () => db.query('select email_confirmed_at from auth.users where id=$1', [id]);
+  assert.equal((await email()).rows[0].email_confirmed_at, null);
+  await assert.rejects(db.query("update public.profiles set is_verified=true,verification_status='APPROVED' where user_id=$1", [id]), /identity verification/);
+  assert.equal((await email()).rows[0].email_confirmed_at, null);
+  await db.query('select public.confirm_account_identity_name($1)', [id]);
+  assert.ok((await email()).rows[0].email_confirmed_at);
+  assert.equal((await db.query('select is_verified from public.profiles where user_id=$1', [id])).rows[0].is_verified, true);
+  await db.exec("select set_config('test.role','authenticated',false)");
+  try { await db.query('update public.profiles set full_name=full_name where user_id=$1', [id]); }
+  finally { await db.exec("select set_config('test.role','service_role',false)"); }
+});
+
+test('unconfirmed manual review confirms email only after administrator approval', async () => {
+  for (const decision of ['APPROVED', 'DECLINED']) {
+    const id = await account('worker', false);
+    const review = await db.query<{ id: string }>('select public.submit_account_manual_review($1,$2,$3,$4) as id',
+      [id, document, 'manual-identity-first-' + id, { front: id + '/front.png', back: id + '/back.png', selfie: id + '/selfie.png' }]);
+    assert.equal((await db.query('select email_confirmed_at from auth.users where id=$1', [id])).rows[0].email_confirmed_at, null);
+    await db.query('select public.decide_account_identity_review($1,$2,$3,$4,$5,$6)',
+      [review.rows[0].id, await admin(), decision, 'Document and selfie evidence reviewed by administrator.', crypto.randomUUID(), decision === 'APPROVED' ? document.fullName : null]);
+    assert.equal(Boolean((await db.query('select email_confirmed_at from auth.users where id=$1', [id])).rows[0].email_confirmed_at), decision === 'APPROVED');
+    assert.equal((await db.query('select is_verified from public.profiles where user_id=$1', [id])).rows[0].is_verified, decision === 'APPROVED');
+  }
 });

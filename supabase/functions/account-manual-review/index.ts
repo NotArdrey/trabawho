@@ -1,13 +1,14 @@
+import { registrationUser } from "../_shared/pendingRegistrationAccess.ts";
 import { corsHeaders, jsonResponse, buildIdentityDocumentFingerprint, recordRegistrationAttempt } from "../_shared/identityRegistration.ts";
 import { asRecord } from "../_shared/identityDomain.ts";
-import { accountClient, AccountError, accountUser, registrationState, requireConfirmed, text } from "../_shared/accountRegistration.ts";
+import { accountClient, AccountError, registrationState, text } from "../_shared/accountRegistration.ts";
 Deno.serve(async (request: Request) => {
   if (request.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   if (request.method !== "POST") return jsonResponse({ error: "Method not allowed" }, 405);
   const client = accountClient(); const paths: string[] = [];
   try {
-    const user = await accountUser(request, client); requireConfirmed(user);
     const body = asRecord(await request.json());
+    const user = await registrationUser(request, client, body);
     const fullName = text(body.fullName); const documentType = text(body.documentType); const documentNumber = text(body.documentNumber);
     if (fullName.length < 2 || fullName.length > 200 || !documentType || documentType.length > 100 || !documentNumber || body.acceptedIdentityTerms !== true)
       throw new AccountError("Provide the name, document type, number, evidence, and identity consent.");

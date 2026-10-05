@@ -28,10 +28,10 @@ export function useAccountRegistration() {
     const epoch = authEpoch.current;
     const state = await resumeRegistration();
     if (epoch !== authEpoch.current) return;
-    if (state) setPending(null);
+    if (state && !pendingAccount()) setPending(null);
     else setPending(pendingAccount());
     if (state?.state === 'identity_in_progress') {
-      const result = await registrationRequest('account-didit-session', { action: 'get_session' });
+      const result = await registrationRequest('account-didit-session', { action: 'get_session', ...pendingAccount() });
       if (epoch !== authEpoch.current) return;
       setRegistration({ ...result, signupRole: result.signupRole ?? state.signupRole });
     }
@@ -59,7 +59,6 @@ export function useAccountRegistration() {
     if (!result.pendingAccount) throw new Error('Account recovery information is unavailable. Use sign in to resume.');
     const account = { ...result.pendingAccount, email: result.email || email };
     savePendingAccount(account); setPending(account); setRegistration(result);
-    if (!result.emailDelivery?.sent) setError('Your account was created, but the confirmation email could not be sent. Use Resend confirmation email.');
   });
   const emailAction = (action: 'resend' | 'change_email', email?: string) => run(async () => {
     if (!pending) throw new Error('Sign in to resume or resend your confirmation link.');
@@ -70,15 +69,21 @@ export function useAccountRegistration() {
     setMessage('Confirmation email requested. Check your inbox and spam folder.');
   });
   const saveName = (signupName: string) => run(async () => {
-    if (!pending) throw new Error('Sign in to resume your registration.');
     const result = await registrationRequest('account-registration', { action: 'save_name', ...pending, signupName });
-    const account = { ...pending, signupName: result.signupName || signupName };
-    savePendingAccount(account); setPending(account);
+    if (pending) {
+      const account = { ...pending, signupName: result.signupName || signupName };
+      savePendingAccount(account); setPending(account);
+    }
     setRegistration((previous) => ({ ...previous, ...result, signupRole: result.signupRole ?? previous?.signupRole }));
   });
   const identityAction = (name: string, body: Record<string, unknown>) => run(async () => {
-    const result = await registrationRequest(name, body);
+    const result = await registrationRequest(name, { ...body, ...pending });
     setRegistration((previous) => ({ ...result, signupRole: result.signupRole ?? previous?.signupRole, signupName: result.signupName ?? previous?.signupName }));
+    if (result.state === 'ready' && pending) {
+      const resumed = await resumeRegistration();
+      if (resumed) setRegistration((previous) => ({ ...resumed, signupRole: resumed.signupRole ?? previous?.signupRole }));
+      setPending(pendingAccount());
+    }
   });
   const resume = (email: string, password: string) => run(async () => {
     const state = await signInForRegistration(email, password);
@@ -89,7 +94,19 @@ export function useAccountRegistration() {
     await registrationSignOut();
     setRegistration(null); setPending(null); setRestoreFailed(false);
   });
-  return { registration: registration || (pending ? { state: 'email_pending' as const, email: pending.email, signupName: pending.signupName } : null), busy, error, message,
+  const registrationState = registration?.state;
+  useEffect(() => {
+    if (!registrationState || !['identity_in_progress', 'identity_review', 'ready'].includes(registrationState)) return;
+    if (registrationState === 'ready' && !pending) return;
+    const check = () => { if (document.visibilityState === 'visible') void refresh(); };
+    const timer = window.setInterval(check, 5000);
+    window.addEventListener('focus', check);
+    document.addEventListener('visibilitychange', check);
+    if (registrationState === 'ready') check();
+    return () => { window.clearInterval(timer); window.removeEventListener('focus', check); document.removeEventListener('visibilitychange', check); };
+  }, [registrationState, pending, refresh]);
+  return { registration: registration || (pending ? { state: 'identity_pending' as const, email: pending.email, signupName: pending.signupName || '' } : null), busy, error, message,
+    completingSession: registrationState === 'ready' && Boolean(pending),
     create, saveName, emailAction, identityAction, resume, refresh, startNewRegistration, initializing, restoreFailed, retryRestore };
 }
 

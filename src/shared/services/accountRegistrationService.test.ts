@@ -1,15 +1,35 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { pendingAccount, registrationRequest, savePendingAccount, resumeRegistration, signInForRegistration, subscribeToRegistrationAuth } from './accountRegistrationService';
-const { invoke, getSession, signInWithPassword, onAuthStateChange } = vi.hoisted(() => ({ invoke: vi.fn(), getSession: vi.fn(), signInWithPassword: vi.fn(), onAuthStateChange: vi.fn() }));
-vi.mock('@/integrations/supabase', () => ({ supabase: { functions: { invoke }, auth: { getSession, signInWithPassword, onAuthStateChange } } }));
+const { invoke, getSession, signInWithPassword, onAuthStateChange, setSession } = vi.hoisted(() => ({ invoke: vi.fn(), getSession: vi.fn(), signInWithPassword: vi.fn(), onAuthStateChange: vi.fn(), setSession: vi.fn() }));
+vi.mock('@/integrations/supabase', () => ({ supabase: { functions: { invoke }, auth: { getSession, signInWithPassword, onAuthStateChange, setSession } } }));
 beforeEach(() => { vi.resetAllMocks(); sessionStorage.clear(); });
 describe('account registration transport and recovery', () => {
   it('retains pending recovery on refresh while signed out', async () => {
     savePendingAccount({ userId: 'pending', nonce: 'recovery', email: 'pending@example.com' });
     getSession.mockResolvedValue({ data: { session: null }, error: null });
-    await expect(resumeRegistration()).resolves.toBeNull();
+    invoke.mockResolvedValue({ data: { state: 'identity_pending', signupName: 'Applicant Name' }, error: null });
+    await expect(resumeRegistration()).resolves.toMatchObject({ state: 'identity_pending' });
     expect(pendingAccount()?.email).toBe('pending@example.com');
-    expect(invoke).not.toHaveBeenCalled();
+    expect(invoke).toHaveBeenCalledWith('account-registration', { body: { action: 'state', userId: 'pending', nonce: 'recovery', email: 'pending@example.com', redirectTo: `${window.location.origin}/register` } });
+    expect(setSession).not.toHaveBeenCalled();
+  });
+  it('installs the completed account session and clears recovery after final identity approval', async () => {
+    savePendingAccount({ userId: 'pending', nonce: 'recovery', email: 'pending@example.com' });
+    getSession.mockResolvedValue({ data: { session: null }, error: null });
+    const session = { access_token: 'completed-access', refresh_token: 'completed-refresh' };
+    invoke.mockResolvedValue({ data: { state: 'ready', session }, error: null });
+    setSession.mockResolvedValue({ error: null });
+    await expect(resumeRegistration()).resolves.toMatchObject({ state: 'ready' });
+    expect(setSession).toHaveBeenCalledWith(session);
+    expect(pendingAccount()).toBeNull();
+  });
+  it('retains recovery when installing the completed session fails', async () => {
+    savePendingAccount({ userId: 'pending', nonce: 'recovery', email: 'pending@example.com' });
+    getSession.mockResolvedValue({ data: { session: null }, error: null });
+    invoke.mockResolvedValue({ data: { state: 'ready', session: { access_token: 'access', refresh_token: 'refresh' } }, error: null });
+    setSession.mockResolvedValue({ error: new Error('Private Auth diagnostic') });
+    await expect(resumeRegistration()).rejects.toThrow('Your account is ready. Sign in to continue.');
+    expect(pendingAccount()?.userId).toBe('pending');
   });
   it('discards old pending recovery after a successful login, including a failed registration state read', async () => {
     savePendingAccount({ userId: 'old', nonce: 'recovery', email: 'old@example.com' });

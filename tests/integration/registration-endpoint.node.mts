@@ -37,11 +37,18 @@ function endpoint(options: { expired?: boolean; confirmed?: boolean; initializat
       sendEmailConfirmation: async () => { calls.push('send_email'); return { sent: !options.deliveryFails }; },
       jsonResponse: (body: unknown, status = 200) => new Response(JSON.stringify(body), { status }), RegistrationRateLimitError,
     },
+    '../_shared/pendingRegistrationAccess.ts': {
+      registrationUser: async (_request: Request, _client: unknown, body: Record<string, unknown>) => {
+        if (body.nonce !== 'capability') throw new AccountError('Invalid recovery capability', 403);
+        if (options.expired) throw new AccountError('Expired recovery capability', 410);
+        return user;
+      }, completedRegistrationSession: async () => { throw new Error('Unexpected session'); },
+    },
     '../_shared/identityDomain.ts': { asRecord: (value: unknown) => value && typeof value === 'object' ? value : {} },
     '../_shared/identityRedirect.ts': { identityReturnUrl: () => new URL('http://localhost:3000/register') },
     '../_shared/accountRegistration.ts': {
       accountClient: () => client, AccountError, accountUser: async () => user,
-      registrationRow: async () => row, registrationState: async () => ({ state: 'identity_pending' }),
+      registrationRow: async () => row, registrationState: async () => ({ state: 'identity_pending', email: user.email, signupRole: 'worker' }),
       signupRole: (value: unknown) => value === 'worker' ? 'worker' : 'client', text: (value: unknown) => typeof value === 'string' ? value.trim() : '',
     },
   };
@@ -61,12 +68,12 @@ function endpoint(options: { expired?: boolean; confirmed?: boolean; initializat
 const validAccount = { action: 'create', email: 'person@example.com', password: 'Password123!', acceptedTerms: true, signupRole: 'worker' };
 const validName = { action: 'save_name', userId: 'pending-test', nonce: 'capability', signupName: 'Ana María Santos' };
 
-test('confirmation delivery follows successful account creation and initialization', async () => {
+test('account creation defers email confirmation until identity approval', async () => {
   const flow = endpoint();
   const response = await flow.request(validAccount);
   assert.equal(response.status, 200);
-  assert.deepEqual(flow.calls, ['record_attempt', 'create_account', 'initialize_account', 'send_email', 'record_email_delivery']);
-  assert.equal(response.body.state, 'email_pending');
+  assert.deepEqual(flow.calls, ['record_attempt', 'create_account', 'initialize_account']);
+  assert.equal(response.body.state, 'identity_pending');
 });
 for (const failure of ['initializationFails', 'duplicate'] as const) test(`${failure} prevents confirmation email delivery`, async () => {
   const flow = endpoint({ [failure]: true });
@@ -75,11 +82,12 @@ for (const failure of ['initializationFails', 'duplicate'] as const) test(`${fai
   assert.ok(!flow.calls.includes('send_email'));
   if (failure === 'initializationFails') assert.ok(flow.calls.includes('delete_account'));
 });
-test('delivery failure keeps the newly created account recoverable', async () => {
+test('SMTP availability does not block identity-first account creation', async () => {
   const flow = endpoint({ deliveryFails: true });
   const response = await flow.request(validAccount);
   assert.equal(response.status, 200);
-  assert.deepEqual(response.body.emailDelivery, { sent: false });
+  assert.equal(response.body.emailDelivery, undefined);
+  assert.ok(!flow.calls.includes('send_email'));
   assert.ok(response.body.pendingAccount);
   assert.ok(!flow.calls.includes('delete_account'));
 });
@@ -87,11 +95,11 @@ test('name entry updates only unverified metadata and sends no email', async () 
   const flow = endpoint();
   const response = await flow.request({ ...validName, full_name: 'Forged verified name', confirmed: true });
   assert.equal(response.status, 200);
-  assert.deepEqual(response.body, { state: 'email_pending', email: 'person@example.com', signupName: 'Ana María Santos', signupRole: 'worker' });
+  assert.deepEqual(response.body, { state: 'identity_pending', email: 'person@example.com', signupName: 'Ana María Santos', signupRole: 'worker' });
   assert.deepEqual(JSON.parse(JSON.stringify(flow.updates)), [{ user_metadata: { registration_version: 2, full_name: 'Existing name', signup_name: 'Ana María Santos' } }]);
   assert.deepEqual(flow.calls, ['record_attempt', 'save_name']);
 });
-for (const options of [{ expired: true }, { confirmed: true }]) test(`name entry rejects ${JSON.stringify(options)} pending accounts`, async () => {
+for (const options of [{ expired: true }]) test(`name entry rejects ${JSON.stringify(options)} pending accounts`, async () => {
   const flow = endpoint(options);
   assert.ok((await flow.request(validName)).status >= 400);
   assert.equal(flow.updates.length, 0);

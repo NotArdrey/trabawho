@@ -21,7 +21,7 @@ export function SignupNameStep({ flow, state, onContinue, onDraftChange }: {
         {form.error && <p id="registration-name-error" role="alert" className="text-sm text-destructive">{form.error}</p>}
         <p id="registration-name-help" className="text-xs leading-5 text-muted-foreground">Use the name on your ID. Entering it here does not verify your identity.</p>
       </div> : <p className="break-words text-sm leading-6">{state.signupName || 'Your complete legal name will be checked during identity verification.'}</p>}
-      <Button type="submit" isLoading={flow.busy} className="w-full">Continue to email<ArrowRight aria-hidden="true" /></Button>
+      <Button type="submit" isLoading={flow.busy} className="w-full">Continue to identity<ArrowRight aria-hidden="true" /></Button>
     </form>
   );
 }

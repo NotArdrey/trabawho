@@ -45,13 +45,13 @@ export function IdentityVerificationStep({ flow, state, onDraftChange, active = 
         </div>
       </div>
       <div data-manual-review hidden={!controls.manual} className="space-y-6">
-        <Button variant="ghost" disabled={flow.busy} onClick={() => controls.setManual(false)}><ArrowLeft aria-hidden="true" />Previous</Button>
         <ManualAccountReview busy={flow.busy} canSubmit={controls.consent} onDraftChange={onDraftChange}
           submit={async (body) => { await flow.identityAction('account-manual-review', body); }}
           consentContent={<label htmlFor="fallback-identity-consent" className="flex min-h-11 cursor-pointer items-start gap-3 py-3 text-sm leading-5">
             <Checkbox id="fallback-identity-consent" disabled={flow.busy} checked={controls.consent} onChange={(event) => controls.setConsent(event.target.checked)} />
             I consent to manual review of my ID and selfie.
           </label>} />
+        <Button variant="ghost" className="w-full" disabled={flow.busy} onClick={() => controls.setManual(false)}><ArrowLeft aria-hidden="true" />Previous</Button>
       </div>
     </section>
   );

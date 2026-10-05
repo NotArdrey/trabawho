@@ -1,3 +1,4 @@
+import { registrationUser, completedRegistrationSession } from "../_shared/pendingRegistrationAccess.ts";
 import { corsHeaders, createSessionNonce, hashSessionNonce, verifySessionNonce, recordRegistrationAttempt,
   sendEmailConfirmation, jsonResponse, RegistrationRateLimitError } from "../_shared/identityRegistration.ts";
 import { asRecord } from "../_shared/identityDomain.ts";
@@ -29,11 +30,27 @@ Deno.serve(async (request: Request) => {
         await client.auth.admin.deleteUser(user.id);
         throw new AccountError("Account setup could not be saved. Retry.", 503);
       }
-      const delivery = await sendEmailConfirmation(email, returnUrl.toString());
-      await client.from("account_registrations").update({ email_sent_at: new Date().toISOString() }).eq("user_id", user.id);
-      return jsonResponse({ state: "email_pending", email, signupRole: role, pendingAccount: { userId: user.id, nonce }, emailDelivery: delivery });
+      return jsonResponse({ state: "identity_pending", email, signupName: "", signupRole: role, pendingAccount: { userId: user.id, nonce } });
     }
-    if (["resend", "change_email", "save_name"].includes(text(body.action))) {
+    if (body.action === "state" && body.userId) {
+      const user = await registrationUser(request, client, body);
+      const state = await registrationState(client, user);
+      return jsonResponse({ ...state, ...(state.state === "ready" && user.email
+        ? { session: await completedRegistrationSession(client, user.email) } : {}) });
+    }
+    if (body.action === "save_name") {
+      const user = await registrationUser(request, client, body);
+      const state = await registrationState(client, user);
+      if (state.state !== "identity_pending") throw new AccountError("Your identity verification has started. Use name review to request a correction.", 409);
+      const name = text(body.signupName);
+      if (name.length < 2 || name.length > 200 || !/\p{L}/u.test(name) || /[\p{Cc}\p{Cf}]/u.test(name))
+        throw new AccountError("Enter your complete name using 2 to 200 characters.");
+      await recordRegistrationAttempt(client, request, { action: "create_unverified_user", email: user.email, userId: user.id, metadata: { operation: "save_signup_name" } });
+      const saved = await client.auth.admin.updateUserById(user.id, { user_metadata: { ...user.user_metadata, signup_name: name } });
+      if (saved.error) throw new AccountError("Your name could not be saved. Retry.", 503);
+      return jsonResponse({ ...state, signupName: name });
+    }
+    if (["resend", "change_email"].includes(text(body.action))) {
       const userId = text(body.userId);
       const row = await registrationRow(client, userId);
       if (!row || !(await verifySessionNonce(userId, body.nonce, row.pending_nonce_hash)))
@@ -42,16 +59,6 @@ Deno.serve(async (request: Request) => {
         throw new AccountError("This pending registration expired. Use Sign in to resume or resend confirmation from there.", 410);
       const result = await client.auth.admin.getUserById(userId); const user = result.data.user;
       if (result.error || !user || user.email_confirmed_at) throw new AccountError("This email is already confirmed. Sign in to continue.", 409);
-      if (body.action === 'save_name') {
-        const name = text(body.signupName);
-        if (name.length < 2 || name.length > 200 || !/\p{L}/u.test(name) || /[\p{Cc}\p{Cf}]/u.test(name))
-          throw new AccountError('Enter your complete name using 2 to 200 characters.');
-        await recordRegistrationAttempt(client, request, { action: 'create_unverified_user', email: user.email, userId, metadata: { operation: 'save_signup_name' } });
-        // This is applicant-provided information, separate from the protected verified name.
-        const saved = await client.auth.admin.updateUserById(userId, { user_metadata: { ...user.user_metadata, signup_name: name } });
-        if (saved.error) throw new AccountError('Your name could not be saved. Retry.', 503);
-        return jsonResponse({ state: 'email_pending', email: user.email, signupName: name, signupRole: row.account_role === 'worker' ? 'worker' : 'client' });
-      }
       await recordRegistrationAttempt(client, request, { action: "registration_email", email: user.email, userId });
       if (new Date(text(row.email_sent_at)).getTime() > Date.now() - 60000) throw new AccountError("Wait one minute before requesting another confirmation email.", 429);
       let email = user.email || "";

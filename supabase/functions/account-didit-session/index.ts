@@ -1,7 +1,8 @@
+import { registrationUser } from "../_shared/pendingRegistrationAccess.ts";
 import { corsHeaders, jsonResponse, recordRegistrationAttempt } from "../_shared/identityRegistration.ts";
 import { asRecord } from "../_shared/identityDomain.ts";
 import { identityReturnUrl } from "../_shared/identityRedirect.ts";
-import { accountClient, AccountError, accountUser, registrationRow, registrationState, requireConfirmed, pollAccountIdentity, text } from "../_shared/accountRegistration.ts";
+import { accountClient, AccountError, registrationRow, registrationState, pollAccountIdentity, text } from "../_shared/accountRegistration.ts";
 
 Deno.serve(async (request: Request) => {
   if (request.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
@@ -10,7 +11,7 @@ Deno.serve(async (request: Request) => {
   const client = accountClient();
   try {
     const body = asRecord(await request.json());
-    const user = await accountUser(request, client); userId = user.id; requireConfirmed(user);
+    const user = await registrationUser(request, client, body); userId = user.id;
     const row = await registrationRow(client, user.id);
     if (!row) throw new AccountError("Contact support to resume an existing identity registration.", 409);
     if (body.action === "get_session") return jsonResponse(await pollAccountIdentity(client, user));
@@ -23,7 +24,7 @@ Deno.serve(async (request: Request) => {
     await recordRegistrationAttempt(client, request, { action: "account_didit_session", email: user.email, userId: user.id });
     lease = crypto.randomUUID();
     const claimed = await client.rpc("claim_account_identity_session", { p_user_id: user.id, p_lease: lease });
-    if (claimed.error) throw new AccountError("Identity verification could not start. Confirm your email and retry.", 409);
+    if (claimed.error) throw new AccountError("Identity verification could not start. Refresh your registration and retry.", 409);
     if (!claimed.data) return jsonResponse(await registrationState(client, user));
     const callback = new URL(`${Deno.env.get("SUPABASE_URL")}/functions/v1/verification-redirect`);
     const returnUrl = identityReturnUrl(body.redirectTo, Deno.env.get("TRABAWHO_APP_URL") || "", Deno.env.get("IDENTITY_ALLOWED_ORIGINS") || "");

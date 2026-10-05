@@ -14,9 +14,28 @@ Existing identity-reviewed names are not backfilled or silently corrected.
 The subsequent fixed-account-role change adds two migrations and updated
 function code. Both migrations and seven affected functions are deployed on the
 linked project. The registration follow-up was published on 2026-10-05: the
-`account-registration` function is active at version 4, and the frontend is live
+`account-registration` function is active at version 5, and the frontend is live
 at [TrabaWho](https://trabawho-kappa.vercel.app). This follow-up requires no schema
 migration or changes to confirmation or identity gates.
+
+The subsequent account-access correction was deployed to `account-registration`,
+`account-didit-session`, `account-manual-review`, `account-identity-name`, and
+`provider-setup`. A failed profile read is retried once; persistent lookup failures
+return a retry message (503), and a missing profile returns an unavailable-profile
+message (409). Only non-active account statuses return the restriction message
+(403). Active accounts can resume registration regardless of identity approval,
+and confirmed existing accounts without a registration record retain legacy
+sign-in access. This backend correction changes no account or verification data.
+Verification passed the full quality gate (525 unit tests and 42 standards/backend
+tests), the three production login/logout and signup-reset journeys, and a live
+confirmed legacy-account state request. The temporary live probe account was
+removed after verification.
+
+The identity-first follow-up adds `20261006108000_identity_before_email_confirmation.sql`
+and changes `account-registration`, `account-didit-session`, `account-manual-review`,
+and `account-identity-name` plus their shared helpers. Apply this migration and
+redeploy these functions together before publishing the new frontend. These changes
+are prepared locally; deployment is not recorded as completed here.
 
 ## Account and email
 
@@ -25,12 +44,17 @@ journey. It starts with an explicit **Client — Book a service** or
 **Worker — Offer services** choice, with neither preselected, then collects email,
 password, password confirmation, and Terms and Conditions agreement. It does
 not ask for a document type, legal name, or service address at this stage.
-The visible steps are **Account → Name → Email → Identity**. Creating the
-account sends its confirmation email only after Auth creation and profile
-initialization succeed. The second step collects the complete applicant name;
-`account-registration` validates the pending recovery capability and saves this
-as unverified `user_metadata.signup_name`. Saving or revisiting a name sends no
-email and does not modify the protected profile name or approve identity.
+The visible steps are **Account → Name → Identity**. Account creation leaves
+email unconfirmed and sends no confirmation email. The second step collects the
+complete applicant name; `account-registration` validates the recovery capability
+or authenticated session and saves unverified `user_metadata.signup_name`.
+Saving or revisiting a name never modifies the protected profile name or approves
+identity. Identity approval, including the verified-name check or administrator
+review, atomically confirms email through the server-only profile access guard.
+Declined, pending, duplicate, and expired identities remain blocked. Email is not
+a wizard page. Back appears below the primary action, and account-access tabs
+hide once registration has started. The registration scrollbar is hidden while
+native scrolling and keyboard access remain available.
 Terms and Conditions opens an accessible modal from the agreement's text link.
 Sign in precedes Create an account in the account-access navigation.
 The server validates the choice, saves it in protected Auth app metadata as
@@ -61,17 +85,22 @@ Supabase Auth uses a unique email for each account.
 restricted profile and `account_registrations` record. Profile initialization and
 consent/recovery metadata are transactional. A failed initialization removes the
 new Auth account. An existing email cannot have its password replaced through
-registration. Account creation and confirmation delivery are separate: delivery
-failure preserves the account and exposes resend recovery.
+registration. Creation does not depend on SMTP delivery.
 
-The confirmation link returns to `/register`. The email-pending screen offers
-resend, change-email, and sign-in after confirmation on another device. Its
-recovery capability expires after 24 hours; expired recovery or confirmation
-links can be recovered through the login screen's resend action. Resends have a
-one-minute cooldown and use a locked, atomic delivery lease. Change-email checks
-confirmation and revokes the old confirmation link in the same transaction. It is
-restricted to the same unconfirmed account; a confirmed account cannot use the
-pending capability to change credentials.
+An expiring recovery capability permits only registration state, applicant-name
+entry, and identity actions before email confirmation. Handlers validate its hash,
+expiry, and live account status; it cannot authorize marketplace operations.
+The recovery window is 14 days to cover the seven-day manual review period.
+Expired capabilities require support recovery; after identity approval users can
+sign in normally. Existing resend/change-email actions remain for older bundles.
+Confirmation callbacks still return to `/register` for those earlier accounts.
+
+The page polls active identity sessions and pending reviews every five seconds
+while visible and refreshes when the user returns. When a capability-owned account
+is ready, a server-generated and redeemed Auth token creates its session without
+storing a password or sending a confirmation email. The service client is kept
+separate from the client redeeming the token. The browser persists the returned
+Auth session and clears the pending recovery capability.
 
 The pending account ID, expiring recovery capability, email, and entered signup
 name are stored
@@ -226,7 +255,8 @@ Server-only secrets are `DIDIT_API_KEY`, `DIDIT_WORKFLOW_ID`,
 `DIDIT_SESSION_NONCE_SECRET`, `TRABAWHO_APP_URL`, and optional
 `IDENTITY_ALLOWED_ORIGINS`. Supabase supplies its URL, anonymous key, and service
 role key. Browser configuration contains only the public URL/key. Auth email
-confirmation remains enabled and automatic confirmation disabled. The confirmation
+confirmation remains enabled globally. Version 2 accounts are confirmed automatically
+only upon final identity approval; legacy email confirmation behavior is retained. The confirmation
 allowlist must include the application origin's `/register` route; existing `/**`
 entries also cover it.
 
@@ -240,6 +270,7 @@ Apply the maintained identity/email migrations followed by:
 - `20261006105000_registration_retry_hardening.sql`
 - `20261006106000_fixed_account_roles.sql`
 - `20261006107000_identity_duplicates_per_role.sql`
+- `20261006108000_identity_before_email_confirmation.sql`
 
 Deploy `account-registration`, `account-didit-session`, `account-identity-name`,
 `account-manual-review`, `account-admin-identity-review`, `provider-setup`,

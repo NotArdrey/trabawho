@@ -3,18 +3,17 @@ import { cn } from '@/lib/utils';
 import type { AccountRegistration } from '@/shared/services/accountRegistrationService';
 import { registrationProgress } from '../domain/registrationProgress';
 
-const steps = ['Account', 'Name', 'Email', 'Identity'];
+const steps = ['Account', 'Name', 'Identity'];
 
 export function RegistrationProgress({ registration, step }: { registration: AccountRegistration | null; step?: number }) {
   const current = step ?? registrationProgress(registration);
   const ready = registration?.state === 'ready';
   return (
-    <div className="space-y-4 border-b pb-6">
+    <div className="space-y-3 border-b pb-4">
       <p className="flex items-center justify-between gap-3 text-xs font-medium" aria-live="polite">
-        <span className="text-primary">{ready ? 'Verification complete' : 'Step ' + current + ' of 4'}</span>
-        <span className="text-muted-foreground">{ready ? 'Ready to book' : 'Account verification'}</span>
+        <span className="text-primary">{ready ? 'Setup complete' : 'Step ' + current + ' of 3'}</span>
       </p>
-      <ol aria-label="Account verification steps" className="grid grid-cols-4 gap-2">
+      <ol aria-label="Account verification steps" className="grid grid-cols-3 gap-2">
         {steps.map((label, index) => {
           const complete = ready || index + 1 < current;
           const active = !ready && index + 1 === current;
