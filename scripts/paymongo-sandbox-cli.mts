@@ -1,7 +1,7 @@
 import { chromium } from "playwright-core";
 import { loadEnv } from "vite";
 
-import { fillSandboxCard, submitSandboxCheckoutAndWaitForReturn, verifySandboxCheckout } from "./paymongo-sandbox-checkout.mts";
+import { fillSandboxCard, submitSandboxCheckoutAndWaitForReturn, verifySandboxCheckout } from "./paymongo-sandbox-checkout.ts";
 
 async function main() {
   const rawUrl = process.argv[2] || process.env.PAYMONGO_TEST_CHECKOUT_URL;

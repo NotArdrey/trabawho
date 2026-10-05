@@ -1,7 +1,7 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { loadEnv } from "vite";
 
-import { completeSandboxCheckout } from "./paymongo-sandbox-checkout.mts";
+import { completeSandboxCheckout } from "./paymongo-sandbox-checkout.ts";
 
 export const sandboxCheckoutEndpoint = "/__trabawho_paymongo_sandbox_checkout";
 export const sandboxReadyEndpoint = "/__trabawho_paymongo_sandbox_ready";

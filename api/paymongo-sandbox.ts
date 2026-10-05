@@ -1,7 +1,7 @@
 import { createClient } from "@supabase/supabase-js";
 import type chromiumPackage from "@sparticuz/chromium";
 
-import { completeSandboxCheckout } from "../scripts/paymongo-sandbox-checkout.mts";
+import { completeSandboxCheckout } from "../scripts/paymongo-sandbox-checkout";
 import {
   ownsOpenSandboxCheckout, sandboxCheckoutEnabled, sandboxReturnUrlAllowed,
   type SandboxCheckoutRequest,

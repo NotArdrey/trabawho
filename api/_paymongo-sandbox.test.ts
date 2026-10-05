@@ -10,7 +10,7 @@ vi.mock("@supabase/supabase-js", () => ({ createClient: () => ({
     selectColumns(columns); return { eq: () => ({ maybeSingle: readAttempt }) };
   } }; },
 }) }));
-vi.mock("../scripts/paymongo-sandbox-checkout.mts", () => ({ completeSandboxCheckout: complete }));
+vi.mock("../scripts/paymongo-sandbox-checkout", () => ({ completeSandboxCheckout: complete }));
 
 import handler from "./paymongo-sandbox";
 

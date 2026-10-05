@@ -90,7 +90,19 @@ The deployed function also needs the existing `VITE_SUPABASE_URL` and
 attempt. Redeploy after changing these variables. Never enable this endpoint
 with live payment credentials or on a customer-facing live-money deployment.
 The PayMongo secret used by Vercel must match the test environment used by the
-Supabase checkout functions. Keep all secrets out of `VITE_*` variables.
+Supabase checkout functions. The linked `trabawho` Vercel project's production
+branch is `main`; its production and preview environments have the sandbox flag,
+server-only test key, and `VITE_SUPABASE_*` settings configured. The PayMongo key
+was verified against Supabase's stored secret digest and an existing test session.
+The shared automation helper uses `.ts` so Vercel's Node builder compiles and
+packages it with the function; `.mts` previously left an unresolved runtime import.
+Hosted billing details are filled before selecting Continue, after the page loads,
+and are filled again on the card step when necessary. Existing prefilled values
+are preserved. Vite currently warns that its future native configuration loader
+requires an explicit ESM package boundary for this shared `.ts` helper; the current
+loader and Node 24 execute it correctly. Revisit that boundary when adopting the
+native loader. Existing large frontend bundle warnings are unrelated to checkout.
+ Keep all secrets out of `VITE_*` variables.
 The checkout function supplies PayMongo's session ID separately from its hosted
 URL; the helper retrieves that exact test session and checks that its URL matches
 before entering any card details. Deploy both checkout Edge Functions when

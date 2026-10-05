@@ -102,7 +102,27 @@ async function chooseCountryIfMissing(page: Page): Promise<void> {
   }
 }
 
+async function fillSandboxBilling(page: Page): Promise<void> {
+  await fillBlankAcrossFrames(page, { labels: [/cardholder|name on card|full name/i],
+    selectors: ['input[autocomplete="cc-name"]'], value: "Test Customer" });
+  await fillBlankAcrossFrames(page, { labels: [/^name$/i], selectors: ['input[autocomplete="name"]'], value: "Test Customer" });
+  await fillBlankAcrossFrames(page, { labels: [/email/i], selectors: ['input[type="email"]', 'input[autocomplete="email"]'],
+    value: "paymongo-test@example.com" });
+  await fillBlankAcrossFrames(page, { labels: [/phone|mobile/i], selectors: ['input[type="tel"]'], value: "09171234567" });
+  await chooseCountryIfMissing(page);
+  await fillBlankAcrossFrames(page, { labels: [/address line 1/i], selectors: ['input[autocomplete="address-line1"]'], value: "123 Test Street" });
+  await fillBlankAcrossFrames(page, { labels: [/^city$/i], selectors: ['input[autocomplete="address-level2"]'], value: "Manila" });
+  await fillBlankAcrossFrames(page, { labels: [/state|province/i], selectors: ['input[autocomplete="address-level1"]'], value: "Metro Manila" });
+  await fillBlankAcrossFrames(page, { labels: [/postal|zip/i], selectors: ['input[autocomplete="postal-code"]'], value: "1000" });
+}
+
 export async function fillSandboxCard(page: Page): Promise<void> {
+  // Wait for the hosted form to hydrate before looking for optional billing fields.
+  await page.locator('input[type="email"]:visible, input[autocomplete="cc-number"]:visible, input[placeholder*="1234 1234"]:visible')
+    .or(page.getByText(/^card$/i)).or(page.getByRole("button", { name: /credit.*debit/i })).first()
+    .waitFor({ state: "visible", timeout: 15_000 });
+  // Hosted Checkout requires billing details before enabling its card step.
+  await fillSandboxBilling(page);
   const cardNumber: Field = { labels: [/card number/i, /card no\.?/i],
     selectors: ['input[autocomplete="cc-number"]', 'input[name*="card_number"]', 'input[placeholder*="1234 1234"]'],
     value: "4343434343434345" };
@@ -127,17 +147,7 @@ export async function fillSandboxCard(page: Page): Promise<void> {
       selectors: ['input[autocomplete="cc-exp-year"]', 'input[name*="exp_year"]', 'input[placeholder="31"]'], value: "30" }, true);
   }
   await fillAcrossFrames(page, cvc, true);
-  await fillBlankAcrossFrames(page, { labels: [/cardholder|name on card|full name/i],
-    selectors: ['input[autocomplete="cc-name"]'], value: "Test Customer" });
-  await fillBlankAcrossFrames(page, { labels: [/^name$/i], selectors: ['input[autocomplete="name"]'], value: "Test Customer" });
-  await fillBlankAcrossFrames(page, { labels: [/email/i], selectors: ['input[type="email"]', 'input[autocomplete="email"]'],
-    value: "paymongo-test@example.com" });
-  await fillBlankAcrossFrames(page, { labels: [/phone|mobile/i], selectors: ['input[type="tel"]'], value: "09171234567" });
-  await chooseCountryIfMissing(page);
-  await fillBlankAcrossFrames(page, { labels: [/address line 1/i], selectors: ['input[autocomplete="address-line1"]'], value: "123 Test Street" });
-  await fillBlankAcrossFrames(page, { labels: [/^city$/i], selectors: ['input[autocomplete="address-level2"]'], value: "Manila" });
-  await fillBlankAcrossFrames(page, { labels: [/state|province/i], selectors: ['input[autocomplete="address-level1"]'], value: "Metro Manila" });
-  await fillBlankAcrossFrames(page, { labels: [/postal|zip/i], selectors: ['input[autocomplete="postal-code"]'], value: "1000" });
+  await fillSandboxBilling(page);
 }
 
 export async function submitSandboxCheckout(page: Page): Promise<void> {
@@ -171,7 +181,7 @@ export async function completeSandboxCheckout(
   const browser = await chromium.launch({ headless: true, ...browserOptions });
   try {
     const page = await browser.newPage();
-    await page.goto(rawUrl, { waitUntil: "domcontentloaded" });
+    await page.goto(rawUrl, { waitUntil: "load" });
     await fillSandboxCard(page);
     return await submitSandboxCheckoutAndWaitForReturn(page);
   } finally { await browser.close(); }

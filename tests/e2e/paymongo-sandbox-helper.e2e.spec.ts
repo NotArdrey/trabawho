@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { checkoutSessionId, fillSandboxCard, submitSandboxCheckout,
-  submitSandboxCheckoutAndWaitForReturn, verifySandboxCheckout } from "../../scripts/paymongo-sandbox-checkout.mts";
+  submitSandboxCheckoutAndWaitForReturn, verifySandboxCheckout } from "../../scripts/paymongo-sandbox-checkout.ts";
 
 test("rejects a non-PayMongo or non-test checkout before card entry", async () => {
   expect(() => checkoutSessionId("https://example.com/cs_abc123")).toThrow(/Only PayMongo/);
@@ -91,6 +91,22 @@ test("advances from PayMongo's card choice and fills only missing customer field
   await expect(page.getByLabel("Email")).toHaveValue("existing@example.com");
   await submitSandboxCheckout(page);
   expect(await page.locator("body").getAttribute("data-submitted")).toBe("yes");
+});
+
+test("waits for hydrated billing fields before advancing to the card form", async ({ page }) => {
+  await page.setContent(`<main><p>Loading checkout...</p></main>`);
+  await page.evaluate(() => {
+    setTimeout(() => {
+      document.querySelector("main")!.innerHTML = `<label>Email <input type="email" oninput="document.querySelector('#continue').disabled=!this.value"></label>
+        <button type="button">Card</button>
+        <button id="continue" type="button" disabled onclick="document.querySelector('#card').hidden=false">Continue</button>
+        <section id="card" hidden><label>Card number <input autocomplete="cc-number"></label>
+        <label>Expiry <input autocomplete="cc-exp"></label><label>CVC <input autocomplete="cc-csc"></label></section>`;
+    }, 300);
+  });
+  await fillSandboxCard(page);
+  await expect(page.getByLabel("Email")).toHaveValue("paymongo-test@example.com");
+  await expect(page.getByLabel("Card number")).toHaveValue("4343434343434345");
 });
 
 test("captures the payment return before the isolated browser is redirected to sign-in", async ({ page }) => {
