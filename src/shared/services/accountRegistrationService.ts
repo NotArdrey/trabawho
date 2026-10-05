@@ -1,5 +1,8 @@
 import { z } from 'zod';
 import { supabase } from '@/integrations/supabase';
+import { clearPendingAccount } from '@/shared/services/pendingAccountRecovery';
+import { signOutUser } from '@/shared/services/authSessionService';
+export { clearPendingAccount, pendingAccount, savePendingAccount, type PendingAccount } from '@/shared/services/pendingAccountRecovery';
 
 const stateSchema = z.object({
   state: z.enum(['legacy', 'email_pending', 'identity_pending', 'identity_in_progress', 'name_pending', 'identity_review', 'declined', 'ready']),
@@ -10,11 +13,10 @@ const stateSchema = z.object({
   pendingAccount: z.object({ userId: z.string(), nonce: z.string() }).optional(),
   emailDelivery: z.object({ sent: z.boolean() }).optional(),
   signupRole: z.enum(['client', 'worker']).optional(),
+  signupName: z.string().optional(),
 });
 export type AccountRegistration = z.infer<typeof stateSchema>;
 export type SignupRole = NonNullable<AccountRegistration['signupRole']>;
-export type PendingAccount = { userId: string; nonce: string; email: string };
-const pendingKey = 'trabawho.pendingAccount.v2';
 
 export async function accountRequest(name: string, body: Record<string, unknown>): Promise<unknown> {
   const result = await supabase.functions.invoke<unknown>(name, { body });
@@ -34,26 +36,17 @@ export async function accountRequest(name: string, body: Record<string, unknown>
 export async function registrationRequest(name: string, body: Record<string, unknown>) {
   return stateSchema.parse(await accountRequest(name, { ...body, redirectTo: `${window.location.origin}/register` }));
 }
-export function savePendingAccount(account: PendingAccount) {
-  // Only an expiring recovery capability and email are persisted. Never credentials.
-  try { sessionStorage.setItem(pendingKey, JSON.stringify(account)); sessionStorage.removeItem('trabawho.identitySignup.v1'); } catch { /* The current page keeps recovery in memory if storage is disabled. */ }
-}
-export function pendingAccount(): PendingAccount | null {
-  try {
-    sessionStorage.removeItem('trabawho.identitySignup.v1');
-    const result = z.object({ userId: z.string(), nonce: z.string(), email: z.string() }).safeParse(JSON.parse(sessionStorage.getItem(pendingKey) || 'null'));
-    return result.success ? result.data : null;
-  } catch { return null; }
-}
 export async function resumeRegistration() {
   const session = await supabase.auth.getSession();
   if (session.error) throw new Error('Your session could not be restored. Sign in again.');
   if (!session.data.session) return null;
+  clearPendingAccount();
   return registrationRequest('account-registration', { action: 'state' });
 }
 export async function signInForRegistration(email: string, password: string) {
   const result = await supabase.auth.signInWithPassword({ email, password });
   if (result.error) throw new Error(result.error.message);
+  clearPendingAccount();
   return registrationRequest('account-registration', { action: 'state' });
 }
 export async function resendFromSignIn(email: string) {
@@ -69,9 +62,15 @@ export async function routePendingRegistration(pathname: string): Promise<boolea
   return false;
 }
 export async function registrationSignOut() {
-  sessionStorage.removeItem(pendingKey);
-  const result = await supabase.auth.signOut();
-  if (result.error) throw new Error('Sign out could not be completed. Retry.');
+  try { await signOutUser(); }
+  catch { throw new Error('Sign out could not be completed. Retry.'); }
+}
+export function subscribeToRegistrationAuth(onSignOut: () => void, onSignIn: () => void): () => void {
+  const { data } = supabase.auth.onAuthStateChange((event, session) => {
+    if (event === 'SIGNED_OUT') { clearPendingAccount(); onSignOut(); }
+    else if (event === 'SIGNED_IN' && session) { clearPendingAccount(); onSignIn(); }
+  });
+  return () => data.subscription.unsubscribe();
 }
 export async function encodeIdentityImage(file: File | null) {
   if (!file || !['image/jpeg', 'image/png', 'image/webp'].includes(file.type) || file.size > 7 * 1024 * 1024 || file.size === 0)

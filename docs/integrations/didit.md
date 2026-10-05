@@ -9,13 +9,14 @@ Official references: [Create Session](https://docs.didit.me/sessions-api/create-
 
 The initial registration redesign is implemented in the repository. Its six migrations
 and eight new or updated backend functions are deployed on the linked Supabase
-project. Frontend publishing is outside the requested scope; the production
-frontend still uses the earlier registration bundle. The new
-account-owned endpoints run alongside the earlier endpoints during this transition.
+project. The new account-owned endpoints run alongside the earlier endpoints.
 Existing identity-reviewed names are not backfilled or silently corrected.
 The subsequent fixed-account-role change adds two migrations and updated
 function code. Both migrations and seven affected functions are deployed on the
-linked project. Frontend publishing remains outside this backend rollout.
+linked project. The registration follow-up was published on 2026-10-05: the
+`account-registration` function is active at version 4, and the frontend is live
+at [TrabaWho](https://trabawho-kappa.vercel.app). This follow-up requires no schema
+migration or changes to confirmation or identity gates.
 
 ## Account and email
 
@@ -24,6 +25,14 @@ journey. It starts with an explicit **Client — Book a service** or
 **Worker — Offer services** choice, with neither preselected, then collects email,
 password, password confirmation, and Terms and Conditions agreement. It does
 not ask for a document type, legal name, or service address at this stage.
+The visible steps are **Account → Name → Email → Identity**. Creating the
+account sends its confirmation email only after Auth creation and profile
+initialization succeed. The second step collects the complete applicant name;
+`account-registration` validates the pending recovery capability and saves this
+as unverified `user_metadata.signup_name`. Saving or revisiting a name sends no
+email and does not modify the protected profile name or approve identity.
+Terms and Conditions opens an accessible modal from the agreement's text link.
+Sign in precedes Create an account in the account-access navigation.
 The server validates the choice, saves it in protected Auth app metadata as
 `signup_role`, and persists the fixed account type in
 `account_registrations.account_role`. Profile role and capabilities match that
@@ -64,10 +73,33 @@ confirmation and revokes the old confirmation link in the same transaction. It i
 restricted to the same unconfirmed account; a confirmed account cannot use the
 pending capability to change credentials.
 
-Only the pending account ID, expiring recovery capability, and email are stored
+The pending account ID, expiring recovery capability, email, and entered signup
+name are stored
 in session storage. The retired password-bearing signup state is removed. Auth
 credentials are never saved by the registration journey; normal Supabase Auth
 session persistence continues to support returning users.
+
+Successful sign-in or authenticated session restoration clears older pending
+recovery. All application logout paths clear pending and retired signup storage
+after successful sign-out. Unsigned page refresh still preserves the current
+pending signup. Registration listens for sign-out to clear its in-memory state;
+an earlier restoration request cannot repopulate the screen after logout.
+**Register another account** abandons the browser's pending journey without
+deleting the server account or sending another email. Signed-in applicants can
+use **Sign out and register another account** to start a fresh signup.
+
+Back navigation revisits completed steps without creating another account,
+resending email, or clearing the current form. A created account shows an
+account summary; a confirmed email shows its completed state. Verification of
+the name extracted from the ID remains part of the final Identity step.
+
+The updated `account-registration` function was deployed before the frontend.
+Live endpoint checks verified nonce rejection and successful signup-name saving
+without changing confirmation delivery, protected names, identity gates, or
+account roles. The temporary verification account was removed afterward.
+All 22 registration Playwright journeys passed against the production frontend,
+including a real login/logout cycle followed by an empty new-account form, modal
+keyboard focus, Back navigation, and all five documented responsive widths.
 
 ## Identity and name confirmation
 

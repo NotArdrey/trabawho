@@ -3,10 +3,10 @@ import { cn } from '@/lib/utils';
 import type { AccountRegistration } from '@/shared/services/accountRegistrationService';
 import { registrationProgress } from '../domain/registrationProgress';
 
-const steps = ['Account', 'Email', 'Identity', 'Name'];
+const steps = ['Account', 'Name', 'Email', 'Identity'];
 
-export function RegistrationProgress({ registration }: { registration: AccountRegistration | null }) {
-  const current = registrationProgress(registration);
+export function RegistrationProgress({ registration, step }: { registration: AccountRegistration | null; step?: number }) {
+  const current = step ?? registrationProgress(registration);
   const ready = registration?.state === 'ready';
   return (
     <div className="space-y-4 border-b pb-6">

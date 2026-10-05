@@ -1,6 +1,6 @@
 import { expect, type Page } from '@playwright/test';
 export const corsHeaders = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': '*', 'Access-Control-Allow-Methods': 'POST, OPTIONS' };
-export type JourneyState = { state: string; signupRole?: 'client' | 'worker'; email?: string; legalName?: string; documentType?: string; sessionId?: string; sessionUrl?: string; nameIssue?: string; requestedName?: string };
+export type JourneyState = { state: string; signupRole?: 'client' | 'worker'; signupName?: string; email?: string; legalName?: string; documentType?: string; sessionId?: string; sessionUrl?: string; nameIssue?: string; requestedName?: string };
 export async function mockAccountJourney(page: Page, initial: JourneyState | null = null, next: JourneyState = {state:'name_pending',legalName:'Maria Isabel de la Cruz Santos',documentType:'passport',sessionId:'didit-owned'}) {
   let state = initial;
   let signupRole = initial?.signupRole;
@@ -18,6 +18,7 @@ export async function mockAccountJourney(page: Page, initial: JourneyState | nul
       signupRole = body.signupRole === 'worker' ? 'worker' : 'client';
       state = { state: 'email_pending', email: String(body.email), signupRole };
     }
+    if(name==='account-registration' && body.action==='save_name') state = { ...state, state: 'email_pending', signupName: String(body.signupName) };
     if(name==='account-didit-session') state=body.action==='get_session'?next:{state:'identity_in_progress',sessionId:'didit-owned',sessionUrl:'https://verification.didit.me/session/test'};
     if(name==='account-identity-name') state=body.action==='request_correction'?{...state,state:'identity_review',requestedName:String(body.requestedName),nameIssue:'Applicant requested a correction.'}:{state:'ready'};
     if(name==='account-manual-review') state={state:'identity_review',nameIssue:'Manual evidence needs review.'};
@@ -32,6 +33,11 @@ export async function fillRegistration(page: Page, email = 'person@example.com',
   await page.getByLabel('Confirm password',{exact:true}).fill('Password123!');
   await page.getByRole('checkbox',{name:'I agree to the Terms and Conditions',exact:true}).check();
   await page.getByRole('button',{name:'Create account',exact:true}).click();
+  await fillSignupName(page);
+}
+export async function fillSignupName(page: Page, name = 'Maria Isabel de la Cruz Santos') {
+  await page.getByLabel('Complete name', { exact: true }).fill(name);
+  await page.getByRole('button', { name: 'Continue to email', exact: true }).click();
 }
 export async function fillManualEvidence(page: Page) {
   await page.getByLabel('Name on ID',{exact:true}).fill('Manual User');

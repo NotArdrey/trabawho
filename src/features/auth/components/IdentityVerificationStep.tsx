@@ -8,15 +8,16 @@ import { useIdentityStep } from '../hooks/useIdentityStep';
 import type { DraftListener } from '../hooks/useRegistrationDraft';
 import { ManualAccountReview } from './ManualAccountReview';
 
-export function IdentityVerificationStep({ flow, state, onDraftChange }: { flow: AccountRegistrationFlow; state: AccountRegistration; onDraftChange?: DraftListener }) {
+export function IdentityVerificationStep({ flow, state, onDraftChange, active = true }: { flow: AccountRegistrationFlow; state: AccountRegistration; onDraftChange?: DraftListener; active?: boolean }) {
   const controls = useIdentityStep();
   const container = useRef<HTMLElement>(null);
   const inProgress = state.state === 'identity_in_progress';
   useEffect(() => {
+    if (!active) return;
     const heading = controls.manual ? container.current?.querySelector<HTMLElement>('[data-manual-review] [data-registration-heading]')
-      : container.current?.parentElement?.querySelector<HTMLElement>('[data-registration-heading]');
+      : container.current?.closest('[data-registration-journey]')?.querySelector<HTMLElement>('[data-registration-heading]');
     heading?.focus();
-  }, [controls.manual]);
+  }, [controls.manual, active]);
   return (
     <section ref={container} className="space-y-6">
       <div data-identity-choice hidden={controls.manual} className="space-y-6">

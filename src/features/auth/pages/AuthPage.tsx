@@ -30,11 +30,11 @@ export default function AuthPage({ mode = 'login', onModeChange, onBack, onSubmi
             aria-label={title} data-testid="auth-task-panel">
             <div className="space-y-4 p-6 sm:p-8">
               <nav aria-label="Account access" className="grid grid-cols-2 gap-2 rounded-lg bg-muted/60 p-1">
-                <Button variant="ghost" className={cn('h-auto min-w-0 w-full whitespace-normal px-2 py-2', mode === 'register' && 'bg-card text-primary shadow-sm')}
-                  aria-current={mode === 'register' ? 'page' : undefined} disabled={busy} onClick={() => { if (mode !== 'register') navigation.request(() => onModeChange?.('register')); }}>Create an account</Button>
                 <Button variant="ghost" className={cn('h-auto min-w-0 w-full whitespace-normal px-2 py-2', mode === 'login' && 'bg-card text-primary shadow-sm')}
                   aria-label={mode === 'register' ? 'Already have an account? Sign in' : undefined}
                   aria-current={mode === 'login' ? 'page' : undefined} disabled={busy} onClick={() => { if (mode !== 'login') navigation.request(() => onModeChange?.('login')); }}>Sign in</Button>
+                <Button variant="ghost" className={cn('h-auto min-w-0 w-full whitespace-normal px-2 py-2', mode === 'register' && 'bg-card text-primary shadow-sm')}
+                  aria-current={mode === 'register' ? 'page' : undefined} disabled={busy} onClick={() => { if (mode !== 'register') navigation.request(() => onModeChange?.('register')); }}>Create an account</Button>
               </nav>
               {mode === 'register' ? <p className="text-xs font-semibold text-primary">Join TrabaWho</p> : <div className="space-y-3">
                 <p className="text-xs font-semibold text-primary">{mode === 'forgot' ? 'Account recovery' : 'Welcome back'}</p>

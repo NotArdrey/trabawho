@@ -23,6 +23,7 @@
 .env.test.local
 .env.production.local
 .vercel
+/supabase/.temp
 demo-accounts.local.md
 
 npm-debug.log*

@@ -13,7 +13,7 @@
   },
   {
     "path": "src/shared/services/authService.js",
-    "baselineLines": 1417
+    "baselineLines": 1414
   },
   {
     "path": "src/features/bookings/pages/MyBookings.jsx",

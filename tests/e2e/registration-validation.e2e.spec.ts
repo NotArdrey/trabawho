@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { corsHeaders, fillRegistration, mockAccountJourney, expectNoRegistrationOverflow } from './helpers/registration';
+import { corsHeaders, fillRegistration, fillSignupName, mockAccountJourney, expectNoRegistrationOverflow } from './helpers/registration';
 for(const width of [390,768,1024,1280,1440]) test(`base account defers identity and service details at ${width}px`,async({page})=>{
   await page.setViewportSize({width,height:900});
   const flow=await mockAccountJourney(page);
@@ -46,6 +46,7 @@ test('signup requires an explicit choice and supports changing it with the keybo
   await expect(worker).toBeChecked();
   await expect(client).not.toBeChecked();
   await page.getByRole('button', { name: 'Create account', exact: true }).click();
+  await fillSignupName(page);
   await expect(page.getByRole('heading', { name: 'Confirm your email', exact: true })).toBeVisible();
   expect(flow.requests.find(item => item.body.action === 'create')?.body.signupRole).toBe('worker');
   expect(flow.requests.some(item => item.name === 'account-didit-session')).toBe(false);
@@ -85,6 +86,7 @@ test('password confirmation blocks creation, focuses its error, and never reache
   expect(flow.requests).toHaveLength(0);
   await confirmation.fill('Password123!');
   await page.getByRole('button',{name:'Create account',exact:true}).click();
+  await fillSignupName(page);
   await expect(page.getByRole('heading',{name:'Confirm your email',exact:true})).toBeVisible();
   const request=flow.requests.find(item=>item.body.action==='create');
   expect(request?.body).toMatchObject({email:'person@example.com',password:'Password123!',acceptedTerms:true});
@@ -95,10 +97,17 @@ test('email delivery failure preserves the account with resend and change-email 
   await page.route('**/functions/v1/account-registration',async route=>{
     if(route.request().method()==='OPTIONS')return route.fulfill({status:204,headers:corsHeaders});
     const body=route.request().postDataJSON() as Record<string,unknown>;
-    return route.fulfill({headers:corsHeaders,json:{state:'email_pending',email:body.email || 'person@example.com',pendingAccount:{userId:'pending',nonce:'capability'},emailDelivery:{sent:body.action!=='create'}}});
+    return route.fulfill({headers:corsHeaders,json:{state:'email_pending',email:body.email || 'person@example.com',pendingAccount:{userId:'pending',nonce:'capability'},signupName:body.action==='save_name'?body.signupName:undefined,emailDelivery:{sent:body.action!=='create'}}});
   });
-  await page.goto('/register'); await fillRegistration(page);
+  await page.goto('/register');
+  await page.getByRole('radio', { name: 'Client: Book a service', exact: true }).check();
+  await page.getByLabel('Email', { exact: true }).fill('person@example.com');
+  await page.getByLabel('Password', { exact: true }).fill('Password123!');
+  await page.getByLabel('Confirm password', { exact: true }).fill('Password123!');
+  await page.getByRole('checkbox', { name: 'I agree to the Terms and Conditions', exact: true }).check();
+  await page.getByRole('button', { name: 'Create account', exact: true }).click();
   await expect(page.getByRole('alert')).toContainText('account was created');
+  await fillSignupName(page);
   await page.getByRole('button',{name:'Resend confirmation email',exact:true}).click();
   await expect(page.getByRole('status')).toContainText('Confirmation email requested');
   await page.getByRole('button',{name:'Change email',exact:true}).click();

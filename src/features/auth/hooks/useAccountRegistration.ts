@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { pendingAccount, registrationRequest, resumeRegistration, savePendingAccount, signInForRegistration,
+import { pendingAccount, registrationRequest, registrationSignOut, resumeRegistration, savePendingAccount, signInForRegistration, subscribeToRegistrationAuth,
   type AccountRegistration, type PendingAccount, type SignupRole } from '@/shared/services/accountRegistrationService';
 
 export function useAccountRegistration() {
@@ -9,19 +9,33 @@ export function useAccountRegistration() {
   const [message, setMessage] = useState(''); const working = useRef(false);
   const [initializing, setInitializing] = useState(true);
   const [restoreFailed, setRestoreFailed] = useState(false);
+  const authEpoch = useRef(0);
+  useEffect(() => subscribeToRegistrationAuth(() => {
+    authEpoch.current += 1;
+    setRegistration(null); setPending(null); setError(''); setMessage(''); setRestoreFailed(false);
+  }, () => setPending(null)), []);
   const run = useCallback(async (action: () => Promise<void>) => {
     if (working.current) return false;
+    const epoch = authEpoch.current;
     working.current = true; setBusy(true); setError(''); setMessage('');
-    try { await action(); return true; } catch (cause) { setError(cause instanceof Error ? cause.message : 'Registration could not be completed. Retry.'); return false; }
+    try { await action(); return true; } catch (cause) {
+      if (epoch !== authEpoch.current) return true;
+      setError(cause instanceof Error ? cause.message : 'Registration could not be completed. Retry.'); return false;
+    }
     finally { working.current = false; setBusy(false); }
   }, []);
   const refresh = useCallback(() => run(async () => {
+    const epoch = authEpoch.current;
     const state = await resumeRegistration();
+    if (epoch !== authEpoch.current) return;
+    if (state) setPending(null);
+    else setPending(pendingAccount());
     if (state?.state === 'identity_in_progress') {
       const result = await registrationRequest('account-didit-session', { action: 'get_session' });
+      if (epoch !== authEpoch.current) return;
       setRegistration({ ...result, signupRole: result.signupRole ?? state.signupRole });
     }
-    else if (state && state.state !== 'legacy') setRegistration(state);
+    else setRegistration(state && state.state !== 'legacy' ? state : null);
   }), [run]);
   useEffect(() => {
     let mounted = true;
@@ -51,21 +65,32 @@ export function useAccountRegistration() {
     if (!pending) throw new Error('Sign in to resume or resend your confirmation link.');
     const result = await registrationRequest('account-registration', { action, ...pending, email: email || pending.email });
     const account = { ...pending, email: result.email || pending.email }; savePendingAccount(account); setPending(account);
-    setRegistration((previous) => ({ ...result, signupRole: result.signupRole ?? previous?.signupRole }));
+    setRegistration((previous) => ({ ...result, signupRole: result.signupRole ?? previous?.signupRole, signupName: result.signupName ?? previous?.signupName }));
     if (!result.emailDelivery?.sent) throw new Error('The confirmation email could not be sent. Wait one minute and retry.');
     setMessage('Confirmation email requested. Check your inbox and spam folder.');
   });
+  const saveName = (signupName: string) => run(async () => {
+    if (!pending) throw new Error('Sign in to resume your registration.');
+    const result = await registrationRequest('account-registration', { action: 'save_name', ...pending, signupName });
+    const account = { ...pending, signupName: result.signupName || signupName };
+    savePendingAccount(account); setPending(account);
+    setRegistration((previous) => ({ ...previous, ...result, signupRole: result.signupRole ?? previous?.signupRole }));
+  });
   const identityAction = (name: string, body: Record<string, unknown>) => run(async () => {
     const result = await registrationRequest(name, body);
-    setRegistration((previous) => ({ ...result, signupRole: result.signupRole ?? previous?.signupRole }));
+    setRegistration((previous) => ({ ...result, signupRole: result.signupRole ?? previous?.signupRole, signupName: result.signupName ?? previous?.signupName }));
   });
   const resume = (email: string, password: string) => run(async () => {
     const state = await signInForRegistration(email, password);
     if (state.state === 'legacy') throw new Error('This account uses the existing verification flow. Sign in from the login page.');
     setRegistration(state); setPending(null);
   });
-  return { registration: registration || (pending ? { state: 'email_pending' as const, email: pending.email } : null), busy, error, message,
-    create, emailAction, identityAction, resume, refresh, initializing, restoreFailed, retryRestore };
+  const startNewRegistration = () => run(async () => {
+    await registrationSignOut();
+    setRegistration(null); setPending(null); setRestoreFailed(false);
+  });
+  return { registration: registration || (pending ? { state: 'email_pending' as const, email: pending.email, signupName: pending.signupName } : null), busy, error, message,
+    create, saveName, emailAction, identityAction, resume, refresh, startNewRegistration, initializing, restoreFailed, retryRestore };
 }
 
 export type AccountRegistrationFlow = ReturnType<typeof useAccountRegistration>;
