@@ -1,8 +1,9 @@
-import { useEffect, useRef, type KeyboardEvent, type PointerEvent, type ReactNode } from "react";
+import { useEffect, useId, useRef, type KeyboardEvent, type PointerEvent, type ReactNode } from "react";
 import { Search, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 
 export interface SearchFilterOption {
@@ -15,6 +16,7 @@ interface SearchFilterBarProps {
   activeValue?: string;
   className?: string;
   endControl?: ReactNode;
+  filterLabel?: string;
   onActiveValueChange?: (value: string) => void;
   onSearchValueChange: (value: string) => void;
   options?: SearchFilterOption[];
@@ -22,12 +24,14 @@ interface SearchFilterBarProps {
   searchLabel: string;
   searchPlaceholder?: string;
   searchValue: string;
+  showSearchLabel?: boolean;
 }
 
 function SearchFilterBar({
   activeValue,
   className,
   endControl,
+  filterLabel,
   onActiveValueChange,
   onSearchValueChange,
   options = [],
@@ -35,7 +39,9 @@ function SearchFilterBar({
   searchLabel,
   searchPlaceholder,
   searchValue,
+  showSearchLabel = false,
 }: SearchFilterBarProps) {
+  const searchId = useId();
   const railRef = useRef<HTMLDivElement>(null);
   const buttonRefs = useRef(new Map<string, HTMLButtonElement>());
   const dragRef = useRef({ pointerId: -1, startX: 0, scrollLeft: 0, moved: false });
@@ -91,10 +97,12 @@ function SearchFilterBar({
       className={cn("min-w-0 max-w-full rounded-xl border border-border bg-card p-4 text-card-foreground shadow-none", className)}
       aria-label="Search and filters"
     >
+      {showSearchLabel ? <Label className="mb-2 block" htmlFor={searchId}>{searchLabel}</Label> : null}
       <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
         <div className="relative min-w-0 flex-1">
           <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
           <Input
+            id={searchId}
             type="search"
             className="pr-11 pl-10 shadow-none focus-visible:border-primary focus-visible:ring-0"
             aria-label={searchLabel}
@@ -125,10 +133,11 @@ function SearchFilterBar({
 
       {options.length > 0 ? (
         <div className="mt-3 min-w-0 max-w-full border-t border-border pt-3">
+          {filterLabel && <p className="mb-2 text-sm font-medium text-foreground">{filterLabel}</p>}
           <div
             ref={railRef}
             className="-mx-1 flex w-full min-w-0 cursor-grab touch-pan-x gap-2 overflow-x-auto overflow-y-hidden overscroll-x-contain px-1 pb-2 scroll-px-1 select-none active:cursor-grabbing [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-            aria-label="Filter results"
+            aria-label={filterLabel || "Filter results"}
             role="toolbar"
             onKeyDown={handleRailKeyDown}
             onPointerDown={handleRailPointerDown}

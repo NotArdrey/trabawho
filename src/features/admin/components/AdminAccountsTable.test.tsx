@@ -10,10 +10,11 @@ const accounts: AdminAccount[] = Array.from({ length: 18 }, (_, index) => ({
   displayStatus: "active",
 }));
 const onSearchChange = vi.fn();
+const onRoleFilterChange = vi.fn();
 const onUpdateRole = vi.fn();
 
 function renderTable() {
-  render(<AdminAccountsTable accounts={accounts} isLoading={false} error="" onRetry={vi.fn()} searchQuery="" onSearchChange={onSearchChange} selectedRole="all" onRoleFilterChange={vi.fn()} roleSavingId={null} accessSaving={false} onUpdateRole={onUpdateRole} onOpenAccessAction={vi.fn()} onRestoreAccount={vi.fn()} />);
+  render(<AdminAccountsTable accounts={accounts} isLoading={false} error="" onRetry={vi.fn()} searchQuery="" onSearchChange={onSearchChange} selectedRole="all" onRoleFilterChange={onRoleFilterChange} roleSavingId={null} accessSaving={false} onUpdateRole={onUpdateRole} onOpenAccessAction={vi.fn()} onRestoreAccount={vi.fn()} />);
 }
 
 describe("AdminAccountsTable", () => {
@@ -42,6 +43,15 @@ describe("AdminAccountsTable", () => {
     expect(onUpdateRole).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
     expect(onUpdateRole).not.toHaveBeenCalled();
+  });
+
+  test("uses the shared search and role filter controls", () => {
+    renderTable();
+    expect(screen.getByRole("searchbox", { name: "Search accounts" })).toBeVisible();
+    const roles = screen.getByRole("toolbar", { name: "Role" });
+    expect(within(roles).getByRole("button", { name: "All roles" })).toHaveAttribute("aria-pressed", "true");
+    fireEvent.click(within(roles).getByRole("button", { name: "Worker" }));
+    expect(onRoleFilterChange).toHaveBeenCalledWith("worker");
   });
 
   test("separates role changes from access restrictions", () => {

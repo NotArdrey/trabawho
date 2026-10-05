@@ -4,13 +4,13 @@ import { useLocation, useNavigate } from "react-router-dom";
 import AdminIdentityReviews from "@/features/admin/identity/AdminIdentityReviews";
 import { Menu } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import LogoutConfirmModal from "@/features/auth/components/LogoutConfirmModal";
 import AdminNavigation from "../components/AdminNavigation";
 import AdminOverview from "../components/AdminOverview";
 import AdminAccountsTable from "../components/AdminAccountsTable";
 import AdminLogsSection from "../components/AdminLogsSection";
 import AdminCommentsSection from "../components/AdminCommentsSection";
+import { DeleteReviewConfirmation } from "../components/DeleteReviewConfirmation";
 import AdminSettings from "../components/AdminSettings";
 import AdminSupportCases from "../components/AdminSupportCases";
 import { AdminCasePage } from "./AdminCasePage";
@@ -52,7 +52,7 @@ export default function AdminDashboard({ appTheme = "light", themeMode = "system
       </main>
     </div>
     <AccessActionModal isOpen={Boolean(state.accessActionTarget)} target={state.accessActionTarget} mode={state.accessActionMode} reason={state.accessReason} onReasonChange={state.setAccessReason} durationValue={state.accessDurationValue} onDurationValueChange={state.setAccessDurationValue} durationUnit={state.accessDurationUnit} onDurationUnitChange={state.setAccessDurationUnit} onConfirm={() => void state.handleConfirmAccessAction()} onCancel={state.closeAccessAction} isSaving={state.accessSaving} error={state.accessError} />
-    <Dialog open={Boolean(state.commentDeleteTarget)} onOpenChange={(open) => { if (!open && !state.commentSaving) { state.setCommentDeleteTarget(null); state.setCommentActionError(""); } }}><DialogContent><DialogHeader><DialogTitle>Delete review?</DialogTitle><DialogDescription>This permanently removes the review from the database. This action cannot be undone.</DialogDescription></DialogHeader>{state.commentActionError && <p role="alert" className="rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">{state.commentActionError}</p>}<p className="rounded-lg bg-muted p-3 text-sm">{state.commentDeleteTarget?.comment || "No written comment"}</p><DialogFooter><Button type="button" variant="outline" disabled={state.commentSaving} onClick={() => { state.setCommentDeleteTarget(null); state.setCommentActionError(""); }}>Cancel</Button><Button type="button" variant="destructive" isLoading={state.commentSaving} onClick={() => void state.handleDeleteComment(state.commentDeleteTarget?.id)}>Delete review</Button></DialogFooter></DialogContent></Dialog>
+    <DeleteReviewConfirmation review={state.commentDeleteTarget} saving={state.commentSaving} error={state.commentActionError} onCancel={() => { state.setCommentDeleteTarget(null); state.setCommentActionError(""); }} onConfirm={(id) => { void state.handleDeleteComment(id); }} />
     <LogoutConfirmModal isOpen={isLogoutConfirmOpen} onCancel={() => setIsLogoutConfirmOpen(false)} onConfirm={() => { setIsLogoutConfirmOpen(false); onLogout?.(); }} />
   </div>;
 }

@@ -31,4 +31,15 @@ describe("AdminCommentsSection", () => {
     fireEvent.click(screen.getByRole("button", { name: "Clear filters" }));
     expect(handlers.onSearchChange).toHaveBeenCalledWith("");
   });
+
+  test("distinguishes rating and publication state while preserving the delete action", () => {
+    renderReviews({ comments: [comment, { ...comment, id: 2, worker: "Jo Worker", rating: 2, comment: "", status: "review" }], total: 2 });
+    expect(screen.getByText("5 / 5 stars")).toBeVisible();
+    expect(screen.getByText("2 / 5 stars")).toBeVisible();
+    expect(screen.getAllByText("Published")).toHaveLength(2);
+    expect(screen.getAllByText("Unpublished")).toHaveLength(2);
+    expect(screen.getByText("No written comment")).toBeVisible();
+    fireEvent.click(screen.getAllByRole("button", { name: "Delete review" })[1]);
+    expect(handlers.onOpenDeleteComment).toHaveBeenCalledWith(expect.objectContaining({ id: 2 }));
+  });
 });

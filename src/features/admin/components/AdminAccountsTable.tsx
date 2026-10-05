@@ -1,13 +1,11 @@
 import { useState } from "react";
-import { Search, UserRound } from "lucide-react";
+import { UserRound } from "lucide-react";
 import { AlertDialog, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { DataPagination } from "@/components/ui/data-pagination";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { SearchFilterBar } from "@/components/ui/search-filter-bar";
 import type { AdminAccount } from "../types";
 
 const PAGE_SIZE = 8;
@@ -87,9 +85,12 @@ export default function AdminAccountsTable({ accounts, isLoading, error, onRetry
 
   return <section className="space-y-5">
     <div><p className="text-sm font-semibold text-primary">Admin workspace</p><h1 className="mt-1 text-3xl font-bold">Account management</h1><p className="mt-2 text-muted-foreground">Find accounts, review access, and confirm changes before they take effect.</p></div>
-    <Card><CardContent className="grid gap-4 p-4 sm:grid-cols-[minmax(0,1fr)_200px]"><div className="space-y-2"><Label htmlFor="admin-account-search">Search accounts</Label><div className="relative"><Search aria-hidden="true" className="absolute left-3 top-3 size-5 text-muted-foreground" /><Input id="admin-account-search" className="pl-10" placeholder="Search name, email, role" value={searchQuery} onChange={(event) => { setPage(1); onSearchChange(event.target.value); }} /></div></div><div className="space-y-2"><Label id="admin-role-label">Role</Label><Select value={selectedRole} onValueChange={(value) => { setPage(1); onRoleFilterChange(value); }}><SelectTrigger aria-labelledby="admin-role-label"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="all">All roles</SelectItem><SelectItem value="client">Client</SelectItem><SelectItem value="worker">Worker</SelectItem><SelectItem value="admin">Admin</SelectItem></SelectContent></Select></div></CardContent></Card>
+    <SearchFilterBar searchLabel="Search accounts" showSearchLabel searchPlaceholder="Search name, email, role…" searchValue={searchQuery}
+      onSearchValueChange={(value) => { setPage(1); onSearchChange(value); }}
+      activeValue={selectedRole} onActiveValueChange={(value) => { setPage(1); onRoleFilterChange(value); }}
+      filterLabel="Role" options={[{ value: "all", label: "All roles" }, { value: "client", label: "Client" }, { value: "worker", label: "Worker" }, { value: "admin", label: "Admin" }]}
+      resultLabel={isLoading ? "Loading accounts…" : error ? "Accounts unavailable" : `Showing ${first}–${last} of ${accounts.length} ${filtered ? "matching " : ""}accounts`} />
     {error && <div role="alert" className="flex flex-wrap items-center gap-3 rounded-lg border border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive"><span>{error}</span><Button type="button" variant="outline" onClick={onRetry}>Try again</Button></div>}
-    {!isLoading && !error && <p className="text-sm font-medium text-muted-foreground" aria-live="polite">Showing {first}–{last} of {accounts.length} {filtered ? "matching " : ""}accounts</p>}
     {isLoading ? <p role="status" className="text-muted-foreground">Loading accounts…</p> : !error && accounts.length === 0 ? <Card><CardContent className="space-y-3 p-6"><h2 className="font-semibold">{filtered ? "No matching accounts" : "No accounts available"}</h2><p className="text-sm text-muted-foreground">{filtered ? "Try another search or clear the filters." : "Accounts will appear here when they are available."}</p>{filtered && <Button type="button" variant="outline" onClick={() => { setPage(1); onSearchChange(""); onRoleFilterChange("all"); }}>Clear filters</Button>}</CardContent></Card> : !error && <div className="grid gap-3">{visibleAccounts.map((account) => <AccountCard key={account.id} account={account} roleSavingId={roleSavingId} accessSaving={accessSaving} onOpenAccessAction={onOpenAccessAction} onRequestAction={setPending} />)}</div>}
     {!isLoading && !error && <DataPagination label="Account pages" page={currentPage} pageCount={pageCount} onPageChange={setPage} />}
     <AlertDialog open={Boolean(pending)} onOpenChange={(open) => { if (!open) setPending(null); }}><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>{pending?.kind === "restore" ? "Restore account?" : pending?.role === "admin" ? "Grant admin access?" : "Set account to client?"}</AlertDialogTitle><AlertDialogDescription>{pending?.kind === "restore" ? `This will re-enable ${pending.account.name}'s access to TrabaWho.` : pending?.role === "admin" ? `This grants ${pending?.account.name} administrator access to account management and moderation.` : `This changes ${pending?.account.name} to a client and removes their current role's access.`}</AlertDialogDescription></AlertDialogHeader><p className="break-all rounded-lg bg-muted p-3 text-sm font-medium text-foreground">{pending?.account.email}</p><AlertDialogFooter><Button type="button" variant="outline" onClick={() => setPending(null)}>Cancel</Button><Button type="button" variant={pending?.kind === "role" && pending.role === "client" ? "destructive" : "primary"} onClick={confirmAction}>Confirm {pending?.kind === "restore" ? "restore" : "role change"}</Button></AlertDialogFooter></AlertDialogContent></AlertDialog>

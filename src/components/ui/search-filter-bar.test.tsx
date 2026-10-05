@@ -37,4 +37,12 @@ describe("SearchFilterBar", () => {
     expect(rail.scrollLeft).toBe(160);
     expect(onActiveValueChange).not.toHaveBeenCalled();
   });
+
+  it("can name a specific filter rail without changing the shared default", () => {
+    render(<SearchFilterBar activeValue="all" options={options} filterLabel="Review status"
+      onActiveValueChange={vi.fn()} onSearchValueChange={vi.fn()} searchLabel="Search reviews" searchValue="" showSearchLabel />);
+    expect(screen.getByText("Review status")).toBeVisible();
+    expect(screen.getByText("Search reviews")).toHaveAttribute("for", screen.getByRole("searchbox").id);
+    expect(screen.getByRole("toolbar", { name: "Review status" })).toBeInTheDocument();
+  });
 });

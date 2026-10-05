@@ -42,6 +42,10 @@ describe("AdminDashboard", () => {
     expect(screen.queryByText("Admin Live")).not.toBeInTheDocument();
     expect(screen.queryByText("Flagged Comments")).not.toBeInTheDocument();
     expect(screen.getByRole("region", { name: "Analytics" })).toBeInTheDocument();
+    const workspace = within(within(screen.getByRole("main")).getByRole("region", { name: "Workspace" }));
+    for (const label of ["Review accounts", "View reviews", "View logs"]) {
+      expect(workspace.getByRole("button", { name: new RegExp(label) })).toHaveClass("bg-primary");
+    }
   });
 
   test("navigates existing screens and loads audit history", () => {
