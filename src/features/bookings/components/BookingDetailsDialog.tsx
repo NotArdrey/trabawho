@@ -16,6 +16,7 @@ import { Button } from "@/components/ui/button";
 import { BookingReplacementSchedule } from "@/features/bookings/components/BookingReplacementSchedule";
 import type { ActiveReplacementSchedule } from "@/features/bookings/services/replacementSchedules";
 import { isShowcasePaymentReference } from "@/features/bookings/utils/bookingPaymentPresentation";
+import { formatBookingCreatedAt } from "@/features/bookings/utils/bookingCreatedAt";
 import {
   Dialog,
   DialogContent,
@@ -27,6 +28,7 @@ import {
 
 export interface BookingDetails {
   clientName?: string;
+  createdAt?: string | null;
   completedAt?: string;
   completionDueAt?: string;
   deliveryStatus?: string;
@@ -79,7 +81,7 @@ function formatPhp(value?: number | string) {
 }
 
 function formatDate(value?: string) {
-  if (!value) return "Coordinated in chat";
+  if (!value) return "Not scheduled yet";
   const date = new Date(`${value}T00:00:00`);
   if (Number.isNaN(date.getTime())) return value;
   return new Intl.DateTimeFormat("en-PH", { weekday: "long", month: "long", day: "numeric", year: "numeric" }).format(date);
@@ -161,6 +163,7 @@ export function BookingDetailsDialog({ booking, isProviderView, onClose, onMessa
         ? { title: isProviderView ? "Waiting for client payment" : booking.paymentStatus === "partially_paid" ? "Pay the balance before work" : "Deposit required to confirm", detail: isProviderView ? "The client must complete the balance checkout before work can begin." : booking.paymentStatus === "partially_paid" ? "Your schedule is confirmed; pay the remaining balance before the appointment starts." : "Pay the 50% deposit to keep this appointment reserved.", complete: false }
         : { title: isProviderView ? "Prepare for the appointment" : "Your appointment is confirmed", detail: isProviderView ? "Use the schedule below and message the client if coordination is needed." : "Review the schedule below and message the provider if anything changes.", complete: true };
   const NextStepIcon = nextStep.complete ? CheckCircle2 : Clock3;
+  const bookedOn = formatBookingCreatedAt(booking.createdAt);
 
   return (
     <Dialog open onOpenChange={(open) => { if (!open) onClose(); }}>
@@ -172,6 +175,7 @@ export function BookingDetailsDialog({ booking, isProviderView, onClose, onMessa
               <div className="mb-2 flex flex-wrap items-center gap-2"><span className="text-xs font-bold uppercase tracking-wide text-primary">Booking details</span><Badge variant={statusVariant(statusLabel)}>{statusLabel}</Badge></div>
               <DialogTitle className="text-2xl">{booking.serviceType || "Service booking"}</DialogTitle>
               <DialogDescription className="mt-1 flex items-center gap-1.5"><UserRound className="size-4" aria-hidden="true" />{isProviderView ? booking.clientName : booking.workerName}</DialogDescription>
+              {bookedOn ? <p className="mt-2 text-sm text-muted-foreground">Booked on <time dateTime={booking.createdAt || undefined} className="font-semibold text-foreground">{bookedOn}</time></p> : null}
             </div>
           </div>
         </DialogHeader>
@@ -192,8 +196,8 @@ export function BookingDetailsDialog({ booking, isProviderView, onClose, onMessa
           <section className="rounded-xl border bg-card p-4" aria-labelledby="booking-schedule-heading">
             <div className="flex items-center gap-2"><CalendarDays className="size-5 text-primary" aria-hidden="true" /><h3 id="booking-schedule-heading" className="font-bold text-foreground">{replacementActive ? "Original booking appointment" : "Appointment"}</h3></div>
             <dl className="mt-4 grid gap-4 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
-              <div><dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Booked date</dt><dd className="mt-1 text-base font-bold text-foreground">{formatDate(booking.selectedSlot?.date || booking.requestDate)}</dd></div>
-              <div className="sm:text-right"><dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Booked time</dt><dd className="mt-1 text-base font-bold text-foreground">{formatTimeRange(booking.selectedSlot?.timeBlock)}</dd></div>
+              <div><dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Visit date</dt><dd className="mt-1 text-base font-bold text-foreground">{formatDate(booking.selectedSlot?.date)}</dd></div>
+              <div className="sm:text-right"><dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Visit time</dt><dd className="mt-1 text-base font-bold text-foreground">{formatTimeRange(booking.selectedSlot?.timeBlock)}</dd></div>
             </dl>
           </section>
 

@@ -11,6 +11,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
+import { isBookableClientAppointment, isFutureClientBookingDate, philippineDateKey } from "@/shared/domain/clientBookingDate";
 import {
   fetchPublicServiceSlots,
   type AvailableServiceSlot,
@@ -53,13 +54,7 @@ interface SlotSelectionModalProps {
 }
 
 const dateKey = (value: string | Date) => {
-  const date = typeof value === "string" ? new Date(value) : value;
-  return new Intl.DateTimeFormat("en-CA", {
-    day: "2-digit",
-    month: "2-digit",
-    timeZone: "Asia/Manila",
-    year: "numeric",
-  }).format(date);
+  return philippineDateKey(value) || "";
 };
 
 const dateLabel = (value: string) => new Date(`${value}T00:00:00`).toLocaleDateString("en-PH", {
@@ -86,7 +81,22 @@ export default function SlotSelectionModal({ action = "checkout", booking, onCan
   const [isLoading, setIsLoading] = useState(true);
   const [isReviewing, setIsReviewing] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [now, setNow] = useState(() => new Date());
   const timesHeadingRef = useRef<HTMLHeadingElement>(null);
+
+  useEffect(() => {
+    const refreshClock = () => {
+      const next = new Date();
+      setNow(next);
+      if (selectedDate && !isFutureClientBookingDate(selectedDate, next)) {
+        setSelectedDate(""); setSelectedSlotId(null); setIsReviewing(false);
+        setError("That date is no longer bookable. Choose a date from tomorrow onward (PHT).");
+      }
+    };
+    const timer = window.setInterval(refreshClock, 30_000);
+    window.addEventListener("focus", refreshClock);
+    return () => { window.clearInterval(timer); window.removeEventListener("focus", refreshClock); };
+  }, [selectedDate]);
 
   useEffect(() => {
     let active = true;
@@ -110,18 +120,24 @@ export default function SlotSelectionModal({ action = "checkout", booking, onCan
     return () => { active = false; };
   }, [booking.serviceId]);
 
-  const groupedSlots = useMemo(() => slots.reduce<Record<string, AvailableServiceSlot[]>>((result, slot) => {
+  const bookableSlots = useMemo(() => slots.filter((slot) => isBookableClientAppointment(slot.start_ts, slot.end_ts, now)), [slots, now]);
+  const groupedSlots = useMemo(() => bookableSlots.reduce<Record<string, AvailableServiceSlot[]>>((result, slot) => {
     const key = dateKey(slot.start_ts);
     (result[key] ??= []).push(slot);
     return result;
-  }, {}), [slots]);
+  }, {}), [bookableSlots]);
   const dates = Object.keys(groupedSlots).sort();
   const pageCount = Math.ceil(dates.length / DATES_PER_PAGE);
-  const visibleDates = dates.slice(datePage * DATES_PER_PAGE, (datePage + 1) * DATES_PER_PAGE);
+  const currentPage = Math.min(datePage, Math.max(0, pageCount - 1));
+  const visibleDates = dates.slice(currentPage * DATES_PER_PAGE, (currentPage + 1) * DATES_PER_PAGE);
   const dateSlots = selectedDate ? groupedSlots[selectedDate] ?? [] : [];
-  const selectedSlot = slots.find((slot) => slot.id === selectedSlotId);
+  const selectedSlot = bookableSlots.find((slot) => slot.id === selectedSlotId);
 
   const chooseDate = (value: string) => {
+    if (!groupedSlots[value] || !isFutureClientBookingDate(value)) {
+      setError("Choose a date from tomorrow onward (PHT).");
+      return;
+    }
     setIsReviewing(false);
     setSubmitError("");
     setSelectedDate(value);
@@ -141,8 +157,8 @@ export default function SlotSelectionModal({ action = "checkout", booking, onCan
 
   const confirm = async () => {
     if (isSubmitting) return;
-    if (!selectedSlot) {
-      setError("Choose one of the available times to continue.");
+    if (!selectedSlot || !isBookableClientAppointment(selectedSlot.start_ts, selectedSlot.end_ts)) {
+      setSubmitError("That time is no longer bookable. Choose a date from tomorrow onward (PHT).");
       return;
     }
     const key = dateKey(selectedSlot.start_ts);
@@ -178,6 +194,15 @@ export default function SlotSelectionModal({ action = "checkout", booking, onCan
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  const review = () => {
+    if (!selectedSlot || !isBookableClientAppointment(selectedSlot.start_ts, selectedSlot.end_ts)) {
+      setSelectedDate(""); setSelectedSlotId(null);
+      setError("That time is no longer bookable. Choose a date from tomorrow onward (PHT).");
+      return;
+    }
+    setIsReviewing(true);
   };
 
   return (
@@ -220,19 +245,20 @@ export default function SlotSelectionModal({ action = "checkout", booking, onCan
           ) : isLoading ? (
             <div className="flex min-h-56 items-center justify-center gap-3 text-muted-foreground" role="status"><LoaderCircle className="size-5 animate-spin" aria-hidden="true" />Loading available times…</div>
           ) : dates.length === 0 ? (
-            <div className="rounded-xl bg-muted/55 p-6 text-center"><p className="font-semibold text-foreground">No times are available right now</p><p className="mt-1 text-sm text-muted-foreground">Close this window and message the provider to coordinate another schedule.</p></div>
+            <div className="rounded-xl bg-muted/55 p-6 text-center"><p className="font-semibold text-foreground">No times are available right now</p><p className="mt-1 text-sm text-muted-foreground">Bookings start tomorrow (PHT). Close this window and message the provider to coordinate another schedule.</p></div>
           ) : (
             <div className="space-y-6">
               <section aria-labelledby="booking-date-heading">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div>
                     <h3 id="booking-date-heading" className="font-semibold text-foreground">1. Choose a date</h3>
-                    <p className="mt-1 text-sm text-muted-foreground">Showing {datePage * DATES_PER_PAGE + 1}–{Math.min((datePage + 1) * DATES_PER_PAGE, dates.length)} of {dates.length} available dates</p>
+                    <p className="mt-1 text-sm text-muted-foreground">Dates start tomorrow, Philippine time.</p>
+                    <p className="mt-1 text-sm text-muted-foreground">Showing {currentPage * DATES_PER_PAGE + 1}–{Math.min((currentPage + 1) * DATES_PER_PAGE, dates.length)} of {dates.length} available dates</p>
                   </div>
                   {pageCount > 1 ? <div className="flex items-center gap-2" aria-label="Available date pages">
-                    <Button type="button" variant="outline" size="icon" aria-label="Previous dates" disabled={datePage === 0} onClick={() => changeDatePage(datePage - 1)}><ChevronLeft aria-hidden="true" /></Button>
-                    <span className="min-w-12 text-center text-sm tabular-nums text-muted-foreground">{datePage + 1} / {pageCount}</span>
-                    <Button type="button" variant="outline" size="icon" aria-label="Next dates" disabled={datePage === pageCount - 1} onClick={() => changeDatePage(datePage + 1)}><ChevronRight aria-hidden="true" /></Button>
+                    <Button type="button" variant="outline" size="icon" aria-label="Previous dates" disabled={currentPage === 0} onClick={() => changeDatePage(currentPage - 1)}><ChevronLeft aria-hidden="true" /></Button>
+                    <span className="min-w-12 text-center text-sm tabular-nums text-muted-foreground">{currentPage + 1} / {pageCount}</span>
+                    <Button type="button" variant="outline" size="icon" aria-label="Next dates" disabled={currentPage === pageCount - 1} onClick={() => changeDatePage(currentPage + 1)}><ChevronRight aria-hidden="true" /></Button>
                   </div> : null}
                 </div>
                 <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3">
@@ -251,7 +277,7 @@ export default function SlotSelectionModal({ action = "checkout", booking, onCan
                   {dateSlots.map((slot) => {
                     const available = Math.max(0, slot.capacity - slot.booked_count);
                     const selected = slot.id === selectedSlotId;
-                    return <button key={slot.id} type="button" disabled={available === 0} aria-pressed={selected} onClick={() => { setSelectedSlotId(slot.id); setError(""); }} className={cn("flex min-h-16 items-center justify-between rounded-xl bg-muted/45 px-4 text-left outline-none hover:bg-primary/10 focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50", selected && "bg-primary text-primary-foreground hover:bg-primary")}><span><span className="flex items-center gap-2 font-semibold"><Clock3 className="size-4" aria-hidden="true" />{timeLabel(slot.start_ts)}–{timeLabel(slot.end_ts)}</span><span className={cn("mt-1 block text-xs text-muted-foreground", selected && "text-primary-foreground/80")}>{available} {available === 1 ? "spot" : "spots"} left</span></span>{selected ? <Check className="size-5" aria-hidden="true" /> : null}</button>;
+                    return <button key={slot.id} type="button" disabled={available === 0} aria-pressed={selected} onClick={() => { if (!isBookableClientAppointment(slot.start_ts, slot.end_ts)) { setError("That time is no longer bookable. Choose a date from tomorrow onward (PHT)."); return; } setSelectedSlotId(slot.id); setError(""); }} className={cn("flex min-h-16 items-center justify-between rounded-xl bg-muted/45 px-4 text-left outline-none hover:bg-primary/10 focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50", selected && "bg-primary text-primary-foreground hover:bg-primary")}><span><span className="flex items-center gap-2 font-semibold"><Clock3 className="size-4" aria-hidden="true" />{timeLabel(slot.start_ts)}–{timeLabel(slot.end_ts)}</span><span className={cn("mt-1 block text-xs text-muted-foreground", selected && "text-primary-foreground/80")}>{available} {available === 1 ? "spot" : "spots"} left</span></span>{selected ? <Check className="size-5" aria-hidden="true" /> : null}</button>;
                   })}
                 </div> : null}
               </section>
@@ -264,7 +290,7 @@ export default function SlotSelectionModal({ action = "checkout", booking, onCan
           <p className="text-sm text-muted-foreground">{selectedSlot ? `${dateLabel(dateKey(selectedSlot.start_ts))}, ${timeLabel(selectedSlot.start_ts)}–${timeLabel(selectedSlot.end_ts)}` : "Select a date and time to continue."}</p>
           <div className="flex gap-2">
             <Button type="button" variant="outline" disabled={isSubmitting} onClick={isReviewing ? () => setIsReviewing(false) : onCancel}>{isReviewing ? "Change time" : "Cancel"}</Button>
-            <Button type="button" disabled={!selectedSlot || isSubmitting} onClick={isReviewing ? confirm : () => setIsReviewing(true)}>{isSubmitting ? "Updating schedule…" : isReviewing ? action === "reschedule" ? "Request reschedule" : "Continue to terms" : "Review booking"}</Button>
+            <Button type="button" disabled={!selectedSlot || isSubmitting} onClick={isReviewing ? confirm : review}>{isSubmitting ? "Updating schedule…" : isReviewing ? action === "reschedule" ? "Request reschedule" : "Continue to terms" : "Review booking"}</Button>
           </div>
         </DialogFooter>
       </DialogContent>

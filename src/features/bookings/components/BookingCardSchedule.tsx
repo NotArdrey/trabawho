@@ -4,7 +4,9 @@ import { CalendarDays, Clock, CreditCard, Receipt } from "lucide-react";
 import { useBookingActivity } from "@/features/bookings/hooks/useBookingActivity";
 import { getActiveReplacementSchedule, type ActiveReplacementSchedule } from "@/features/bookings/services/replacementSchedules";
 import { isShowcasePaymentReference } from "@/features/bookings/utils/bookingPaymentPresentation";
+import type { ProviderBookingConflict } from "@/features/bookings/utils/providerBookingConflicts";
 import { cn } from "@/lib/utils";
+import { ProviderBookingConflictNotice } from "./ProviderBookingConflictNotice";
 
 interface BookingCardScheduleProps {
   bookingId: string;
@@ -13,6 +15,8 @@ interface BookingCardScheduleProps {
   originalTime: string;
   paymentMethod?: string;
   paymentReference?: string;
+  conflicts?: readonly ProviderBookingConflict[];
+  onViewConflict?: (bookingId: string) => void;
 }
 
 const visitDate = (value: string) => new Date(value).toLocaleDateString("en-PH", {
@@ -33,7 +37,7 @@ function paymentLabel(method?: string) {
 }
 
 export function BookingCardSchedule({ bookingId, checkReplacement, originalDate, originalTime,
-  paymentMethod, paymentReference }: BookingCardScheduleProps) {
+  paymentMethod, paymentReference, conflicts = [], onViewConflict }: BookingCardScheduleProps) {
   const demoPayment = isShowcasePaymentReference(paymentReference);
   const [schedule, setSchedule] = useState<ActiveReplacementSchedule | null>(null);
   const replacementCompleted = schedule?.status === "completed";
@@ -53,7 +57,7 @@ export function BookingCardSchedule({ bookingId, checkReplacement, originalDate,
   useEffect(() => { queueMicrotask(() => { void refresh(); }); }, [refresh]);
   useBookingActivity(refresh, checkReplacement, 30_000, "support");
 
-  return <div className={cn("booking-details-grid border", schedule
+  return <><div className={cn("booking-details-grid border", schedule
     ? "border-emerald-200 bg-emerald-50/40 dark:border-emerald-900 dark:bg-emerald-950/20"
     : "border-orange-200 dark:border-orange-800/60")}>
     <div className="booking-detail-item">
@@ -78,5 +82,7 @@ export function BookingCardSchedule({ bookingId, checkReplacement, originalDate,
       {schedule ? "The latest visit update could not be checked. Confirm the time in your support case."
         : "The current visit could not be checked. Open the support case before relying on the original date above."}
     </p>}
-  </div>;
+  </div>
+    {onViewConflict && <ProviderBookingConflictNotice conflicts={conflicts} onViewBooking={onViewConflict} />}
+  </>;
 }

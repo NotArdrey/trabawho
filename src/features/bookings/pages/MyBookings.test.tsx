@@ -1,6 +1,6 @@
 import type { ComponentType, ReactNode } from 'react';
 import { beforeEach, describe, expect, test, vi } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, within } from '@testing-library/react';
 import { MemoryRouter, useLocation } from 'react-router-dom';
 import LegacyMyBookings from '@/features/bookings/pages/MyBookings';
 const MyBookings = LegacyMyBookings as unknown as ComponentType<Record<string, unknown>>;
@@ -20,6 +20,9 @@ vi.mock('@/features/bookings/components/SlotSelectionModal', () => ({
 vi.mock('@/features/bookings/components/PaymentModal', () => ({
   default: () => <div data-testid="mock-payment-modal">Payment</div>,
 }));
+vi.mock('@/features/bookings/hooks/useProviderReplacementSchedules', () => ({
+  useProviderReplacementSchedules: () => new Map(),
+}));
 vi.mock('@/features/bookings/components/BookingTermsModal', () => ({
   default: ({ isOpen, onConfirm }: { isOpen: boolean; onConfirm: () => void }) => (
     isOpen ? <button data-testid="mock-terms-modal" onClick={onConfirm}>Continue to payment</button> : null
@@ -36,6 +39,7 @@ const mockBookings = [
     description: 'Math tutorial sessions for grade 10',
     status: 'Service Scheduled',
     quoteAmount: 1500,
+    createdAt: '2026-10-05T05:07:00Z',
     requestDate: '2026-08-20',
     selectedSlot: {
       timeBlock: { startTime: '08:08', endTime: '10:08' },
@@ -157,6 +161,8 @@ describe('MyBookings Redesign Component', () => {
     expect(screen.getByText('Maria Santos')).toBeInTheDocument();
     expect(screen.getByText('PHP 1,500')).toBeInTheDocument();
     expect(screen.getByText('PHP 2,200')).toBeInTheDocument();
+    expect(screen.getByText('Booked on')).toBeVisible();
+    expect(screen.getByText(/Oct 5, 2026.*1:07 PM PHT/)).toBeVisible();
   });
 
   test('pages bookings after filtering and resets to page one when searching', () => {
@@ -200,6 +206,8 @@ describe('MyBookings Redesign Component', () => {
 
     const detailsDialog = screen.getByRole('dialog', { name: /Tutor/i });
     expect(detailsDialog).toBeInTheDocument();
+    expect(detailsDialog).toHaveTextContent('Booked on');
+    expect(detailsDialog).toHaveTextContent('Oct 5, 2026');
     expect(detailsDialog).toHaveTextContent('GCASH-998811');
     expect(detailsDialog).toHaveTextContent('8:08 AM – 10:08 AM');
   });
@@ -320,13 +328,31 @@ describe('MyBookings Redesign Component', () => {
     expect(screen.getByRole('button', { name: 'Scheduled, 1' })).toHaveAttribute('aria-pressed', 'true');
     expect(screen.getAllByRole('button', { name: 'Message client' })).toHaveLength(1);
     expect(screen.getByText('PHP 1,500')).toHaveClass('text-lg', 'text-emerald-700');
-    expect(screen.getByText('Requested on')).toBeVisible();
-    expect(screen.getByText(/Aug.*2026/)).toBeVisible();
+    expect(screen.getByText('Booked on')).toBeVisible();
+    expect(screen.getByText(/Oct 5, 2026.*1:07 PM PHT/)).toBeVisible();
     expect(screen.queryByTestId('booking-card-b2')).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'All, 2' }));
     expect(screen.getByTestId('booking-card-b2')).toBeInTheDocument();
     expect(screen.getByTestId('location-probe')).toHaveTextContent('filter=all');
     expect(mockListRole).toBe('seller');
+  });
+
+  test('warns on the worker cards before opening an overlapping job across services', () => {
+    const first = { ...mockBookings[0], id: 'job-one', sellerId: 'provider-1', serviceType: 'Garden cleanup',
+      status: 'Payment Confirmed', paymentStatus: 'paid', scheduleStatus: 'confirmed',
+      raw: { booking: { status: 'confirmed', start_ts: '2026-10-10T01:00:00Z', end_ts: '2026-10-10T02:00:00Z' } } };
+    const second = { ...first, id: 'job-two', clientName: 'Bea Client', serviceType: 'House painting',
+      raw: { booking: { status: 'confirmed', start_ts: '2026-10-10T01:30:00Z', end_ts: '2026-10-10T02:30:00Z' } } };
+    mockCurrentBookings = [first, second];
+
+    renderBookings(<MyBookings currentView="worker-bookings" sellerProfile={{ role: 'worker', userId: 'provider-1' }} />,
+      '/worker/bookings?scope=incoming');
+
+    const card = within(screen.getByTestId('booking-card-job-one'));
+    expect(card.getByRole('alert')).toHaveTextContent('Schedule conflict with 1 other booking');
+    expect(card.getByText(/House painting for Bea Client/)).toBeVisible();
+    fireEvent.click(card.getByRole('button', { name: 'View conflicting booking' }));
+    expect(screen.getByRole('dialog')).toHaveTextContent('House painting');
   });
 
   test('forces client-only accounts onto purchased services', () => {

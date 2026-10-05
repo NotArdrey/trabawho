@@ -6,12 +6,14 @@ test.beforeEach(async ({ page }) => {
     </head><body><div id="root"></div><script type="module" src="/tests/e2e/fixtures/booking-card-actions-journey.tsx"></script></body></html>` }));
 });
 
-for (const width of [390, 768, 1280]) test(`booking actions stay organized at ${width}px`, async ({ page }) => {
+for (const width of [390, 768, 1024, 1280, 1440]) test(`booking actions stay organized at ${width}px`, async ({ page }) => {
   await page.setViewportSize({ width, height: 900 });
   await page.goto("/__booking-card-actions-journey");
   const pay = page.getByRole("button", { name: "Pay Balance" });
   const report = page.getByRole("button", { name: "Report a problem" });
   await expect(pay).toBeVisible();
+  await expect(page.getByText("Booked on")).toBeVisible();
+  await expect(page.getByText(/Oct 5, 2026.*1:07 PM PHT/)).toBeVisible();
   await expect(report).toBeVisible();
   await expect(report).toHaveClass(/bg-amber-50/);
   const reportColor = await report.evaluate((button) => getComputedStyle(button).backgroundColor);

@@ -25,15 +25,32 @@ const booking = {
 
 describe("BookingDetailsDialog", () => {
   it("organizes details into meaningful categories", () => {
-    render(<BookingDetailsDialog booking={booking} isProviderView={false} statusLabel="Payment Pending" onClose={vi.fn()} onMessage={vi.fn()} />);
+    render(<BookingDetailsDialog booking={{ ...booking, createdAt: "2026-10-05T05:07:00Z" }} isProviderView={false} statusLabel="Payment Pending" onClose={vi.fn()} onMessage={vi.fn()} />);
 
     expect(screen.getByRole("heading", { name: "Appointment" })).toBeVisible();
     expect(screen.getByRole("heading", { name: "Payment" })).toBeVisible();
     expect(screen.getByRole("heading", { name: "Service progress" })).toBeVisible();
     expect(screen.getByRole("heading", { name: "Payment reference" })).toBeVisible();
     expect(screen.getByText("Monday, September 28, 2026")).toBeVisible();
+    expect(screen.getByText("Visit date")).toBeVisible();
+    expect(screen.getByText("Visit time")).toBeVisible();
+    expect(screen.getByText(/Oct 5, 2026.*1:07 PM PHT/)).toBeVisible();
     expect(screen.getByText("PHP 997.50")).toBeVisible();
     expect(screen.getByRole("heading", { name: "Deposit required to confirm" })).toBeVisible();
+  });
+
+  it("shows the same original booking timestamp to the provider", () => {
+    render(<BookingDetailsDialog booking={{ ...booking, createdAt: "2026-10-05T05:07:00Z" }} isProviderView statusLabel="Payment Pending" onClose={vi.fn()} onMessage={vi.fn()} />);
+    expect(screen.getByText(/Oct 5, 2026.*1:07 PM PHT/)).toBeVisible();
+    expect(screen.getByText("Visit date")).toBeVisible();
+  });
+
+  it("does not present the creation date as a visit when no time is scheduled", () => {
+    render(<BookingDetailsDialog booking={{ ...booking, selectedSlot: undefined, requestDate: "2026-10-05",
+      createdAt: "2026-10-05T05:07:00Z" }} isProviderView={false} statusLabel="Payment Pending"
+      onClose={vi.fn()} onMessage={vi.fn()} />);
+    expect(screen.getByText("Booked on")).toBeVisible();
+    expect(screen.getByText("Not scheduled yet")).toBeVisible();
   });
 
   it("opens the booking conversation", async () => {

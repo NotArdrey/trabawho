@@ -313,7 +313,7 @@ export const mapBookingRowToUiBooking = (booking = {}, context = {}) => {
     clientPhoto: getProfilePhotoUrl(buyerProfile.profile_photo),
     serviceType: getServiceType(service, seller) || metadata.service_type || metadata.serviceType,
     status: uiStatus,
-    requestDate: formatDate(booking.created_at) || formatDate(nowIso()),
+    createdAt: booking.created_at || null, requestDate: formatDate(booking.created_at) || formatDate(nowIso()),
     description: service.short_description || service.description || metadata.description || seller.about || 'Service booking',
     quoteAmount: totalAmount,
     bookingMode,

@@ -31,6 +31,8 @@ import { BookingRequestReviewDialog } from '../components/BookingRequestReviewDi
 import { PaymentReturnStatus } from '../components/PaymentReturnStatus';
 import { BookingCardFooter } from '../components/BookingCardFooter';
 import { BookingCardSchedule } from '../components/BookingCardSchedule';
+import { findProviderBookingConflicts } from '../utils/providerBookingConflicts';
+import { useProviderReplacementSchedules } from '../hooks/useProviderReplacementSchedules';
 import { isShowcasePaymentReference } from '../utils/bookingPaymentPresentation';
 import { BookingTransactionActions } from '../components/BookingTransactionActions';
 import { BookingListFeedback } from '@/features/bookings/components/BookingListFeedback';
@@ -71,7 +73,6 @@ const isWorkerProfile = (profile = {}) => {
   if (WORKER_ROLE_VALUES.has(normalizedRole)) return true;
   return !normalizedRole && Boolean(profile?.isWorker || profile?.is_worker || profile?.sellerId || profile?.workerProfileId);
 };
-
 const isBookingNavigationMatch = (booking = {}, navigationId = null) => {
   if (!navigationId) return false;
   const targetId = String(navigationId);
@@ -492,13 +493,12 @@ const MyBookings = ({
   const ratingBooking = bookingListCtrl.bookings.find((b) => String(b.id) === String(ratingCtrl.ratingTargetId));
 
   const allBookings = useMemo(() => bookingListCtrl.bookings || [], [bookingListCtrl.bookings]);
-
+  const replacementSchedules = useProviderReplacementSchedules(allBookings, shouldLoadSellerBookings);
   const activeBookingsCount = useMemo(() => (
     allBookings.filter(
       (b) => !['Completed Service', 'Service Stopped', 'Cancelled', 'Cancelled (Cash)', 'Refunded'].includes(b.status)
     ).length
   ), [allBookings]);
-
   const completedBookingsCount = useMemo(() => (
     allBookings.filter(
       (b) => ['Completed Service', 'Service Stopped'].includes(b.status)
@@ -638,15 +638,15 @@ const MyBookings = ({
             onChooseSlot={() => { setSelectedBookingId(booking.id); setScheduleAction('checkout'); setUiState('slots'); }} />
 
           <BookingCardSchedule bookingId={booking.id} checkReplacement={['open', 'closed'].includes(booking.disputeStatus)}
-            originalDate={booking.selectedSlot?.date || booking.requestDate}
+            originalDate={booking.selectedSlot?.date}
             originalTime={formatBookingTimeRange(booking.selectedSlot?.timeBlock)}
-            paymentMethod={booking.paymentMethod} paymentReference={booking.paymentReference} />
+            paymentMethod={booking.paymentMethod} paymentReference={booking.paymentReference} conflicts={shouldLoadSellerBookings ? findProviderBookingConflicts(booking, allBookings, Date.now(), replacementSchedules) : []} onViewConflict={shouldLoadSellerBookings ? setDetailBookingId : undefined} />
         </div>
         <BookingCardFooter
           amountLabel={shouldLoadSellerBookings ? 'Booking amount' : 'Service price'}
           amount={formatPhp(booking.quoteAmount || booking.totalChargedAmount || 0)}
           emphasizeAmount={shouldLoadSellerBookings}
-          requestDate={shouldLoadSellerBookings ? booking.requestDate : undefined}
+          requestDate={shouldLoadSellerBookings ? booking.requestDate : undefined} createdAt={booking.createdAt}
           platformFee={!shouldLoadSellerBookings && booking.transactionFeeAmount > 0 ? formatPhp(booking.transactionFeeAmount) : undefined}
           totalPayment={!shouldLoadSellerBookings && booking.totalChargedAmount > 0 ? formatPhp(booking.totalChargedAmount) : undefined}
           demoPayment={isShowcasePaymentReference(booking.paymentReference)}
