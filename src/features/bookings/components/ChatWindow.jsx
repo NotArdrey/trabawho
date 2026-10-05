@@ -2,7 +2,7 @@ import { matchesBookingSearch } from '@/features/bookings/utils/bookingSearch';
 import React, { useMemo, useState, useEffect, useRef } from 'react';
 import { Archive, ArrowLeft, MessageCircle, MoreVertical, Trash2 } from 'lucide-react';
 import { SearchFilterBar } from '@/components/ui/search-filter-bar';
-import { ProviderQuoteComposer } from './ProviderQuoteComposer';
+import { ProviderQuoteAction } from './ProviderQuoteAction';
 import { BookingQuoteCard } from './BookingQuoteCard';
 import { QuoteResponseDialog } from './QuoteResponseDialog';
 import { getThemeTokens } from '../../../shared/styles/themeTokens';
@@ -69,8 +69,7 @@ const ChatWindow = ({ appTheme = 'light', booking, onApproveQuote, onRespondQuot
     && new Date(booking.activeQuote.expires_at).getTime() > Date.now()
     && !booking?.quoteApproved
     && !isClosedConversation
-    && !isRefundConversation
-    && !isQuoteRejected;
+    && !isRefundConversation;
   const shouldShowPriceAmount = hasSellerQuote || booking?.quoteApproved || !isRequestBooking;
   const priceDetailLabel = hasSellerQuote || booking?.quoteApproved
     ? 'Quote Amount'
@@ -574,8 +573,8 @@ const ChatWindow = ({ appTheme = 'light', booking, onApproveQuote, onRespondQuot
                   No saved messages yet.
                 </p>
                 <p style={{ margin: 0, fontSize: '13px', lineHeight: 1.5 }}>
-                  {isRequestBooking
-                    ? 'Send the worker your details. A price quote will appear here after the worker sends one.'
+                  {isRequestBooking && viewerRole === 'seller' ? 'Ask the client about the work, or create a quote with your price and proposed time.'
+                    : isRequestBooking ? 'Send the worker your details. A price quote will appear here after the worker sends one.'
                     : 'Send a message to coordinate this booking with the worker.'}
                 </p>
               </div>
@@ -595,9 +594,8 @@ const ChatWindow = ({ appTheme = 'light', booking, onApproveQuote, onRespondQuot
               isConfirmed={booking.scheduleStatus === 'confirmed'}
             />
           )}
-          {viewerRole === 'seller' && isRequestBooking && !isClosedConversation && !['held', 'confirmed', 'reschedule_requested'].includes(booking?.scheduleStatus) && !['partially_paid', 'paid', 'refund_pending', 'refunded'].includes(booking?.paymentStatus) && onProposeQuote && (
-            <ProviderQuoteComposer onSubmit={onProposeQuote} />
-          )}
+          <ProviderQuoteAction key={booking.id} booking={booking} viewerRole={viewerRole} isRequestBooking={isRequestBooking}
+            isClosedConversation={isClosedConversation} onProposeQuote={onProposeQuote} />
 
           {shouldShowSlotSelectionNotice && (
             <div style={styles.approvalStatus}>

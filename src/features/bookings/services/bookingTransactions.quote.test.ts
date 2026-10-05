@@ -36,4 +36,11 @@ describe("booking quote transactions", () => {
     await expect(respondBookingQuote({ bookingId: "booking-1", quoteVersion: 1, action: "decline", feedback: "" }))
       .rejects.toThrow("expired");
   });
+
+  it("explains missing quote schema without exposing database details", async () => {
+    rpc.mockResolvedValue({ data: null, error: { code: "42703", message: 'column "expires_at" does not exist' } });
+    await expect(proposeBookingQuote({ bookingId: "booking-1", amount: 950,
+      startAt: "2099-10-06T02:00:00Z", endAt: "2099-10-06T03:00:00Z", scopeSummary: "Garden cleanup" }))
+      .rejects.toThrow("booking database needs an update");
+  });
 });

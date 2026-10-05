@@ -1,5 +1,5 @@
 import { useId, useRef, useState, type FormEvent } from "react";
-import { CalendarClock, ChevronLeft, Send } from "lucide-react";
+import { CalendarClock, ChevronLeft, Send, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -79,8 +79,9 @@ export function ProviderQuoteComposer({ initialAmount = "", onCancel, onSubmit }
   return <Card className="mx-4 mb-4 border-primary/20 bg-primary/5">
     <CardHeader className="flex flex-row items-start gap-3 space-y-0 pb-3">
       <span className="flex size-11 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground"><CalendarClock className="size-5" aria-hidden="true" /></span>
-      <div><CardTitle className="text-base">{isReviewing ? "Review your offer" : "Send price and schedule"}</CardTitle>
+      <div className="min-w-0 flex-1"><CardTitle className="text-base">{isReviewing ? "Review your offer" : "Send price and schedule"}</CardTitle>
         <p className="mt-1 text-sm text-muted-foreground">The client reviews this offer before choosing whether to reserve and pay. Sending it does not hold the time.</p></div>
+      {onCancel && <Button type="button" variant="ghost" size="icon" className="shrink-0" aria-label="Close quote editor" onClick={onCancel} disabled={isSaving}><X aria-hidden="true" /></Button>}
     </CardHeader>
     <CardContent>
       {isReviewing ? <div className="grid gap-3" aria-live="polite">
