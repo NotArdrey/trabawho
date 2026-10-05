@@ -577,6 +577,16 @@ Priority: P1
 
 Priority: P0 before live payments
 
+The pending `20261006115000_queue_pending_refund_reviews.sql` migration closes a
+test-workflow gap: approved paid cancellations and payments received after a
+checkout hold expires now create a system-origin support case atomically when
+the booking becomes `refund_pending`. It backfills existing pending exceptions
+without duplicating active cases. Admins can review verified test payments and
+use the existing simulated-refund decision; no PayMongo money is claimed to be
+returned. The migration is local until separately deployed and rehearsed with
+both cancellation and late-payment bookings. Manual or unverified receipts
+remain blocked from refund approval and require support investigation.
+
 - [ ] Add versioned cancellation policies and snapshot the applicable policy on
       the booking.
 - [ ] Calculate refund and cancellation-fee amounts on the server.

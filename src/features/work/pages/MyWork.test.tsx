@@ -8,7 +8,7 @@ const state = vi.hoisted(() => ({ transactions: [] as WorkPaymentTransaction[] }
 
 vi.mock("@/shared/components/DashboardNavigation", () => ({ default: () => null }));
 vi.mock("../hooks", () => {
-  const profile = { fullName: "Arnold Lim Castillo", serviceType: "Plumbing Leak Repair", fixedPrice: 800 };
+  const profile = { fullName: "Arnold Lim Castillo", serviceType: "Plumbing Leak Repair", fixedPrice: 800, raw: { id: 7 } };
   const services = [profile];
   return {
     useWorkProfileServices: () => ({
@@ -71,5 +71,16 @@ describe("MyWork booking summary", () => {
   it("shows zero when there are no bookings", () => {
     render(<MyWork {...props} />);
     expectCount("Completed", 0);
+  });
+
+  it("keeps service actions in the manager when only one listing exists", () => {
+    render(<MyWork {...props} />);
+
+    const manager = screen.getByRole("region", { name: "Manage your services" });
+    expect(within(manager).getByRole("button", { name: "Edit service" })).toBeVisible();
+    expect(within(manager).getByRole("button", { name: "Delete service" })).toBeVisible();
+    expect(within(manager).queryByRole("combobox")).not.toBeInTheDocument();
+    expect(within(screen.getByRole("region", { name: "Current service summary" }))
+      .getByRole("heading", { name: "Arnold Lim Castillo" })).toBeVisible();
   });
 });

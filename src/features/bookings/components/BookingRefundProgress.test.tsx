@@ -22,6 +22,13 @@ describe("dispute refund progress", () => {
     expect(screen.queryByText("Refund review")).not.toBeInTheDocument();
     expect(hasVerifiedRefundPayment).not.toHaveBeenCalled();
   });
+  it("shows a system-queued payment exception without asking the client to request it again", async () => {
+    render(<BookingRefundProgress {...props} systemQueued />);
+    expect(await screen.findByText("Support review queued")).toBeVisible();
+    expect(screen.getByText(/No refund has been completed/)).toBeVisible();
+    expect(screen.queryByRole("button", { name: "Request refund review" })).not.toBeInTheDocument();
+    expect(hasVerifiedRefundPayment).not.toHaveBeenCalled();
+  });
   it("holds the request while payment verification cannot be checked and allows retry", async () => {
     vi.mocked(hasVerifiedRefundPayment).mockRejectedValueOnce(new Error("offline")).mockResolvedValueOnce(true);
     render(<BookingRefundProgress {...props} />);

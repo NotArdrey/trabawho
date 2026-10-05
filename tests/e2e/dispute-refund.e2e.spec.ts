@@ -62,7 +62,7 @@ test("a paid booking without a provider-verified attempt does not offer refund r
 test("provider cannot start work with an outstanding balance and stale paid label", async ({ page }) => {
   await page.goto("/__refund-journey?role=provider");
   await expect(page.getByText(/Do not begin until full payment is verified/)).toBeVisible();
-  await expect(page.getByRole("button", { name: "Start work" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Start work" })).toBeDisabled();
   await expect(page.getByRole("button", { name: "Submit delivery" })).toHaveCount(0);
 });
 test("admin refund requires an evidence reason and explicit confirmation", async ({ page }) => {

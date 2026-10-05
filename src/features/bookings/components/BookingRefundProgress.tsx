@@ -11,14 +11,14 @@ export const refundStatusLabels: Record<BookingRefund["status"], string> = {
   needs_review: "Refund needs payment review", simulated: "Sandbox refund simulated — no money returned",
 };
 
-export function BookingRefundProgress({ bookingId, caseId, requestedAt, canRequest, replacementAccepted = false, demoBooking = false, onChanged }: {
+export function BookingRefundProgress({ bookingId, caseId, requestedAt, canRequest, replacementAccepted = false, demoBooking = false, systemQueued = false, onChanged }: {
   bookingId: string; caseId: string; requestedAt?: string | null; canRequest: boolean;
-  replacementAccepted?: boolean; demoBooking?: boolean; onChanged: () => void;
+  replacementAccepted?: boolean; demoBooking?: boolean; systemQueued?: boolean; onChanged: () => void;
 }) {
   const flow = useBookingRefunds(bookingId, caseId, onChanged);
   const [verification, setVerification] = useState<{ bookingId: string; revision: number; state: "verified" | "missing" | "error" } | null>(null);
   const [verificationRevision, setVerificationRevision] = useState(0);
-  const requestCandidate = canRequest && !demoBooking && !replacementAccepted && !requestedAt && !flow.refunds.length;
+  const requestCandidate = canRequest && !systemQueued && !demoBooking && !replacementAccepted && !requestedAt && !flow.refunds.length;
   useEffect(() => {
     if (!requestCandidate) return;
     let active = true;
@@ -31,13 +31,14 @@ export function BookingRefundProgress({ bookingId, caseId, requestedAt, canReque
   const allSent = flow.refunds.length > 0 && flow.refunds.every((refund) => refund.status === "succeeded");
   const allSimulated = flow.refunds.length > 0 && flow.refunds.every((refund) => refund.status === "simulated");
   const sentTotal = flow.refunds.reduce((total, refund) => total + (refund.status === "succeeded" ? refund.amount : 0), 0);
-  if (!flow.error && !requestedAt && !flow.refunds.length && (demoBooking || !canRequest || verificationState === "missing")) return null;
+  if (!systemQueued && !flow.error && !requestedAt && !flow.refunds.length && (demoBooking || !canRequest || verificationState === "missing")) return null;
   if (requestCandidate && verificationState === "checking" && !flow.error) return null;
   if (replacementAccepted && !requestedAt && !flow.refunds.length && !flow.error) return null;
-  return <WorkflowPanel icon={CreditCard} title="Refund review" description="Payment review and refund progress" tone="highlight" status={<span className="rounded-full bg-card px-3 py-1 text-xs font-medium text-brand-highlight-foreground">{flow.loading || requestCandidate && verificationState === "checking" ? "Checking payment" : allSimulated ? "Test refund simulated" : allSent ? "Refund sent" : flow.refunds.length ? "Refund progress" : requestedAt ? "Review requested" : flow.error || requestCandidate && verificationState === "error" ? "Check unavailable" : "Not requested"}</span>} contentClassName="grid min-w-0 gap-3 p-4 text-sm sm:p-5">
+  return <WorkflowPanel icon={CreditCard} title="Refund review" description="Payment review and refund progress" tone="highlight" status={<span className="rounded-full bg-card px-3 py-1 text-xs font-medium text-brand-highlight-foreground">{flow.loading || requestCandidate && verificationState === "checking" ? "Checking payment" : allSimulated ? "Test refund simulated" : allSent ? "Refund sent" : flow.refunds.length ? "Refund progress" : requestedAt ? "Review requested" : systemQueued ? "Support review queued" : flow.error || requestCandidate && verificationState === "error" ? "Check unavailable" : "Not requested"}</span>} contentClassName="grid min-w-0 gap-3 p-4 text-sm sm:p-5">
     {flow.loading && <p role="status">Loading refund status...</p>}
     {requestedAt && !flow.refunds.length && <p>Refund review requested. Waiting for support approval.</p>}
-    {!demoBooking && !replacementAccepted && !requestedAt && !flow.refunds.length && (!requestCandidate || verificationState === "verified") && <p>Support can review whether a refund is appropriate. Reporting a problem does not return money; a verified payment and support approval are required.</p>}
+    {systemQueued && !requestedAt && !flow.refunds.length && <p>Support is reviewing this payment exception. No refund has been completed. A verified payment is required before approval.</p>}
+    {!systemQueued && !demoBooking && !replacementAccepted && !requestedAt && !flow.refunds.length && (!requestCandidate || verificationState === "verified") && <p>Support can review whether a refund is appropriate. Reporting a problem does not return money; a verified payment and support approval are required.</p>}
     {requestCandidate && verificationState === "error" && <div role="alert" className="grid gap-2"><p>Payment verification is unavailable right now. Refund review is paused until it can be checked.</p><Button type="button" variant="outline" className="w-fit" onClick={() => setVerificationRevision((value) => value + 1)}><RefreshCw aria-hidden="true" />Retry payment check</Button></div>}
     {allSent && flow.refunds.length > 1 && <p className="font-semibold text-foreground">{flow.refunds[0].currency} {sentTotal.toLocaleString("en-PH", { minimumFractionDigits: 2 })} sent across {flow.refunds.length} refunds.</p>}
     {allSimulated && <p className="rounded-md border border-amber-300 bg-amber-50 p-3 font-medium text-amber-950 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-100">This test-only refund completed the case process. PayMongo did not return real money.</p>}

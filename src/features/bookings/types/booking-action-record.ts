@@ -7,6 +7,7 @@ export interface BookingActionRecord extends BookingFunding {
   deliveryStatus?: string;
   disputeStatus?: string;
   scheduleStatus?: string;
+  cancellationStatus?: string;
   scheduleVersion?: number;
   workStartedAt?: string | null;
   appointmentStartAt?: string | null;

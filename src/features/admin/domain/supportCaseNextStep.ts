@@ -3,6 +3,7 @@ import type { SupportCase } from "@/features/admin/services/adminSupportService"
 export function supportCaseNextStep(item: SupportCase): string {
   if (item.pendingReviewCount) return "Further review requested · admin decision needed";
   if (item.status === "closed") return "Case closed";
+  if (item.case_type === "refund_review") return "Payment exception needs refund review";
   if (item.case_type === "provider_no_show") {
     if (item.escalated_at) return "Provider response overdue · admin decision needed";
     if (item.resolution_status === "awaiting_provider" && item.response_due_at && new Date(item.response_due_at).getTime() <= Date.now()) return "Provider reply overdue · support review needed";

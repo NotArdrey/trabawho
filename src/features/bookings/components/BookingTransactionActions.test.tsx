@@ -83,14 +83,33 @@ describe("BookingTransactionActions", () => {
   it("blocks work controls while the balance is unpaid", () => {
     render(<BookingTransactionActions booking={{ ...booking, paymentStatus: "partially_paid" }} viewerRole="provider" onUpdated={vi.fn()} />);
     expect(screen.getByText(/waiting for client balance/i)).toBeVisible();
-    expect(screen.queryByRole("button", { name: "Start work" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Start work" })).toBeDisabled();
     expect(screen.queryByRole("button", { name: "Submit delivery" })).not.toBeInTheDocument();
   });
 
   it("blocks a stale paid label when the numeric balance remains due", () => {
     render(<BookingTransactionActions booking={{ ...booking, balanceDueAmount: 400, amountPaid: 464, totalChargedAmount: 864 }} viewerRole="provider" onUpdated={vi.fn()} />);
     expect(screen.getByText(/Do not begin until full payment is verified/)).toBeVisible();
-    expect(screen.queryByRole("button", { name: "Start work" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Start work" })).toBeDisabled();
+  });
+
+  it("shows a disabled start button and its opening time before a paid appointment", () => {
+    const appointmentStartAt = new Date(Date.now() + 2 * 60 * 60_000).toISOString();
+    render(<BookingTransactionActions booking={{ ...booking, appointmentStartAt }} viewerRole="provider" onUpdated={vi.fn()} />);
+
+    const start = screen.getByRole("button", { name: "Start work" });
+    expect(start).toBeDisabled();
+    expect(start).toHaveAccessibleDescription(/Start work becomes available.*30 minutes before the appointment/);
+    fireEvent.click(start);
+    expect(startBookingWork).not.toHaveBeenCalled();
+    expect(screen.queryByRole("dialog", { name: "Start this work?" })).not.toBeInTheDocument();
+  });
+
+  it("enables start work once the appointment is within 30 minutes", () => {
+    const appointmentStartAt = new Date(Date.now() + 20 * 60_000).toISOString();
+    render(<BookingTransactionActions booking={{ ...booking, appointmentStartAt }} viewerRole="provider" onUpdated={vi.fn()} />);
+
+    expect(screen.getByRole("button", { name: "Start work" })).toBeEnabled();
   });
 
   it("keeps provider workflow and report actions in the card action row with a caution style", () => {
