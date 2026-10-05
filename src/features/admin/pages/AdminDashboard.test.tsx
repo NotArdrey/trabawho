@@ -41,11 +41,20 @@ describe("AdminDashboard", () => {
     expect(screen.getByText("Disabled accounts")).toBeInTheDocument();
     expect(screen.queryByText("Admin Live")).not.toBeInTheDocument();
     expect(screen.queryByText("Flagged Comments")).not.toBeInTheDocument();
-    expect(screen.getByRole("region", { name: "Analytics" })).toBeInTheDocument();
+    expect(screen.queryByRole("region", { name: "Analytics" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /explore analytics/i })).toBeInTheDocument();
+    expect(screen.getByText("Active accounts")).toBeInTheDocument();
     const workspace = within(within(screen.getByRole("main")).getByRole("region", { name: "Workspace" }));
-    for (const label of ["Review accounts", "View reviews", "View logs"]) {
-      expect(workspace.getByRole("button", { name: new RegExp(label) })).toHaveClass("bg-primary");
+    for (const label of ["Accounts", "Reviews", "Audit logs", "Identity reviews", "Support cases"]) {
+      expect(workspace.getByRole("button", { name: new RegExp(label) })).toBeInTheDocument();
     }
+  });
+
+  test("keeps trends on the dedicated analytics page", () => {
+    render(<AdminDashboard />);
+    fireEvent.click(screen.getByRole("button", { name: /explore analytics/i }));
+    expect(screen.getByRole("region", { name: "Analytics" })).toBeInTheDocument();
+    expect(screen.queryByText("Account snapshot")).not.toBeInTheDocument();
   });
 
   test("navigates existing screens and loads audit history", () => {

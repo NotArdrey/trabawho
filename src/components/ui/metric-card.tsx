@@ -3,7 +3,7 @@ import { ArrowUpRight, type LucideIcon } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 
-type MetricCardTone = "blue" | "sky" | "green" | "orange" | "neutral";
+type MetricCardTone = "blue" | "sky" | "green" | "orange" | "red" | "neutral";
 
 interface MetricCardProps {
   actionLabel?: string;
@@ -35,6 +35,11 @@ const toneStyles: Record<MetricCardTone, { card: string; icon: string; watermark
     card: "bg-brand-highlight-soft",
     icon: "bg-brand-highlight-soft text-brand-highlight-foreground",
     watermark: "text-brand-highlight",
+  },
+  red: {
+    card: "bg-destructive/5",
+    icon: "bg-destructive/10 text-destructive",
+    watermark: "text-destructive",
   },
   neutral: {
     card: "bg-card",
