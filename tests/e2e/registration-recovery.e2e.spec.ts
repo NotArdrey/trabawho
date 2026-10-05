@@ -66,7 +66,8 @@ test('a rejected cached login session restores through recovery for the same acc
   let rejectedSession = false;
   await page.route('**/functions/v1/account-registration', async route => {
     if (route.request().method() === 'OPTIONS') return route.fulfill({ status: 204, headers: corsHeaders });
-    if (!route.request().postDataJSON().userId) {
+    const payload: unknown = route.request().postDataJSON();
+    if (!payload || typeof payload !== 'object' || !('userId' in payload) || !payload.userId) {
       rejectedSession = true;
       return route.fulfill({ status: 401, headers: corsHeaders, json: { error: 'Sign in to continue your registration.' } });
     }
