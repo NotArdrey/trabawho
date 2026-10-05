@@ -60,6 +60,7 @@ interface PaymentWarrantyPolicy {
 }
 
 export interface PaymentSelectionDetails {
+  testCheckout?: boolean;
   serviceAddress?: ServiceAddress;
   serviceAmount: number;
   transactionFeeRate: number;
@@ -144,12 +145,14 @@ export default function PaymentModal({
   const baseAmount = Number(booking.quoteAmount || 0) || 0;
   const pricing = calculateBookingPricing(baseAmount, transactionFeeRate ?? booking.transactionFeeRate ?? undefined);
   const isPayingRemainingBalance = booking.paymentStatus === "partially_paid";
+  const showHostedCheckoutAction = !import.meta.env.DEV || !isPayingRemainingBalance;
   const [selectedMethod, setSelectedMethod] = useState<PaymentMethod | null>(allowsPayMongo ? "paymongo-card" : null);
   const [paymentPlan, setPaymentPlan] = useState<PaymentPlan>(isRequestBooking && booking.paymentPlan !== "downpayment" ? "full" : "downpayment");
   const processingRef = useRef(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [submitError, setSubmitError] = useState("");
   const [reviewingTerms, setReviewingTerms] = useState(false);
+  const [selectedTestCheckout, setSelectedTestCheckout] = useState(false);
   const [serviceAddress, setServiceAddress] = useState(emptyServiceAddress);
 
   const amountDueNow = isPayingRemainingBalance
@@ -167,7 +170,7 @@ export default function PaymentModal({
     : listingPolicy?.enabled ? listingPolicy.duration_days : null;
   const warrantySummary = booking.warrantyCoverageSummary || listingPolicy?.coverage_summary;
 
-  const handleConfirmPayment = async () => {
+  const handleConfirmPayment = async (testCheckout = false) => {
     if (processingRef.current) return;
     if (collectServiceAddress && !serviceAddressValid(serviceAddress)) {
       setSubmitError('Complete the province, city, barangay, and specific service address.'); return;
@@ -181,6 +184,7 @@ export default function PaymentModal({
       processingRef.current = true;
       setIsProcessing(true);
       const paymentDetails: PaymentSelectionDetails = {
+        testCheckout,
         serviceAddress: collectServiceAddress ? serviceAddress : undefined,
         serviceAmount: baseAmount,
         transactionFeeRate: pricing.transactionFeeRate,
@@ -204,6 +208,12 @@ export default function PaymentModal({
     }
   };
 
+  const beginPayment = (testCheckout: boolean) => {
+    setSelectedTestCheckout(testCheckout);
+    if (requireBookingTerms) setReviewingTerms(true);
+    else void handleConfirmPayment(testCheckout);
+  };
+
   return (
     <>
     <Dialog open={!reviewingTerms} onOpenChange={(open) => { if (!open && !isProcessing) onCancel(); }}>
@@ -215,7 +225,9 @@ export default function PaymentModal({
             </span>
             <div>
               <DialogTitle className="text-2xl">{isProcessing ? "Reserving your time" : title}</DialogTitle>
-              <DialogDescription className="mt-1.5 leading-5">{isProcessing ? "Protecting the selected time before opening PayMongo." : resolvedSubtitle}</DialogDescription>
+              <DialogDescription className="mt-1.5 leading-5">{isProcessing
+                ? selectedTestCheckout ? "Completing a real PayMongo sandbox payment with the test card. No real money moves." : "Protecting the selected time before opening PayMongo."
+                : resolvedSubtitle}</DialogDescription>
             </div>
           </div>
         </DialogHeader>
@@ -226,7 +238,9 @@ export default function PaymentModal({
               <LoaderCircle className="size-8 animate-spin" aria-hidden="true" />
             </span>
             <h3 className="mt-5 text-xl font-bold text-foreground">Reserving your time</h3>
-            <p className="mt-2 max-w-sm text-sm leading-6 text-muted-foreground">Keep this window open while we reserve the schedule and prepare secure card checkout.</p>
+            <p className="mt-2 max-w-sm text-sm leading-6 text-muted-foreground">{selectedTestCheckout
+              ? "Keep this window open while PayMongo processes the sandbox test card. The booking updates only after provider verification."
+              : "Keep this window open while we reserve the schedule and prepare secure card checkout."}</p>
           </div>
         ) : (
           <>
@@ -296,6 +310,8 @@ export default function PaymentModal({
               <p className="rounded-xl bg-destructive/10 p-4 text-sm font-medium text-destructive">No payment method is available for this booking.</p>
             )}
 
+            {import.meta.env.DEV && <p className="mt-3 text-sm text-muted-foreground">Testing locally? Use the one-click sandbox button below to pay with PayMongo&apos;s test card without filling its form. No real money moves.</p>}
+
           </section>
 
           <section className="mt-2 overflow-hidden rounded-xl bg-muted/40" aria-labelledby="payment-breakdown-heading">
@@ -324,10 +340,12 @@ export default function PaymentModal({
             <p className="mt-0.5 text-xl font-extrabold text-emerald-600 dark:text-emerald-400">{formatPhp(amountDueNow)}</p>
           </div>
           <Button type="button" variant="outline" onClick={onCancel} disabled={isProcessing}>Cancel</Button>
-          <Button type="button" onClick={() => { if (requireBookingTerms) setReviewingTerms(true); else void handleConfirmPayment(); }} disabled={!selectedMethod} isLoading={isProcessing}>
+          {showHostedCheckoutAction && <Button type="button" variant={import.meta.env.DEV ? "outline" : "primary"} onClick={() => beginPayment(false)} disabled={!selectedMethod} isLoading={isProcessing}>
             {isProcessing ? <LoaderCircle className="animate-spin" aria-hidden="true" /> : <Send aria-hidden="true" />}
             {isProcessing ? "Opening checkout..." : confirmLabel}
-          </Button>
+          </Button>}
+          {import.meta.env.DEV && <Button type="button" className={showHostedCheckoutAction ? "col-span-2" : "w-full sm:w-auto"} disabled={!selectedMethod} isLoading={isProcessing}
+            onClick={() => beginPayment(true)}><CreditCard aria-hidden="true" />One-click sandbox test payment</Button>}
         </DialogFooter>
           </>
         )}
@@ -335,7 +353,7 @@ export default function PaymentModal({
     </Dialog>
     <BookingTermsModal isOpen={reviewingTerms} onCancel={() => setReviewingTerms(false)} onConfirm={() => {
       setReviewingTerms(false);
-      void handleConfirmPayment();
+      void handleConfirmPayment(selectedTestCheckout);
     }} />
     </>
   );

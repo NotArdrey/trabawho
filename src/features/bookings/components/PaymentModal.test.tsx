@@ -58,6 +58,14 @@ describe("PaymentModal", () => {
     expect(screen.getByRole("button", { name: /reserve and continue/i })).toBeInTheDocument();
   });
 
+  it("offers a form-free PayMongo sandbox path only through the explicit test action", async () => {
+    const user = userEvent.setup();
+    const onSelectPayment = vi.fn().mockResolvedValue(undefined);
+    render(<PaymentModal booking={booking} onSelectPayment={onSelectPayment} onCancel={vi.fn()} />);
+    await user.click(screen.getByRole("button", { name: "One-click sandbox test payment" }));
+    expect(onSelectPayment).toHaveBeenCalledWith("paymongo-card", expect.objectContaining({ testCheckout: true }));
+  });
+
   it("supports canceling from the footer", async () => {
     const user = userEvent.setup();
     const onCancel = vi.fn();
@@ -70,12 +78,14 @@ describe("PaymentModal", () => {
   it("collects only the remaining service balance after the deposit and fee were paid", async () => {
     const user = userEvent.setup();
     const onSelectPayment = vi.fn().mockResolvedValue(undefined);
-    render(<PaymentModal booking={{ ...booking, quoteAmount: 1200, paymentStatus: "partially_paid", balanceDueAmount: 600, transactionFeeRate: 0.05 }} onSelectPayment={onSelectPayment} onCancel={vi.fn()} />);
+    render(<PaymentModal booking={{ ...booking, quoteAmount: 1200, paymentStatus: "partially_paid", balanceDueAmount: 600, transactionFeeRate: 0.05 }}
+      confirmLabel="Pay remaining balance" onSelectPayment={onSelectPayment} onCancel={vi.fn()} />);
     expect(screen.getAllByText("PHP 600", { exact: true })).toHaveLength(2);
     expect(screen.queryByText("Deposit and platform fee")).not.toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: /reserve and continue/i }));
+    expect(screen.queryByRole("button", { name: "Pay remaining balance" })).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "One-click sandbox test payment" }));
     expect(onSelectPayment).toHaveBeenCalledWith("paymongo-card", expect.objectContaining({
-      paymentAttemptAmount: 600, remainingBalanceAmount: 0, totalChargedAmount: 1260,
+      paymentAttemptAmount: 600, remainingBalanceAmount: 0, totalChargedAmount: 1260, testCheckout: true,
     }));
   });
 

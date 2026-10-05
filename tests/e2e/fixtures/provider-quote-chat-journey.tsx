@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { BrowserRouter } from "react-router-dom";
 
@@ -8,8 +8,18 @@ import "@/styles/globals.css";
 import "@/shared/styles/modern.css";
 
 function Journey() {
+  const isStandalone = new URLSearchParams(window.location.search).has("standalone");
+  const shouldRerender = new URLSearchParams(window.location.search).has("rerender");
+  const [tick, setTick] = useState(0);
+  useEffect(() => {
+    if (!shouldRerender) return;
+    const timer = window.setInterval(() => setTick((current) => current + 1), 100);
+    return () => window.clearInterval(timer);
+  }, [shouldRerender]);
   const [booking, setBooking] = useState({
-    id: "booking-1", bookingMode: "calendar-only", isRequestBooking: true,
+    id: isStandalone ? "conversation:7b0b479a-4c4e-4dac-b061-dd3cc520bb35" : "booking-1",
+    bookingMode: isStandalone ? "conversation" : "calendar-only", isStandaloneChat: isStandalone,
+    isRequestBooking: true,
     workerName: "Sofia Provider", clientName: "Ana Client", serviceType: "Garden Cleanup",
     status: "Negotiating", scheduleStatus: "unscheduled", paymentStatus: "unpaid",
     quoteAmount: 0, quoteApproved: false, raw: { booking: { status: "pending" } },
@@ -26,9 +36,14 @@ function Journey() {
         proposed_end_ts: input.endAt, expires_at: "2099-10-07T00:00:00Z" } }));
     return Promise.resolve();
   };
+  const bookings = new URLSearchParams(window.location.search).has("many")
+    ? [booking, ...Array.from({ length: 9 }, (_, index) => ({
+      ...booking, id: `booking-${index + 2}`, clientName: `Client ${index + 2}`,
+    }))]
+    : [booking];
 
-  return <main className="booking-chat-page">
-    <ChatWindow booking={booking} bookings={[booking]} viewerRole="seller" selectedBookingId={booking.id}
+  return <main className="booking-chat-page" data-render-tick={tick}>
+    <ChatWindow booking={booking} bookings={bookings} viewerRole="seller" selectedBookingId={booking.id}
       onSelectBooking={() => undefined} onProposeQuote={sendQuote} />
   </main>;
 }

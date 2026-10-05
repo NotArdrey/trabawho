@@ -3,10 +3,49 @@ import { expect, test } from "@playwright/test";
 const attempt = "b93376bb-8ed9-4c03-a754-6cd512e32ff7";
 const gig = { id: 83, title: "Handyman Home Repairs", metadata: {} };
 test.beforeEach(async ({ page }) => {
+  await page.route("**/__trabawho_paymongo_sandbox_ready", (route) => route.fulfill({ json: { status: "ready" } }));
   await page.route("**/__boost-journey*", (route) => route.fulfill({ contentType: "text/html", body: `<html><head><meta name="viewport" content="width=device-width, initial-scale=1" />
     <script type="module">import RefreshRuntime from '/@react-refresh';RefreshRuntime.injectIntoGlobalHook(window);window.$RefreshReg$=()=>{};window.$RefreshSig$=()=>(type)=>type;window.__vite_plugin_react_preamble_installed__=true;</script>
     </head><body><div id="root"></div><script type="module" src="/tests/e2e/fixtures/gig-boost-journey.tsx"></script></body></html>` }));
   await page.route("**/rest/v1/services?*", (route) => route.fulfill({ json: [gig] }));
+});
+
+test("one-click sandbox requires local setup before creating a boost checkout", async ({ page }) => {
+  let checkoutCalls = 0;
+  await page.route("**/__trabawho_paymongo_sandbox_ready", (route) => route.fulfill({
+    status: 503, json: { error: "Add PAYMONGO_SECRET_KEY=sk_test_... to the ignored .env.local, then restart the dev server." },
+  }));
+  await page.route("**/functions/v1/create-paymongo-boost-checkout", (route) => {
+    checkoutCalls += 1;
+    return route.fulfill({ status: 500 });
+  });
+  await page.goto("/__boost-journey");
+  await page.getByRole("button", { name: "Review boost payment" }).click();
+  await page.getByRole("checkbox").check();
+  await page.getByRole("button", { name: "One-click sandbox test payment" }).click();
+  await expect(page.getByRole("alert")).toContainText("PAYMONGO_SECRET_KEY");
+  expect(checkoutCalls).toBe(0);
+});
+
+test("one-click sandbox boost payment skips the hosted form and returns for verification", async ({ page }) => {
+  let shortcutCalls = 0;
+  await page.route("**/functions/v1/create-paymongo-boost-checkout", (route) => route.fulfill({ json: {
+    checkoutUrl: "https://checkout.paymongo.com/opaque-boost-token#public-key", checkoutSessionId: "cs_boost123", attemptId: attempt,
+  } }));
+  await page.route("**/__trabawho_paymongo_sandbox_checkout", (route) => {
+    shortcutCalls += 1;
+    expect(route.request().postDataJSON()).toEqual({
+      checkoutUrl: "https://checkout.paymongo.com/opaque-boost-token#public-key", checkoutSessionId: "cs_boost123",
+    });
+    return route.fulfill({ json: { returnUrl: new URL(`/profile?boostPayment=verifying&boostAttempt=${attempt}`, page.url()).toString() } });
+  });
+  await page.route("**/profile?boostPayment=verifying*", (route) => route.fulfill({ contentType: "text/html", body: "<h1>Verifying boost payment</h1>" }));
+  await page.goto("/__boost-journey");
+  await page.getByRole("button", { name: "Review boost payment" }).click();
+  await page.getByRole("checkbox").check();
+  await page.getByRole("button", { name: "One-click sandbox test payment" }).click();
+  await expect(page.getByRole("heading", { name: "Verifying boost payment" })).toBeVisible();
+  expect(shortcutCalls).toBe(1);
 });
 
 for (const width of [390, 768, 1024, 1280, 1440]) {

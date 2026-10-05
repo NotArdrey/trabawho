@@ -18,4 +18,16 @@ describe("BoostActivationDialog", () => {
     await user.click(screen.getByRole("button", { name: "Continue to PayMongo" }));
     expect(onConfirm).toHaveBeenCalledOnce();
   });
+
+  it("requires agreement before one-click sandbox testing", async () => {
+    const user = userEvent.setup();
+    const onTestConfirm = vi.fn();
+    render(<BoostActivationDialog totalPrice={350} days={7} isOpen isSaving={false}
+      onCancel={vi.fn()} onConfirm={vi.fn()} onTestConfirm={onTestConfirm} serviceTitle="Garden Cleanup" />);
+    const testButton = screen.getByRole("button", { name: "One-click sandbox test payment" });
+    expect(testButton).toBeDisabled();
+    await user.click(screen.getByRole("checkbox"));
+    await user.click(testButton);
+    expect(onTestConfirm).toHaveBeenCalledOnce();
+  });
 });

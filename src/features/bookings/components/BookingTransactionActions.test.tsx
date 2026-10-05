@@ -2,10 +2,12 @@ import { fireEvent, render, screen, waitFor, within } from "@testing-library/rea
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { performBookingLifecycleAction } from "@/features/bookings/services/bookingLifecycle";
+import { fetchBookingById } from "@/features/bookings/services/bookingService";
 import { deliverBookingWithEvidence, getBookingSupportCase, openBookingSupportCase, respondToRepairClaim, startBookingWork } from "@/features/bookings/services/bookingTransactions";
 import { BookingTransactionActions } from "./BookingTransactionActions";
 
 vi.mock("@/features/bookings/services/bookingLifecycle", () => ({ performBookingLifecycleAction: vi.fn() }));
+vi.mock("@/features/bookings/services/bookingService", () => ({ fetchBookingById: vi.fn() }));
 vi.mock("@/features/bookings/services/bookingTransactions", () => ({
   startBookingWork: vi.fn(), deliverBookingWithEvidence: vi.fn(),
   openBookingSupportCase: vi.fn(), getBookingDeliveryEvidence: vi.fn(), getBookingSupportCase: vi.fn(),
@@ -13,10 +15,9 @@ vi.mock("@/features/bookings/services/bookingTransactions", () => ({
 }));
 
 vi.mock("./BookingRefundProgress", () => ({ BookingRefundProgress: () => null }));
-vi.mock("./BookingReplacementSchedule", () => ({ BookingReplacementSchedule: ({ onScheduleChange }: {
-  onScheduleChange?: (schedule: { bookingId: string; caseId: string; status: "accepted"; startAt: string; endAt: string }) => void;
-}) => <button type="button" onClick={() => onScheduleChange?.({ bookingId: "booking-1", caseId: "case-1", status: "accepted",
-  startAt: "2026-10-05T09:00:00+08:00", endAt: "2026-10-05T10:00:00+08:00" })}>Simulate confirmed replacement</button> }));
+vi.mock("./ReplacementVisitActions", () => ({ ReplacementVisitActions: ({ viewerRole, funded, onChanged }: {
+  viewerRole: "client" | "provider"; funded: boolean; onChanged: () => void;
+}) => <button type="button" data-funded={funded} onClick={onChanged}>Replacement workflow for {viewerRole}</button> }));
 
 const booking = {
   id: "booking-1", paymentStatus: "paid", scheduleStatus: "confirmed",
@@ -58,16 +59,25 @@ describe("BookingTransactionActions", () => {
     await waitFor(() => expect(screen.queryByText("Support case open")).not.toBeInTheDocument());
   });
 
-  it("uses the confirmed schedule when the case status has not caught up", async () => {
+  it("shows the replacement workflow on the booking card and refreshes the booking", async () => {
     vi.mocked(getBookingSupportCase).mockResolvedValue({
       ...emptyRework, id: "case-1", case_type: "provider_no_show", reason: "The provider missed the visit.",
-      policy_route: "support_review", policy_reason: null, status: "under_review", created_at: new Date().toISOString(),
+      policy_route: "support_review", policy_reason: null, status: "under_review",
+      resolution_status: "replacement_accepted", created_at: new Date().toISOString(),
       provider_response_action: null, provider_response_text: null, provider_responded_at: null,
     });
-    render(<BookingTransactionActions booking={{ ...booking, disputeStatus: "open" }} viewerRole="client" onUpdated={vi.fn()} />);
-    expect(await screen.findByText("Support case open")).toBeVisible();
-    fireEvent.click(screen.getByRole("button", { name: "Simulate confirmed replacement" }));
+    vi.mocked(fetchBookingById).mockResolvedValue({ ...booking, status: "Completed Service" } as unknown as Awaited<ReturnType<typeof fetchBookingById>>);
+    const onUpdated = vi.fn();
+    const { rerender } = render(<BookingTransactionActions booking={{ ...booking, disputeStatus: "open" }}
+      viewerRole="provider" onUpdated={onUpdated} />);
+    const workflow = await screen.findByRole("button", { name: "Replacement workflow for provider" });
+    expect(workflow).toHaveAttribute("data-funded", "true");
     expect(screen.queryByText("Support case open")).not.toBeInTheDocument();
+    fireEvent.click(workflow);
+    await waitFor(() => expect(onUpdated).toHaveBeenCalledWith(expect.objectContaining({ status: "Completed Service" })));
+    rerender(<BookingTransactionActions booking={{ ...booking, disputeStatus: "open" }}
+      viewerRole="client" onUpdated={onUpdated} />);
+    expect(screen.getByRole("button", { name: "Replacement workflow for client" })).toBeVisible();
   });
 
   it("blocks work controls while the balance is unpaid", () => {
@@ -83,12 +93,13 @@ describe("BookingTransactionActions", () => {
     expect(screen.queryByRole("button", { name: "Start work" })).not.toBeInTheDocument();
   });
 
-  it("keeps provider workflow and report actions in the same responsive action group", () => {
+  it("keeps provider workflow and report actions in the card action row with a caution style", () => {
     render(<BookingTransactionActions booking={booking} viewerRole="provider" onUpdated={vi.fn()} />);
     const group = screen.getByTestId("booking-transaction-actions");
-    expect(group).toHaveClass("sm:flex", "sm:flex-wrap", "sm:items-center");
+    expect(group).toHaveClass("contents");
     expect(group).toContainElement(screen.getByRole("button", { name: "Start work" }));
     expect(group).toContainElement(screen.getByRole("button", { name: "Report a problem" }));
+    expect(screen.getByRole("button", { name: "Report a problem" })).toHaveClass("bg-amber-50", "text-amber-900");
   });
 
   it("does not start work when the provider cancels confirmation", () => {

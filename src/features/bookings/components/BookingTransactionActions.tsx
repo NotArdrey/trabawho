@@ -8,8 +8,8 @@ import { FilePicker } from "@/components/ui/file-picker";
 import { SelectField } from "@/components/forms";
 import { performBookingLifecycleAction } from "@/features/bookings/services/bookingLifecycle";
 import { RepairCaseResolution } from "@/features/bookings/components/RepairCaseResolution";
-import { BookingReplacementSchedule } from "@/features/bookings/components/BookingReplacementSchedule";
-import type { ActiveReplacementSchedule } from "@/features/bookings/services/replacementSchedules";
+import { ReplacementVisitActions } from "@/features/bookings/components/ReplacementVisitActions";
+import { fetchBookingById } from "@/features/bookings/services/bookingService";
 import { BookingRefundProgress } from "./BookingRefundProgress";
 import { isBookingFullyFunded } from "../utils/bookingPaymentGuard";
 import { isShowcasePaymentReference } from "../utils/bookingPaymentPresentation";
@@ -45,12 +45,15 @@ export function BookingTransactionActions({ booking, supportCaseId, viewerRole, 
   const [caseSummary, setCaseSummary] = useState<{ bookingId: string; data: Awaited<ReturnType<typeof getBookingSupportCase>> } | null>(null);
   const [caseLoadError, setCaseLoadError] = useState("");
   const [caseReload, setCaseReload] = useState(0);
-  const [replacementState, setReplacementState] = useState<{ bookingId: string; schedule: ActiveReplacementSchedule | null } | null>(null);
   const [now, setNow] = useState(() => Date.now());
   const inFlight = useRef(false);
-  const onReplacementChange = useCallback((schedule: ActiveReplacementSchedule | null) => {
-    setReplacementState({ bookingId: booking.id, schedule });
-  }, [booking.id]);
+  const onReplacementChanged = useCallback(() => {
+    setCaseReload((value) => value + 1);
+    void fetchBookingById(booking.id).then((updated) => {
+      if (updated) onUpdated(updated);
+      else setError("The visit was saved, but the booking summary could not be refreshed. Reload this page.");
+    }).catch(() => setError("The visit was saved, but the booking summary could not be refreshed. Reload this page."));
+  }, [booking.id, onUpdated]);
 
   useEffect(() => {
     const timer = window.setInterval(() => setNow(Date.now()), 30_000);
@@ -86,8 +89,9 @@ export function BookingTransactionActions({ booking, supportCaseId, viewerRole, 
     && now <= new Date(booking.completedAt || "").getTime() + (booking.warrantyDurationDays || 7) * 24 * 60 * 60_000;
   const canReport = booking.disputeStatus === "none" && (canReportNoShow || canReportDelivery || canReportCompleted);
   const currentCase = caseSummary?.bookingId === booking.id ? caseSummary.data : null;
-  const replacementAccepted = currentCase?.resolution_status === "replacement_accepted"
-    || replacementState?.bookingId === booking.id && Boolean(replacementState.schedule);
+  const replacementAccepted = currentCase?.resolution_status === "replacement_accepted";
+  const showReplacementActions = currentCase?.case_type === "provider_no_show"
+    && ["replacement_accepted", "resolved"].includes(currentCase.resolution_status || "");
   const canRespond = viewerRole === "provider" && booking.disputeStatus === "open"
     && currentCase?.case_type === "warranty_issue" && currentCase.policy_route === "rework_request"
     && currentCase.status === "open" && !currentCase.provider_responded_at;
@@ -156,14 +160,16 @@ export function BookingTransactionActions({ booking, supportCaseId, viewerRole, 
     catch (cause) { setError(cause instanceof Error ? cause.message : "Could not load delivery proof."); }
   };
 
-  return <div className="col-span-2 grid w-full min-w-0 grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:items-center sm:justify-end" data-testid="booking-transaction-actions">
-    {currentCase?.case_type === "provider_no_show" && <BookingReplacementSchedule bookingId={booking.id} className="col-span-2 sm:basis-full" onScheduleChange={onReplacementChange} />}
+  return <div className="contents" data-testid="booking-transaction-actions">
+    {showReplacementActions && <div className="col-span-2 min-w-0 sm:basis-full"><ReplacementVisitActions
+      caseId={currentCase.id} bookingId={booking.id} viewerRole={viewerRole} funded={isBookingFullyFunded(booking)}
+      showVisitTime={false} onChanged={onReplacementChanged} /></div>}
     {viewerRole === "provider" && active && !isBookingFullyFunded(booking) && ["paid", "partially_paid"].includes(booking.paymentStatus || "") && <span className="self-center text-sm font-medium text-amber-700 dark:text-amber-300">Waiting for client balance before work. Do not begin until full payment is verified.</span>}
     {canStart && <Button type="button" disabled={pending} onClick={() => { setError(""); setDialog("start"); }}><Play aria-hidden="true" />Start work</Button>}
     {canDeliver && <Button type="button" disabled={pending} onClick={() => { setImage(null); setPhotoError(""); setError(""); setDialog("delivery"); }}><FileCheck2 aria-hidden="true" />Submit delivery</Button>}
     {canComplete && <Button type="button" disabled={pending} onClick={() => { void run(() => performBookingLifecycleAction("complete", booking.id), "Completion confirmed and saved."); }}><CheckCircle2 aria-hidden="true" />Confirm completion</Button>}
     {viewerRole === "client" && booking.deliveryStatus === "seller_claimed" && <Button type="button" variant="outline" onClick={() => { void viewEvidence(); }}>View delivery proof</Button>}
-    {canReport && <Button type="button" variant="outline" disabled={pending} onClick={openCase}><Flag aria-hidden="true" />Report a problem</Button>}
+    {canReport && <Button type="button" variant="outline" className="border-amber-300 bg-amber-50 text-amber-900 hover:bg-amber-100 hover:text-amber-950 focus-visible:ring-amber-500 dark:border-amber-700 dark:bg-amber-950/30 dark:text-amber-200 dark:hover:bg-amber-900/40 dark:hover:text-amber-100" disabled={pending} onClick={openCase}><Flag aria-hidden="true" />Report a problem</Button>}
     {(booking.disputeStatus === "open" || booking.disputeStatus === "closed") && caseLoadError && <div role="alert" className="col-span-2 grid gap-2 text-sm text-destructive sm:basis-full"><p>{caseLoadError}</p><Button type="button" variant="outline" className="w-fit" onClick={() => { setCaseLoadError(""); setCaseReload((value) => value + 1); }}><RefreshCw aria-hidden="true" />Retry loading report</Button></div>}
     {booking.disputeStatus === "open" && !replacementAccepted && <div className="col-span-2 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950 sm:basis-full dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-100"><p className="font-semibold">{currentCase?.policy_route === "rework_request" ? viewerRole === "provider" ? "Client requested repair rework" : "Repair rework requested" : "Support case open"}</p><p className="mt-1">{currentCase?.reason || "Completion is paused while this report is reviewed."}</p>{currentCase?.policy_reason && <p className="mt-1 text-xs">{currentCase.policy_reason}</p>}{currentCase?.provider_response_action && <div className="mt-3 border-t border-amber-300 pt-3 dark:border-amber-800"><p className="font-semibold">{currentCase.provider_response_action === "offer_rework" ? "Provider offered rework" : "Provider requested support review"}</p><p className="mt-1">{currentCase.provider_response_text}</p><p className="mt-1 text-xs">This response does not close the case or change payment.</p></div>}</div>}
     {canRespond && <Button type="button" variant="outline" disabled={pending} onClick={() => { setResponseAction("offer_rework"); setResponseText(""); setError(""); setDialog("response"); }}>Respond to repair claim</Button>}

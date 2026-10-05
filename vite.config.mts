@@ -3,6 +3,7 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
 import { defineConfig } from "vitest/config";
+import { paymongoSandboxMiddleware } from "./scripts/paymongo-sandbox-dev-server.mts";
 
 const registrationLogEndpoint = "/__trabawho_registration_log";
 const maxLogBytes = 64 * 1024;
@@ -47,6 +48,12 @@ export default defineConfig({
       name: "trabawho-registration-log",
       configureServer(server) {
         server.middlewares.use(registrationLogMiddleware);
+      },
+    },
+    {
+      name: "trabawho-local-paymongo-test-checkout",
+      configureServer(server) {
+        server.middlewares.use((request, response, next) => { void paymongoSandboxMiddleware(request, response, next); });
       },
     },
   ],

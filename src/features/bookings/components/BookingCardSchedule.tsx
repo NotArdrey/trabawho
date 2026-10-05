@@ -36,6 +36,7 @@ export function BookingCardSchedule({ bookingId, checkReplacement, originalDate,
   paymentMethod, paymentReference }: BookingCardScheduleProps) {
   const demoPayment = isShowcasePaymentReference(paymentReference);
   const [schedule, setSchedule] = useState<ActiveReplacementSchedule | null>(null);
+  const replacementCompleted = schedule?.status === "completed";
   const [error, setError] = useState(false);
   const [checking, setChecking] = useState(checkReplacement);
   const refresh = useCallback(async () => {
@@ -57,12 +58,12 @@ export function BookingCardSchedule({ bookingId, checkReplacement, originalDate,
     : "border-orange-200 dark:border-orange-800/60")}>
     <div className="booking-detail-item">
       <CalendarDays size={16} aria-hidden="true" />
-      <div><span>{schedule ? "Active visit date: " : "Date: "}</span>
+      <div><span>{replacementCompleted ? "Completed visit date: " : schedule ? "Active visit date: " : "Date: "}</span>
         <strong>{schedule ? visitDate(schedule.startAt) : checking ? "Checking current visit…" : originalDate || "Coordinated in chat"}</strong></div>
     </div>
     <div className="booking-detail-item">
       <Clock size={16} aria-hidden="true" />
-      <div><span>{schedule ? "Active visit time: " : "Time: "}</span>
+      <div><span>{replacementCompleted ? "Completed visit time: " : schedule ? "Active visit time: " : "Time: "}</span>
         <strong>{schedule ? `${visitTime(schedule.startAt)}–${visitTime(schedule.endAt)} PHT` : checking ? "Checking current visit…" : originalTime}</strong></div>
     </div>
     <div className="booking-detail-item">

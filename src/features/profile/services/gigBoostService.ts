@@ -57,7 +57,8 @@ export async function createBoostCheckout(sellerId: string, draft: BoostDraft) {
   let url: URL;
   try { url = new URL(String(response.checkoutUrl)); } catch { throw new Error("PayMongo returned an invalid checkout link."); }
   if (url.protocol !== "https:" || url.hostname !== "checkout.paymongo.com" || typeof response.attemptId !== "string") throw new Error("PayMongo returned an invalid checkout link.");
-  return { checkoutUrl: url.toString(), attemptId: response.attemptId };
+  return { checkoutUrl: url.toString(), checkoutSessionId: typeof response.checkoutSessionId === "string" ? response.checkoutSessionId.trim() : undefined,
+    attemptId: response.attemptId };
 }
 
 export async function verifyBoostCheckout(attemptId: string): Promise<BoostVerification> {

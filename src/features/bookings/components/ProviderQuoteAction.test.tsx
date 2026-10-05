@@ -45,4 +45,12 @@ describe("ProviderQuoteAction", () => {
       viewerRole="seller" isRequestBooking isClosedConversation={false} onProposeQuote={onProposeQuote} />);
     expect(screen.queryByRole("button", { name: "Create quote" })).not.toBeInTheDocument();
   });
+
+  it("does not offer a booking quote in a standalone conversation", () => {
+    render(<ProviderQuoteAction booking={{ id: "conversation:7b0b479a-4c4e-4dac-b061-dd3cc520bb35",
+      bookingMode: "conversation", isStandaloneChat: true }} viewerRole="seller" isRequestBooking
+      isClosedConversation={false} onProposeQuote={vi.fn()} />);
+    expect(screen.queryByRole("button", { name: "Create quote" })).not.toBeInTheDocument();
+    expect(screen.queryByText(/client must submit a booking request/i)).not.toBeInTheDocument();
+  });
 });

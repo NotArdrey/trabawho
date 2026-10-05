@@ -25,7 +25,7 @@ secret key through a `VITE_*` variable, source file, client request, screenshot,
 documentation example, or commit.
 
 For local tooling, the server-only test secret may be read from the ignored
-`.env` as `PAYMONGO_SECRET_KEY`. Upload it as an Edge Function secret; restarting
+`.env.local` as `PAYMONGO_SECRET_KEY`. Upload it as an Edge Function secret; restarting
 Vite alone does not update the remote payment configuration. Checkout uses the
 secret's environment, and the PayMongo API's `livemode` field verifies it. The
 hosted page may omit a test-mode banner.
@@ -73,16 +73,34 @@ activate the client redirect before both functions are reachable.
 
 ### Faster QA checkout for bookings and gig boosts
 
+When running the app through the local Vite development server, booking payment
+review and gig-boost review offer **One-click sandbox test payment**. The local
+server checks the checkout with `PAYMONGO_SECRET_KEY=sk_test_...`, then fills
+PayMongo's successful test card in a headless browser. The user stays in the
+app; after PayMongo redirects, the normal signed-webhook/server reconciliation
+verifies the booking or boost. The button is absent from production builds.
+The checkout function supplies PayMongo's session ID separately from its hosted
+URL; the helper retrieves that exact test session and checks that its URL matches
+before entering any card details. Deploy both checkout Edge Functions when
+updating this shortcut.
+The normal **Continue to PayMongo** option remains available for testing the
+hosted form. If automation fails, check the payment status before retrying;
+an already-submitted sandbox payment may still be processing. The local Vite
+server must be restarted after changing `.env.local`, and Playwright Chromium must be
+installed (`npx playwright install chromium`).
+
+The command-line alternative is:
+
 The same test-only helper fills PayMongo's public successful test card for any
 TrabaWho Hosted Checkout session, whether it came from a booking deposit,
 booking balance, or gig boost:
 
 ```powershell
-npm run paymongo:test-checkout -- "https://checkout.paymongo.com/cs_..."
+npm run paymongo:test-checkout -- "https://checkout.paymongo.com/..." "cs_..."
 ```
 
-Copy the checkout URL after starting payment in the app. The helper requires a
-server-only `PAYMONGO_SECRET_KEY=sk_test_...` in the local ignored `.env` or
+Copy the checkout URL and session ID after starting payment in the app. The helper requires a
+server-only `PAYMONGO_SECRET_KEY=sk_test_...` in the local ignored `.env.local` or
 process environment. Before opening or filling the page, it retrieves that
 session from PayMongo and refuses any session whose `livemode` is not `false`.
 It then uses PayMongo's documented no-3DS test card, submits the hosted form,
@@ -97,8 +115,7 @@ applies only to **new** sessions after those Edge Functions are deployed;
 opening an older checkout URL will not gain the prefill. TrabaWho does not
 store a postal code, so PayMongo may still ask for it. Card details remain on
 PayMongo's hosted page; this is not card vaulting or a reusable saved card.
-The QA helper above is run locally with a checkout URL, not by clicking the
-app's payment button. The boost return flow checks provider status
+The command-line helper can still be run with a checkout URL. The boost return flow checks provider status
 automatically and does not offer a separate "Check payment again" button.
 
 - [PayMongo test mode and test cards](https://docs.paymongo.com/docs/payment-acceptance-testing)

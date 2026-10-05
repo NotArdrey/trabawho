@@ -5,7 +5,9 @@ import { Button } from "@/components/ui/button";
 import { ProviderQuoteComposer, type QuoteProposalInput } from "@/features/bookings/components/ProviderQuoteComposer";
 
 interface QuoteBooking {
+  bookingMode?: string | null;
   id?: string;
+  isStandaloneChat?: boolean;
   paymentStatus?: string | null;
   raw?: { booking?: { status?: string | null } };
   scheduleStatus?: string | null;
@@ -25,7 +27,9 @@ export function ProviderQuoteAction({ booking, isClosedConversation, isRequestBo
   const actionRef = useRef<HTMLButtonElement>(null);
   const editorRef = useRef<HTMLDivElement>(null);
   const wasOpen = useRef(false);
-  const canQuote = viewerRole === "seller" && isRequestBooking && !isClosedConversation
+  const isStandalone = Boolean(booking?.isStandaloneChat || booking?.bookingMode === "conversation"
+    || booking?.id?.startsWith("conversation:"));
+  const canQuote = viewerRole === "seller" && isRequestBooking && !isClosedConversation && !isStandalone
     && Boolean(onProposeQuote) && (!booking?.raw?.booking?.status || booking.raw.booking.status === "pending")
     && !["held", "confirmed", "reschedule_requested"].includes(booking?.scheduleStatus || "")
     && !["partially_paid", "paid", "refund_pending", "refunded"].includes(booking?.paymentStatus || "");

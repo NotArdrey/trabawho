@@ -1,13 +1,38 @@
 import { expect, test } from "@playwright/test";
-import { checkoutSessionId, fillSandboxCard, submitSandboxCheckout, verifySandboxCheckout } from "../../scripts/paymongo-sandbox-checkout.mts";
+import { checkoutSessionId, fillSandboxCard, submitSandboxCheckout,
+  submitSandboxCheckoutAndWaitForReturn, verifySandboxCheckout } from "../../scripts/paymongo-sandbox-checkout.mts";
 
 test("rejects a non-PayMongo or non-test checkout before card entry", async () => {
   expect(() => checkoutSessionId("https://example.com/cs_abc123")).toThrow(/Only PayMongo/);
   await expect(verifySandboxCheckout("https://checkout.paymongo.com/cs_abc123", "sk_live_secret"))
     .rejects.toThrow(/Live keys are never accepted/);
   const request = () => Promise.resolve(new Response(JSON.stringify({ data: { attributes: { livemode: true } } }), { status: 200 }));
-  await expect(verifySandboxCheckout("https://checkout.paymongo.com/cs_abc123", "sk_test_secret", request))
+  await expect(verifySandboxCheckout("https://checkout.paymongo.com/cs_abc123", "sk_test_secret", undefined, request))
     .rejects.toThrow(/not confirmed as PayMongo test mode/);
+});
+
+test("accepts an opaque v2 link only with its provider session ID and matching provider URL", async () => {
+  const checkoutUrl = "https://checkout.paymongo.com/opaque-checkout-token#public-key";
+  expect(() => checkoutSessionId(checkoutUrl)).toThrow(/did not provide a checkout session ID/);
+  expect(checkoutSessionId(checkoutUrl, "cs_checkout123")).toBe("cs_checkout123");
+  const request = (input: string | URL | Request) => {
+    expect(typeof input === "string" ? input : input instanceof URL ? input.href : input.url)
+      .toBe("https://api.paymongo.com/v1/checkout_sessions/cs_checkout123");
+    return Promise.resolve(new Response(JSON.stringify({ data: { id: "cs_checkout123", attributes: {
+      livemode: false, checkout_url: checkoutUrl,
+    } } }), { status: 200 }));
+  };
+  await expect(verifySandboxCheckout(checkoutUrl, "sk_test_secret", "cs_checkout123", request)).resolves.toBeUndefined();
+  await expect(verifySandboxCheckout(`${checkoutUrl}-different`, "sk_test_secret", "cs_checkout123", request))
+    .rejects.toThrow(/different checkout session/);
+});
+
+test("rejects a non-local origin before trying to access the sandbox key", async ({ request }) => {
+  const response = await request.post("/__trabawho_paymongo_sandbox_checkout", {
+    headers: { Origin: "https://untrusted.example" },
+    data: { checkoutUrl: "https://checkout.paymongo.com/cs_abc123" },
+  });
+  expect(response.status()).toBe(403);
 });
 
 for (const payment of ["booking deposit", "booking balance", "gig boost"]) {
@@ -16,9 +41,11 @@ for (const payment of ["booking deposit", "booking balance", "gig boost"]) {
     const request = (input: string | URL | Request) => {
       expect(typeof input === "string" ? input : input instanceof URL ? input.href : input.url)
         .toBe(`https://api.paymongo.com/v1/checkout_sessions/${sessionId}`);
-      return Promise.resolve(new Response(JSON.stringify({ data: { attributes: { livemode: false } } }), { status: 200 }));
+      return Promise.resolve(new Response(JSON.stringify({ data: { id: sessionId, attributes: {
+        livemode: false, checkout_url: `https://checkout.paymongo.com/${sessionId}`,
+      } } }), { status: 200 }));
     };
-    await verifySandboxCheckout(`https://checkout.paymongo.com/${sessionId}`, "sk_test_secret", request);
+    await verifySandboxCheckout(`https://checkout.paymongo.com/${sessionId}`, "sk_test_secret", undefined, request);
     await page.setContent(`<main><h1>PayMongo test checkout</h1>
       <label>Card number <input autocomplete="cc-number"></label>
       <label>Expiry <input autocomplete="cc-exp"></label>
@@ -35,3 +62,43 @@ for (const payment of ["booking deposit", "booking balance", "gig boost"]) {
     expect(await page.locator("body").getAttribute("data-submitted")).toBe("yes");
   });
 }
+
+test("advances from PayMongo's card choice and fills only missing customer fields", async ({ page }) => {
+  await page.setContent(`<main>
+    <section id="method"><button type="button" onclick="document.querySelector('#continue').disabled=false">Card</button>
+      <button id="continue" type="button" disabled onclick="setTimeout(()=>{document.querySelector('#method').hidden=true;document.querySelector('#form').hidden=false},250)">Continue</button></section>
+    <section id="form" hidden>
+      <label>Name <input value="Existing Customer"></label>
+      <label>Email <input type="email" value="existing@example.com"></label>
+      <label>Country <select><option value="">Select a country</option><option value="PH">Philippines</option></select></label>
+      <label>Address Line 1 <input value="Existing address"></label>
+      <label>City <input value="Malolos"></label>
+      <label>State / Province <input value="Bulacan"></label>
+      <label>Postal Code <input placeholder="12345"></label>
+      <label>Card Number <input placeholder="1234 1234 1234 1234"></label>
+      <label>MM <input placeholder="01"></label><label>YY <input placeholder="31"></label>
+      <label>CVC <input placeholder="123"></label><label>Full Name <input placeholder="John Doe"></label>
+      <button type="submit" onclick="document.body.dataset.submitted='yes'">Pay ₱551.00</button>
+    </section></main>`);
+  await fillSandboxCard(page);
+  await expect(page.getByLabel("Card Number")).toHaveValue("4343434343434345");
+  await expect(page.getByLabel("MM")).toHaveValue("12");
+  await expect(page.getByLabel("YY")).toHaveValue("30");
+  await expect(page.getByLabel("CVC")).toHaveValue("123");
+  await expect(page.getByLabel("Postal Code")).toHaveValue("1000");
+  await expect(page.getByLabel("Country")).toHaveValue("PH");
+  await expect(page.getByLabel("Name", { exact: true })).toHaveValue("Existing Customer");
+  await expect(page.getByLabel("Email")).toHaveValue("existing@example.com");
+  await submitSandboxCheckout(page);
+  expect(await page.locator("body").getAttribute("data-submitted")).toBe("yes");
+});
+
+test("captures the payment return before the isolated browser is redirected to sign-in", async ({ page }) => {
+  await page.route("**/bookings?payment=verifying*", (route) => route.fulfill({ status: 302, headers: { Location: "/login" } }));
+  await page.route("**/login", (route) => route.fulfill({ contentType: "text/html", body: "<h1>Sign in</h1>" }));
+  await page.goto("/__paymongo-test-return");
+  await page.setContent(`<button type="submit" onclick="location.href='/bookings?payment=verifying&booking=booking-1&attempt=attempt-1'">Pay now</button>`);
+  const returnUrl = await submitSandboxCheckoutAndWaitForReturn(page);
+  expect(new URL(returnUrl).pathname).toBe("/bookings");
+  expect(new URL(returnUrl).searchParams.get("attempt")).toBe("attempt-1");
+});

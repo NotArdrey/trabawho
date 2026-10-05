@@ -1,4 +1,5 @@
 import { supabase } from "@/integrations/supabase";
+import { completeLocalSandboxCheckout } from "@/shared/services/paymongoSandboxCheckout";
 import type { ServiceAddress } from '@/shared/domain/serviceAddress';
 
 interface CheckoutBooking {
@@ -18,6 +19,7 @@ interface CheckoutBooking {
 
 interface CheckoutFunctionResponse {
   checkoutUrl?: unknown;
+  checkoutSessionId?: unknown;
   bookingId?: unknown;
   error?: unknown;
   holdExpiresAt?: unknown;
@@ -27,6 +29,7 @@ interface CheckoutFunctionResponse {
 export interface PayMongoCheckout {
   bookingId: string;
   checkoutUrl: string;
+  checkoutSessionId?: string;
   holdExpiresAt: string | null;
   paymentAttemptId: string;
 }
@@ -160,11 +163,13 @@ export async function createPayMongoCheckout(booking: CheckoutBooking): Promise<
   return {
     bookingId,
     checkoutUrl: validateCheckoutUrl(data?.checkoutUrl),
+    checkoutSessionId: typeof data?.checkoutSessionId === "string" ? data.checkoutSessionId.trim() : undefined,
     holdExpiresAt,
     paymentAttemptId,
   };
 }
 
-export function redirectToPayMongo(checkout: PayMongoCheckout) {
+export async function redirectToPayMongo(checkout: PayMongoCheckout, options: { oneClickTest?: boolean } = {}) {
+  if (options.oneClickTest) return completeLocalSandboxCheckout(checkout.checkoutUrl, checkout.checkoutSessionId);
   window.location.assign(checkout.checkoutUrl);
 }

@@ -2,24 +2,28 @@ import { chromium, type Frame, type Locator, type Page } from "@playwright/test"
 import { loadEnv } from "vite";
 
 type ProviderSession = {
-  data?: { attributes?: { livemode?: unknown; payments?: unknown[] } };
+  data?: { id?: unknown; attributes?: { checkout_url?: unknown; livemode?: unknown } };
 };
 
-export function checkoutSessionId(rawUrl: string): string {
+export function checkoutSessionId(rawUrl: string, providedSessionId?: string): string {
   let url: URL;
   try { url = new URL(rawUrl); } catch { throw new Error("Provide a PayMongo checkout URL."); }
-  if (url.protocol !== "https:" || url.hostname !== "checkout.paymongo.com") {
+  if (url.origin !== "https://checkout.paymongo.com" || url.username || url.password) {
     throw new Error("Only PayMongo Hosted Checkout URLs are allowed.");
   }
-  const sessionId = url.pathname.split("/").filter(Boolean)[0];
-  if (!sessionId || !/^cs_[A-Za-z0-9]+$/.test(sessionId)) {
-    throw new Error("The checkout URL has no valid session ID.");
+  const path = url.pathname.split("/").filter(Boolean);
+  if (path.length !== 1) throw new Error("The checkout URL is not a PayMongo session link.");
+  if (providedSessionId !== undefined) {
+    if (!/^cs_[A-Za-z0-9_-]+$/.test(providedSessionId)) throw new Error("The payment server returned an invalid checkout session ID.");
+    return providedSessionId;
   }
-  return sessionId;
+  const legacy = /^(cs_[A-Za-z0-9]+)(?:_client_[A-Za-z0-9]+)?$/.exec(path[0]);
+  if (legacy) return legacy[1];
+  throw new Error("The payment server did not provide a checkout session ID. Update the payment functions or use hosted test checkout.");
 }
 
-export async function verifySandboxCheckout(rawUrl: string, secret: string, request: typeof fetch = fetch): Promise<void> {
-  const sessionId = checkoutSessionId(rawUrl);
+export async function verifySandboxCheckout(rawUrl: string, secret: string, providedSessionId?: string, request: typeof fetch = fetch): Promise<void> {
+  const sessionId = checkoutSessionId(rawUrl, providedSessionId);
   if (!secret.startsWith("sk_test_")) throw new Error("A PayMongo test secret is required. Live keys are never accepted.");
   const response = await request(`https://api.paymongo.com/v1/checkout_sessions/${sessionId}`, {
     headers: { Authorization: `Basic ${Buffer.from(`${secret}:`).toString("base64")}` },
@@ -28,6 +32,12 @@ export async function verifySandboxCheckout(rawUrl: string, secret: string, requ
   const session = await response.json() as ProviderSession;
   if (session.data?.attributes?.livemode !== false) {
     throw new Error("This checkout is not confirmed as PayMongo test mode. No card details were entered.");
+  }
+  let providerUrl: URL;
+  try { providerUrl = new URL(String(session.data.attributes.checkout_url)); }
+  catch { throw new Error("PayMongo did not confirm this checkout link. No card details were entered."); }
+  if (session.data.id !== sessionId || providerUrl.href !== new URL(rawUrl).href) {
+    throw new Error("PayMongo returned a different checkout session. No card details were entered.");
   }
 }
 
@@ -45,43 +55,90 @@ async function firstVisible(locators: Locator[]): Promise<Locator | null> {
 }
 
 async function fillAcrossFrames(page: Page, field: Field, required: boolean): Promise<boolean> {
-  const frames: Frame[] = page.frames();
-  for (const frame of frames) {
-    const candidate = await firstVisible([
-      ...field.labels.map((label) => frame.getByLabel(label)),
-      ...field.selectors.map((selector) => frame.locator(selector)),
-    ]);
-    if (!candidate) continue;
-    await candidate.fill(field.value);
-    return true;
+  const attempts = required ? 40 : 1;
+  for (let attempt = 0; attempt < attempts; attempt++) {
+    const frames: Frame[] = page.frames();
+    for (const frame of frames) {
+      const candidate = await firstVisible([
+        ...field.labels.map((label) => frame.getByLabel(label)),
+        ...field.selectors.map((selector) => frame.locator(selector)),
+      ]);
+      if (!candidate) continue;
+      await candidate.fill(field.value);
+      return true;
+    }
+    if (attempt < attempts - 1) await page.waitForTimeout(250);
   }
   if (required) throw new Error("The PayMongo card form changed. Complete this test checkout manually; no payment was submitted.");
   return false;
 }
 
+async function fillBlankAcrossFrames(page: Page, field: Field): Promise<void> {
+  for (const frame of page.frames()) {
+    const candidate = await firstVisible([
+      ...field.labels.map((label) => frame.getByLabel(label)),
+      ...field.selectors.map((selector) => frame.locator(selector)),
+    ]);
+    if (!candidate) continue;
+    if (!(await candidate.inputValue()).trim()) await candidate.fill(field.value);
+    return;
+  }
+}
+
+async function chooseCountryIfMissing(page: Page): Promise<void> {
+  for (const frame of page.frames()) {
+    const country = await firstVisible([frame.getByLabel(/country/i), frame.locator('select[name*="country"]'),
+      frame.locator('select:has(option:text-is("Philippines"))')]);
+    if (!country) continue;
+    const value = await country.inputValue().catch(() => "");
+    if (value.trim()) return;
+    if (await country.evaluate((element) => element.tagName === "SELECT")) {
+      await country.selectOption({ label: "Philippines" });
+      return;
+    }
+    await country.click();
+    const option = await firstVisible([frame.getByRole("option", { name: /^philippines$/i })]);
+    if (option) await option.click();
+    return;
+  }
+}
+
 export async function fillSandboxCard(page: Page): Promise<void> {
   const cardNumber: Field = { labels: [/card number/i, /card no\.?/i],
-    selectors: ['input[autocomplete="cc-number"]', 'input[name*="card_number"]', 'input[placeholder*="1234"]'],
+    selectors: ['input[autocomplete="cc-number"]', 'input[name*="card_number"]', 'input[placeholder*="1234 1234"]'],
     value: "4343434343434345" };
   const expiry: Field = { labels: [/expir/i, /mm\s*\/\s*yy/i],
-    selectors: ['input[autocomplete="cc-exp"]', 'input[name*="expir"]', 'input[placeholder*="MM"]'], value: "12/30" };
+    selectors: ['input[autocomplete="cc-exp"]', 'input[name="expiry"]', 'input[placeholder="MM/YY"]'], value: "12/30" };
   const cvc: Field = { labels: [/cvc/i, /cvv/i, /security code/i],
     selectors: ['input[autocomplete="cc-csc"]', 'input[name*="cvc"]', 'input[name*="cvv"]'], value: "123" };
   if (!await fillAcrossFrames(page, cardNumber, false)) {
     const cardChoice = await firstVisible([
       page.getByRole("radio", { name: /card/i }), page.getByRole("button", { name: /^card$|credit.*debit/i }),
-      page.getByText(/^credit\s*(?:\/|or|and)\s*debit card$/i),
+      page.getByText(/^credit\s*(?:\/|or|and)\s*debit card$/i), page.getByText(/^card$/i),
     ]);
     if (cardChoice) await cardChoice.click();
+    const continueButton = await firstVisible([page.getByRole("button", { name: /^continue$/i })]);
+    if (continueButton) await continueButton.click({ timeout: 5_000 });
     await fillAcrossFrames(page, cardNumber, true);
   }
-  await fillAcrossFrames(page, expiry, true);
+  if (!await fillAcrossFrames(page, expiry, false)) {
+    await fillAcrossFrames(page, { labels: [/^mm$/i, /expiration month/i],
+      selectors: ['input[autocomplete="cc-exp-month"]', 'input[name*="exp_month"]', 'input[placeholder="01"]'], value: "12" }, true);
+    await fillAcrossFrames(page, { labels: [/^yy$/i, /expiration year/i],
+      selectors: ['input[autocomplete="cc-exp-year"]', 'input[name*="exp_year"]', 'input[placeholder="31"]'], value: "30" }, true);
+  }
   await fillAcrossFrames(page, cvc, true);
-  await fillAcrossFrames(page, { labels: [/cardholder|name on card|full name/i],
-    selectors: ['input[autocomplete="cc-name"]', 'input[name="name"]'], value: "Test Customer" }, false);
-  await fillAcrossFrames(page, { labels: [/email/i], selectors: ['input[type="email"]', 'input[autocomplete="email"]'],
-    value: "paymongo-test@example.com" }, false);
-  await fillAcrossFrames(page, { labels: [/phone|mobile/i], selectors: ['input[type="tel"]'], value: "09171234567" }, false);
+  await fillBlankAcrossFrames(page, { labels: [/cardholder|name on card|full name/i],
+    selectors: ['input[autocomplete="cc-name"]'], value: "Test Customer" });
+  await fillBlankAcrossFrames(page, { labels: [/^name$/i], selectors: ['input[autocomplete="name"]'], value: "Test Customer" });
+  await fillBlankAcrossFrames(page, { labels: [/email/i], selectors: ['input[type="email"]', 'input[autocomplete="email"]'],
+    value: "paymongo-test@example.com" });
+  await fillBlankAcrossFrames(page, { labels: [/phone|mobile/i], selectors: ['input[type="tel"]'], value: "09171234567" });
+  await chooseCountryIfMissing(page);
+  await fillBlankAcrossFrames(page, { labels: [/address line 1/i], selectors: ['input[autocomplete="address-line1"]'], value: "123 Test Street" });
+  await fillBlankAcrossFrames(page, { labels: [/^city$/i], selectors: ['input[autocomplete="address-level2"]'], value: "Manila" });
+  await fillBlankAcrossFrames(page, { labels: [/state|province/i], selectors: ['input[autocomplete="address-level1"]'], value: "Metro Manila" });
+  await fillBlankAcrossFrames(page, { labels: [/postal|zip/i], selectors: ['input[autocomplete="postal-code"]'], value: "1000" });
 }
 
 export async function submitSandboxCheckout(page: Page): Promise<void> {
@@ -93,23 +150,45 @@ export async function submitSandboxCheckout(page: Page): Promise<void> {
   await submit.click();
 }
 
+export async function submitSandboxCheckoutAndWaitForReturn(page: Page): Promise<string> {
+  const isAppReturn = (url: URL) =>
+    (url.pathname === "/bookings" && url.searchParams.get("payment") === "verifying") ||
+    (url.pathname === "/profile" && url.searchParams.get("boostPayment") === "verifying");
+  const [returnRequest] = await Promise.all([
+    page.waitForRequest((request) => {
+      try { return request.isNavigationRequest() && isAppReturn(new URL(request.url())); }
+      catch { return false; }
+    }, { timeout: 120_000 }),
+    submitSandboxCheckout(page),
+  ]);
+  return returnRequest.url();
+}
+
+export async function completeSandboxCheckout(rawUrl: string, secret: string, sessionId?: string): Promise<string> {
+  await verifySandboxCheckout(rawUrl, secret, sessionId);
+  const browser = await chromium.launch({ headless: true });
+  try {
+    const page = await browser.newPage();
+    await page.goto(rawUrl, { waitUntil: "domcontentloaded" });
+    await fillSandboxCard(page);
+    return await submitSandboxCheckoutAndWaitForReturn(page);
+  } finally { await browser.close(); }
+}
+
 async function main() {
   const rawUrl = process.argv[2] || process.env.PAYMONGO_TEST_CHECKOUT_URL;
   if (!rawUrl) throw new Error("Pass the test checkout URL or set PAYMONGO_TEST_CHECKOUT_URL.");
+  const sessionId = process.argv[3] || process.env.PAYMONGO_TEST_CHECKOUT_SESSION_ID;
   const env = loadEnv("development", process.cwd(), "");
   const secret = process.env.PAYMONGO_SECRET_KEY || env.PAYMONGO_SECRET_KEY || "";
-  await verifySandboxCheckout(rawUrl, secret);
+  await verifySandboxCheckout(rawUrl, secret, sessionId);
   const browser = await chromium.launch({ headless: false });
   try {
     const page = await browser.newPage();
     await page.goto(rawUrl, { waitUntil: "domcontentloaded" });
     await fillSandboxCard(page);
-    await submitSandboxCheckout(page);
-    console.info("Submitted a PayMongo test card. Waiting for the provider's confirmation and app return...");
-    await page.waitForURL((url) =>
-      (url.pathname === "/bookings" && url.searchParams.get("payment") === "verifying") ||
-      (url.pathname === "/profile" && url.searchParams.get("boostPayment") === "verifying"),
-    { timeout: 120_000 });
+    console.info("Submitting a PayMongo test card and waiting for the app return...");
+    await submitSandboxCheckoutAndWaitForReturn(page);
     console.info("Checkout returned to the application. Verify the booking or boost is marked paid by the webhook/reconciliation.");
   } finally { await browser.close(); }
 }

@@ -594,7 +594,7 @@ const ChatWindow = ({ appTheme = 'light', booking, onApproveQuote, onRespondQuot
               isConfirmed={booking.scheduleStatus === 'confirmed'}
             />
           )}
-          <ProviderQuoteAction key={booking.id} booking={booking} viewerRole={viewerRole} isRequestBooking={isRequestBooking}
+          <ProviderQuoteAction key={`quote:${booking.id}`} booking={booking} viewerRole={viewerRole} isRequestBooking={isRequestBooking}
             isClosedConversation={isClosedConversation} onProposeQuote={onProposeQuote} />
 
           {shouldShowSlotSelectionNotice && (

@@ -159,6 +159,7 @@ serve(async (request: Request) => {
     if (attempt.checkout_url && new Date(attempt.expires_at).getTime() > Date.now()) {
       return paymentJsonResponse({
         checkoutUrl: attempt.checkout_url,
+        checkoutSessionId: attempt.checkout_session_id,
         paymentAttemptId: attempt.id,
         bookingId: checkoutStart.bookingId,
         holdExpiresAt: checkoutStart.holdExpiresAt,
@@ -246,6 +247,7 @@ serve(async (request: Request) => {
 
     return paymentJsonResponse({
       checkoutUrl,
+      checkoutSessionId,
       paymentAttemptId: attempt.id,
       bookingId: checkoutStart.bookingId,
       holdExpiresAt: checkoutStart.holdExpiresAt,

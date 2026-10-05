@@ -29,7 +29,7 @@ export function GigBoostPanel({ sellerId }: { sellerId?: string }) {
       </div> : null}
       {flow.error && !flow.draft ? <p role="alert" className="mt-3 text-sm text-destructive">{flow.error}</p> : null}
       {flow.error && !flow.services.length ? <Button variant="outline" className="mt-3 min-h-11" disabled={flow.loading} onClick={() => { void flow.retryLoad(); }}>Reload gigs</Button> : null}
-      {flow.draft ? <BoostActivationDialog totalPrice={flow.draft.amount} days={flow.draft.days} serviceTitle={flow.draft.serviceTitle} isOpen isSaving={flow.saving} error={flow.error} onCancel={flow.cancel} onConfirm={() => { void flow.checkout(); }} /> : null}
+      {flow.draft ? <BoostActivationDialog totalPrice={flow.draft.amount} days={flow.draft.days} serviceTitle={flow.draft.serviceTitle} isOpen isSaving={flow.saving} error={flow.error} onCancel={flow.cancel} onConfirm={() => { void flow.checkout(); }} onTestConfirm={() => { void flow.checkout(true); }} /> : null}
     </section>
   );
 }

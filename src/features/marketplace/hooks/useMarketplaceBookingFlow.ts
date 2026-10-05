@@ -1,5 +1,6 @@
 import { useRef, useState } from "react";
 import { createPayMongoCheckout, redirectToPayMongo, startServiceConversation, type PaymentSelectionDetails } from "@/features/bookings";
+import { ensureLocalSandboxReady } from "@/shared/services/paymongoSandboxCheckout";
 import { createScheduleForProvider, getDisplayServiceType, getProviderQuoteAmount } from "../utils/serviceNormalizer";
 
 interface Provider extends Record<string, unknown> {
@@ -119,7 +120,9 @@ export function useMarketplaceBookingFlow({ isPublic, services, schedulesByProvi
     setIsBookingSubmitting(true);
     setBookingError("");
     try {
-      redirectToPayMongo(await createPayMongoCheckout({ ...pendingBooking, paymentPlan: details.paymentPlan, serviceAddress: details.serviceAddress }));
+      if (details.testCheckout) await ensureLocalSandboxReady();
+      await redirectToPayMongo(await createPayMongoCheckout({ ...pendingBooking, paymentPlan: details.paymentPlan, serviceAddress: details.serviceAddress }),
+        { oneClickTest: details.testCheckout });
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unable to reserve this booking.";
       if (/time (?:is|was).*(?:unavailable|booked)|slot.*(?:unavailable|full)/i.test(message)) {

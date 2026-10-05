@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { getActiveAdBooster } from "@/shared/utils/serviceBoost";
 import { createBoostCheckout, fetchBoostServices, forgetBoostCheckoutOperations, verifyBoostCheckout, type BoostService } from "../services/gigBoostService";
+import { completeLocalSandboxCheckout, ensureLocalSandboxReady } from "@/shared/services/paymongoSandboxCheckout";
 import { buildBoostDraft, calculateBoostTotal, getBoostDailyRate, validateBoostSettings, type BoostDraft } from "../utils/gigBoost";
 
 export function useGigBoost(sellerId?: string) {
@@ -119,10 +120,15 @@ export function useGigBoost(sellerId?: string) {
       setError("");
     } catch (failure) { setError(failure instanceof Error ? failure.message : "Check your boost settings."); }
   };
-  const checkout = async () => {
+  const checkout = async (oneClickTest = false) => {
     if (!draft || !sellerId || submitLock.current) return;
     submitLock.current = true; setSaving(true); setError("");
-    try { const result = await createBoostCheckout(sellerId, draft); window.location.assign(result.checkoutUrl); }
+    try {
+      if (oneClickTest) await ensureLocalSandboxReady();
+      const result = await createBoostCheckout(sellerId, draft);
+      if (oneClickTest) await completeLocalSandboxCheckout(result.checkoutUrl, result.checkoutSessionId);
+      else window.location.assign(result.checkoutUrl);
+    }
     catch (failure) { setError(failure instanceof Error ? failure.message : "Unable to start checkout."); }
     finally { submitLock.current = false; setSaving(false); }
   };

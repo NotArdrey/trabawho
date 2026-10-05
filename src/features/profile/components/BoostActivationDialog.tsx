@@ -20,12 +20,13 @@ interface BoostActivationDialogProps {
   isSaving: boolean;
   onCancel: () => void;
   onConfirm: () => void;
+  onTestConfirm?: () => void;
   serviceTitle: string;
 }
 
 const formatPhp = (amount: number) => `PHP ${amount.toLocaleString("en-PH", { maximumFractionDigits: 2 })}`;
 
-export function BoostActivationDialog({ totalPrice, days, error, isOpen, isSaving, onCancel, onConfirm, serviceTitle }: BoostActivationDialogProps) {
+export function BoostActivationDialog({ totalPrice, days, error, isOpen, isSaving, onCancel, onConfirm, onTestConfirm, serviceTitle }: BoostActivationDialogProps) {
   const [agreed, setAgreed] = useState(false);
   return (
     <Dialog open={isOpen} onOpenChange={(open) => { if (!open && !isSaving) onCancel(); }}>
@@ -45,12 +46,14 @@ export function BoostActivationDialog({ totalPrice, days, error, isOpen, isSavin
           </dl>
           <p className="flex gap-2 rounded-xl border border-primary/20 bg-primary/5 p-4 text-sm leading-6 text-foreground"><ShieldCheck className="mt-0.5 size-5 shrink-0 text-primary" aria-hidden="true" /><span>The price covers all {days} days, starting after verified payment. Active boosts receive priority in recommendations; inquiries, bookings, and earnings are not guaranteed.</span></p>
           <label htmlFor="boost-terms" className="flex min-h-11 cursor-pointer items-center gap-3 text-sm"><Checkbox id="boost-terms" checked={agreed} onChange={(event) => setAgreed(event.target.checked)} disabled={isSaving} />I agree to these boost settings and terms.</label>
+          {import.meta.env.DEV && <p className="text-sm text-muted-foreground">One-click sandbox testing uses PayMongo&apos;s test card without opening its form. No real money moves; the boost activates only after payment verification.</p>}
           {error ? <p className="rounded-lg bg-destructive/10 p-3 text-sm font-medium text-destructive" role="alert">{error}</p> : null}
         </div>
 
         <DialogFooter className="sticky bottom-0 bg-background px-5 py-4 sm:px-6">
           <Button type="button" variant="outline" onClick={onCancel} disabled={isSaving}>Cancel</Button>
-          <Button type="button" onClick={onConfirm} isLoading={isSaving} disabled={!agreed || isSaving}><Rocket aria-hidden="true" />Continue to PayMongo</Button>
+          <Button type="button" variant={import.meta.env.DEV ? "outline" : "primary"} onClick={onConfirm} isLoading={isSaving} disabled={!agreed || isSaving}><Rocket aria-hidden="true" />Continue to PayMongo</Button>
+          {import.meta.env.DEV && onTestConfirm && <Button type="button" onClick={onTestConfirm} isLoading={isSaving} disabled={!agreed || isSaving}><ShieldCheck aria-hidden="true" />One-click sandbox test payment</Button>}
         </DialogFooter>
       </DialogContent>
     </Dialog>

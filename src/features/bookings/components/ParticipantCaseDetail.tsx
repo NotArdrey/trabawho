@@ -12,6 +12,7 @@ import { ReplacementVisitActions } from "./ReplacementVisitActions";
 import { getParticipantReportImage, getParticipantSupportBooking, type ParticipantSupportCase } from "../services/participantSupportCases";
 import type { BookingActionRecord } from "../types/booking-action-record";
 import { isShowcasePaymentReference } from "../utils/bookingPaymentPresentation";
+import { isBookingFullyFunded } from "../utils/bookingPaymentGuard";
 
 export function ParticipantCaseDetail({ item, onUpdated }: { item: ParticipantSupportCase; onUpdated: () => void }) {
   const [booking, setBooking] = useState<BookingActionRecord | null>(null);
@@ -36,7 +37,7 @@ export function ParticipantCaseDetail({ item, onUpdated }: { item: ParticipantSu
     <CaseConversation caseId={item.report.id} bookingId={bookingId} viewerRole={item.viewerRole} closed={item.report.status === "closed"} onChanged={onUpdated} />
     <div className="grid gap-4 border-t pt-5" aria-label="Resolution options">
       <div><h3 className="text-base font-semibold">Resolution and next steps</h3><p className="mt-1 text-sm text-muted-foreground">Track the available remedies and any action needed from you.</p></div>
-      {item.report.case_type === "provider_no_show" && <ReplacementVisitActions caseId={item.report.id} bookingId={bookingId} viewerRole={item.viewerRole} onChanged={() => { setRevision((value) => value + 1); onUpdated(); }} />}
+      {item.report.case_type === "provider_no_show" && <ReplacementVisitActions caseId={item.report.id} bookingId={bookingId} viewerRole={item.viewerRole} funded={Boolean(booking && isBookingFullyFunded(booking))} onChanged={() => { setRevision((value) => value + 1); onUpdated(); }} />}
       {item.report.resolution_status === "replacement_accepted" && item.report.status !== "closed" && <div className="grid gap-2 rounded-lg border border-primary/20 bg-primary/5 p-4 text-sm"><h3 className="font-semibold text-primary">Need help with the new visit?</h3><p>The agreed visit remains active. If the provider cannot attend or another problem occurs, tell support what changed; a refund is not automatic.</p><Button asChild variant="outline" className="w-fit"><Link to={`${paths.supportCases}?case=${item.report.id}#case-conversation`}>Contact support about this visit</Link></Button></div>}
       {booking && item.report.case_type === "provider_no_show" && <BookingRefundProgress bookingId={bookingId} caseId={item.report.id} requestedAt={item.report.refund_requested_at} replacementAccepted={item.report.resolution_status === "replacement_accepted"} demoBooking={isShowcasePaymentReference(booking.paymentReference)} canRequest={item.viewerRole === "client" && item.report.resolution_status !== "replacement_accepted" && item.report.status !== "closed" && ["paid", "partially_paid"].includes(booking.paymentStatus || "")} onChanged={onUpdated} />}
       <CaseReviewPanel caseId={item.report.id} viewerRole={item.viewerRole} closed={item.report.status === "closed"} onChanged={onUpdated} />

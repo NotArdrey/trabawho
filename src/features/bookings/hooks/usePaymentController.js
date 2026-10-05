@@ -13,6 +13,7 @@
 
 import { useState, useCallback } from 'react';
 import { createPayMongoCheckout, redirectToPayMongo } from '../services/paymongoCheckout';
+import { ensureLocalSandboxReady } from '@/shared/services/paymongoSandboxCheckout';
 
 export function usePaymentController(onPaymentProofSubmit, onPaymentMethodSelect, updateBooking) {
   // ========================================================================
@@ -110,6 +111,7 @@ export function usePaymentController(onPaymentProofSubmit, onPaymentMethodSelect
    */
   const handleSelectPaymentMethod = useCallback(async (booking, paymentMethod, mockPayment = {}) => {
     if (paymentMethod === 'paymongo-card') {
+      if (mockPayment?.testCheckout === true) await ensureLocalSandboxReady();
       const checkoutBooking = {
         ...booking,
         paymentPlan: booking?.bookingMode === 'with-slots' && booking?.paymentStatus !== 'partially_paid'
@@ -118,7 +120,7 @@ export function usePaymentController(onPaymentProofSubmit, onPaymentMethodSelect
       };
       onPaymentMethodSelect?.(booking.id, paymentMethod, mockPayment);
       const checkout = await createPayMongoCheckout(checkoutBooking);
-      redirectToPayMongo(checkout);
+      await redirectToPayMongo(checkout, { oneClickTest: mockPayment?.testCheckout === true });
       return booking;
     }
 

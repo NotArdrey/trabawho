@@ -4,6 +4,7 @@ import { chooseBookingArea, chooseLocation, mockLocationOptions } from './helper
 
 test.beforeEach(async ({ page }) => {
   await mockLocationOptions(page);
+  await page.route("**/__trabawho_paymongo_sandbox_ready", (route) => route.fulfill({ json: { status: "ready" } }));
   await page.route("**/__booking-journey*", async (route) => {
     await route.fulfill({ contentType: "text/html", body: `<html><head><meta name="viewport" content="width=device-width, initial-scale=1" />
       <script type="module">
@@ -14,6 +15,64 @@ test.beforeEach(async ({ page }) => {
         window.__vite_plugin_react_preamble_installed__ = true;
       </script></head><body><div id="root"></div><script type="module" src="/tests/e2e/fixtures/booking-payment-journey.tsx"></script></body></html>` });
   });
+});
+
+test("one-click sandbox requires local setup before creating a booking hold", async ({ page }) => {
+  let checkoutCalls = 0;
+  await page.route("**/__trabawho_paymongo_sandbox_ready", (route) => route.fulfill({
+    status: 503, json: { error: "Add PAYMONGO_SECRET_KEY=sk_test_... to the ignored .env.local, then restart the dev server." },
+  }));
+  await page.route("**/functions/v1/create-paymongo-checkout", (route) => {
+    checkoutCalls += 1;
+    return route.fulfill({ status: 500 });
+  });
+  await page.goto("/__booking-journey");
+  await page.getByRole("button", { name: "One-click sandbox test payment" }).click();
+  await expect(page.getByRole("alert")).toContainText("PAYMONGO_SECRET_KEY");
+  expect(checkoutCalls).toBe(0);
+});
+
+test("one-click sandbox booking payment skips the hosted form and returns for verification", async ({ page }) => {
+  let shortcutCalls = 0;
+  await page.route("**/functions/v1/create-paymongo-checkout", (route) => route.fulfill({ json: {
+    bookingId: "booking-1", paymentAttemptId: "attempt-1", holdExpiresAt: null,
+    checkoutUrl: "https://checkout.paymongo.com/opaque-booking-token#public-key", checkoutSessionId: "cs_test123",
+  } }));
+  await page.route("**/__trabawho_paymongo_sandbox_checkout", (route) => {
+    shortcutCalls += 1;
+    expect(route.request().postDataJSON()).toEqual({
+      checkoutUrl: "https://checkout.paymongo.com/opaque-booking-token#public-key", checkoutSessionId: "cs_test123",
+    });
+    return route.fulfill({ json: { returnUrl: new URL("/bookings?payment=verifying&booking=booking-1&attempt=attempt-1", page.url()).toString() } });
+  });
+  await page.route("**/bookings?payment=verifying*", (route) => route.fulfill({ contentType: "text/html", body: "<h1>Verifying sandbox payment</h1>" }));
+  await page.goto("/__booking-journey");
+  await page.getByRole("button", { name: "One-click sandbox test payment" }).click();
+  await expect(page.getByRole("heading", { name: "Verifying sandbox payment" })).toBeVisible();
+  expect(shortcutCalls).toBe(1);
+});
+
+test("one-click sandbox rejects a return to another site", async ({ page }) => {
+  await page.route("**/functions/v1/create-paymongo-checkout", (route) => route.fulfill({ json: {
+    bookingId: "booking-1", paymentAttemptId: "attempt-1", holdExpiresAt: null,
+    checkoutUrl: "https://checkout.paymongo.com/opaque-booking-token#public-key", checkoutSessionId: "cs_test123",
+  } }));
+  await page.route("**/__trabawho_paymongo_sandbox_checkout", (route) => route.fulfill({ json: {
+    returnUrl: "https://untrusted.example/bookings?payment=verifying&booking=booking-1&attempt=attempt-1",
+  } }));
+  await page.goto("/__booking-journey");
+  await page.getByRole("button", { name: "One-click sandbox test payment" }).click();
+  await expect(page.getByRole("alert")).toContainText("unexpected page");
+  await expect(page.getByRole("dialog", { name: "Choose payment" })).toBeVisible();
+});
+
+for (const width of [390, 1280]) test(`remaining balance has one payment action in local development at ${width}px`, async ({ page }) => {
+  await page.setViewportSize({ width, height: 900 });
+  await page.goto("/__booking-journey?balance");
+  await expect(page.getByRole("dialog", { name: "Choose payment" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Pay remaining balance" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "One-click sandbox test payment" })).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
 });
 
 for (const width of [390,768,1024,1280,1440]) test(`new booking collects its service address at checkout at ${width}px`, async ({ page }, testInfo) => {

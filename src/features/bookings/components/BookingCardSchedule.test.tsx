@@ -29,6 +29,15 @@ it("retains the original appointment when there is no replacement", async () => 
   expect(screen.getByText(props.originalTime)).toBeVisible();
 });
 
+it("labels a confirmed and finished replacement as completed, not active", async () => {
+  vi.mocked(getActiveReplacementSchedule).mockResolvedValue({ bookingId: "booking-1", caseId: "case-1",
+    status: "completed", startAt: "2026-10-05T09:00:00+08:00", endAt: "2026-10-05T10:00:00+08:00" });
+  render(<BookingCardSchedule {...props} />);
+  expect(await screen.findByText("Completed visit date:")).toBeVisible();
+  expect(screen.getByText("Completed visit time:")).toBeVisible();
+  expect(screen.queryByText("Active visit date:")).not.toBeInTheDocument();
+});
+
 it("does not present the old time as verified when the current visit cannot be checked", async () => {
   vi.mocked(getActiveReplacementSchedule).mockRejectedValue(new Error("Network unavailable"));
   render(<BookingCardSchedule {...props} />);

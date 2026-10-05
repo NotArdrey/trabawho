@@ -35,8 +35,10 @@ serve(async (request: Request) => {
     if (attempt.amount !== amount || Number(attempt.duration_days) !== days) {
       throw new PaymentFunctionError("This pending checkout has different pricing. Wait for it to expire, then review a new boost.", 409);
     }
-    const response = (url: string) => paymentJsonResponse({ checkoutUrl: url, attemptId: attempt.id, expiresAt: attempt.expires_at });
-    if (attempt.checkout_url) return response(validBoostCheckoutUrl(attempt.checkout_url));
+    const response = (url: string, checkoutSessionId: string) => paymentJsonResponse({
+      checkoutUrl: url, checkoutSessionId, attemptId: attempt.id, expiresAt: attempt.expires_at,
+    });
+    if (attempt.checkout_url) return response(validBoostCheckoutUrl(attempt.checkout_url), attempt.checkout_session_id);
     const admin = createPaymentAdminClient();
     const { data: payer } = await admin.from("profiles").select("full_name, email, phone_number, address, barangay, city, province")
       .eq("user_id", attempt.seller_id).maybeSingle();
@@ -71,7 +73,7 @@ serve(async (request: Request) => {
       checkout_session_id: session.id, checkout_url: url, status: "awaiting_payment", updated_at: new Date().toISOString(),
     }).eq("id", attempt.id).in("status", ["created", "awaiting_payment"]);
     if (attachError) throw new PaymentFunctionError("Unable to attach payment to this boost. Please retry.", 500);
-    return response(url);
+    return response(url, cleanPaymentString(session.id));
   } catch (error) {
     const safe = safePaymentError(error);
     if (safe.status >= 500) console.error("boost_checkout_failed", error instanceof Error ? error.message : "unknown");
