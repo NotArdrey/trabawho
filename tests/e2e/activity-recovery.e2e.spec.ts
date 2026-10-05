@@ -35,14 +35,17 @@ for (const width of [390, 768, 1024, 1280, 1440]) {
   test(`admin analytics and audit search work at ${width}px`, async ({ page }, testInfo) => {
     await page.setViewportSize({ width, height: 900 });
     await page.goto("/__activity-journey?mode=admin");
-    await expect(page.getByRole("heading", { name: "Daily account registrations" })).toBeVisible();
+    await page.getByRole("button", { name: "Explore analytics" }).click();
+    await expect(page.getByRole("heading", { name: "Account registrations" })).toBeVisible();
     await expect(page.getByText("Currently active listings")).toBeVisible();
     if (width === 1440) {
       await page.getByRole("combobox", { name: "Period" }).click();
       await page.getByRole("option", { name: "Last 7 days" }).click();
-      await expect(page.getByRole("heading", { name: "Daily account registrations" })).toBeVisible();
-      await page.getByText("View daily counts", { exact: true }).first().click();
-      await expect(page.getByRole("table").first().getByRole("row")).toHaveCount(8);
+      await expect(page.getByRole("heading", { name: "Account registrations" })).toBeVisible();
+      await page.getByRole("button", { name: "View daily breakdown" }).first().click();
+      await expect(page.getByRole("list", { name: "Account registrations daily counts" }).getByRole("listitem")).toHaveCount(1);
+      await page.getByRole("region", { name: "Hide daily breakdown" }).first().getByRole("button", { name: /All days/ }).click();
+      await expect(page.getByRole("list", { name: "Account registrations daily counts" }).getByRole("listitem")).toHaveCount(7);
     }
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
     await page.screenshot({ path: testInfo.outputPath(`analytics-${width}.png`), fullPage: true });
@@ -110,7 +113,8 @@ test("booking search finds clients and references, and global search opens marke
 test("audit logs preserve available sources and identify an unavailable source", async ({ page }) => {
   await page.route("**/rest/v1/identity_review_actions*", async (route) => { await route.fulfill({ status: 503, json: { message: "Private database failure" } }); });
   await page.goto("/__activity-journey?mode=admin");
-  await expect(page.getByRole("heading", { name: "Daily account registrations" })).toBeVisible();
+  await page.getByRole("button", { name: "Explore analytics" }).click();
+  await expect(page.getByRole("heading", { name: "Account registrations" })).toBeVisible();
   await page.getByRole("button", { name: "Audit Logs", exact: true }).filter({ visible: true }).click();
   await expect(page.getByText(/History is incomplete: Identity decisions/)).toBeVisible();
   await expect(page.getByText("Confirmed successful plumbing repair")).toBeVisible();

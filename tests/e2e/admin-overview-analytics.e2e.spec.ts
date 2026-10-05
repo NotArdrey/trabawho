@@ -18,6 +18,14 @@ for (const width of [390, 768, 1024, 1280, 1440]) {
     await expect(page.getByRole("img", { name: /Account registrations: 3 in this period/i })).toBeVisible();
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width);
 
+    const breakdown = page.getByRole("button", { name: "View daily breakdown" }).first();
+    await breakdown.click();
+    const dailyCounts = page.getByRole("list", { name: "Account registrations daily counts" });
+    await expect(dailyCounts.getByRole("listitem")).toHaveCount(1);
+    await page.getByRole("region", { name: "Hide daily breakdown" }).first().getByRole("button", { name: /All days/ }).click();
+    await expect(dailyCounts.getByRole("listitem")).toHaveCount(30);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width);
+
     await page.getByRole("combobox", { name: "Period" }).click();
     await page.getByRole("option", { name: "Last 7 days" }).click();
     await expect(page.getByRole("heading", { name: "Activity in the last 7 days" })).toBeVisible();
