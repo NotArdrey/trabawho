@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { supabase } from '@/integrations/supabase';
-import { clearPendingAccount, pendingAccount } from '@/shared/services/pendingAccountRecovery';
+import { clearPendingAccount, pendingAccount, type PendingAccount } from '@/shared/services/pendingAccountRecovery';
 import { signOutUser } from '@/shared/services/authSessionService';
 export { clearPendingAccount, pendingAccount, savePendingAccount, type PendingAccount } from '@/shared/services/pendingAccountRecovery';
 
@@ -19,6 +19,13 @@ const stateSchema = z.object({
 export type AccountRegistration = z.infer<typeof stateSchema>;
 export type SignupRole = NonNullable<AccountRegistration['signupRole']>;
 
+export class RegistrationRequestError extends Error {
+  constructor(message: string, public readonly status: number) {
+    super(message);
+    this.name = 'RegistrationRequestError';
+  }
+}
+
 export async function accountRequest(name: string, body: Record<string, unknown>): Promise<unknown> {
   const result = await supabase.functions.invoke<unknown>(name, { body });
   if (result.error) {
@@ -26,7 +33,9 @@ export async function accountRequest(name: string, body: Record<string, unknown>
     if (error && typeof error === 'object' && 'context' in error && error.context instanceof Response) {
       const payload: unknown = await error.context.clone().json().catch(() => null);
       const parsed = z.object({ error: z.string() }).safeParse(payload);
-      if (parsed.success) throw new Error(parsed.data.error);
+      if (parsed.success) throw new RegistrationRequestError(parsed.data.error, error.context.status);
+      if (error.context.status === 401)
+        throw new RegistrationRequestError('Sign in to continue your registration.', 401);
     }
     throw new Error('The service could not be reached. Check your connection and retry.');
   }
@@ -37,22 +46,32 @@ export async function accountRequest(name: string, body: Record<string, unknown>
 export async function registrationRequest(name: string, body: Record<string, unknown>) {
   return stateSchema.parse(await accountRequest(name, { ...body, redirectTo: `${window.location.origin}/register` }));
 }
+async function resumePendingRegistration(pending: PendingAccount) {
+  const state = await registrationRequest('account-registration', { action: 'state', ...pending });
+  if (state.state === 'ready' && state.session) {
+    const signedIn = await supabase.auth.setSession(state.session);
+    if (signedIn.error) throw new Error('Your account is ready. Sign in to continue.');
+    clearPendingAccount();
+  }
+  return state;
+}
 export async function resumeRegistration() {
   const session = await supabase.auth.getSession();
   if (session.error) throw new Error('Your session could not be restored. Sign in again.');
-  if (!session.data.session) {
-    const pending = pendingAccount();
-    if (!pending) return null;
-    const state = await registrationRequest('account-registration', { action: 'state', ...pending });
-    if (state.state === 'ready' && state.session) {
-      const signedIn = await supabase.auth.setSession(state.session);
-      if (signedIn.error) throw new Error('Your account is ready. Sign in to continue.');
-      clearPendingAccount();
-    }
+  const pending = pendingAccount();
+  if (!session.data.session) return pending ? resumePendingRegistration(pending) : null;
+  const sameAccount = pending?.userId === session.data.session.user.id;
+  if (!sameAccount) clearPendingAccount();
+  try {
+    const state = await registrationRequest('account-registration', { action: 'state' });
+    clearPendingAccount();
     return state;
+  } catch (cause) {
+    // A rejected cached session must not discard valid recovery for this account.
+    if (cause instanceof RegistrationRequestError && cause.status === 401 && pending && sameAccount)
+      return resumePendingRegistration(pending);
+    throw cause;
   }
-  clearPendingAccount();
-  return registrationRequest('account-registration', { action: 'state' });
 }
 export async function signInForRegistration(email: string, password: string) {
   const result = await supabase.auth.signInWithPassword({ email, password });

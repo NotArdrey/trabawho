@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { pendingAccount, registrationRequest, registrationSignOut, resumeRegistration, savePendingAccount, signInForRegistration, subscribeToRegistrationAuth,
+import { pendingAccount, registrationRequest, RegistrationRequestError, registrationSignOut, resumeRegistration, savePendingAccount, signInForRegistration, subscribeToRegistrationAuth,
   type AccountRegistration, type PendingAccount, type SignupRole } from '@/shared/services/accountRegistrationService';
 
 export function useAccountRegistration() {
@@ -9,10 +9,11 @@ export function useAccountRegistration() {
   const [message, setMessage] = useState(''); const working = useRef(false);
   const [initializing, setInitializing] = useState(true);
   const [restoreFailed, setRestoreFailed] = useState(false);
+  const [restoreNeedsSignIn, setRestoreNeedsSignIn] = useState(false);
   const authEpoch = useRef(0);
   useEffect(() => subscribeToRegistrationAuth(() => {
     authEpoch.current += 1;
-    setRegistration(null); setPending(null); setError(''); setMessage(''); setRestoreFailed(false);
+    setRegistration(null); setPending(null); setError(''); setMessage(''); setRestoreFailed(false); setRestoreNeedsSignIn(false);
   }, () => setPending(null)), []);
   const run = useCallback(async (action: () => Promise<void>) => {
     if (working.current) return false;
@@ -26,16 +27,26 @@ export function useAccountRegistration() {
   }, []);
   const refresh = useCallback(() => run(async () => {
     const epoch = authEpoch.current;
-    const state = await resumeRegistration();
-    if (epoch !== authEpoch.current) return;
-    if (state && !pendingAccount()) setPending(null);
-    else setPending(pendingAccount());
-    if (state?.state === 'identity_in_progress') {
-      const result = await registrationRequest('account-didit-session', { action: 'get_session', ...pendingAccount() });
+    setRestoreNeedsSignIn(false);
+    try {
+      const state = await resumeRegistration();
       if (epoch !== authEpoch.current) return;
-      setRegistration({ ...result, signupRole: result.signupRole ?? state.signupRole });
+      if (state && !pendingAccount()) setPending(null);
+      else setPending(pendingAccount());
+      if (state?.state === 'identity_in_progress') {
+        const result = await registrationRequest('account-didit-session', { action: 'get_session', ...pendingAccount() });
+        if (epoch !== authEpoch.current) return;
+        setRegistration({ ...result, signupRole: result.signupRole ?? state.signupRole });
+      }
+      else setRegistration(state && state.state !== 'legacy' ? state : null);
+      setRestoreFailed(false);
+    } catch (cause) {
+      if (epoch === authEpoch.current) setRestoreNeedsSignIn(
+        (cause instanceof RegistrationRequestError && cause.status === 401) ||
+        (cause instanceof Error && /sign in/i.test(cause.message)),
+      );
+      throw cause;
     }
-    else setRegistration(state && state.state !== 'legacy' ? state : null);
   }), [run]);
   useEffect(() => {
     let mounted = true;
@@ -88,11 +99,11 @@ export function useAccountRegistration() {
   const resume = (email: string, password: string) => run(async () => {
     const state = await signInForRegistration(email, password);
     if (state.state === 'legacy') throw new Error('This account uses the existing verification flow. Sign in from the login page.');
-    setRegistration(state); setPending(null);
+    setRegistration(state); setPending(null); setRestoreFailed(false); setRestoreNeedsSignIn(false);
   });
   const startNewRegistration = () => run(async () => {
     await registrationSignOut();
-    setRegistration(null); setPending(null); setRestoreFailed(false);
+    setRegistration(null); setPending(null); setRestoreFailed(false); setRestoreNeedsSignIn(false);
   });
   const registrationState = registration?.state;
   useEffect(() => {
@@ -107,7 +118,7 @@ export function useAccountRegistration() {
   }, [registrationState, pending, refresh]);
   return { registration: registration || (pending ? { state: 'identity_pending' as const, email: pending.email, signupName: pending.signupName || '' } : null), busy, error, message,
     completingSession: registrationState === 'ready' && Boolean(pending),
-    create, saveName, emailAction, identityAction, resume, refresh, startNewRegistration, initializing, restoreFailed, retryRestore };
+    create, saveName, emailAction, identityAction, resume, refresh, startNewRegistration, initializing, restoreFailed, restoreNeedsSignIn, retryRestore };
 }
 
 export type AccountRegistrationFlow = ReturnType<typeof useAccountRegistration>;

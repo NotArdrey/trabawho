@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { pendingAccount, registrationRequest, savePendingAccount, resumeRegistration, signInForRegistration, subscribeToRegistrationAuth } from './accountRegistrationService';
+import { pendingAccount, registrationRequest, RegistrationRequestError, savePendingAccount, resumeRegistration, signInForRegistration, subscribeToRegistrationAuth } from './accountRegistrationService';
 const { invoke, getSession, signInWithPassword, onAuthStateChange, setSession } = vi.hoisted(() => ({ invoke: vi.fn(), getSession: vi.fn(), signInWithPassword: vi.fn(), onAuthStateChange: vi.fn(), setSession: vi.fn() }));
 vi.mock('@/integrations/supabase', () => ({ supabase: { functions: { invoke }, auth: { getSession, signInWithPassword, onAuthStateChange, setSession } } }));
 beforeEach(() => { vi.resetAllMocks(); sessionStorage.clear(); });
@@ -51,6 +51,30 @@ describe('account registration transport and recovery', () => {
     await resumeRegistration();
     expect(pendingAccount()).toBeNull();
   });
+  it('restores with same-account recovery when the saved login session is rejected', async () => {
+    savePendingAccount({ userId: 'pending', nonce: 'recovery', email: 'pending@example.com' });
+    getSession.mockResolvedValue({ data: { session: { user: { id: 'pending' } } }, error: null });
+    invoke.mockResolvedValueOnce({ error: { context: new Response(JSON.stringify({ error: 'Sign in to continue your registration.' }), { status: 401 }) } })
+      .mockResolvedValueOnce({ data: { state: 'identity_pending', signupName: 'Ana Santos' }, error: null });
+    await expect(resumeRegistration()).resolves.toMatchObject({ state: 'identity_pending', signupName: 'Ana Santos' });
+    expect(invoke).toHaveBeenLastCalledWith('account-registration', { body: { action: 'state', userId: 'pending', nonce: 'recovery', email: 'pending@example.com', redirectTo: `${window.location.origin}/register` } });
+    expect(pendingAccount()?.userId).toBe('pending');
+  });
+  it('never restores another pending account when a saved login session is rejected', async () => {
+    savePendingAccount({ userId: 'old', nonce: 'recovery', email: 'old@example.com' });
+    getSession.mockResolvedValue({ data: { session: { user: { id: 'new' } } }, error: null });
+    invoke.mockResolvedValue({ error: { context: new Response('{}', { status: 401 }) } });
+    await expect(resumeRegistration()).rejects.toMatchObject({ status: 401 });
+    expect(invoke).toHaveBeenCalledOnce();
+    expect(pendingAccount()).toBeNull();
+  });
+  it('retains same-account recovery when registration is temporarily unavailable', async () => {
+    savePendingAccount({ userId: 'pending', nonce: 'recovery', email: 'pending@example.com' });
+    getSession.mockResolvedValue({ data: { session: { user: { id: 'pending' } } }, error: null });
+    invoke.mockResolvedValue({ error: { context: new Response('{}', { status: 503 }) } });
+    await expect(resumeRegistration()).rejects.toThrow();
+    expect(pendingAccount()?.userId).toBe('pending');
+  });
   it('clears recovery on auth changes and unsubscribes, while preserving unsigned initial sessions', () => {
     const unsubscribe = vi.fn();
     onAuthStateChange.mockReturnValue({ data: { subscription: { unsubscribe } } });
@@ -90,6 +114,14 @@ describe('account registration transport and recovery', () => {
     invoke.mockResolvedValueOnce({ data: { state: 'approved-by-browser' }, error: null });
     await expect(registrationRequest('account-registration', {})).rejects.toThrow();
   });
+  it.each([JSON.stringify({ error: 'Sign in to continue your registration.' }), 'Unauthorized'])(
+    'preserves authentication failure status even when the gateway response is %s', async (body) => {
+      invoke.mockResolvedValue({ error: { context: new Response(body, { status: 401 }) } });
+      const failure = await registrationRequest('account-registration', { action: 'state' }).catch((cause: unknown) => cause);
+      expect(failure).toBeInstanceOf(RegistrationRequestError);
+      expect(failure).toMatchObject({ status: 401, message: 'Sign in to continue your registration.' });
+    },
+  );
   it('restores the server-owned account type and rejects unsupported roles', async () => {
     invoke.mockResolvedValueOnce({ data: { state: 'ready', signupRole: 'worker' }, error: null });
     await expect(registrationRequest('account-registration', { action: 'state' })).resolves.toMatchObject({ signupRole: 'worker' });

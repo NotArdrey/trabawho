@@ -8,6 +8,7 @@ const mocks = vi.hoisted(() => ({
 }));
 vi.mock('@/shared/services/accountRegistrationService', () => ({
   ...mocks, registrationRequest: vi.fn(), savePendingAccount: vi.fn(), signInForRegistration: vi.fn(),
+  RegistrationRequestError: class extends Error { readonly status = 401; },
 }));
 beforeEach(() => {
   vi.resetAllMocks();
@@ -54,5 +55,25 @@ describe('registration auth lifecycle', () => {
     await act(async () => { await result.current.startNewRegistration(); });
     expect(mocks.registrationSignOut).toHaveBeenCalledOnce();
     expect(result.current.registration).toBeNull();
+  });
+  it('offers sign-in recovery without losing saved details, then clears the failure after a successful retry', async () => {
+    mocks.resumeRegistration.mockRejectedValueOnce(new Error('Sign in to continue your registration.'));
+    const { result } = renderHook(() => useAccountRegistration());
+    await waitFor(() => expect(result.current.initializing).toBe(false));
+    expect(result.current.restoreFailed).toBe(true);
+    expect(result.current.restoreNeedsSignIn).toBe(true);
+    expect(result.current.registration?.email).toBe('old@example.com');
+    mocks.resumeRegistration.mockResolvedValue({ state: 'identity_pending', email: 'old@example.com', signupName: 'Ana Santos' });
+    await act(async () => { await result.current.retryRestore(); });
+    expect(result.current.restoreFailed).toBe(false);
+    expect(result.current.restoreNeedsSignIn).toBe(false);
+    expect(result.current.registration?.signupName).toBe('Ana Santos');
+  });
+  it('keeps connection failures retryable instead of asking for sign-in', async () => {
+    mocks.resumeRegistration.mockRejectedValue(new Error('The service could not be reached. Check your connection and retry.'));
+    const { result } = renderHook(() => useAccountRegistration());
+    await waitFor(() => expect(result.current.initializing).toBe(false));
+    expect(result.current.restoreFailed).toBe(true);
+    expect(result.current.restoreNeedsSignIn).toBe(false);
   });
 });
