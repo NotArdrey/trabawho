@@ -24,6 +24,11 @@ describe("booking filter meaning", () => {
   it("does not silently show all records for an unknown filter", () => {
     expect(matchesBookingHubFilter({ status: "Active Service" }, "unknown", "incoming")).toBe(false);
   });
+  it.each(["Pending", "Pending Response", "Negotiating", "Awaiting Slot Selection"])("shows %s in the provider inquiry tab", (status) => {
+    expect(matchesBookingHubFilter({ status }, "inquiries", "incoming")).toBe(true);
+    expect(matchesBookingHubFilter({ status }, "inquiries", "purchases")).toBe(false);
+    expect(matchesBookingHubFilter({ status: "Cancelled" }, "inquiries", "incoming")).toBe(false);
+  });
   it("keeps a cancelled visit in history and tracks its refund separately", () => {
     const booking = { status: "Cancelled", paymentStatus: "refund_pending" };
     expect(matchesBookingHubFilter(booking, "cancelled", "purchases")).toBe(true);

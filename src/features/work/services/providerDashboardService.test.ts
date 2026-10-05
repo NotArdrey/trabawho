@@ -36,3 +36,14 @@ it("shows the accepted replacement on the provider's upcoming schedule", async (
   expect(snapshot.nextAppointment?.status).toBe("Replacement visit confirmed");
   expect(snapshot.actions).toContainEqual(expect.objectContaining({ title: "Replacement visit confirmed", bookingId: "booking-1" }));
 });
+
+it("marks cash and refund alerts with the work section that owns the action", async () => {
+  vi.mocked(fetchSellerBookings).mockResolvedValue([
+    { id: "cash-1", status: "Cash Verification Pending", cashConfirmationStatus: "pending-worker-review" },
+    { id: "refund-1", status: "Refund Processing", refundStatus: "requested" },
+  ] as never);
+  vi.mocked(getActiveReplacementSchedules).mockResolvedValue(new Map());
+  const snapshot = await fetchProviderDashboardSnapshot("provider-1", {});
+  expect(snapshot.actions).toContainEqual(expect.objectContaining({ bookingId: "cash-1", destination: "work", workSection: "cash-approvals" }));
+  expect(snapshot.actions).toContainEqual(expect.objectContaining({ bookingId: "refund-1", destination: "work", workSection: "refunds" }));
+});

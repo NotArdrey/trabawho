@@ -18,6 +18,7 @@ export interface ProviderActionItem {
   bookingId?: string;
   conversationId?: string;
   destination: ProviderActionDestination;
+  workSection?: "cash-approvals" | "refunds";
 }
 
 export interface ProviderScheduleItem {

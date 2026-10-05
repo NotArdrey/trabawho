@@ -11,6 +11,7 @@ import {
   Star,
   Store,
 } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -20,6 +21,8 @@ import { WorkflowEmptyState, WorkflowPanel, WorkflowStatGrid } from "@/component
 import DashboardNavigation from "@/shared/components/DashboardNavigation";
 import { useProviderDashboard } from "@/features/work/hooks/useProviderDashboard";
 import type { ProviderActionItem, ProviderScheduleItem, ProviderServiceHealth } from "@/features/work/types/provider-dashboard";
+import { providerActionPath, providerBookingPath } from "@/features/work/domain/providerQuickNav";
+import { paths } from "@/app/router/routes";
 
 type SellerProfile = Record<string, unknown> & {
   userId?: string;
@@ -86,11 +89,11 @@ function AttentionPanel({ actions, onOpen }: { actions: readonly ProviderActionI
   );
 }
 
-function SchedulePanel({ items, nextAppointment, onOpenBookings, onManageAvailability }: { items: readonly ProviderScheduleItem[]; nextAppointment: ProviderScheduleItem | null; onOpenBookings?: () => void; onManageAvailability?: () => void }) {
+function SchedulePanel({ items, nextAppointment, onOpenBooking, onManageAvailability }: { items: readonly ProviderScheduleItem[]; nextAppointment: ProviderScheduleItem | null; onOpenBooking: (bookingId: string) => void; onManageAvailability?: () => void }) {
   return (
     <WorkflowPanel icon={CalendarCheck} title="Today's schedule" description={items.length ? `${items.length} job${items.length === 1 ? "" : "s"} scheduled` : "No jobs scheduled today"} tone="primary">
-      {items.length ? <div className="divide-y px-2 py-1">{items.slice(0, 4).map((item) => <button key={item.id} type="button" className="group flex min-h-[68px] w-full items-start gap-3 rounded-lg px-2 py-3 text-left hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:px-3" onClick={onOpenBookings}><Clock3 className="mt-0.5 size-4 shrink-0 text-primary" aria-hidden="true" /><span className="min-w-0 flex-1"><strong className="block text-sm">{item.service}</strong><span className="mt-1 block text-xs leading-5 text-muted-foreground">{item.client} · {item.schedule}</span></span><ArrowRight className="mt-1 size-4 shrink-0 text-muted-foreground group-hover:text-primary" aria-hidden="true" /></button>)}</div> : <WorkflowEmptyState icon={CalendarCheck} title="Your day is clear" description="Set availability so clients can book a time that works for you." tone="primary" action={<Button type="button" size="sm" onClick={onManageAvailability}>Manage availability</Button>} />}
-      {nextAppointment && !items.some((item) => item.id === nextAppointment.id) ? <div className="border-t bg-muted/20 px-4 py-4 sm:px-5"><p className="text-xs font-bold uppercase tracking-wide text-muted-foreground">Next appointment</p><p className="mt-2 text-sm font-semibold">{nextAppointment.service}</p><p className="mt-1 text-xs text-muted-foreground">{nextAppointment.client} · {nextAppointment.schedule}</p></div> : null}
+      {items.length ? <div className="divide-y px-2 py-1">{items.slice(0, 4).map((item) => <button key={item.id} type="button" className="group flex min-h-[68px] w-full items-start gap-3 rounded-lg px-2 py-3 text-left hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:px-3" onClick={() => onOpenBooking(item.bookingId)}><Clock3 className="mt-0.5 size-4 shrink-0 text-primary" aria-hidden="true" /><span className="min-w-0 flex-1"><strong className="block text-sm">{item.service}</strong><span className="mt-1 block text-xs leading-5 text-muted-foreground">{item.client} · {item.schedule}</span></span><ArrowRight className="mt-1 size-4 shrink-0 text-muted-foreground group-hover:text-primary" aria-hidden="true" /></button>)}</div> : <WorkflowEmptyState icon={CalendarCheck} title="Your day is clear" description="Set availability so clients can book a time that works for you." tone="primary" action={<Button type="button" size="sm" onClick={onManageAvailability}>Manage availability</Button>} />}
+      {nextAppointment && !items.some((item) => item.id === nextAppointment.id) ? <button type="button" className="group flex min-h-20 w-full items-center justify-between gap-3 border-t bg-muted/20 px-4 py-4 text-left hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring sm:px-5" onClick={() => onOpenBooking(nextAppointment.bookingId)}><span><span className="block text-xs font-bold uppercase tracking-wide text-muted-foreground">Next appointment</span><span className="mt-2 block text-sm font-semibold">{nextAppointment.service}</span><span className="mt-1 block text-xs text-muted-foreground">{nextAppointment.client} · {nextAppointment.schedule}</span></span><ArrowRight className="size-4 shrink-0 text-muted-foreground group-hover:text-primary" aria-hidden="true" /></button> : null}
     </WorkflowPanel>
   );
 }
@@ -127,17 +130,18 @@ function WorkerDashboard({
   onOpenAdminDashboard,
 }: WorkerDashboardProps) {
   const userId = String(sellerProfile?.userId || sellerProfile?.user_id || "");
+  const navigate = useNavigate();
   const { snapshot, isLoading, error, refresh } = useProviderDashboard(userId, sellerProfile);
 
   const openAction = (action: ProviderActionItem) => {
     if (action.destination === "messages") onOpenChatPage?.(action.bookingId || action.conversationId || null, "incoming");
-    else if (action.destination === "bookings") onOpenMyBookings?.();
-    else onOpenMyWork?.();
+    else { const path = providerActionPath(action); if (path) void navigate(path); }
   };
 
   const openMetric = (metricId: keyof typeof metricIcons) => {
     if (metricId === "messages") onOpenChatPage?.(null, "incoming");
-    else if (metricId === "today" || metricId === "inquiries") onOpenMyBookings?.();
+    else if (metricId === "inquiries") void navigate(`${paths.workerBookings}?scope=incoming&filter=inquiries`);
+    else if (metricId === "today") onOpenMyBookings?.();
     else onOpenMyWork?.();
   };
 
@@ -185,7 +189,7 @@ function WorkerDashboard({
 
                 <section className="grid gap-4 lg:grid-cols-[minmax(0,1.65fr)_minmax(18rem,0.85fr)]">
                   <AttentionPanel actions={snapshot.actions} onOpen={openAction} />
-                  <SchedulePanel items={snapshot.todaySchedule} nextAppointment={snapshot.nextAppointment} onOpenBookings={onOpenMyBookings} onManageAvailability={onOpenMyWork} />
+                  <SchedulePanel items={snapshot.todaySchedule} nextAppointment={snapshot.nextAppointment} onOpenBooking={(bookingId) => { void navigate(providerBookingPath(bookingId)); }} onManageAvailability={onOpenMyWork} />
                 </section>
 
                 <ServiceHealthPanel health={snapshot.serviceHealth} onManageServices={onOpenMyWork} />

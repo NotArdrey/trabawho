@@ -5,6 +5,7 @@ import WorkerDashboard from "./WorkerDashboard";
 import type { ProviderDashboardSnapshot } from "@/features/work/types/provider-dashboard";
 
 const refresh = vi.fn();
+const navigate = vi.hoisted(() => vi.fn());
 interface ProviderDashboardHookResult {
   snapshot: ProviderDashboardSnapshot | null;
   isLoading: boolean;
@@ -15,6 +16,7 @@ interface ProviderDashboardHookResult {
 const useProviderDashboard = vi.fn<(userId: string, profile: unknown) => ProviderDashboardHookResult>();
 
 vi.mock("@/shared/components/DashboardNavigation", () => ({ default: () => <nav>Provider navigation</nav> }));
+vi.mock("react-router-dom", async (importOriginal) => ({ ...await importOriginal<Record<string, unknown>>(), useNavigate: () => navigate }));
 vi.mock("@/features/work/hooks/useProviderDashboard", () => ({ useProviderDashboard: (userId: string, profile: unknown) => useProviderDashboard(userId, profile) }));
 
 const snapshot: ProviderDashboardSnapshot = {
@@ -37,6 +39,7 @@ const snapshot: ProviderDashboardSnapshot = {
 describe("WorkerDashboard", () => {
   beforeEach(() => {
     refresh.mockClear();
+    navigate.mockClear();
     useProviderDashboard.mockReturnValue({ snapshot, isLoading: false, error: "", refresh });
   });
 
@@ -59,7 +62,28 @@ describe("WorkerDashboard", () => {
     expect(screen.getByText("₱1,500")).toBeVisible();
     fireEvent.click(screen.getByRole("button", { name: "Open incoming bookings" }));
     fireEvent.click(screen.getByRole("button", { name: /Respond to client request/i }));
-    expect(onOpenMyBookings).toHaveBeenCalledTimes(2);
+    expect(onOpenMyBookings).not.toHaveBeenCalled();
+    expect(navigate).toHaveBeenCalledWith("/worker/bookings?scope=incoming&filter=all&q=booking-1");
+  });
+
+  it("routes payment and refund alerts to the matching My Work queue", () => {
+    useProviderDashboard.mockReturnValue({ snapshot: { ...snapshot, actions: [
+      { id: "cash-1", priority: 1, title: "Review payment confirmation", detail: "Ana", bookingId: "booking-1", destination: "work", workSection: "cash-approvals" },
+      { id: "refund-1", priority: 1, title: "Review refund request", detail: "Ben", bookingId: "booking-2", destination: "work", workSection: "refunds" },
+    ] }, isLoading: false, error: "", refresh });
+    render(<WorkerDashboard sellerProfile={{ userId: "worker-1" }} />);
+    fireEvent.click(screen.getByRole("button", { name: /Review payment confirmation/ }));
+    fireEvent.click(screen.getByRole("button", { name: /Review refund request/ }));
+    expect(navigate).toHaveBeenNthCalledWith(1, "/work?section=cash-approvals&booking=booking-1");
+    expect(navigate).toHaveBeenNthCalledWith(2, "/work?section=refunds&booking=booking-2");
+  });
+
+  it("opens the specific scheduled booking and the inquiry tab", () => {
+    render(<WorkerDashboard sellerProfile={{ userId: "worker-1" }} />);
+    fireEvent.click(screen.getByRole("button", { name: "Open incoming bookings" }));
+    expect(navigate).toHaveBeenCalledWith("/worker/bookings?scope=incoming&filter=inquiries");
+    fireEvent.click(screen.getByRole("button", { name: /Home repairAna/ }));
+    expect(navigate).toHaveBeenCalledWith("/worker/bookings?scope=incoming&filter=all&q=booking-2");
   });
 
   it("makes clear queues and an empty day recognizable and actionable", () => {
@@ -78,6 +102,8 @@ describe("WorkerDashboard", () => {
     render(<WorkerDashboard sellerProfile={{ userId: "worker-1" }} />);
     expect(screen.getByText("Next appointment")).toBeVisible();
     expect(screen.getByText("Ana · Sep 8, 2:00 PM")).toBeVisible();
+    fireEvent.click(screen.getByRole("button", { name: /Next appointment/ }));
+    expect(navigate).toHaveBeenCalledWith("/worker/bookings?scope=incoming&filter=all&q=booking-2");
   });
 
   it("shows incomplete service health without inventing a rating", () => {

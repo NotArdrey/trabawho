@@ -12,6 +12,11 @@ const COMPLETED = ["Completed Service", "Service Stopped"];
 const CANCELLED = ["Cancelled", "Cancelled (Cash)"];
 const TERMINAL = [...COMPLETED, ...CANCELLED, "Refunded", "Refund Simulated"];
 const PAYMENT_DUE = ["Payment Pending", "Slot Selected - Payment Pending", "Downpayment Paid"];
+const INQUIRY_STATUSES = new Set(["pending", "pending response", "negotiating", "awaiting slot selection"]);
+
+export function isBookingInquiry(booking: FilterableBooking) {
+  return !isBookingTerminal(booking) && INQUIRY_STATUSES.has(booking.status.trim().toLowerCase());
+}
 
 export function isBookingTerminal(booking: FilterableBooking) {
   return TERMINAL.includes(booking.status) || booking.refundSimulated === true || booking.paymentStatus === "refunded";
@@ -40,6 +45,7 @@ export function matchesBookingHubFilter(booking: FilterableBooking, filter: stri
     || ["refund_pending", "refunded"].includes(booking.paymentStatus || "")
     || ["Refund Processing", "Refunded", "Refund Simulated"].includes(booking.status);
   if (filter === "delivered") return !isBookingTerminal(booking) && (booking.deliveryStatus === "seller_claimed" || booking.status === "Service Delivered");
+  if (filter === "inquiries") return scope === "incoming" && isBookingInquiry(booking);
   if (filter === "scheduled") return !isBookingTerminal(booking) && ["Payment Confirmed", "Service Scheduled", "Active Service"].includes(booking.status);
   if (filter === "payment-due") return isBookingPaymentDue(booking);
   if (filter === "action-needed") return isBookingActionNeeded(booking, scope);

@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import MyWork from "./MyWork";
 import type { WorkPaymentTransaction } from "../types/payment";
 
-const state = vi.hoisted(() => ({ transactions: [] as WorkPaymentTransaction[] }));
+const state = vi.hoisted(() => ({ transactions: [] as WorkPaymentTransaction[], refundTransactions: [] as WorkPaymentTransaction[], cashTransactions: [] as WorkPaymentTransaction[] }));
 
 vi.mock("@/shared/components/DashboardNavigation", () => ({ default: () => null }));
 vi.mock("../hooks", () => {
@@ -23,7 +23,7 @@ vi.mock("../hooks", () => {
     }),
     useWorkPayments: () => ({
       transactions: state.transactions, weekTransactions: [],
-      cancelledCashTransactions: [], cashConfirmationNotifications: [], refundTransactions: [],
+      cancelledCashTransactions: [], cashConfirmationNotifications: state.cashTransactions, refundTransactions: state.refundTransactions,
       cashPaymentView: "pending",
     }),
   };
@@ -47,6 +47,9 @@ function expectCount(label: string, count: number) {
 describe("MyWork booking summary", () => {
   beforeEach(() => {
     state.transactions = [];
+    state.refundTransactions = [];
+    state.cashTransactions = [];
+    window.history.replaceState({}, "", "/");
     Object.defineProperty(HTMLElement.prototype, "scrollIntoView", { configurable: true, value: vi.fn() });
   });
 
@@ -82,5 +85,24 @@ describe("MyWork booking summary", () => {
     expect(within(manager).queryByRole("combobox")).not.toBeInTheDocument();
     expect(within(screen.getByRole("region", { name: "Current service summary" }))
       .getByRole("heading", { name: "Arnold Lim Castillo" })).toBeVisible();
+  });
+
+  it("opens the linked refund section and focuses the referenced booking", () => {
+    window.history.replaceState({}, "", "/work?section=refunds&booking=refund-1");
+    state.refundTransactions = [{ id: "refund-1", clientName: "Ana", service: "Repair", refundStatus: "requested" }];
+    render(<MyWork {...props} />);
+    expect(screen.getByTestId("work-refund-section")).toBeVisible();
+    expect(screen.queryByTestId("work-cash-section")).not.toBeInTheDocument();
+    expect(document.getElementById("work-payment-target")).toHaveTextContent("Ana");
+    expect(document.activeElement).toBe(document.getElementById("work-payment-target"));
+  });
+
+  it("opens the linked cash approval section", () => {
+    window.history.replaceState({}, "", "/work?section=cash-approvals&booking=cash-1");
+    state.cashTransactions = [{ id: "cash-1", clientName: "Ben", service: "Cleaning", cashConfirmationStatus: "pending-worker-review" }];
+    render(<MyWork {...props} />);
+    expect(screen.getByTestId("work-cash-section")).toBeVisible();
+    expect(screen.queryByTestId("work-refund-section")).not.toBeInTheDocument();
+    expect(document.getElementById("work-payment-target")).toHaveTextContent("Ben");
   });
 });

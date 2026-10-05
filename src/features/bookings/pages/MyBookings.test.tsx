@@ -167,6 +167,31 @@ describe('MyBookings Redesign Component', () => {
     expect(screen.getByText(/Oct 5, 2026.*1:07 PM PHT/)).toBeVisible();
   });
 
+  test('a provider quick link isolates an expired booking outside the Scheduled tab', () => {
+    mockCurrentBookings = [
+      { ...mockBookings[0], id: 'expired-1', status: 'Reservation Expired' },
+      { ...mockBookings[0], id: 'other-2', status: 'Service Scheduled' },
+    ];
+    renderBookings(<MyBookings currentView="worker-bookings" sellerProfile={{ role: 'worker', userId: 'worker-1' }} />,
+      '/worker/bookings?scope=incoming&filter=all&q=expired-1');
+    expect(screen.getByRole('button', { name: 'All, 2' })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('searchbox', { name: 'Search bookings' })).toHaveValue('expired-1');
+    expect(screen.getByTestId('booking-card-expired-1')).toBeInTheDocument();
+    expect(screen.queryByTestId('booking-card-other-2')).not.toBeInTheDocument();
+  });
+
+  test('the provider inquiry tab includes pending requests that are not scheduled', () => {
+    mockCurrentBookings = [
+      { ...mockBookings[0], id: 'pending-1', status: 'Pending Response' },
+      { ...mockBookings[0], id: 'scheduled-2', status: 'Service Scheduled' },
+    ];
+    renderBookings(<MyBookings currentView="worker-bookings" sellerProfile={{ role: 'worker', userId: 'worker-1' }} />,
+      '/worker/bookings?scope=incoming&filter=inquiries');
+    expect(screen.getByRole('button', { name: 'Inquiries, 1' })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByTestId('booking-card-pending-1')).toBeInTheDocument();
+    expect(screen.queryByTestId('booking-card-scheduled-2')).not.toBeInTheDocument();
+  });
+
   test.each([
     { view: 'my-bookings', scope: 'purchases', label: 'My Bookings' },
     { view: 'worker-bookings', scope: 'incoming', label: 'Bookings' },

@@ -141,7 +141,7 @@ const MyWork = ({ appTheme = 'light', themeMode = 'system', onThemeChange, curre
   const [doneConfirmTarget, setDoneConfirmTarget] = useState(null);
   const [profileEditModalOpen, setProfileEditModalOpen] = useState(false);
   const [hoverKey, setHoverKey] = useState('');
-  const [workSectionFilter, setWorkSectionFilter] = useState('all'); // all | inquiries | cash-approvals | refunds | cancelled
+  const [workSectionFilter, setWorkSectionFilter] = useState(() => { const section = new URLSearchParams(window.location.search).get('section'); return ['cash-approvals', 'refunds'].includes(section) ? section : 'all'; });
   const [isMobile, setIsMobile] = useState(() =>
     typeof window !== 'undefined' ? window.innerWidth <= 768 : false
   );
@@ -786,7 +786,7 @@ const MyWork = ({ appTheme = 'light', themeMode = 'system', onThemeChange, curre
               onApproveRefund={handleApproveRefund}
               onCashReview={handleRequestCashConfirmationReview}
               onCashViewChange={setCashPaymentView}
-              refundTransactions={refundTransactions}
+              refundTransactions={refundTransactions} targetBookingId={new URLSearchParams(window.location.search).get('booking')}
               showCancelled={showCancelledSection}
               showCash={showCashApprovalSection}
               showRefunds={showRefundSection}

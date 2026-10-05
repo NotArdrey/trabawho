@@ -10,8 +10,12 @@ test.beforeEach(async ({ page }) => {
   await page.route("**/src/features/bookings/hooks/useBookingActivity.ts*", async (route) => { await route.fulfill({ contentType: "application/javascript", body: "export function useBookingActivity() {}" }); });
   await page.route("**/src/features/work/hooks/useProviderDashboard.ts*", async (route) => {
     await route.fulfill({ contentType: "application/javascript", body: `export function useProviderDashboard() { return { isLoading: false, error: '', refresh() {}, snapshot: {
-      providerName: 'Jose', hasProviderSetup: true, metrics: [{ id: 'messages', label: 'Unread messages', value: '1', detail: 'Client message' }],
-      actions: [{ id: 'message-1', priority: 3, title: 'Unread client message', detail: 'Hello from Ana', conversationId: 'chat-1', destination: 'messages' }],
+      providerName: 'Jose', hasProviderSetup: true, metrics: [{ id: 'inquiries', label: 'Open inquiries', value: '1', detail: 'Waiting for your response' }, { id: 'messages', label: 'Unread messages', value: '1', detail: 'Client message' }],
+      actions: [
+        { id: 'message-1', priority: 3, title: 'Unread client message', detail: 'Hello from Ana', conversationId: 'chat-1', destination: 'messages' },
+        { id: 'booking-1', priority: 5, title: 'Active booking update', detail: 'Reservation Expired', bookingId: 'expired-1', destination: 'bookings' },
+        { id: 'refund-1', priority: 1, title: 'Review refund request', detail: 'Ana', bookingId: 'refund-1', destination: 'work', workSection: 'refunds' },
+      ],
       todaySchedule: [], nextAppointment: null, serviceHealth: { activeListings: 1, totalListings: 1, availableSlots: 1, rating: null, reviewCount: 0 }
     }}; }` });
   });
@@ -40,6 +44,22 @@ for (const width of [390, 768, 1024, 1280, 1440]) {
     await expect(page.getByRole("heading", { name: "Incoming chats" })).toBeVisible();
     await expect(page.getByRole("region", { name: "Incoming messages" }).getByText("Hello from Ana")).toBeVisible();
     await expect(page.getByText("New incoming message")).toBeVisible();
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  });
+
+  test(`provider quick links preserve the booking and work queue at ${width}px`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 900 });
+    await page.goto("/__provider-journey");
+    await page.getByRole("button", { name: "Open incoming bookings" }).click();
+    await expect(page).toHaveURL(/worker\/bookings\?scope=incoming&filter=inquiries/);
+
+    await page.goto("/__provider-journey");
+    await page.getByRole("button", { name: /Active booking update/ }).click();
+    await expect(page).toHaveURL(/worker\/bookings\?scope=incoming&filter=all&q=expired-1/);
+
+    await page.goto("/__provider-journey");
+    await page.getByRole("button", { name: /Review refund request/ }).click();
+    await expect(page).toHaveURL(/work\?section=refunds&booking=refund-1/);
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
   });
 }

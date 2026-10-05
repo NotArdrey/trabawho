@@ -1,5 +1,6 @@
 import { supabase } from "@/integrations/supabase";
 import { fetchSellerBookings } from "@/features/bookings/services/bookingService";
+import { isBookingInquiry } from "@/features/bookings/utils/bookingFilters";
 import { getActiveReplacementSchedules } from "@/features/bookings/services/replacementSchedules";
 import { loadWorkerProfileServices } from "@/features/work/services/workerService";
 import type {
@@ -14,7 +15,6 @@ type UnknownRecord = Record<string, unknown>;
 const loadProviderServices = loadWorkerProfileServices as unknown as (input: { userId: string; fallbackProfile: unknown }) => Promise<unknown>;
 
 const TERMINAL_STATUSES = new Set(["completed service", "service stopped", "cancelled", "cancelled (cash)", "refunded"]);
-const INQUIRY_STATUSES = new Set(["pending", "pending response", "negotiating", "awaiting slot selection"]);
 
 const asRecord = (value: unknown): UnknownRecord => value && typeof value === "object" ? value as UnknownRecord : {};
 const text = (...values: unknown[]) => values.find((value): value is string => typeof value === "string" && Boolean(value.trim()))?.trim() || "";
@@ -106,10 +106,10 @@ function bookingAction(booking: UnknownRecord, now: Date): ProviderActionItem | 
       : undefined,
     bookingId: id,
   };
-  if (text(booking.cashConfirmationStatus) === "pending-worker-review") return { ...base, priority: 1, title: "Review payment confirmation", destination: "work" };
-  if (text(booking.refundStatus) && !["completed", "approved"].includes(text(booking.refundStatus).toLowerCase())) return { ...base, priority: 1, title: "Review refund request", destination: "work" };
+  if (text(booking.cashConfirmationStatus) === "pending-worker-review") return { ...base, priority: 1, title: "Review payment confirmation", destination: "work", workSection: "cash-approvals" };
+  if (text(booking.refundStatus) && !["completed", "approved"].includes(text(booking.refundStatus).toLowerCase())) return { ...base, priority: 1, title: "Review refund request", destination: "work", workSection: "refunds" };
   if (text(booking.activeReplacementStartAt)) return { ...base, priority: 2, title: "Replacement visit confirmed", destination: "bookings" };
-  if (INQUIRY_STATUSES.has(normalizedStatus)) return { ...base, priority: 2, title: "Respond to client request", destination: "bookings" };
+  if (isBookingInquiry({ status })) return { ...base, priority: 2, title: "Respond to client request", destination: "bookings" };
   if (date && sameDay(date, now) && !TERMINAL_STATUSES.has(normalizedStatus)) return { ...base, priority: 4, title: "Job scheduled today", destination: "bookings" };
   if (!TERMINAL_STATUSES.has(normalizedStatus)) return { ...base, priority: 5, title: "Active booking update", destination: "bookings" };
   return null;
@@ -149,7 +149,7 @@ export async function fetchProviderDashboardSnapshot(userId: string, fallbackPro
   const earnings = confirmedEarnings(bookings);
   const now = new Date();
   const activeBookings = bookings.filter((booking) => !TERMINAL_STATUSES.has(text(booking.status).toLowerCase()));
-  const openInquiries = activeBookings.filter((booking) => INQUIRY_STATUSES.has(text(booking.status).toLowerCase()));
+  const openInquiries = activeBookings.filter((booking) => isBookingInquiry({ status: text(booking.status) }));
   const scheduled = activeBookings
     .filter((booking) => bookingDate(booking))
     .sort((left, right) => (bookingDate(left)?.getTime() || 0) - (bookingDate(right)?.getTime() || 0));

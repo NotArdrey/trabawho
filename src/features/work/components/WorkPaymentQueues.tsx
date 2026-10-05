@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { Ban, CircleDollarSign, RotateCcw } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
@@ -22,6 +23,7 @@ interface WorkPaymentQueuesProps {
   showCancelled: boolean;
   showCash: boolean;
   showRefunds: boolean;
+  targetBookingId?: string | null;
 }
 
 const formatAmount = (amount?: number) => `₱${Number(amount || 0).toLocaleString("en-PH")}`;
@@ -30,12 +32,13 @@ function QueueList({ children }: { children: React.ReactNode }) {
   return <ul className="divide-y divide-border">{children}</ul>;
 }
 
-function QueueRow({ children, tone = "neutral" }: { children: React.ReactNode; tone?: "neutral" | "refund" | "cancelled" }) {
+function QueueRow({ children, tone = "neutral", targeted = false, targetId }: { children: React.ReactNode; tone?: "neutral" | "refund" | "cancelled"; targeted?: boolean; targetId?: string }) {
   return (
-    <li className={cn(
+    <li id={targeted ? targetId : undefined} tabIndex={targeted ? -1 : undefined} className={cn(
       "grid gap-3 px-4 py-4 sm:px-5",
       tone === "refund" && "bg-primary/[0.025]",
       tone === "cancelled" && "bg-destructive/[0.025]",
+      targeted && "rounded-lg bg-primary/10 outline-none ring-2 ring-inset ring-primary",
     )}>
       {children}
     </li>
@@ -69,7 +72,16 @@ export default function WorkPaymentQueues({
   showCancelled,
   showCash,
   showRefunds,
+  targetBookingId,
 }: WorkPaymentQueuesProps) {
+  useEffect(() => {
+    if (!targetBookingId) return;
+    const target = document.getElementById("work-payment-target");
+    if (!target) return;
+    target.focus({ preventScroll: true });
+    target.scrollIntoView?.({ block: "center" });
+  }, [cashTransactions, refundTransactions, showCash, showRefunds, targetBookingId]);
+
   return (
     <>
       {showCash && (
@@ -83,7 +95,7 @@ export default function WorkPaymentQueues({
           ) : (
             <QueueList>
               {cashTransactions.map((transaction) => (
-                <QueueRow key={`confirm-${transaction.id}`}>
+                <QueueRow key={`confirm-${transaction.id}`} targeted={String(transaction.id) === targetBookingId} targetId="work-payment-target">
                   <QueueHeading status={<CashStatus status={transaction.cashConfirmationStatus} />}>{transaction.clientName || "Client"}</QueueHeading>
                   <p className="text-sm font-semibold text-foreground">{transaction.service || "Service"}</p>
                   <dl className="grid gap-1 text-xs text-muted-foreground sm:grid-cols-2">
@@ -111,7 +123,7 @@ export default function WorkPaymentQueues({
           ) : (
             <QueueList>
               {refundTransactions.map((transaction) => (
-                <QueueRow key={`refund-${transaction.id}`} tone="refund">
+                <QueueRow key={`refund-${transaction.id}`} tone="refund" targeted={String(transaction.id) === targetBookingId} targetId="work-payment-target">
                   <QueueHeading status={<RefundStatusBadge status={transaction.refundStatus} />}>{transaction.clientName || "Client"}</QueueHeading>
                   <p className="text-sm font-semibold text-primary">{transaction.service || "Service"}</p>
                   <div className="grid gap-1 text-xs text-muted-foreground">

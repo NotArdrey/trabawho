@@ -503,7 +503,7 @@ const MyBookings = ({
   ], [bookingListCtrl.isLoading, allBookings.length, activeBookingsCount, completedBookingsCount, pendingActionCount, shouldLoadSellerBookings]);
   const filterDefinitions = shouldLoadSellerBookings
     ? [
-        ['action-needed', 'Action needed'],
+        ['inquiries', 'Inquiries'], ['action-needed', 'Action needed'],
         ['scheduled', 'Scheduled'],
         ['delivered', 'Delivered'],
         ['all', 'All'],
