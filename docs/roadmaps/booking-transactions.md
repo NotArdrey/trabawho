@@ -472,7 +472,7 @@ Priority: P0
 - [ ] Retrying booking creation returns the existing booking.
 - [ ] A provider cannot book their own listing.
 
-### Provider-wide calendar for multiple services (local implementation; not deployed)
+### Provider-wide calendar for multiple services
 
 Providers may publish multiple active services, but a solo provider can accept
 only one appointment at a time across all of them. The homepage features at
@@ -480,22 +480,30 @@ most one recently listed service per provider; search still exposes every
 active service. New time-slot editors present a one-booking limit rather than
 an independent capacity for each service.
 
-The pending `20261005113000_featured_provider_diversity.sql` migration selects
-the latest active service from each visible provider. The pending
+The deployed `20261005113000_featured_provider_diversity.sql` migration selects
+the latest active service from each visible provider. The deployed
 `20261005113100_provider_calendar_conflicts.sql` migration serializes a
 provider's booking transactions and rejects overlapping direct bookings,
 reschedules, and accepted replacement visits. Public availability hides
 conflicting slots without exposing other clients' booking records. Expired
-holds, cancellation, and completion release time according to their existing
-states. Existing slot-capacity values are preserved for audit; new writes are
-normalized to one, and public availability presents an effective limit of one.
-These migrations and their dependent frontend changes must be released
-together; the database changes have **not** been applied to the shared project.
+holds and cancellation release time; completed visits retain their original
+window. Existing slot-capacity values were preserved for audit, although new
+writes are normalized to one. A read-only audit on October 5, 2026 found one
+historical same-slot overlap created before the provider guard was deployed;
+many future legacy slots still stored capacity above one. The follow-up
+`20261006122000_prevent_future_provider_double_bookings.sql` was applied to the
+linked test database on October 5, 2026. It normalized those future slots,
+marked occupied ones booked, and added an explicit same-slot check to the
+provider-wide guard. It did not delete or cancel existing bookings. A
+post-deployment read-only audit found zero future slots with capacity above
+one, zero occupied future slots marked available, and zero future active
+overlaps; the one historical conflict remains for support review.
 
 - [ ] Run the read-only [`provider calendar audit`](../../scripts/audit-provider-calendar.sql)
       before applying the migrations. Review existing overlapping bookings and
       legacy slots with capacity above one without deleting customer history.
-- [ ] Apply migrations in order, then deploy the dependent frontend.
+- [x] Apply the follow-up migration and verify future slots expose only one
+      place per provider window without changing historical booking records.
 - [ ] Exercise concurrent checkouts across two services from one provider,
       quote checkout, paid and unpaid reschedules, accepted replacement visits,
       expiry, cancellation, and availability refresh against a test database.
