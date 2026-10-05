@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { CalendarCheck, CheckCircle2, MapPin, Star, UserRound } from "lucide-react";
+import { ArrowRight, CalendarCheck, CheckCircle2, MapPin, Star, UserRound } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 
@@ -80,8 +80,8 @@ function ServiceCard({
         <div className="mt-auto pt-5">
           <div className="flex flex-col gap-3 border-t pt-4">
             <span className="break-words text-sm font-bold text-foreground">{service.priceLabel || "Ask provider for pricing"}</span>
-            <Button variant="outline" className="w-full" onClick={() => onSelect({ query: service.title })}>
-              Browse similar services
+            <Button variant="outline" className="min-h-11 w-full border-primary/25 bg-primary/10 font-semibold text-primary hover:border-primary/40 hover:bg-primary/15 hover:text-primary dark:bg-primary/15 dark:hover:bg-primary/25" onClick={() => onSelect({ query: service.title })}>
+              Browse similar services <ArrowRight className="size-4" aria-hidden="true" />
             </Button>
           </div>
         </div>

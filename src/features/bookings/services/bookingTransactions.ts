@@ -13,11 +13,27 @@ const asRecord = (value: Json | undefined): Record<string, Json | undefined> =>
   value !== null && typeof value === "object" && !Array.isArray(value) ? value : {};
 const safeError = (message?: string) => {
   const normalized = String(message || "").toLowerCase();
+  if (normalized.includes("quote has expired") || normalized.includes("proposed schedule is in the past")) return new Error("This quote has expired. Ask the provider for a new price and time.");
+  if (normalized.includes("newer quote") || normalized.includes("quote is no longer available")) return new Error("This offer has changed. Review the latest quote before continuing.");
+  if (normalized.includes("already has a booking") || normalized.includes("conflicts with another booking")) return new Error("The provider is already booked at that time. Choose another time before sending a quote.");
+  if (normalized.includes("cannot receive a new quote") || normalized.includes("already has an active schedule or payment") || normalized.includes("cannot receive a quote response")) return new Error("This booking already has a schedule or payment, so its quote cannot be changed.");
+  if (normalized.includes("cannot receive a quote")) return new Error("This request is no longer open for a quote.");
   if (normalized.includes("just booked") || normalized.includes("no longer available")) return new Error("That time is no longer available. Choose another time to continue.");
   if (normalized.includes("past")) return new Error("Choose a future date and time.");
   if (normalized.includes("own service")) return new Error("You cannot book your own service.");
   if (normalized.includes("permission") || normalized.includes("only the")) return new Error("You do not have permission to complete this booking action.");
   return new Error("We could not update this booking. Your existing details are unchanged.");
+};
+
+const quoteError = (error: { code?: string; message: string }) => {
+  if (["PGRST202", "PGRST204", "42703", "42883"].includes(error.code || "")) {
+    return new Error("Quotes are temporarily unavailable because the booking database needs an update. No quote was sent. Please contact support.");
+  }
+  const mapped = safeError(error.message);
+  if (mapped.message.startsWith("We could not update")) {
+    return new Error("We could not send this quote. Refresh the booking and try again; if it still fails, contact support with the booking reference.");
+  }
+  return mapped;
 };
 
 export async function createBookingRequest(serviceId: number, requestId = operationId("request")) {
@@ -28,8 +44,18 @@ export async function createBookingRequest(serviceId: number, requestId = operat
 
 export async function proposeBookingQuote(input: { amount: number; bookingId: string; endAt: string; operationId?: string; scopeSummary: string; startAt: string }): Promise<QuoteProposalResult> {
   const { data, error } = await supabase.rpc("propose_booking_quote", { p_booking_id: input.bookingId, p_amount: input.amount, p_start_ts: input.startAt, p_end_ts: input.endAt, p_scope_summary: input.scopeSummary, p_operation_id: input.operationId || operationId("quote") });
-  if (error) throw safeError(error.message);
+  if (error) throw quoteError(error);
   return asRecord(data) as unknown as QuoteProposalResult;
+}
+
+export async function respondBookingQuote(input: { action: "request_changes" | "decline"; bookingId: string; feedback: string; quoteVersion: number; operationId?: string }): Promise<BookingRow> {
+  const { data, error } = await supabase.rpc("respond_booking_quote", {
+    p_booking_id: input.bookingId, p_quote_version: input.quoteVersion,
+    p_action: input.action, p_feedback: input.feedback,
+    p_operation_id: input.operationId || operationId(`quote-${input.action}`),
+  });
+  if (error) throw quoteError(error);
+  return data;
 }
 
 export async function rejectBookingQuote(input: { bookingId: string; quoteVersion: number; reason: string; operationId?: string }): Promise<BookingRow> {

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Banknote, MessageSquareText, PhilippinePeso, Send, Sparkles } from "lucide-react";
+import { Banknote, MessageSquareText, Send, Sparkles } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -9,15 +9,19 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import { getProfilePhotoUrl } from "@/shared/utils/profilePhoto";
 import type { WorkInquiry } from "@/features/work/types/inquiry";
+import { BookingQuoteCard } from "@/features/bookings/components/BookingQuoteCard";
+import { ProviderQuoteComposer, type QuoteProposalInput } from "@/features/bookings/components/ProviderQuoteComposer";
+import { proposeBookingQuote } from "@/features/bookings/services/bookingTransactions";
+import type { BookingQuote } from "@/features/bookings/types/booking-transactions";
+import { fetchBookingById } from "@/features/bookings/services/bookingService";
 import {
   fetchBookingMessages,
   sendBookingMessage,
-  updateBookingWorkflow,
 } from "@/features/bookings";
 
 type ComposerMode = "message" | "quote";
@@ -42,6 +46,14 @@ export interface InquiryChatModalProps {
   onError?: (message: string) => void;
 }
 
+interface InquiryBookingSnapshot {
+  activeQuote?: BookingQuote | null;
+  id: string;
+  paymentStatus?: string;
+  scheduleStatus?: string;
+  status?: string;
+}
+
 const QUICK_REPLY = "Hi! I'm available to help. Could you confirm the preferred date and any important details?";
 const errorMessage = (error: unknown, fallback: string) => error instanceof Error ? error.message : fallback;
 const sendMessage = sendBookingMessage as unknown as (
@@ -54,8 +66,7 @@ function InquiryChatModal({ inquiry, onClose, onBookingUpdated, onError }: Inqui
   const [messages, setMessages] = useState<InquiryMessage[]>([]);
   const [replyText, setReplyText] = useState("");
   const [composerMode, setComposerMode] = useState<ComposerMode>("message");
-  const [quoteAmount, setQuoteAmount] = useState("");
-  const [quoteDescription, setQuoteDescription] = useState("");
+  const [bookingSnapshot, setBookingSnapshot] = useState<InquiryBookingSnapshot | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const savingRef = useRef(false);
@@ -64,15 +75,19 @@ function InquiryChatModal({ inquiry, onClose, onBookingUpdated, onError }: Inqui
   useEffect(() => {
     let mounted = true;
     const loadMessages = async () => {
-      if (!inquiry.booking) {
+      const bookingId = typeof inquiry.booking?.id === "string" ? inquiry.booking.id : null;
+      if (!inquiry.booking || !bookingId) {
         setMessages([]);
         setIsLoading(false);
         return;
       }
       try {
         setIsLoading(true);
-        const rows = await fetchBookingMessages(inquiry.booking) as InquiryMessage[];
-        if (mounted) setMessages(rows);
+        const [rows, booking] = await Promise.all([
+          fetchBookingMessages(inquiry.booking) as Promise<InquiryMessage[]>,
+          fetchBookingById(bookingId) as Promise<InquiryBookingSnapshot>,
+        ]);
+        if (mounted) { setMessages(rows); setBookingSnapshot(booking); }
       } catch (error) {
         if (mounted) onError?.(errorMessage(error, "Unable to load inquiry messages."));
       } finally {
@@ -109,48 +124,25 @@ function InquiryChatModal({ inquiry, onClose, onBookingUpdated, onError }: Inqui
     }
   };
 
-  const sendQuote = async () => {
-    if (savingRef.current) return;
-    const amount = Number(quoteAmount);
-    if (!Number.isFinite(amount) || amount <= 0 || !inquiry.booking) {
-      onError?.("Enter a valid quote amount before sending.");
-      return;
-    }
-    const description = quoteDescription.trim() || `Quote for ${inquiry.service}`;
-    savingRef.current = true;
-    try {
-      setIsSaving(true);
-      const updatedBooking = await updateBookingWorkflow(inquiry.booking, {
-        quoteAmount: amount,
-        status: "Negotiating",
-        dbStatus: "pending",
-      });
-      const saved = await sendMessage(inquiry.booking, description, {
-        type: "quote",
-        amount,
-        description,
-        note: "Seller quote saved to the booking record.",
-      });
-      setMessages((current) => [...current, saved]);
-      setComposerMode("message");
-      setQuoteAmount("");
-      setQuoteDescription("");
-      onBookingUpdated?.(updatedBooking);
-    } catch (error) {
-      onError?.(errorMessage(error, "Unable to send quote."));
-    } finally {
-      savingRef.current = false;
-      setIsSaving(false);
-    }
+  const sendQuote = async (input: QuoteProposalInput) => {
+    const bookingId = typeof inquiry.booking?.id === "string" ? inquiry.booking.id : null;
+    if (!bookingId) throw new Error("This request is no longer available.");
+    await proposeBookingQuote({ bookingId, ...input });
+    const updatedBooking = await fetchBookingById(bookingId) as InquiryBookingSnapshot;
+    setBookingSnapshot(updatedBooking);
+    setComposerMode("message");
+    onBookingUpdated?.(updatedBooking);
   };
 
   const openQuote = () => {
-    if (!quoteAmount) {
-      const proposed = inquiry.proposedBudget?.match(/[\d,.]+/)?.[0]?.replaceAll(",", "");
-      if (proposed && Number(proposed) > 0) setQuoteAmount(proposed);
-    }
     setComposerMode("quote");
   };
+
+  const canQuote = Boolean(inquiry.booking?.id && bookingSnapshot
+    && !["Completed Service", "Cancelled", "Cancelled (Cash)", "Service Stopped", "Refund Processing", "Refunded"].includes(bookingSnapshot.status || "")
+    && !["held", "confirmed", "reschedule_requested"].includes(bookingSnapshot.scheduleStatus || "")
+    && !["partially_paid", "paid", "refund_pending", "refunded"].includes(bookingSnapshot.paymentStatus || ""));
+  const proposedAmount = inquiry.proposedBudget?.match(/[\d,.]+/)?.[0]?.replaceAll(",", "") || "";
 
   const showConversation = composerMode === "message" || messages.length > 0 || isLoading;
 
@@ -161,7 +153,7 @@ function InquiryChatModal({ inquiry, onClose, onBookingUpdated, onError }: Inqui
           "grid w-[calc(100vw-1rem)] max-w-[36rem]! gap-0 overflow-hidden rounded-2xl p-0 shadow-xl sm:w-[calc(100vw-2rem)]",
           "max-h-[calc(100svh-2rem)] grid-rows-[auto_auto_minmax(13.75rem,auto)_auto]",
           "max-sm:max-h-[calc(100svh-1rem)] max-sm:rounded-xl",
-          composerMode === "quote" && "grid-rows-[auto_auto_auto]",
+          composerMode === "quote" && "grid-rows-[auto_auto_minmax(0,1fr)]",
         )}
         data-testid="inquiry-response-dialog"
       >
@@ -186,17 +178,18 @@ function InquiryChatModal({ inquiry, onClose, onBookingUpdated, onError }: Inqui
         {showConversation ? (
           <div
             ref={messageListRef}
-            className="min-h-[13.75rem] max-h-[46svh] overflow-y-auto overscroll-contain bg-muted/30 p-5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden max-sm:min-h-[11.875rem] max-sm:max-h-[40svh] max-sm:px-4"
+            className="min-h-[13.75rem] max-h-[46svh] overflow-y-auto overscroll-contain bg-muted/30 p-5 max-sm:min-h-[11.875rem] max-sm:max-h-[40svh] max-sm:px-4"
             aria-live="polite"
             aria-label="Conversation messages"
           >
             {isLoading ? <EmptyConversation loading /> : messages.length ? messages.map((message) => (
               <MessageBubble key={message.id} message={message} />
             )) : <EmptyConversation />}
+            {bookingSnapshot?.activeQuote ? <BookingQuoteCard quote={bookingSnapshot.activeQuote} canRespond={false} /> : null}
           </div>
         ) : null}
 
-        <div className="border-t bg-background px-3 pb-3 pt-2.5">
+        <div className={cn("border-t bg-background px-3 pb-3 pt-2.5", composerMode === "quote" && "min-h-0 overflow-y-auto overscroll-contain")}>
           {composerMode === "message" ? (
             <MessageComposer
               clientName={inquiry.clientName}
@@ -204,19 +197,11 @@ function InquiryChatModal({ inquiry, onClose, onBookingUpdated, onError }: Inqui
               replyText={replyText}
               onChange={setReplyText}
               onOpenQuote={openQuote}
+              canQuote={canQuote}
               onSend={() => void sendReply()}
             />
           ) : (
-            <QuoteComposer
-              amount={quoteAmount}
-              description={quoteDescription}
-              inquiry={inquiry}
-              isSaving={isSaving}
-              onAmountChange={setQuoteAmount}
-              onBack={() => setComposerMode("message")}
-              onDescriptionChange={setQuoteDescription}
-              onSend={() => void sendQuote()}
-            />
+            <ProviderQuoteComposer initialAmount={proposedAmount} onCancel={() => setComposerMode("message")} onSubmit={sendQuote} />
           )}
         </div>
       </DialogContent>
@@ -249,6 +234,7 @@ function MessageBubble({ message }: { message: InquiryMessage }) {
 }
 
 interface MessageComposerProps {
+  canQuote: boolean;
   clientName: string;
   isSaving: boolean;
   onChange: (value: string) => void;
@@ -257,15 +243,15 @@ interface MessageComposerProps {
   replyText: string;
 }
 
-function MessageComposer({ clientName, isSaving, onChange, onOpenQuote, onSend, replyText }: MessageComposerProps) {
+function MessageComposer({ canQuote, clientName, isSaving, onChange, onOpenQuote, onSend, replyText }: MessageComposerProps) {
   return <>
     <div className="mb-2 flex gap-1 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden" aria-label="Response options">
       <Button type="button" variant="ghost" size="sm" className="min-h-9 text-muted-foreground" onClick={() => onChange(QUICK_REPLY)}><Sparkles aria-hidden="true" />Use quick reply</Button>
-      <Button type="button" variant="ghost" size="sm" className="min-h-9 text-muted-foreground" onClick={onOpenQuote}><Banknote aria-hidden="true" />Create quote</Button>
+      {canQuote ? <Button type="button" variant="ghost" size="sm" className="min-h-11 text-muted-foreground" onClick={onOpenQuote}><Banknote aria-hidden="true" />Create quote</Button> : null}
     </div>
     <div className="flex items-end gap-2">
       <Label htmlFor="inquiry-reply" className="sr-only">Reply to {clientName}</Label>
-      <textarea id="inquiry-reply" className="min-h-12 max-h-32 flex-1 resize-y rounded-lg border bg-background p-3 text-sm leading-5 outline-none focus-visible:ring-2 focus-visible:ring-ring" placeholder="Write a reply..." value={replyText} rows={2} onChange={(event) => onChange(event.target.value)} onKeyDown={(event) => {
+      <Textarea id="inquiry-reply" className="min-h-12 max-h-32 flex-1 resize-y" placeholder="Write a reply..." value={replyText} rows={2} onChange={(event) => onChange(event.target.value)} onKeyDown={(event) => {
         if (event.key === "Enter" && !event.shiftKey) {
           event.preventDefault();
           if (!event.repeat && !event.nativeEvent.isComposing && !isSaving) onSend();
@@ -275,31 +261,6 @@ function MessageComposer({ clientName, isSaving, onChange, onOpenQuote, onSend, 
     </div>
     <p className="mx-0.5 mb-0 mt-1.5 text-[11px] text-muted-foreground">Enter to send · Shift + Enter for a new line</p>
   </>;
-}
-
-interface QuoteComposerProps {
-  amount: string;
-  description: string;
-  inquiry: WorkInquiry;
-  isSaving: boolean;
-  onAmountChange: (value: string) => void;
-  onBack: () => void;
-  onDescriptionChange: (value: string) => void;
-  onSend: () => void;
-}
-
-function QuoteComposer({ amount, description, inquiry, isSaving, onAmountChange, onBack, onDescriptionChange, onSend }: QuoteComposerProps) {
-  return <div className="grid gap-4 p-2">
-    <div><strong>Create a price quote</strong><p className="mt-0.5 text-xs text-muted-foreground">Review the amount and describe exactly what the client will receive.</p></div>
-    <div className="grid items-start gap-4 sm:grid-cols-[minmax(10rem,0.65fr)_minmax(16rem,1.35fr)]">
-      <div className="space-y-2"><Label htmlFor="quote-amount">Amount (PHP)</Label><div className="relative"><PhilippinePeso className="pointer-events-none absolute left-3 top-1/2 z-10 size-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" /><Input id="quote-amount" className="pl-9 text-base tabular-nums" type="text" inputMode="decimal" placeholder="0.00" value={amount} onChange={(event) => {
-        const next = event.target.value.replace(/[^\d.]/g, "");
-        if ((next.match(/\./g) ?? []).length <= 1) onAmountChange(next);
-      }} /></div>{inquiry.proposedBudget ? <p className="mt-1.5 text-[11px] text-muted-foreground">Client budget: {inquiry.proposedBudget}</p> : null}</div>
-      <div className="space-y-2"><Label htmlFor="quote-description">Scope and inclusions <span className="font-normal text-muted-foreground">(optional)</span></Label><textarea id="quote-description" className="min-h-[5.75rem] w-full resize-y rounded-lg border bg-background px-3 py-2.5 text-sm leading-5 outline-none focus-visible:ring-2 focus-visible:ring-ring" placeholder="Describe labor, materials, and important limitations." value={description} rows={3} onChange={(event) => onDescriptionChange(event.target.value)} /></div>
-    </div>
-    <div className="flex justify-end gap-2 border-t pt-3.5 max-sm:[&>button]:flex-1"><Button type="button" variant="outline" onClick={onBack}>Back to reply</Button><Button type="button" onClick={onSend} disabled={!amount || Number(amount) <= 0} isLoading={isSaving}><Send aria-hidden="true" />Send quote</Button></div>
-  </div>;
 }
 
 export default InquiryChatModal;

@@ -2,12 +2,13 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import { isSupabaseConfigured, supabase, type Database } from "@/integrations/supabase";
 import type { AppNotification } from "./notification-center";
-import { bookingNotification, caseNotification, messageNotification } from "./notification-items";
+import { bookingNotification, caseNotification, messageNotification, quoteNotification } from "./notification-items";
 
 type BookingRow = Database["public"]["Tables"]["bookings"]["Row"];
 type ConversationRow = Database["public"]["Tables"]["conversations"]["Row"];
 type MessageRow = Database["public"]["Tables"]["messages"]["Row"];
 type CaseMessageRow = Database["public"]["Tables"]["booking_case_messages"]["Row"];
+type QuoteRow = Database["public"]["Tables"]["booking_quotes"]["Row"];
 
 const MAX_NOTIFICATIONS = 30;
 
@@ -62,32 +63,46 @@ function useRealtimeNotifications(providedUserId?: string) {
       const conversations = (conversationResult.data || []) as ConversationRow[];
       conversationIds.current = new Set(conversations.map((row) => row.id));
       const ids = [...conversationIds.current];
+      const bookings = (bookingResult.data || []) as BookingRow[];
+      const bookingIds = bookings.map((booking) => booking.id);
       const caseNotices = caseNoticeResult.error ? [] : caseNoticeResult.data || [];
-      const [messageResult, caseMessageResult] = await Promise.all([
+      const [messageResult, caseMessageResult, quoteResult] = await Promise.all([
         ids.length
           ? supabase.from("messages").select("*").in("conversation_id", ids).neq("sender_id", userId).order("created_at", { ascending: false }).limit(30)
           : Promise.resolve({ data: [] as MessageRow[], error: null }),
         caseNotices.length
           ? supabase.from("booking_case_messages").select("*").in("id", [...new Set(caseNotices.map((notice) => notice.message_id))])
           : Promise.resolve({ data: [] as CaseMessageRow[], error: null }),
+        bookingIds.length
+          ? supabase.from("booking_quotes").select("*").in("booking_id", bookingIds).order("updated_at", { ascending: false }).limit(30)
+          : Promise.resolve({ data: [] as QuoteRow[], error: null }),
       ]);
       if (messageResult.error) throw messageResult.error;
       if (!active || sequence !== loadSequence) return;
       const byConversation = new Map(conversations.map((row) => [row.id, row]));
       const byCaseMessage = new Map((caseMessageResult.error ? [] : caseMessageResult.data || []).map((row) => [row.id, row]));
+      const byBooking = new Map(bookings.map((row) => [row.id, row]));
+      const quotedBookingIds = new Set((quoteResult.error ? [] : quoteResult.data || []).map((row) => row.booking_id));
 
       setNotifications([
-        ...((bookingResult.data || []) as BookingRow[]).map((row) => bookingNotification(row, userId, readIds.current)),
+        ...bookings.filter((row) => !quotedBookingIds.has(row.id)
+          || (row.status !== "pending" && !(row.status === "cancelled" && row.quote_status === "declined")))
+          .map((row) => bookingNotification(row, userId, readIds.current)),
         ...((messageResult.data || []) as MessageRow[]).flatMap((row) => {
           const conversation = byConversation.get(row.conversation_id);
           return conversation ? [messageNotification(row, conversation, userId, readIds.current)] : [];
         }),
         ...caseNotices.map((notice) => caseNotification(notice, byCaseMessage.get(notice.message_id))),
+        ...((quoteResult.error ? [] : quoteResult.data || []) as QuoteRow[]).flatMap((quote) => {
+          const booking = byBooking.get(quote.booking_id);
+          const item = booking ? quoteNotification(quote, booking, userId, readIds.current) : null;
+          return item ? [item] : [];
+        }),
       ].sort((left, right) => String(right.createdAt).localeCompare(String(left.createdAt))).slice(0, MAX_NOTIFICATIONS));
       setLoadedForUserId(userId);
       hasLoaded = true;
       setError("");
-      if (caseNoticeResult.error || caseMessageResult.error) setActionError("Some support alerts could not be loaded. Try again shortly.");
+      if (caseNoticeResult.error || caseMessageResult.error || quoteResult.error) setActionError("Some updates could not be loaded. Try again shortly.");
       setIsLoading(false);
     };
 

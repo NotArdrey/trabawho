@@ -7,10 +7,12 @@ import InquiryChatModal from "./InquiryChatModal";
 const bookingApi = vi.hoisted(() => ({
   fetchBookingMessages: vi.fn(),
   sendBookingMessage: vi.fn(),
-  updateBookingWorkflow: vi.fn(),
 }));
+const quoteApi = vi.hoisted(() => ({ proposeBookingQuote: vi.fn(), fetchBookingById: vi.fn() }));
 
 vi.mock("@/features/bookings", () => bookingApi);
+vi.mock("@/features/bookings/services/bookingTransactions", () => ({ proposeBookingQuote: quoteApi.proposeBookingQuote }));
+vi.mock("@/features/bookings/services/bookingService", () => ({ fetchBookingById: quoteApi.fetchBookingById }));
 
 const inquiry = {
   booking: { id: "booking-1" },
@@ -31,7 +33,8 @@ beforeEach(() => {
     content: "Available tomorrow.",
     timestamp: "Now",
   });
-  bookingApi.updateBookingWorkflow.mockReset().mockResolvedValue({ id: "booking-1" });
+  quoteApi.proposeBookingQuote.mockReset().mockResolvedValue({ quote: { id: "quote-1" } });
+  quoteApi.fetchBookingById.mockReset().mockResolvedValue({ id: "booking-1", status: "Negotiating", scheduleStatus: "unscheduled", paymentStatus: "unpaid" });
 });
 
 describe("InquiryChatModal", () => {
@@ -59,20 +62,19 @@ describe("InquiryChatModal", () => {
     await screen.findByText("Start the conversation");
 
     await user.click(screen.getByRole("button", { name: "Create quote" }));
-    expect(screen.getByLabelText("Amount (PHP)")).toHaveValue("900");
+    expect(screen.getByLabelText("Service price (PHP)")).toHaveValue(900);
     expect(screen.getAllByRole("dialog")).toHaveLength(1);
 
-    await user.type(screen.getByLabelText(/Scope and inclusions/), "Labor and installation materials");
+    await user.type(screen.getByLabelText("Included work"), "Labor and installation materials");
+    fireEvent.change(screen.getByLabelText("Starts (PHT)"), { target: { value: "2099-10-06T10:00" } });
+    fireEvent.change(screen.getByLabelText("Ends (PHT)"), { target: { value: "2099-10-06T11:00" } });
+    await user.click(screen.getByRole("button", { name: "Review quote" }));
     await user.click(screen.getByRole("button", { name: "Send quote" }));
 
-    await waitFor(() => expect(bookingApi.updateBookingWorkflow).toHaveBeenCalledWith(
-      inquiry.booking,
-      expect.objectContaining({ quoteAmount: 900 }),
-    ));
-    expect(bookingApi.sendBookingMessage).toHaveBeenCalledWith(
-      inquiry.booking,
-      "Labor and installation materials",
-      expect.objectContaining({ type: "quote", amount: 900 }),
-    );
+    await waitFor(() => expect(quoteApi.proposeBookingQuote).toHaveBeenCalledWith(expect.objectContaining({
+      bookingId: "booking-1", amount: 900, scopeSummary: "Labor and installation materials",
+      startAt: "2099-10-06T02:00:00.000Z", endAt: "2099-10-06T03:00:00.000Z",
+    })));
+    expect(bookingApi.sendBookingMessage).not.toHaveBeenCalled();
   });
 });

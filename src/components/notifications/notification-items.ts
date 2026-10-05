@@ -7,6 +7,7 @@ type ConversationRow = Database["public"]["Tables"]["conversations"]["Row"];
 type MessageRow = Database["public"]["Tables"]["messages"]["Row"];
 type CaseNoticeRow = Database["public"]["Tables"]["booking_case_notifications"]["Row"];
 type CaseMessageRow = Database["public"]["Tables"]["booking_case_messages"]["Row"];
+type QuoteRow = Database["public"]["Tables"]["booking_quotes"]["Row"];
 
 function formatRelativeTime(value: string) {
   const difference = new Date(value).getTime() - Date.now();
@@ -57,6 +58,25 @@ export function messageNotification(row: MessageRow, conversation: ConversationR
     isRead: readIds.has(id) || hasReadBy(row.read_by, userId), type: "message",
     href: `${paths.messages}/${encodeURIComponent(conversation.booking_id || conversation.id)}?scope=${scope}`,
   };
+}
+
+export function quoteNotification(row: QuoteRow, booking: BookingRow, userId: string, readIds: Set<string>): AppNotification | null {
+  const isClient = booking.buyer_id === userId;
+  if ((row.status === "proposed" && !isClient) ||
+      (["changes_requested", "declined", "accepted"].includes(row.status) && isClient) ||
+      !["proposed", "changes_requested", "declined", "accepted", "expired"].includes(row.status)) return null;
+  const id = `quote:${row.id}:${row.status}`;
+  const labels: Record<string, [string, string]> = {
+    proposed: ["New provider quote", "Review the proposed price and appointment."],
+    changes_requested: ["Quote changes requested", "The client asked you to revise your offer."],
+    declined: ["Quote declined", "The client declined the offer and closed the request."],
+    accepted: ["Quote accepted", "The client started checkout for your offer."],
+    expired: ["Quote expired", "This offer can no longer be accepted."],
+  };
+  const [title, message] = labels[row.status];
+  return { id, title, message, time: formatRelativeTime(row.updated_at), createdAt: row.updated_at,
+    isRead: readIds.has(id), type: "quote",
+    href: `${paths.messages}/${encodeURIComponent(row.booking_id)}?scope=${isClient ? "purchases" : "incoming"}` };
 }
 
 export function caseNotification(notice: CaseNoticeRow, message: CaseMessageRow | undefined): AppNotification {

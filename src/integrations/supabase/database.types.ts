@@ -125,7 +125,7 @@ export interface Database {
         currency: string | null;
         payment_reference: string | null;
         metadata: Json | null;
-        quote_status: "not_required" | "awaiting_quote" | "proposed" | "accepted" | "rejected";
+        quote_status: "not_required" | "awaiting_quote" | "proposed" | "accepted" | "rejected" | "changes_requested" | "declined" | "expired";
         schedule_status: "unscheduled" | "proposed" | "held" | "confirmed" | "expired" | "reschedule_requested" | "released";
         hold_expires_at: string | null;
         balance_due_at: string | null;
@@ -140,7 +140,7 @@ export interface Database {
         cancellation_requested_at: string | null;
         cancellation_requested_by: string | null;
       }>;
-      booking_quotes: Table<TimestampColumns & { id: string; booking_id: string; version: number; amount: number; currency: "PHP"; scope_summary: string; proposed_start_ts: string; proposed_end_ts: string; status: "proposed" | "accepted" | "rejected" | "superseded"; created_by: string; accepted_at: string | null; rejected_at: string | null; rejection_reason: string | null }>;
+      booking_quotes: Table<TimestampColumns & { id: string; booking_id: string; version: number; amount: number; currency: "PHP"; scope_summary: string; proposed_start_ts: string; proposed_end_ts: string; expires_at: string; status: "proposed" | "accepted" | "rejected" | "superseded" | "changes_requested" | "declined" | "expired"; created_by: string; accepted_at: string | null; rejected_at: string | null; rejection_reason: string | null; response_note: string | null }>;
       booking_reschedule_requests: Table<TimestampColumns & { id: string; booking_id: string; requested_by: string; requested_slot_id: number; previous_slot_id: number | null; status: "pending" | "approved" | "declined" | "cancelled"; reason: string | null; reviewer_id: string | null; review_reason: string | null; reviewed_at: string | null; operation_id: string }>;
       payment_attempts: Table<{ id: string; booking_id: string; buyer_id: string; purpose: "initial" | "balance"; status: string; amount: number; currency: string; created_at: string; paid_at: string | null; payment_id: string | null; environment: "test" | "live" }>;
       payment_provider_events: Table<{ provider: "paymongo"; event_id: string; event_type: string; payment_attempt_id: string | null; livemode: boolean; status: "processed" | "failed"; processed_at: string | null }>;
@@ -162,6 +162,8 @@ export interface Database {
     };
     Views: Record<string, never>;
     Functions: {
+      landing_featured_service_ids: { Args: { p_limit?: number }; Returns: { service_id: number }[] };
+      list_available_service_slots: { Args: { p_service_ids: number[] }; Returns: Pick<Database["public"]["Tables"]["service_slots"]["Row"], "id" | "service_id" | "seller_id" | "start_ts" | "end_ts" | "capacity" | "status" | "visibility" | "metadata">[] };
       start_booking_checkout_with_address: { Args: { p_booking_id?: string | null; p_service_id?: number | null;
         p_slot_id?: number | null; p_quote_version?: number | null; p_payment_plan?: string;
         p_operation_id?: string | null; p_service_address?: Json | null }; Returns: Json };
@@ -182,6 +184,7 @@ export interface Database {
       cancel_booking: { Args: { p_booking_id: string; p_reason: string; p_operation_id: string }; Returns: Json };
       create_booking_request: { Args: { p_service_id: number; p_operation_id: string }; Returns: Database["public"]["Tables"]["bookings"]["Row"] };
       propose_booking_quote: { Args: { p_booking_id: string; p_amount: number; p_start_ts: string; p_end_ts: string; p_scope_summary: string; p_operation_id: string }; Returns: Json };
+      respond_booking_quote: { Args: { p_booking_id: string; p_quote_version: number; p_action: "request_changes" | "decline"; p_feedback: string; p_operation_id: string }; Returns: Database["public"]["Tables"]["bookings"]["Row"] };
       reject_booking_quote: { Args: { p_booking_id: string; p_quote_version: number; p_reason: string; p_operation_id: string }; Returns: Database["public"]["Tables"]["bookings"]["Row"] };
       reschedule_booking: { Args: { p_booking_id: string; p_new_slot_id: number; p_reason: string; p_operation_id: string }; Returns: Json };
       review_booking_cancellation: { Args: { p_booking_id: string; p_decision: string; p_reason: string; p_operation_id: string }; Returns: Database["public"]["Tables"]["bookings"]["Row"] };

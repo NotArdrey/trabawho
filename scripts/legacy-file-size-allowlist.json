@@ -17,11 +17,11 @@
   },
   {
     "path": "src/features/bookings/pages/MyBookings.jsx",
-    "baselineLines": 973
+    "baselineLines": 966
   },
   {
     "path": "src/features/bookings/components/ChatWindow.jsx",
-    "baselineLines": 964
+    "baselineLines": 904
   },
   {
     "path": "src/features/navigation/useAppNavigation.js",

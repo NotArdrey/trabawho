@@ -25,7 +25,7 @@ import PaymentModal from '../components/PaymentModal';
 import BookingTermsModal from '../components/BookingTermsModal';
 import RatingModal from '../components/RatingModal';
 import { BookingDetailsDialog } from '../components/BookingDetailsDialog';
-import { ReservationStatus } from '../components/ReservationStatus';
+import { BookingReservationNotice } from '../components/BookingReservationNotice';
 import { CancelBookingDialog } from '../components/CancelBookingDialog';
 import { BookingRequestReviewDialog } from '../components/BookingRequestReviewDialog';
 import { PaymentReturnStatus } from '../components/PaymentReturnStatus';
@@ -43,6 +43,7 @@ import { isBookingActionNeeded, matchesBookingHubFilter } from '../utils/booking
 import { WorkflowEmptyState } from '@/components/ui/workflow-panel';
 import { paths } from '@/app/router/routes';
 import { hasPastUnpaidSchedule } from '@/features/bookings/utils/bookingSchedule';
+import { isQuoteCheckoutAvailable } from '@/features/bookings/utils/quoteStatus';
 import {
   useBookingListController,
   usePaymentController,
@@ -57,7 +58,7 @@ import {
 import {
   cancelBooking,
   proposeBookingQuote,
-  rejectBookingQuote,
+  respondBookingQuote,
   rescheduleBooking,
   reviewBookingCancellation,
   reviewBookingReschedule,
@@ -397,7 +398,7 @@ const MyBookings = ({
 
   const handleApproveQuote = useCallback(async (bookingId) => {
     const booking = bookingListCtrl.getBooking(bookingId);
-    if (!booking?.activeQuote) {
+    if (booking?.activeQuote?.status !== 'proposed' || new Date(booking.activeQuote.expires_at).getTime() <= Date.now()) {
       pushHeaderNotification('Quote Unavailable', 'Ask the provider to send an updated price and schedule.');
       return;
     }
@@ -405,17 +406,14 @@ const MyBookings = ({
     setIsTermsModalOpen(true);
   }, [bookingListCtrl, pushHeaderNotification]);
 
-  const handleRejectQuote = useCallback(async (bookingId, reason) => {
-    try {
-      const booking = bookingListCtrl.getBooking(bookingId);
-      if (!booking?.quoteVersion) throw new Error('This quote is no longer available.');
-      await rejectBookingQuote({ bookingId, quoteVersion: Number(booking.quoteVersion), reason });
-      bookingListCtrl.replaceBooking(await fetchBookingById(bookingId));
-      pushHeaderNotification('Quote Rejected', 'Your reason was sent to the worker so they can review or revise the quote.');
-      setUiState('chat');
-    } catch (error) {
-      pushHeaderNotification('Quote Update Failed', error?.message || 'Unable to reject quote.');
-    }
+  const handleRespondQuote = useCallback(async (bookingId, action, feedback) => {
+    const booking = bookingListCtrl.getBooking(bookingId);
+    if (booking?.activeQuote?.status !== 'proposed') throw new Error('This offer has changed. Review the latest quote.');
+    await respondBookingQuote({ bookingId, quoteVersion: Number(booking.activeQuote.version), action, feedback });
+    bookingListCtrl.replaceBooking(await fetchBookingById(bookingId));
+    pushHeaderNotification(action === 'decline' ? 'Request Closed' : 'Changes Requested',
+      action === 'decline' ? 'You declined the quote and closed this unpaid request.' : 'The provider can now send a revised offer.');
+    setUiState('chat');
   }, [bookingListCtrl, pushHeaderNotification]);
 
   const handleProposeQuote = useCallback(async (bookingId, input) => {
@@ -585,11 +583,12 @@ const MyBookings = ({
   const bookingPage = paginateBookings(displayedBookings, searchParams.get('page'));
   const renderBookingCard = (booking) => {
     const scheduleHasPassed = hasPastUnpaidSchedule(booking);
+    const quoteCanCheckout = isQuoteCheckoutAvailable(booking);
     const statusMeta = getStatusMeta(scheduleHasPassed ? 'Reservation Expired' : booking.status);
     const StatusIcon = statusMeta.icon;
     const canPayNow = !shouldLoadSellerBookings && (
       ['Payment Pending', 'Slot Selected - Payment Pending'].includes(booking.status)
-      || booking.paymentStatus === 'partially_paid') && !scheduleHasPassed;
+      || booking.paymentStatus === 'partially_paid') && !scheduleHasPassed && quoteCanCheckout;
     const hasPrimaryWorkflowAction = canPayNow
       || (!shouldLoadSellerBookings && booking.cashCollectionStatus === 'seller_claimed')
       || (!shouldLoadSellerBookings && booking.deliveryStatus === 'seller_claimed')
@@ -632,17 +631,11 @@ const MyBookings = ({
             <p className="booking-card-desc">{booking.description}</p>
           )}
 
-          <ReservationStatus
-            scheduleStatus={scheduleHasPassed ? 'passed' : booking.scheduleStatus}
-            expiresAt={booking.holdExpiresAt}
-            actionLabel={booking.quoteVersion ? 'Retry saved quote' : undefined}
-            onChooseAnotherTime={!shouldLoadSellerBookings ? () => {
-              setSelectedBookingId(booking.id);
-              if (scheduleHasPassed) { setScheduleAction('checkout'); setUiState('slots'); }
-              else if (booking.quoteVersion) setIsTermsModalOpen(true);
-              else { setScheduleAction('checkout'); setUiState('slots'); }
-            } : undefined}
-          />
+          <BookingReservationNotice quote={booking.activeQuote} canCheckoutQuote={quoteCanCheckout}
+            scheduleHasPassed={scheduleHasPassed} scheduleStatus={booking.scheduleStatus} expiresAt={booking.holdExpiresAt}
+            isSeller={shouldLoadSellerBookings} onOpenChat={() => handleOpenChat(booking.id)}
+            onRetryQuote={() => { setSelectedBookingId(booking.id); setIsTermsModalOpen(true); }}
+            onChooseSlot={() => { setSelectedBookingId(booking.id); setScheduleAction('checkout'); setUiState('slots'); }} />
 
           <BookingCardSchedule bookingId={booking.id} checkReplacement={['open', 'closed'].includes(booking.disputeStatus)}
             originalDate={booking.selectedSlot?.date || booking.requestDate}
@@ -883,7 +876,7 @@ const MyBookings = ({
               viewerRole={shouldLoadSellerBookings ? 'seller' : 'buyer'}
               onSelectBooking={handleOpenChat}
               onApproveQuote={() => handleApproveQuote(currentBooking.id)}
-              onRejectQuote={(reason) => handleRejectQuote(currentBooking.id, reason)}
+              onRespondQuote={(action, feedback) => handleRespondQuote(currentBooking.id, action, feedback)}
               onProposeQuote={(input) => handleProposeQuote(currentBooking.id, input)}
               onOpenSlotSelection={handleOpenSlotSelection}
               onOpenPaymentSelection={handleOpenPaymentSelection}

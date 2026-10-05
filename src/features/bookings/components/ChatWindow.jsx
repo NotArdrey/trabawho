@@ -2,8 +2,9 @@ import { matchesBookingSearch } from '@/features/bookings/utils/bookingSearch';
 import React, { useMemo, useState, useEffect, useRef } from 'react';
 import { Archive, ArrowLeft, MessageCircle, MoreVertical, Trash2 } from 'lucide-react';
 import { SearchFilterBar } from '@/components/ui/search-filter-bar';
-import { ProviderQuoteComposer } from './ProviderQuoteComposer';
+import { ProviderQuoteAction } from './ProviderQuoteAction';
 import { BookingQuoteCard } from './BookingQuoteCard';
+import { QuoteResponseDialog } from './QuoteResponseDialog';
 import { getThemeTokens } from '../../../shared/styles/themeTokens';
 import { useBookingConversation } from '../hooks/useBookingConversation';
 import { BookingMessageComposer } from './BookingMessageComposer';
@@ -21,15 +22,14 @@ const getChatListKey = (booking = {}, viewerRole = 'buyer') => {
   ].map(normalizeChatKeyPart).join('|');
 };
 
-const ChatWindow = ({ appTheme = 'light', booking, onApproveQuote, onRejectQuote, onProposeQuote, onStopServiceAccepted, bookings, onSelectBooking, selectedBookingId, onOpenSlotSelection, onOpenPaymentSelection, onRequestRefund, onConfirmRefundReceived, onLeaveRating, onArchiveChat, onDeleteChat, onChatRestored, viewerRole = 'buyer', initialMobileListOpen = false }) => {
+const ChatWindow = ({ appTheme = 'light', booking, onApproveQuote, onRespondQuote, onProposeQuote, onStopServiceAccepted, bookings, onSelectBooking, selectedBookingId, onOpenSlotSelection, onOpenPaymentSelection, onRequestRefund, onConfirmRefundReceived, onLeaveRating, onArchiveChat, onDeleteChat, onChatRestored, viewerRole = 'buyer', initialMobileListOpen = false }) => {
   const { messages, setMessages, isLoading, isSending, messageError, send } = useBookingConversation(booking);
   const [hoveredChatId, setHoveredChatId] = useState(null);
   const [activeSidebarPanel, setActiveSidebarPanel] = useState(null);
   const [showRefundRequestModal, setShowRefundRequestModal] = useState(false);
   const [showRefundConfirmModal, setShowRefundConfirmModal] = useState(false);
   const [refundReason, setRefundReason] = useState('');
-  const [showRejectQuoteModal, setShowRejectQuoteModal] = useState(false);
-  const [rejectQuoteReason, setRejectQuoteReason] = useState('');
+  const [quoteResponseAction, setQuoteResponseAction] = useState(null);
   const [draftRating, setDraftRating] = useState(booking?.rating || 0);
   const [ratingComment, setRatingComment] = useState(booking?.ratingComment || '');
   const [ratingSubmitted, setRatingSubmitted] = useState(!!booking?.rating);
@@ -46,9 +46,8 @@ const ChatWindow = ({ appTheme = 'light', booking, onApproveQuote, onRejectQuote
   const isServiceStopped =
     booking?.status === 'Service Stopped'
     || Boolean(booking?.stopRequested && booking?.workerStopApproved);
-  const isClosedConversation = ['Completed Service', 'Service Stopped', 'Cancelled (Cash)', 'Refund Processing', 'Refunded'].includes(booking?.status);
+  const isClosedConversation = ['Completed Service', 'Service Stopped', 'Cancelled', 'Cancelled (Cash)', 'Refund Processing', 'Refunded'].includes(booking?.status);
   const isRefundConversation = booking?.status === 'Refund Processing' || booking?.status === 'Refunded' || booking?.refundStatus === 'requested';
-  const isQuoteRejected = booking?.status === 'Quote Rejected';
   const isRequestBooking = booking?.bookingMode === 'calendar-only' || booking?.isRequestBooking;
   const canRequestRefund = booking?.refundEligible && !booking?.refundStatus;
   const canConfirmRefund = booking?.refundStatus === 'approved-awaiting-client-confirmation';
@@ -66,11 +65,11 @@ const ChatWindow = ({ appTheme = 'light', booking, onApproveQuote, onRejectQuote
     && !isClosedConversation
     && !isRefundConversation;
   const canReviewQuote =
-    hasSellerQuote
+    booking?.activeQuote?.status === 'proposed'
+    && new Date(booking.activeQuote.expires_at).getTime() > Date.now()
     && !booking?.quoteApproved
     && !isClosedConversation
-    && !isRefundConversation
-    && !isQuoteRejected;
+    && !isRefundConversation;
   const shouldShowPriceAmount = hasSellerQuote || booking?.quoteApproved || !isRequestBooking;
   const priceDetailLabel = hasSellerQuote || booking?.quoteApproved
     ? 'Quote Amount'
@@ -193,14 +192,6 @@ const ChatWindow = ({ appTheme = 'light', booking, onApproveQuote, onRejectQuote
   }, [isConversationMenuOpen]);
 
   const handleApproveQuoteClick = async () => {
-    const approvalMessage = {
-      id: `approval-${Date.now()}`,
-      sender: 'system',
-      type: 'text',
-      content: 'You approved the quote. Proceeding to calendar/slot selection...',
-      timestamp: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
-    };
-    setMessages([...messages, approvalMessage]);
     await onApproveQuote();
   };
 
@@ -214,13 +205,6 @@ const ChatWindow = ({ appTheme = 'light', booking, onApproveQuote, onRejectQuote
   const handleConfirmRefundReceived = () => {
     onConfirmRefundReceived();
     setShowRefundConfirmModal(false);
-  };
-
-  const handleSubmitRejectQuote = () => {
-    if (!rejectQuoteReason.trim() || !onRejectQuote) return;
-    onRejectQuote(rejectQuoteReason.trim());
-    setShowRejectQuoteModal(false);
-    setRejectQuoteReason('');
   };
 
   const themeTokens = getThemeTokens(appTheme);
@@ -589,8 +573,8 @@ const ChatWindow = ({ appTheme = 'light', booking, onApproveQuote, onRejectQuote
                   No saved messages yet.
                 </p>
                 <p style={{ margin: 0, fontSize: '13px', lineHeight: 1.5 }}>
-                  {isRequestBooking
-                    ? 'Send the worker your details. A price quote will appear here after the worker sends one.'
+                  {isRequestBooking && viewerRole === 'seller' ? 'Ask the client about the work, or create a quote with your price and proposed time.'
+                    : isRequestBooking ? 'Send the worker your details. A price quote will appear here after the worker sends one.'
                     : 'Send a message to coordinate this booking with the worker.'}
                 </p>
               </div>
@@ -603,23 +587,15 @@ const ChatWindow = ({ appTheme = 'light', booking, onApproveQuote, onRejectQuote
               quote={booking.activeQuote}
               canRespond={viewerRole === 'buyer' && canReviewQuote}
               onAccept={handleApproveQuoteClick}
-              onReject={() => setShowRejectQuoteModal(true)}
+              onRequestChanges={() => setQuoteResponseAction('request_changes')}
+              onDecline={() => setQuoteResponseAction('decline')}
+              feeRate={booking.transactionFeeRate}
+              holdExpiresAt={booking.holdExpiresAt}
+              isConfirmed={booking.scheduleStatus === 'confirmed'}
             />
           )}
-
-          {canReviewQuote && !booking?.activeQuote && (
-            <div className="border-t bg-muted/30 p-4 text-center">
-              <p className="mb-3 text-sm font-semibold text-foreground">Review this quote and choose what to do next.</p>
-              <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2">
-                <button className="min-h-11 rounded-md bg-primary px-5 font-semibold text-primary-foreground" onClick={handleApproveQuoteClick}>Approve quote</button>
-                <button className="min-h-11 rounded-md border border-destructive px-4 font-semibold text-destructive" onClick={() => setShowRejectQuoteModal(true)}>Reject quote</button>
-              </div>
-            </div>
-          )}
-
-          {viewerRole === 'seller' && isRequestBooking && !isClosedConversation && onProposeQuote && (
-            <ProviderQuoteComposer onSubmit={onProposeQuote} />
-          )}
+          <ProviderQuoteAction key={booking.id} booking={booking} viewerRole={viewerRole} isRequestBooking={isRequestBooking}
+            isClosedConversation={isClosedConversation} onProposeQuote={onProposeQuote} />
 
           {shouldShowSlotSelectionNotice && (
             <div style={styles.approvalStatus}>
@@ -629,24 +605,11 @@ const ChatWindow = ({ appTheme = 'light', booking, onApproveQuote, onRejectQuote
 
           {shouldShowRequestPaymentNotice && (
             <div style={styles.approvalStatus}>
-              <p style={styles.approvalStatusText}>{'\u2713'} Quote Approved - schedule/details are coordinated in chat</p>
+              <p style={styles.approvalStatusText}>Quote accepted — complete payment to confirm the appointment.</p>
             </div>
           )}
 
-          {isQuoteRejected && (
-            <div style={{ ...styles.approvalStatus, background: isDarkMode ? '#7f1d1d' : '#fef2f2', borderColor: isDarkMode ? '#991b1b' : '#fecaca' }}>
-              <p style={{ ...styles.approvalStatusText, color: isDarkMode ? '#fecaca' : '#991b1b' }}>
-                {'\u2715'} Quote Rejected - waiting for worker response
-              </p>
-              {booking?.quoteRejectionReason && (
-                <p style={{ margin: '8px 0 0', color: isDarkMode ? '#fecaca' : '#7f1d1d', fontSize: '13px', textAlign: 'center' }}>
-                  Reason sent: {booking.quoteRejectionReason}
-                </p>
-              )}
-            </div>
-          )}
-
-          {booking.status !== 'Cancelled (Cash)' && (
+          {!['Cancelled', 'Cancelled (Cash)'].includes(booking.status) && (
             <BookingMessageComposer key={booking.id} conversationId={booking.id} hasQuote={hasSellerQuote} isSending={isSending} onSend={send} />
           )}
         </div>
@@ -932,30 +895,7 @@ const ChatWindow = ({ appTheme = 'light', booking, onApproveQuote, onRejectQuote
         </div>
       )}
 
-      {showRejectQuoteModal && (
-        <div style={styles.modalOverlay}>
-          <div style={styles.modalCard}>
-            <h3 style={styles.modalTitle}>Reject Quote</h3>
-            <p style={styles.modalText}>Let the worker know why you are declining this quote so they can revise their offer.</p>
-            <textarea
-              style={styles.modalTextarea}
-              placeholder="Type your reason for rejecting the quote..."
-              value={rejectQuoteReason}
-              onChange={(event) => setRejectQuoteReason(event.target.value)}
-            />
-            <div style={styles.modalActions}>
-              <button style={styles.modalBtnCancel} onClick={() => setShowRejectQuoteModal(false)}>Cancel</button>
-              <button
-                style={{ ...styles.modalBtnPrimary, ...(rejectQuoteReason.trim() ? { background: '#b91c1c' } : { background: isDarkMode ? '#687282' : '#cbd5e1', cursor: 'not-allowed' }) }}
-                onClick={handleSubmitRejectQuote}
-                disabled={!rejectQuoteReason.trim()}
-              >
-                Submit Rejection
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <QuoteResponseDialog action={quoteResponseAction} onClose={() => setQuoteResponseAction(null)} onSubmit={onRespondQuote} />
     </div>
   );
 };

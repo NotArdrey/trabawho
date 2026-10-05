@@ -29,7 +29,7 @@ interface NotificationCenterProps {
   onRetry?: () => void;
 }
 
-const notificationIcons = { booking: CalendarClock, message: MessageSquareText, payment: CreditCard, work: BriefcaseBusiness, case: LifeBuoy } as const;
+const notificationIcons = { booking: CalendarClock, quote: CalendarClock, message: MessageSquareText, payment: CreditCard, work: BriefcaseBusiness, case: LifeBuoy } as const;
 
 function NotificationCenter({ notifications, open, onOpenChange, onMarkAllRead, onNotificationClick, isLoading = false, error = "", actionError = "", onRetry }: NotificationCenterProps) {
   const unreadCount = notifications.filter((notification) => !notification.isRead).length;
