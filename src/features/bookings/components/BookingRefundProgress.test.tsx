@@ -60,8 +60,10 @@ describe("dispute refund progress", () => {
     vi.mocked(getBookingRefunds).mockResolvedValue([{ id: "refund-1", case_id: "case-1", payment_attempt_id: "attempt-1",
       amount: 464, currency: "PHP", status: "simulated", provider_refund_id: null, updated_at: "2026-10-05T08:00:00Z" }]);
     render(<BookingRefundProgress {...props} canRequest={false} />);
-    expect(await screen.findByText(/Sandbox refund simulated — no money returned/)).toBeVisible();
-    expect(screen.getByText(/PayMongo did not return real money/)).toBeVisible();
+    expect(await screen.findByText(/PHP 464.00.*Test review recorded/)).toBeVisible();
+    expect(screen.getByText("Review complete")).toBeVisible();
+    expect(screen.getByText(/PayMongo did not return money for them/)).toBeVisible();
+    expect(screen.queryByText(/simulat/i)).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Check refund status" })).not.toBeInTheDocument();
   });
   it("summarizes split refunds while keeping each provider reference visible", async () => {

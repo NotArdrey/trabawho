@@ -4,6 +4,7 @@ import { MemoryRouter } from "react-router-dom";
 import { BookingTransactionActions } from "@/features/bookings/components/BookingTransactionActions";
 import { BookingDetailsDialog } from "@/features/bookings/components/BookingDetailsDialog";
 import { BookingRefundStage } from "@/features/bookings/components/BookingRefundStage";
+import { BookingRefundProgress } from "@/features/bookings/components/BookingRefundProgress";
 import { Button } from "@/components/ui/button";
 import { AdminRefundDecision } from "@/features/admin/components/AdminRefundDecision";
 import "@/styles/globals.css";
@@ -15,7 +16,10 @@ function Journey() {
   const [detailsOpen, setDetailsOpen] = useState(false);
   return <main className="mx-auto max-w-4xl p-4">
     <h1 className="mb-4 text-2xl font-bold">Booking payment and dispute</h1>
-    {role.startsWith("cancelled-") ? <section className="grid gap-4 rounded-xl border bg-card p-4">
+    {role === "completed-test-refund" ? <section className="grid gap-4 rounded-xl border bg-card p-4">
+      <BookingRefundStage booking={{ status: "Cancelled", paymentStatus: "refunded", refundSimulated: true }} />
+      <BookingRefundProgress bookingId={bookingId} caseId={caseId} canRequest={false} onChanged={() => {}} />
+    </section> : role.startsWith("cancelled-") ? <section className="grid gap-4 rounded-xl border bg-card p-4">
       <div className="flex flex-wrap items-center gap-2"><strong>Cancelled</strong><BookingRefundStage booking={{ status: "Cancelled", paymentStatus: "refund_pending" }} /></div>
       <Button type="button" variant="outline" className="w-fit" onClick={() => setDetailsOpen(true)}>View details</Button>
       <BookingTransactionActions booking={{ id: bookingId, paymentStatus: "refund_pending", amountPaid: 464,

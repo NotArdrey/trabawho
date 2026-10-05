@@ -156,7 +156,7 @@ export function BookingDetailsDialog({ booking, isProviderView, onClose, onMessa
   const completed = normalizedStatus.includes("complete") || clientComplete;
   const nextStep = cancelled
     ? booking.refundSimulated
-      ? { title: "Visit cancelled; test refund simulated", detail: "The appointment ended and support closed its test refund review. PayMongo did not return real money.", complete: false }
+      ? { title: "Visit cancelled; refund review complete", detail: "Support closed the review in test mode. PayMongo did not return money.", complete: false }
       : booking.paymentStatus === "refund_pending"
         ? { title: "Visit cancelled; refund review in progress", detail: "The time is released. Support is verifying the payment separately; no money has been returned.", complete: false }
         : { title: "This booking is no longer active", detail: "The appointment was cancelled and its time released.", complete: false }

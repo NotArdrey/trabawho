@@ -6,12 +6,13 @@ export interface CancellationBooking {
   disputeStatus?: string | null;
   status: string;
   paymentStatus?: string | null;
+  refundSimulated?: boolean;
 }
 
-const terminalStatuses = new Set(["Completed Service", "Cancelled", "Cancelled (Cash)", "Refunded"]);
+const terminalStatuses = new Set(["Completed Service", "Cancelled", "Cancelled (Cash)", "Refunded", "Refund Simulated"]);
 
 export function canRequestBookingCancellation(booking: CancellationBooking, isProvider: boolean): boolean {
-  if (terminalStatuses.has(booking.status) || booking.disputeStatus === "open"
+  if (terminalStatuses.has(booking.status) || booking.refundSimulated || booking.paymentStatus === "refunded" || booking.disputeStatus === "open"
     || booking.cancellationStatus === "requested") return false;
   // Providers may request cancellation of paid appointments; unpaid appointments
   // retain the existing client-owned immediate cancellation flow.

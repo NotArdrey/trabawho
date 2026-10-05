@@ -66,6 +66,7 @@ let mockCurrentBookings: Array<{ id: string; status: string; [key: string]: unkn
 let mockIsLoading = false;
 let mockListRole = '';
 const mockHandleOpenRating = vi.fn();
+const mockRefreshBookings = vi.fn();
 
 vi.mock('@/features/bookings/hooks', () => ({
   useBookingListController: (_initialBookings: unknown, options: { listRole: string }) => {
@@ -82,7 +83,7 @@ vi.mock('@/features/bookings/hooks', () => ({
     setDisplayFilter: vi.fn(),
     updateBooking: vi.fn(),
     replaceBooking: vi.fn(),
-    refreshBookings: vi.fn(),
+    refreshBookings: mockRefreshBookings,
     handleApproveQuote: vi.fn(),
     handleRejectQuote: vi.fn(),
     handleStopServiceAccepted: vi.fn(),
@@ -117,6 +118,7 @@ describe('MyBookings Redesign Component', () => {
     mockCurrentBookings = [];
     mockIsLoading = false;
     mockHandleOpenRating.mockClear();
+    mockRefreshBookings.mockClear();
   });
 
   test('renders empty state with rich CTA when there are no bookings', () => {
@@ -163,6 +165,21 @@ describe('MyBookings Redesign Component', () => {
     expect(screen.getByText('PHP 2,200')).toBeInTheDocument();
     expect(screen.getByText('Booked on')).toBeVisible();
     expect(screen.getByText(/Oct 5, 2026.*1:07 PM PHT/)).toBeVisible();
+  });
+
+  test.each([
+    { view: 'my-bookings', scope: 'purchases', label: 'My Bookings' },
+    { view: 'worker-bookings', scope: 'incoming', label: 'Bookings' },
+  ])('shows a completed sandbox refund in the $scope Refunds tab and refreshes on selection', ({ view, scope, label }) => {
+    mockCurrentBookings = [{ ...mockBookings[0], status: 'Refund Simulated', paymentStatus: 'paid', refundSimulated: true }];
+    renderBookings(<MyBookings currentView={view} sellerProfile={scope === 'incoming' ? { role: 'worker', userId: 'worker-1' } : { role: 'client' }} />,
+      `/bookings?scope=${scope}&filter=all`);
+    expect(screen.getByRole('heading', { name: label })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Refunds, 1' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Refunds, 1' }));
+    expect(screen.getByTestId('booking-card-b1')).toBeInTheDocument();
+    expect(mockRefreshBookings).toHaveBeenCalledTimes(1);
+    expect(screen.getByTestId('location-probe')).toHaveTextContent('filter=refunds');
   });
 
   test('pages bookings after filtering and resets to page one when searching', () => {

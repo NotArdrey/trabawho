@@ -92,6 +92,14 @@ describe("BookingDetailsDialog", () => {
     expect(screen.getByText("Card via PayMongo")).toBeVisible();
   });
 
+  it("keeps test-mode disclosure in cancelled booking details without repeating simulation labels", () => {
+    render(<BookingDetailsDialog booking={{ ...booking, status: "Cancelled", paymentStatus: "refunded", refundSimulated: true }}
+      isProviderView={false} statusLabel="Cancelled" onClose={vi.fn()} onMessage={vi.fn()} />);
+    expect(screen.getByRole("heading", { name: "Visit cancelled; refund review complete" })).toBeVisible();
+    expect(screen.getByText(/PayMongo did not return money/)).toBeVisible();
+    expect(screen.queryByText(/simulat/i)).not.toBeInTheDocument();
+  });
+
   it("distinguishes the agreed replacement from the original booking appointment", async () => {
     vi.mocked(getActiveReplacementSchedule).mockResolvedValue({ bookingId: "booking-1", caseId: "case-1",
       status: "accepted", startAt: "2026-10-05T09:00:00+08:00", endAt: "2026-10-05T10:00:00+08:00" });

@@ -62,6 +62,20 @@ for (const width of [390, 768, 1024, 1280, 1440]) {
       expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
     });
   }
+  test(`completed test refund uses one clear disclosure at ${width}px`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 1000 });
+    await page.route("**/rest/v1/booking_refunds?*", (route) => route.fulfill({ json: [
+      { id: "refund-1", case_id: caseId, amount: 319, currency: "PHP", status: "simulated", provider_refund_id: null },
+      { id: "refund-2", case_id: caseId, amount: 275, currency: "PHP", status: "simulated", provider_refund_id: null },
+    ] }));
+    await page.goto("/__refund-journey?role=completed-test-refund");
+    await expect(page.getByText("Refund review complete")).toBeVisible();
+    await expect(page.getByText("Review complete", { exact: true })).toBeVisible();
+    await expect(page.getByText(/PayMongo did not return money for them/)).toBeVisible();
+    await expect(page.getByText(/Test review recorded/)).toHaveCount(2);
+    await expect(page.getByText(/simulat/i)).toHaveCount(0);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  });
 }
 test("a paid booking without a provider-verified attempt does not offer refund review", async ({ page }) => {
   let paymentChecks = 0;
@@ -105,6 +119,7 @@ test("admin refund requires an evidence reason and explicit confirmation", async
   expect(calls).toBe(0);
   await page.getByRole("button", { name: "Approve test refund" }).click();
   await page.getByRole("button", { name: "Confirm test refund" }).click();
-  await expect(page.getByText(/PHP 464.*Sandbox refund simulated/)).toBeVisible();
+  await expect(page.getByText(/PHP 464.*Test review recorded/)).toBeVisible();
+  await expect(page.getByRole("status")).toContainText("No real money was returned by PayMongo");
   expect(calls).toBe(1);
 });

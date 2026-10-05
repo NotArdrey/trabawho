@@ -464,11 +464,7 @@ const MyBookings = ({
 
   const allBookings = useMemo(() => bookingListCtrl.bookings || [], [bookingListCtrl.bookings]);
   const replacementSchedules = useProviderReplacementSchedules(allBookings, shouldLoadSellerBookings);
-  const activeBookingsCount = useMemo(() => (
-    allBookings.filter(
-      (b) => !['Completed Service', 'Service Stopped', 'Cancelled', 'Cancelled (Cash)', 'Refunded'].includes(b.status)
-    ).length
-  ), [allBookings]);
+  const activeBookingsCount = useMemo(() => allBookings.filter((booking) => matchesBookingHubFilter(booking, 'active', activeScope)).length, [activeScope, allBookings]);
   const completedBookingsCount = useMemo(() => (
     allBookings.filter(
       (b) => ['Completed Service', 'Service Stopped'].includes(b.status)
@@ -629,7 +625,7 @@ const MyBookings = ({
           messageIsPrimary={!hasPrimaryWorkflowAction}
           onViewDetails={() => setDetailBookingId(booking.id)}
           onMessage={() => handleOpenChat(booking.id)}
-          onReschedule={!shouldLoadSellerBookings && booking.disputeStatus !== 'open' && !['Completed Service', 'Cancelled', 'Cancelled (Cash)', 'Refunded'].includes(booking.status) && booking.selectedSlot ? () => {
+          onReschedule={!shouldLoadSellerBookings && booking.disputeStatus !== 'open' && matchesBookingHubFilter(booking, 'active', activeScope) && booking.selectedSlot ? () => {
             setSelectedBookingId(booking.id);
             setScheduleAction(scheduleHasPassed ? 'checkout' : 'reschedule'); setUiState('slots');
           } : undefined}
@@ -721,13 +717,13 @@ const MyBookings = ({
 
       <SearchFilterBar
         activeValue={selectedDisplayFilter}
-        onActiveValueChange={(value) => updateSearchParams({ filter: value })}
+        onActiveValueChange={(value) => { updateSearchParams({ filter: value }); void bookingListCtrl.refreshBookings(); }}
         onSearchValueChange={(value) => {
           updateSearchParams({ q: value }, true);
           onSearchChange?.({ target: { value } });
         }}
         options={displayFilters}
-        resultLabel={displayedBookings.length ? `Showing ${bookingPage.first}–${bookingPage.last} of ${displayedBookings.length} matching bookings` : 'No matching bookings'}
+        resultLabel={bookingListCtrl.isLoading ? 'Updating bookings...' : displayedBookings.length ? `Showing ${bookingPage.first}–${bookingPage.last} of ${displayedBookings.length} matching bookings` : 'No matching bookings'}
         searchLabel="Search bookings"
         searchPlaceholder="Search by worker, service, or reference..."
         searchValue={bookingSearch}

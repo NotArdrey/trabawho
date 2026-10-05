@@ -15,6 +15,7 @@ const bookings = [
   { id: 'paid', status: 'Payment Confirmed', paymentStatus: 'paid', paymentMethod: 'gcash-advance' },
   { id: 'completed', status: 'Completed Service', paymentStatus: 'paid', paymentMethod: 'after-service-cash' },
   { id: 'refunded', status: 'Refunded', paymentStatus: 'refunded', refundStatus: 'completed' },
+  { id: 'simulated', status: 'Refund Simulated', paymentStatus: 'paid', refundSimulated: true },
   { id: 'cancelled', status: 'Cancelled', paymentStatus: 'unpaid' },
 ];
 
@@ -26,7 +27,7 @@ describe('useBookingListController filters', () => {
     ['paid', ['paid', 'completed']],
     ['completed', ['completed']],
     ['cash-approvals', []],
-    ['refunds', ['refunded']],
+    ['refunds', ['refunded', 'simulated']],
     ['cancelled', ['cancelled']],
   ])('filters %s bookings', (filter, expectedIds) => {
     const { result } = setup();

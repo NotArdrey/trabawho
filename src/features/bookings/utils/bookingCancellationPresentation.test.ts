@@ -18,6 +18,8 @@ describe("paid cancellation presentation", () => {
     expect(canRequestBookingCancellation(available, false)).toBe(true);
     expect(canRequestBookingCancellation({ ...available, disputeStatus: "open" }, true)).toBe(false);
     expect(canRequestBookingCancellation({ ...available, status: "Cancelled" }, false)).toBe(false);
+    expect(canRequestBookingCancellation({ ...available, refundSimulated: true }, false)).toBe(false);
+    expect(canRequestBookingCancellation({ ...available, status: "Refund Simulated" }, true)).toBe(false);
   });
 
   it("presents the payment result separately from cancellation", () => {

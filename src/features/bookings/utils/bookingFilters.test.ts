@@ -32,4 +32,19 @@ describe("booking filter meaning", () => {
     expect(matchesBookingHubFilter(booking, "payment-due", "purchases")).toBe(false);
     expect(matchesBookingHubFilter({ ...booking, paymentStatus: "refunded" }, "refunds", "incoming")).toBe(true);
   });
+  it.each([
+    { status: "Refund Simulated", paymentStatus: "paid", refundSimulated: true },
+    { status: "Payment Confirmed", paymentStatus: "paid", refundSimulated: true },
+  ])("puts a completed sandbox refund in Refunds rather than Active: $status", (booking) => {
+    for (const scope of ["purchases", "incoming"]) {
+      expect(matchesBookingHubFilter(booking, "refunds", scope)).toBe(true);
+      expect(matchesBookingHubFilter(booking, "active", scope)).toBe(false);
+      expect(matchesBookingHubFilter(booking, "payment-due", scope)).toBe(false);
+      expect(isBookingActionNeeded(booking, scope)).toBe(false);
+    }
+  });
+  it("recognizes an older refund label even without the metadata flag", () => {
+    expect(matchesBookingHubFilter({ status: "Refund Simulated" }, "refunds", "purchases")).toBe(true);
+    expect(matchesBookingHubFilter({ status: "Refund Simulated" }, "active", "purchases")).toBe(false);
+  });
 });

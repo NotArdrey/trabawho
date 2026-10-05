@@ -12,6 +12,9 @@ export function getStatusMeta(status: string) {
     return { className: "booking-status-pending", icon: CreditCard, label: "Payment Pending" };
   }
   if (status === "Cash Verification Pending") return { className: "booking-status-pending", icon: Clock, label: "Cash Verification" };
+  if (status === "Refund Simulated") {
+    return { className: "booking-status-completed", icon: CheckCircle2, label: "Refund review complete" };
+  }
   if (status === "Refund Processing" || status === "Refunded") {
     return { className: "booking-status-cancelled", icon: RotateCcw, label: status };
   }
