@@ -14,6 +14,7 @@ import { caseNextActor } from "@/features/admin/domain/caseNextActor";
 import { supportCaseNextStep } from "@/features/admin/domain/supportCaseNextStep";
 import { supportActionLabels, supportTimeline } from "@/features/admin/domain/supportTimeline";
 import { AdminRefundDecision } from "@/features/admin/components/AdminRefundDecision";
+import { summarizeVerifiedTestPayments } from "@/features/admin/domain/paymentSummary";
 import { AdminReplacementWorkflow } from "@/features/admin/components/AdminReplacementWorkflow";
 import { claimSupportCase, getCurrentAdminId, getSupportCaseById, getSupportCaseDetail,
   openSupportEvidence, recordSupportFollowup, type SupportAction, type SupportCase,
@@ -86,8 +87,12 @@ export function AdminCasePage({ caseId }: { caseId: string }) {
   const booking = detail?.booking;
   const client = detail?.people.find((person) => person.user_id === booking?.buyer_id);
   const provider = detail?.people.find((person) => person.user_id === booking?.seller_id);
-  const verifiedIds = new Set(detail?.providerEvents.filter((event) => event.status === "processed" && event.livemode === false && event.processed_at).map((event) => event.payment_attempt_id) || []);
-  const verifiedAmount = detail?.payments.filter((payment) => ["paid", "late_paid"].includes(payment.status) && payment.payment_id && verifiedIds.has(payment.id)).reduce((sum, payment) => sum + payment.amount, 0) || 0;
+  const verifiedIds = new Set(detail?.providerEvents.filter((event) => event.event_type === "checkout_session.payment.paid"
+    && event.status === "processed" && event.livemode === false && event.processed_at).map((event) => event.payment_attempt_id) || []);
+  const paymentSummary = summarizeVerifiedTestPayments(detail?.payments || [], detail?.providerEvents || []);
+  const verifiedAmount = paymentSummary.refundable;
+  const simulatedRefund = Boolean(booking?.metadata && typeof booking.metadata === "object"
+    && !Array.isArray(booking.metadata) && booking.metadata.refund_simulated === true);
   const providerWasAsked = detail?.caseMessages.some((message) => message.author_role === "admin" && ["provider", "both"].includes(message.audience)) || false;
   const providerReplied = detail?.caseMessages.some((message) => message.author_role === "provider") || false;
   const nextSection: Section = !providerWasAsked || item?.resolution_status === "awaiting_provider"
@@ -119,7 +124,13 @@ export function AdminCasePage({ caseId }: { caseId: string }) {
       <div className={section === "summary" ? "grid gap-5 lg:grid-cols-2" : "hidden"}>
         <section className="rounded-xl border bg-brand-highlight-soft/50 p-4 sm:p-5"><h2 className="flex items-center gap-2 font-semibold text-brand-highlight-foreground"><AlertCircle aria-hidden="true" className="size-4 shrink-0" />Reported issue</h2><p className="mt-3 whitespace-pre-wrap break-words leading-6">{item.reason}</p>{item.policy_reason && <p className="mt-3 text-sm text-muted-foreground">{item.policy_reason}</p>}</section>
         <section className="rounded-xl border bg-primary/5 p-4 sm:p-5"><h2 className="flex items-center gap-2 font-semibold text-primary"><CalendarDays aria-hidden="true" className="size-4 shrink-0" />People and appointment</h2><dl className="mt-4 grid gap-4 text-sm sm:grid-cols-2"><div><dt className="font-medium">Client</dt><dd>{client?.full_name || "Name unavailable"}</dd><dd className="break-all text-muted-foreground">{client?.email || "Contact unavailable"}</dd></div><div><dt className="font-medium">Provider</dt><dd>{provider?.full_name || "Name unavailable"}</dd><dd className="break-all text-muted-foreground">{provider?.email || "Contact unavailable"}</dd></div><div><dt className="font-medium">Service</dt><dd>{detail.service?.title || "Service unavailable"}</dd></div><div><dt className="font-medium">Scheduled visit</dt><dd>{formatDate(booking?.start_ts)}</dd><dd className="text-muted-foreground">Booking: {booking?.status || "unavailable"}{booking?.work_started_at ? ` · Work started ${formatDate(booking.work_started_at)}` : " · Work not recorded as started"}</dd></div></dl></section>
-        <section className="rounded-xl border bg-muted/40 p-4 sm:p-5 lg:col-span-2"><h2 className="flex items-center gap-2 font-semibold text-primary"><CreditCard aria-hidden="true" className="size-4 shrink-0" />Payment status</h2><p className="mt-3 text-sm">Confirmed PayMongo test payments for this booking: <strong>PHP {verifiedAmount.toLocaleString("en-PH")}</strong></p><p className="mt-1 text-sm text-muted-foreground">Booking price: {booking?.currency || "PHP"} {booking?.total_amount ?? "unavailable"}. The booking price is not proof that payment was received.</p>{!verifiedAmount && <p className="mt-3 rounded-md bg-amber-100 px-3 py-2 text-sm font-medium text-amber-950 dark:bg-amber-950/50 dark:text-amber-100"><AlertCircle aria-hidden="true" className="mr-2 inline size-4 align-[-2px]" />No confirmed PayMongo payment is linked to this booking. Check the payment reference before approving a refund.</p>}</section>
+        <section className="rounded-xl border bg-muted/40 p-4 sm:p-5 lg:col-span-2"><h2 className="flex items-center gap-2 font-semibold text-primary"><CreditCard aria-hidden="true" className="size-4 shrink-0" />Payment status</h2>
+          <p className="mt-3 text-sm">Verified PayMongo test payments collected: <strong>PHP {paymentSummary.collected.toLocaleString("en-PH")}</strong></p>
+          <p className="mt-1 text-sm">{simulatedRefund ? "Recorded as simulated test refund" : "Recorded as refunded"}: <strong>PHP {paymentSummary.refunded.toLocaleString("en-PH")}</strong> · Still eligible for review: <strong>PHP {paymentSummary.refundable.toLocaleString("en-PH")}</strong></p>
+          {simulatedRefund && <p className="mt-2 rounded-md border border-amber-300 bg-amber-50 p-3 text-sm font-medium text-amber-950 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-100">Sandbox process only. PayMongo did not return real money.</p>}
+          <p className="mt-1 text-sm text-muted-foreground">Booking price: {booking?.currency || "PHP"} {booking?.total_amount ?? "unavailable"}. The booking price is not proof that payment was received.</p>
+          {!paymentSummary.collected && <p className="mt-3 rounded-md bg-amber-100 px-3 py-2 text-sm font-medium text-amber-950 dark:bg-amber-950/50 dark:text-amber-100"><AlertCircle aria-hidden="true" className="mr-2 inline size-4 align-[-2px]" />{booking?.status === "refunded" ? "This booking is marked refunded, but no confirmed PayMongo payment or refund is linked. Check whether this was a manual or demo transaction." : "No confirmed PayMongo payment is linked to this booking. A manual or demo receipt is not refundable through PayMongo."}</p>}
+        </section>
       </div>
       <div className={section === "evidence" ? "grid gap-5 lg:grid-cols-2" : "hidden"}>
         <section className="rounded-xl border bg-brand-highlight-soft/50 p-4 sm:p-5"><h2 className="flex items-center gap-2 font-semibold text-brand-highlight-foreground"><FileImage aria-hidden="true" className="size-4 shrink-0" />Report evidence</h2><p className="mt-2 text-sm text-muted-foreground">Submitted {formatDate(item.created_at)}</p>{item.storage_path ? <Button type="button" variant="outline" className="mt-3" onClick={() => setEvidence({ path: item.storage_path || "", title: "Reported issue image", date: item.created_at })}><Eye aria-hidden="true" />Preview image</Button> : <p className="mt-3 text-sm text-muted-foreground">No report image attached.</p>}</section>

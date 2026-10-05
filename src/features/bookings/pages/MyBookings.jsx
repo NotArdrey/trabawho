@@ -621,7 +621,7 @@ const MyBookings = ({
           <div>
             <span className={`booking-status-badge ${statusMeta.className}`}>
               <StatusIcon size={14} aria-hidden="true" />
-              {statusMeta.label}
+              {booking.refundSimulated ? 'Refund simulated' : statusMeta.label}
             </span>
           </div>
         </div>

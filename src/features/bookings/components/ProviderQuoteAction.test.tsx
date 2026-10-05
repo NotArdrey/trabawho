@@ -53,4 +53,11 @@ describe("ProviderQuoteAction", () => {
     expect(screen.queryByRole("button", { name: "Create quote" })).not.toBeInTheDocument();
     expect(screen.queryByText(/client must submit a booking request/i)).not.toBeInTheDocument();
   });
+
+  it("lets the provider replace an expired unpaid reservation with a new offer", () => {
+    render(<ProviderQuoteAction booking={{ ...booking, scheduleStatus: "expired", bookingMode: "with-slots" }}
+      viewerRole="seller" isRequestBooking={false} isClosedConversation={false} onProposeQuote={vi.fn()} />);
+    expect(screen.getByRole("button", { name: "Create quote" })).toBeVisible();
+    expect(screen.getByText(/previous reservation expired/i)).toBeVisible();
+  });
 });

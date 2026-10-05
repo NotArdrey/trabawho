@@ -9,6 +9,7 @@ import "@/shared/styles/modern.css";
 
 function Journey() {
   const isStandalone = new URLSearchParams(window.location.search).has("standalone");
+  const isExpired = new URLSearchParams(window.location.search).has("expired");
   const shouldRerender = new URLSearchParams(window.location.search).has("rerender");
   const [tick, setTick] = useState(0);
   useEffect(() => {
@@ -18,10 +19,10 @@ function Journey() {
   }, [shouldRerender]);
   const [booking, setBooking] = useState({
     id: isStandalone ? "conversation:7b0b479a-4c4e-4dac-b061-dd3cc520bb35" : "booking-1",
-    bookingMode: isStandalone ? "conversation" : "calendar-only", isStandaloneChat: isStandalone,
-    isRequestBooking: true,
+    bookingMode: isStandalone ? "conversation" : isExpired ? "with-slots" : "calendar-only", isStandaloneChat: isStandalone,
+    isRequestBooking: !isExpired,
     workerName: "Sofia Provider", clientName: "Ana Client", serviceType: "Garden Cleanup",
-    status: "Negotiating", scheduleStatus: "unscheduled", paymentStatus: "unpaid",
+    status: "Negotiating", scheduleStatus: isExpired ? "expired" : "unscheduled", paymentStatus: "unpaid",
     quoteAmount: 0, quoteApproved: false, raw: { booking: { status: "pending" } },
     activeQuote: null as null | {
       id: string; amount: number; version: number; status: "proposed"; scope_summary: string;

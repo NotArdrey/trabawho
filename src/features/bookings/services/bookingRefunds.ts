@@ -10,14 +10,9 @@ export async function getBookingRefunds(bookingId: string) {
 export type BookingRefund = Awaited<ReturnType<typeof getBookingRefunds>>[number];
 
 export async function hasVerifiedRefundPayment(bookingId: string): Promise<boolean> {
-  const { data, error } = await supabase.from("payment_attempts")
-    .select("id")
-    .eq("booking_id", bookingId)
-    .in("status", ["paid", "late_paid"])
-    .not("payment_id", "is", null)
-    .limit(1);
+  const { data, error } = await supabase.rpc("has_verified_refund_payment", { p_booking_id: bookingId });
   if (error) throw new Error("Payment verification could not be checked. Try again before requesting a refund review.");
-  return Boolean(data?.length);
+  return data === true;
 }
 
 export async function requestCaseRefund(caseId: string) {
@@ -33,5 +28,6 @@ export async function processCaseRefunds(caseId: string, reason?: string, expect
   const result = record(response);
   const data = record(result.data);
   if (result.error || data.checked !== true) throw new Error("Refund verification is unavailable. The saved status is preserved; check again shortly.");
-  return { checked: true, needsRetry: data.needsRetry === true };
+  return { checked: true, needsRetry: data.needsRetry === true, providerRejected: data.providerRejected === true,
+    simulatedCount: typeof data.simulatedCount === "number" ? data.simulatedCount : 0 };
 }

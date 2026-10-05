@@ -29,7 +29,9 @@ export function ProviderQuoteAction({ booking, isClosedConversation, isRequestBo
   const wasOpen = useRef(false);
   const isStandalone = Boolean(booking?.isStandaloneChat || booking?.bookingMode === "conversation"
     || booking?.id?.startsWith("conversation:"));
-  const canQuote = viewerRole === "seller" && isRequestBooking && !isClosedConversation && !isStandalone
+  const isExpiredUnpaidReservation = booking?.scheduleStatus === "expired";
+  const canQuote = viewerRole === "seller" && (isRequestBooking || isExpiredUnpaidReservation)
+    && !isClosedConversation && !isStandalone
     && Boolean(onProposeQuote) && (!booking?.raw?.booking?.status || booking.raw.booking.status === "pending")
     && !["held", "confirmed", "reschedule_requested"].includes(booking?.scheduleStatus || "")
     && !["partially_paid", "paid", "refund_pending", "refunded"].includes(booking?.paymentStatus || "");
@@ -48,7 +50,9 @@ export function ProviderQuoteAction({ booking, isClosedConversation, isRequestBo
         aria-expanded={open} aria-controls="provider-quote-editor" onClick={() => setOpen((current) => !current)}>
         <CalendarPlus className="size-4" aria-hidden="true" />{open ? "Back to messages" : "Create quote"}
       </Button>
-      {!open && <p className="text-xs text-muted-foreground">Send a price and proposed visit time to this client.</p>}
+      {!open && <p className="text-xs text-muted-foreground">{isExpiredUnpaidReservation
+        ? "The previous reservation expired. Send a new price and future visit time; the old checkout cannot be reused."
+        : "Send a price and proposed visit time to this client."}</p>}
     </div>
     {open && <div id="provider-quote-editor" ref={editorRef} role="region"
       className="max-h-[min(55svh,36rem)] overflow-y-auto overscroll-contain pb-2" aria-label="Quote editor">

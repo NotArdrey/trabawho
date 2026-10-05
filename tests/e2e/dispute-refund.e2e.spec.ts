@@ -20,7 +20,7 @@ for (const width of [390, 768, 1024, 1280, 1440]) {
     } }));
     await page.route("**/rest/v1/booking_refunds?*", (route) => route.fulfill({ json: approved ? [{ id: "refund-1", case_id: caseId,
       amount: 464, currency: "PHP", status: succeeded ? "succeeded" : "pending", provider_refund_id: "ref_verified", updated_at: new Date().toISOString() }] : [] }));
-    await page.route("**/rest/v1/payment_attempts?*", (route) => route.fulfill({ json: [{ id: "attempt-verified" }] }));
+    await page.route("**/rest/v1/rpc/has_verified_refund_payment", (route) => route.fulfill({ json: true }));
     await page.route("**/rest/v1/rpc/request_booking_case_refund", async (route) => {
       requests++; requested = true;
       await route.fulfill({ json: {} });
@@ -52,7 +52,7 @@ test("a paid booking without a provider-verified attempt does not offer refund r
     refund_requested_at: null, resolution_status: null,
   } }));
   await page.route("**/rest/v1/booking_refunds?*", (route) => route.fulfill({ json: [] }));
-  await page.route("**/rest/v1/payment_attempts?*", (route) => { paymentChecks++; return route.fulfill({ json: [] }); });
+  await page.route("**/rest/v1/rpc/has_verified_refund_payment", (route) => { paymentChecks++; return route.fulfill({ json: false }); });
   await page.goto("/__refund-journey");
   await expect.poll(() => paymentChecks).toBeGreaterThan(0);
   await expect(page.getByText("Refund review")).toHaveCount(0);
@@ -69,24 +69,24 @@ test("admin refund requires an evidence reason and explicit confirmation", async
   let issued = false;
   let calls = 0;
   await page.route("**/rest/v1/booking_refunds?*", (route) => route.fulfill({ json: issued ? [{ id: "refund-1", case_id: caseId,
-    amount: 464, currency: "PHP", status: "pending", provider_refund_id: "ref_verified", updated_at: new Date().toISOString() }] : [] }));
+    amount: 464, currency: "PHP", status: "simulated", provider_refund_id: null, updated_at: new Date().toISOString() }] : [] }));
   await page.route("**/functions/v1/process-booking-refunds", async (route) => {
     const body: unknown = route.request().postDataJSON();
     expect(body).toEqual({ caseId, action: "approve", expectedAmount: 464, reason: "The provider did not attend the confirmed appointment." });
     issued = true; calls++;
-    await route.fulfill({ json: { checked: true, needsRetry: false } });
+    await route.fulfill({ json: { checked: true, needsRetry: false, simulatedCount: 1 } });
   });
   await page.goto("/__refund-journey?role=admin");
   await expect(page.getByRole("heading", { name: "Refund review" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Approve full refund" })).toBeDisabled();
+  await expect(page.getByRole("button", { name: "Approve test refund" })).toBeDisabled();
   await page.getByRole("textbox", { name: "Refund approval reason" }).fill("The provider did not attend the confirmed appointment.");
-  await page.getByRole("button", { name: "Approve full refund" }).click();
+  await page.getByRole("button", { name: "Approve test refund" }).click();
   await expect(page.getByRole("alertdialog")).toContainText("PHP 464");
   expect(calls).toBe(0);
   await page.getByRole("button", { name: "Keep reviewing" }).click();
   expect(calls).toBe(0);
-  await page.getByRole("button", { name: "Approve full refund" }).click();
-  await page.getByRole("button", { name: "Confirm full refund" }).click();
-  await expect(page.getByText(/PHP 464.*Refund pending/)).toBeVisible();
+  await page.getByRole("button", { name: "Approve test refund" }).click();
+  await page.getByRole("button", { name: "Confirm test refund" }).click();
+  await expect(page.getByText(/PHP 464.*Sandbox refund simulated/)).toBeVisible();
   expect(calls).toBe(1);
 });

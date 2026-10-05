@@ -135,4 +135,19 @@ describe("SlotSelectionModal", () => {
     await user.click(screen.getByRole("button", { name: "Request reschedule" }));
     expect(await screen.findByRole("alert")).toHaveTextContent("This booking can no longer be rescheduled");
   });
+
+  it("blocks a slot taken by another booking while the chooser was open", async () => {
+    const user = userEvent.setup();
+    const onConfirmSlot = vi.fn();
+    mockedFetchSlots.mockResolvedValueOnce([{ booked_count: 0, capacity: 1, id: 42,
+      service_id: 7, start_ts: "2026-10-10T09:00:00+08:00", end_ts: "2026-10-10T10:00:00+08:00" }])
+      .mockResolvedValueOnce([]);
+    render(<SlotSelectionModal booking={{ serviceId: 7 }} onCancel={vi.fn()} onConfirmSlot={onConfirmSlot} />);
+    await user.click(await screen.findByRole("button", { name: /Sat, Oct 10/i }));
+    await user.click(screen.getByRole("button", { name: /9:00 AM.*10:00 AM/i }));
+    await user.click(screen.getByRole("button", { name: "Review booking" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("That time was just booked or changed");
+    expect(screen.queryByRole("heading", { name: "Review your booking" })).not.toBeInTheDocument();
+    expect(onConfirmSlot).not.toHaveBeenCalled();
+  });
 });

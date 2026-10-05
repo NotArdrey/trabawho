@@ -19,8 +19,6 @@ export async function handleBookingRefundRequest(request: Request): Promise<Resp
     if (caseError || !caseRecord) return paymentJsonResponse({ error: "Case not available to your account." }, 404);
     const { data: isAdmin } = await user.rpc("is_current_user_admin");
     if (action === "approve" && isAdmin !== true) return paymentJsonResponse({ error: "Administrator access required." }, 403);
-    const secret = cleanPaymentString(Deno.env.get("PAYMONGO_SECRET_KEY"));
-    if (!secret.startsWith("sk_test_")) return paymentJsonResponse({ error: "Sandbox refund processing is unavailable." }, 503);
     if (action === "approve") {
       const reason = cleanPaymentString(body.reason);
       if (reason.length < 20) return paymentJsonResponse({ error: "Explain the refund approval in at least 20 characters." }, 400);
@@ -35,38 +33,52 @@ export async function handleBookingRefundRequest(request: Request): Promise<Resp
     }
     const admin = createPaymentAdminClient();
     const { data: refunds, error: loadError } = await admin.from("booking_refunds")
-      .select("id, payment_attempt_id, provider_refund_id, status, amount, currency")
+      .select("id, payment_attempt_id, provider_refund_id, submitted_at, status, amount, currency")
       .eq("booking_id", caseRecord.booking_id);
     if (loadError) return paymentJsonResponse({ error: "Refund records could not be loaded." }, 503);
     let needsRetry = false;
+    let providerRejected = false;
+    let simulatedCount = 0;
     for (const refund of refunds || []) {
-      if (["succeeded", "failed", "needs_review"].includes(refund.status)) continue;
+      if (["succeeded", "simulated", "failed", "needs_review"].includes(refund.status)) continue;
       // Participants can check existing provider refunds, but cannot submit approvals.
       if (!refund.provider_refund_id && isAdmin !== true) continue;
+      if (!refund.provider_refund_id) {
+        if (refund.status !== "approved" || refund.submitted_at) {
+          needsRetry = true; providerRejected = true;
+          continue;
+        }
+        const { error: simulationError } = await admin.rpc("simulate_booking_case_refund", { p_refund_id: refund.id });
+        if (simulationError) needsRetry = true;
+        else simulatedCount += 1;
+        continue;
+      }
       const { data: claimed, error: claimError } = await admin.rpc("claim_booking_refund", { p_refund_id: refund.id });
       if (claimError) { needsRetry = true; continue; }
       if (!claimed?.id) continue;
       const { data: attempt, error: attemptError } = await admin.from("payment_attempts")
         .select("payment_id, environment").eq("id", refund.payment_attempt_id).single();
       if (attemptError || attempt?.environment !== "test" || !attempt.payment_id) { needsRetry = true; continue; }
+      const secret = cleanPaymentString(Deno.env.get("PAYMONGO_SECRET_KEY"));
+      if (!secret.startsWith("sk_test_")) { needsRetry = true; continue; }
       try {
         const providerId = cleanPaymentString(claimed.provider_refund_id);
-        const response = await fetch(`https://api.paymongo.com/v1/refunds${providerId ? `/${encodeURIComponent(providerId)}` : ""}`, {
-          method: providerId ? "GET" : "POST",
+        if (!providerId) { needsRetry = true; continue; }
+        const response = await fetch(`https://api.paymongo.com/v1/refunds/${encodeURIComponent(providerId)}`, {
+          method: "GET",
           signal: AbortSignal.timeout(15_000),
-          headers: { Authorization: `Basic ${btoa(`${secret}:`)}`, Accept: "application/json",
-            ...(!providerId ? { "Content-Type": "application/json", "Idempotency-Key": `trabawho-refund:${refund.id}` } : {}) },
-          ...(!providerId ? { body: JSON.stringify({ data: { attributes: {
-            amount: Math.round(Number(refund.amount) * 100), payment_id: attempt.payment_id,
-            reason: "requested_by_customer", metadata: { trabawho_refund_id: refund.id },
-          } } }) } : {}),
+          headers: { Authorization: `Basic ${btoa(`${secret}:`)}`, Accept: "application/json" },
         });
-        if (!response.ok) { needsRetry = true; continue; }
+        if (!response.ok) {
+          needsRetry = true;
+          if (response.status >= 400 && response.status < 500) providerRejected = true;
+          continue;
+        }
         const resource = asRecord(asRecord(await response.json()).data);
         const attributes = asRecord(resource.attributes);
         // Do not coerce an absent mode or amount into a verification success.
         if (typeof attributes.livemode !== "boolean" || !Number.isInteger(attributes.amount)
-          || (providerId && resource.id !== providerId)) { needsRetry = true; continue; }
+          || resource.id !== providerId) { needsRetry = true; continue; }
         const { error: recordError } = await admin.rpc("record_booking_refund", {
           p_refund_id: refund.id, p_provider_refund_id: cleanPaymentString(resource.id),
           p_payment_id: cleanPaymentString(attributes.payment_id), p_amount: Number(attributes.amount) / 100,
@@ -76,7 +88,7 @@ export async function handleBookingRefundRequest(request: Request): Promise<Resp
         if (recordError) needsRetry = true;
       } catch { needsRetry = true; }
     }
-    return paymentJsonResponse({ checked: true, needsRetry });
+    return paymentJsonResponse({ checked: true, needsRetry, providerRejected, simulatedCount });
   } catch {
     return paymentJsonResponse({ error: "Refund processing could not finish. Check the saved status before retrying." }, 503);
   }

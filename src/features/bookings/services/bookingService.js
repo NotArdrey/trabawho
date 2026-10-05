@@ -364,7 +364,7 @@ export const mapBookingRowToUiBooking = (booking = {}, context = {}) => {
     submittedCashAmount: metadata.submitted_cash_amount ?? metadata.submittedCashAmount ?? null,
     expectedCashAmount: totalChargedAmount,
     refundEligible: metadata.refund_eligible ?? (['gcash-advance', 'paymongo-card'].includes(paymentMethod) && booking.status === 'completed'),
-    refundStatus,
+    refundStatus, refundSimulated: metadata.refund_simulated === true,
     refundAmount: metadata.refund_amount ?? metadata.refundAmount ?? null,
     refundReason: metadata.refund_reason || metadata.refundReason || '',
     refundReference: metadata.refund_reference || metadata.refundReference || '',

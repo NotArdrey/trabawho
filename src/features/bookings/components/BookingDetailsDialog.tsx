@@ -48,6 +48,7 @@ export interface BookingDetails {
   warrantyCoverageSummary?: string | null;
   disputeStatus?: string;
   paymentReference?: string;
+  refundSimulated?: boolean;
   quoteAmount?: number | string;
   rating?: number | string;
   requestDate?: string;
@@ -151,7 +152,9 @@ export function BookingDetailsDialog({ booking, isProviderView, onClose, onMessa
     || normalizedStatus.includes("payment pending");
   const cancelled = normalizedStatus.includes("cancel") || normalizedStatus.includes("refund");
   const completed = normalizedStatus.includes("complete") || clientComplete;
-  const nextStep = replacementActive
+  const nextStep = booking.refundSimulated
+    ? { title: "Sandbox refund process complete", detail: "Support completed the refund decision for this test booking. No real money was returned by PayMongo.", complete: false }
+    : replacementActive
     ? { title: "Replacement visit confirmed", detail: "The agreed new appointment is active. The support case stays open until replacement work is completed and confirmed.", complete: true }
     : booking.disputeStatus === "open"
     ? { title: "Support case open", detail: "Completion is paused while the case is reviewed. Check the support case for messages, a replacement visit, or refund progress.", complete: false }
@@ -172,7 +175,7 @@ export function BookingDetailsDialog({ booking, isProviderView, onClose, onMessa
           <div className="flex items-start gap-3">
             <span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-primary text-primary-foreground"><ReceiptText className="size-5" aria-hidden="true" /></span>
             <div className="min-w-0 flex-1">
-              <div className="mb-2 flex flex-wrap items-center gap-2"><span className="text-xs font-bold uppercase tracking-wide text-primary">Booking details</span><Badge variant={statusVariant(statusLabel)}>{statusLabel}</Badge></div>
+              <div className="mb-2 flex flex-wrap items-center gap-2"><span className="text-xs font-bold uppercase tracking-wide text-primary">Booking details</span><Badge variant={statusVariant(statusLabel)}>{booking.refundSimulated ? "Refund simulated" : statusLabel}</Badge></div>
               <DialogTitle className="text-2xl">{booking.serviceType || "Service booking"}</DialogTitle>
               <DialogDescription className="mt-1 flex items-center gap-1.5"><UserRound className="size-4" aria-hidden="true" />{isProviderView ? booking.clientName : booking.workerName}</DialogDescription>
               {bookedOn ? <p className="mt-2 text-sm text-muted-foreground">Booked on <time dateTime={booking.createdAt || undefined} className="font-semibold text-foreground">{bookedOn}</time></p> : null}

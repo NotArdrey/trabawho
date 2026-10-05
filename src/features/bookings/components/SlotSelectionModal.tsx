@@ -188,6 +188,14 @@ export default function SlotSelectionModal({ action = "checkout", booking, onCan
     setSubmitError("");
     setIsSubmitting(true);
     try {
+      const fresh = await fetchPublicServiceSlots(booking.serviceId!);
+      const available = fresh.find((slot) => slot.id === selectedSlot.id
+        && slot.start_ts === selectedSlot.start_ts && slot.end_ts === selectedSlot.end_ts);
+      if (!available) {
+        setSlots(fresh); setSelectedSlotId(null); setIsReviewing(false);
+        setSubmitError("That time was just booked or changed. Choose another available time.");
+        return;
+      }
       await onConfirmSlot(selection);
     } catch (caught) {
       setSubmitError(caught instanceof Error ? caught.message : "Unable to continue with this booking. Please try again.");
@@ -196,13 +204,28 @@ export default function SlotSelectionModal({ action = "checkout", booking, onCan
     }
   };
 
-  const review = () => {
+  const review = async () => {
     if (!selectedSlot || !isBookableClientAppointment(selectedSlot.start_ts, selectedSlot.end_ts)) {
       setSelectedDate(""); setSelectedSlotId(null);
       setError("That time is no longer bookable. Choose a date from tomorrow onward (PHT).");
       return;
     }
-    setIsReviewing(true);
+    setIsSubmitting(true);
+    setSubmitError("");
+    try {
+      const fresh = await fetchPublicServiceSlots(booking.serviceId!);
+      const available = fresh.find((slot) => slot.id === selectedSlot.id
+        && slot.start_ts === selectedSlot.start_ts && slot.end_ts === selectedSlot.end_ts);
+      setSlots(fresh);
+      if (!available) {
+        setSelectedSlotId(null);
+        setSubmitError("That time was just booked or changed. Choose another available time.");
+        return;
+      }
+      setIsReviewing(true);
+    } catch {
+      setSubmitError("Could not check the provider's latest availability. Please try again.");
+    } finally { setIsSubmitting(false); }
   };
 
   return (
@@ -290,7 +313,7 @@ export default function SlotSelectionModal({ action = "checkout", booking, onCan
           <p className="text-sm text-muted-foreground">{selectedSlot ? `${dateLabel(dateKey(selectedSlot.start_ts))}, ${timeLabel(selectedSlot.start_ts)}–${timeLabel(selectedSlot.end_ts)}` : "Select a date and time to continue."}</p>
           <div className="flex gap-2">
             <Button type="button" variant="outline" disabled={isSubmitting} onClick={isReviewing ? () => setIsReviewing(false) : onCancel}>{isReviewing ? "Change time" : "Cancel"}</Button>
-            <Button type="button" disabled={!selectedSlot || isSubmitting} onClick={isReviewing ? confirm : review}>{isSubmitting ? "Updating schedule…" : isReviewing ? action === "reschedule" ? "Request reschedule" : "Continue to terms" : "Review booking"}</Button>
+            <Button type="button" disabled={!selectedSlot || isSubmitting} onClick={() => { void (isReviewing ? confirm() : review()); }}>{isSubmitting ? "Updating schedule…" : isReviewing ? action === "reschedule" ? "Request reschedule" : "Continue to terms" : "Review booking"}</Button>
           </div>
         </DialogFooter>
       </DialogContent>
