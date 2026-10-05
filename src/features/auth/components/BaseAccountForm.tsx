@@ -41,8 +41,8 @@ export function BaseAccountForm({ flow, onDraftChange }: { flow: AccountRegistra
         </div>
         {form.errors.acceptedTerms && <p id="account-terms-error" role="alert" className="text-sm text-destructive">{form.errors.acceptedTerms}</p>}
       </div>
-      <Button type="submit" isLoading={flow.busy} className="h-auto min-h-11 w-full whitespace-normal py-3">Create account<ArrowRight aria-hidden="true" /></Button>
-      <p className="text-xs leading-5 text-muted-foreground">Creating your account sends a confirmation email. Next, enter your name, confirm your email, and verify your identity.</p>
+      <Button type="submit" isLoading={flow.busy} className="h-auto min-h-11 w-full whitespace-normal py-3">Continue<ArrowRight aria-hidden="true" /></Button>
+      <p className="text-xs leading-5 text-muted-foreground">Your account is created after identity verification. We send a confirmation email when your identity is approved.</p>
     </form>
   );
 }

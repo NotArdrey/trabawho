@@ -1,3 +1,5 @@
+import { deliverAccountConfirmation } from '../_shared/accountConfirmation.ts';
+import { applyDraftEvent } from '../_shared/registrationDraftIdentity.ts';
 import { buildIdentityDocumentFingerprint, corsHeaders, createAdminClient,
   jsonResponse, sanitizeIdentityVerificationData, sha256Hex } from "../_shared/identityRegistration.ts";
 import { asRecord, resolveDiditDecisionStatus } from "../_shared/identityDomain.ts";
@@ -24,11 +26,19 @@ Deno.serve(async (req: Request) => {
     const document = verifiedDocument(payload);
     const fingerprint: string | null = await buildIdentityDocumentFingerprint(payload);
     const sanitized: unknown = sanitizeIdentityVerificationData(payload);
-    const { data, error } = await createAdminClient().rpc("apply_didit_identity_event", {
+    const client = createAdminClient();
+    const event = {
       p_event_key: `didit:${eventId}`, p_payload_hash: await sha256Hex(rawBody), p_session_id: sessionId,
       p_status: status, p_payload: sanitized, p_document: { ...document, documentNumber: undefined }, p_fingerprint: fingerprint,
-    });
+    };
+    const draftResult = await applyDraftEvent(client,event);
+    if (draftResult) return jsonResponse(draftResult);
+    const {data,error} = await client.rpc("apply_didit_identity_event",event);
     if (error) throw new Error(error.code);
+    const session = await client.from('verification_sessions').select('user_id').eq('session_ref',sessionId).maybeSingle();
+    if (session.error) throw new Error('session_lookup_failed');
+    const userId = asRecord(session.data).user_id;
+    if (typeof userId==='string') await deliverAccountConfirmation(client,userId);
     return jsonResponse(asRecord(data));
   } catch (error) {
     console.error("didit_webhook_failed", { code: error instanceof Error ? error.message : "unknown" });

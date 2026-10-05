@@ -2,14 +2,14 @@ import type { AccountRegistration } from '@/shared/services/accountRegistrationS
 
 export function registrationProgress(registration: AccountRegistration | null) {
   switch (registration?.state) {
-    case 'email_pending': return registration.signupName ? 3 : 2;
-    case 'identity_pending': return registration.signupName === '' ? 2 : 3;
+    case 'email_pending':
+    case 'identity_pending':
     case 'identity_in_progress':
-    case 'declined': return 3;
+    case 'declined': return 2;
     case 'identity_review':
-      return 3;
+      return 2;
     case 'name_pending':
-    case 'ready': return 3;
+    case 'ready': return 2;
     default: return 1;
   }
 }

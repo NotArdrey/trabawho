@@ -1,9 +1,11 @@
+import { createLegacyRegistration } from '../_shared/legacyAccountCreation.ts';
+import { createRegistrationDraft, ownedDraft, finalizeRegistrationDraft } from '../_shared/registrationDrafts.ts';
 import { registrationUser, completedRegistrationSession } from "../_shared/pendingRegistrationAccess.ts";
-import { corsHeaders, createSessionNonce, hashSessionNonce, verifySessionNonce, recordRegistrationAttempt,
+import { corsHeaders, verifySessionNonce, recordRegistrationAttempt,
   sendEmailConfirmation, jsonResponse, RegistrationRateLimitError } from "../_shared/identityRegistration.ts";
 import { asRecord } from "../_shared/identityDomain.ts";
 import { identityReturnUrl } from "../_shared/identityRedirect.ts";
-import { accountClient, AccountError, accountUser, registrationRow, registrationState, signupRole, text } from "../_shared/accountRegistration.ts";
+import { accountClient, AccountError, accountUser, registrationRow, registrationState, text } from "../_shared/accountRegistration.ts";
 
 Deno.serve(async (request: Request) => {
   if (request.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
@@ -13,24 +15,25 @@ Deno.serve(async (request: Request) => {
     const client = accountClient();
     const returnUrl = identityReturnUrl(body.redirectTo, Deno.env.get("TRABAWHO_APP_URL") || "", Deno.env.get("IDENTITY_ALLOWED_ORIGINS") || "");
     returnUrl.pathname = "/register"; returnUrl.hash = ""; returnUrl.search = "";
-    if (body.action === "create") {
-      const role = signupRole(body.signupRole);
+    if (body.action === 'resend_from_sign_in') {
       const email = text(body.email).toLowerCase();
-      const password = typeof body.password === "string" ? body.password : "";
-      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || password.length < 8 || password.length > 128 || password !== password.trim() || body.acceptedTerms !== true)
-        throw new AccountError("Enter a valid email, a password of at least 8 characters, and accept the Terms and Conditions.");
-      await recordRegistrationAttempt(client, request, { action: "base_account", email });
-      const created = await client.auth.admin.createUser({ email, password, email_confirm: false,
-        user_metadata: { registration_version: 2, role, is_worker: role === 'worker', is_client: role === 'client' },
-        app_metadata: { identity_required: true, verification_status: "UNVERIFIED", signup_role: role } });
-      if (created.error || !created.data.user) throw new AccountError("This account could not be created. If the email is already registered, sign in or resend confirmation.");
-      const user = created.data.user; const nonce = createSessionNonce();
-      const initialized = await client.rpc("initialize_account_registration", { p_user_id: user.id, p_nonce_hash: await hashSessionNonce(user.id, nonce) });
-      if (initialized.error) {
-        await client.auth.admin.deleteUser(user.id);
-        throw new AccountError("Account setup could not be saved. Retry.", 503);
-      }
-      return jsonResponse({ state: "identity_pending", email, signupName: "", signupRole: role, pendingAccount: { userId: user.id, nonce } });
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new AccountError('Enter a valid email address.');
+      await recordRegistrationAttempt(client,request,{action:'registration_email',email});
+      const profile = await client.from('profiles').select('user_id,identity_required,verification_status,id_document_expiry,account_status').eq('email',email).maybeSingle();
+      if (profile.error) throw new AccountError('Email recovery is unavailable. Retry shortly.',503);
+      const value = asRecord(profile.data);
+      const approved = value.account_status==='active' && (value.identity_required!==true ||
+        (value.verification_status==='APPROVED' && (!value.id_document_expiry || text(value.id_document_expiry)>=new Date().toISOString().slice(0,10))));
+      if (approved) await sendEmailConfirmation(email,returnUrl.toString());
+      // Keep the same response for nonexistent, restricted, and pending accounts.
+      return jsonResponse({requested:true});
+    }
+    if (body.action === "create") return jsonResponse(body.registrationVersion===3
+      ? await createRegistrationDraft(request,client,body) : await createLegacyRegistration(request,client,body));
+    const draft = await ownedDraft(client,body);
+    if (draft && !draft.finalized_at) {
+      if (body.action !== 'state') throw new AccountError('Complete identity verification before requesting confirmation.',409);
+      return jsonResponse(await finalizeRegistrationDraft(client,String(draft.id)));
     }
     if (body.action === "state" && body.userId) {
       const user = await registrationUser(request, client, body);

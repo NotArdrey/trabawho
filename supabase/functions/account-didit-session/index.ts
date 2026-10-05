@@ -1,3 +1,5 @@
+import { ownedDraft } from '../_shared/registrationDrafts.ts';
+import { draftDidit } from '../_shared/registrationDraftIdentity.ts';
 import { registrationUser } from "../_shared/pendingRegistrationAccess.ts";
 import { corsHeaders, jsonResponse, recordRegistrationAttempt } from "../_shared/identityRegistration.ts";
 import { asRecord } from "../_shared/identityDomain.ts";
@@ -11,6 +13,8 @@ Deno.serve(async (request: Request) => {
   const client = accountClient();
   try {
     const body = asRecord(await request.json());
+    const draft = await ownedDraft(client,body);
+    if (draft && !draft.finalized_at) return jsonResponse(await draftDidit(request,client,draft,body));
     const user = await registrationUser(request, client, body); userId = user.id;
     const row = await registrationRow(client, user.id);
     if (!row) throw new AccountError("Contact support to resume an existing identity registration.", 409);

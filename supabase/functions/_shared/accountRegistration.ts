@@ -50,6 +50,7 @@ export async function registrationState(client: ReturnType<typeof accountClient>
   const status = text(value.verification_status);
   const expired = text(value.id_document_expiry) && text(value.id_document_expiry) < new Date().toISOString().slice(0, 10);
   const state = expired || ["DECLINED", "ABANDONED", "EXPIRED"].includes(status) ? "declined"
+    : status === "APPROVED" && !user.email_confirmed_at ? "email_pending"
     : status === "APPROVED" && value.is_verified === true && (row.name_confirmed_at || row.reviewed_legal_name) ? "ready"
     : status === "PENDING_REVIEW" ? "identity_review"
     : row.provider_status === "APPROVED" && row.source_legal_name && !row.name_issue ? "name_pending"

@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { ArrowLeft, ArrowRight, ExternalLink } from 'lucide-react';
+import { ArrowLeft, ArrowRight, ExternalLink, FileCheck, ScanFace } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import type { AccountRegistration } from '@/shared/services/accountRegistrationService';
@@ -21,27 +21,27 @@ export function IdentityVerificationStep({ flow, state, onDraftChange, active = 
   return (
     <section ref={container} className="space-y-6">
       <div data-identity-choice hidden={controls.manual} className="space-y-6">
-        {!inProgress && <div className="space-y-3">
-          <ol className="space-y-3 text-sm leading-6">
-            {['Have your government ID ready. Upload an existing ID photo if Didit offers that option, or capture your ID with your camera.', 'Use good lighting and a camera-enabled device for the selfie check.', 'Check the complete name from your ID afterwards.'].map((item, index) =>
-              <li key={item} className="flex items-start gap-3"><span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-semibold text-primary">{index + 1}</span>{item}</li>)}
-          </ol>
-          <p className="text-xs leading-5 text-muted-foreground">If you cannot use Didit, manual review lets you upload your ID photos and selfie for an administrator to check.</p>
-          <label htmlFor="account-identity-consent" className="flex min-h-11 cursor-pointer items-start gap-3 py-3 text-sm leading-5">
-            <Checkbox id="account-identity-consent" disabled={flow.busy} checked={controls.consent} aria-describedby="identity-consent-help"
-              onChange={(event) => controls.setConsent(event.target.checked)} />
-            I consent to identity verification using my ID and selfie.
-          </label>
-          <p id="identity-consent-help" className="text-xs leading-5 text-muted-foreground">Select the consent checkbox to start verification or choose manual review.</p>
-        </div>}
-        <div className="space-y-3">
-          <Button variant="outline" className="h-auto min-h-11 w-full whitespace-normal py-3" disabled={flow.busy || (!inProgress && !controls.consent)}
-            onClick={() => controls.setManual(true)}>{inProgress ? 'Didit cannot verify my document' : 'Use manual identity review instead'}</Button>
+        {!inProgress && <label htmlFor="account-identity-consent" className="flex min-h-11 cursor-pointer items-start gap-3 py-3 text-sm leading-5">
+          <Checkbox id="account-identity-consent" disabled={flow.busy} checked={controls.consent}
+            onChange={(event) => controls.setConsent(event.target.checked)} />
+          I consent to identity verification using my ID and selfie.
+        </label>}
+        <div className="space-y-3 rounded-lg border p-4">
+          <p className="text-xs font-semibold text-primary">Recommended</p>
+          <h3 className="flex items-center gap-2 text-lg font-semibold"><ScanFace className="size-5 text-primary" aria-hidden="true" />Automatic Verification</h3>
+          <p className="text-sm leading-6 text-muted-foreground">Verify securely using your government-issued ID and a selfie. Didit extracts your legal name from your ID.</p>
           {inProgress ? <>
-            <Button variant="outline" disabled={flow.busy} className="h-auto min-h-11 w-full whitespace-normal py-3" onClick={() => void flow.refresh()}>Check verification status</Button>
             {state.sessionUrl && <Button asChild className="h-auto min-h-11 w-full whitespace-normal py-3"><a href={state.sessionUrl}>Continue in Didit<ExternalLink aria-hidden="true" /></a></Button>}
-          </> : <Button disabled={!controls.consent || flow.busy} className="h-auto min-h-11 w-full whitespace-normal py-3"
-            onClick={() => void flow.identityAction('account-didit-session', { acceptedIdentityTerms: controls.consent })}>Start identity verification<ArrowRight aria-hidden="true" /></Button>}
+            <Button variant="outline" disabled={flow.busy} className="w-full" onClick={() => void flow.refresh()}>Check verification status</Button>
+          </> : <Button disabled={!controls.consent || flow.busy} className="w-full"
+            onClick={() => void flow.identityAction('account-didit-session', { acceptedIdentityTerms: controls.consent })}>Verify with Didit<ArrowRight aria-hidden="true" /></Button>}
+        </div>
+        <p className="text-center text-sm text-muted-foreground">or</p>
+        <div className="space-y-3 rounded-lg border p-4">
+          <h3 className="flex items-center gap-2 text-lg font-semibold"><FileCheck className="size-5 text-primary" aria-hidden="true" />Manual Verification</h3>
+          <p className="text-sm leading-6 text-muted-foreground">Submit your ID and a selfie holding it for an administrator to review.</p>
+          <Button variant="outline" className="w-full" disabled={flow.busy}
+            onClick={() => controls.setManual(true)}>Submit manually</Button>
         </div>
       </div>
       <div data-manual-review hidden={!controls.manual} className="space-y-6">
@@ -51,7 +51,7 @@ export function IdentityVerificationStep({ flow, state, onDraftChange, active = 
             <Checkbox id="fallback-identity-consent" disabled={flow.busy} checked={controls.consent} onChange={(event) => controls.setConsent(event.target.checked)} />
             I consent to manual review of my ID and selfie.
           </label>} />
-        <Button variant="ghost" className="w-full" disabled={flow.busy} onClick={() => controls.setManual(false)}><ArrowLeft aria-hidden="true" />Previous</Button>
+        <Button variant="ghost" className="w-full" disabled={flow.busy} onClick={() => controls.setManual(false)}><ArrowLeft aria-hidden="true" />Back to verification options</Button>
       </div>
     </section>
   );

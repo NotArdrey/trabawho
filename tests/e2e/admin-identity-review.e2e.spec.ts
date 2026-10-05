@@ -45,7 +45,7 @@ for (const width of [390, 768, 1024, 1280, 1440]) {
     await dialog.getByRole("button", { name: "Approve identity" }).click();
     expect(decisions).toHaveLength(0);
     await dialog.getByRole("button", { name: "Confirm approval" }).click();
-    await expect(dialog.getByRole("status")).toContainText("confirm their email");
+    await expect(dialog.getByRole("status").filter({hasText:"confirm their email"})).toBeVisible();
     expect(decisions).toHaveLength(1);
     expect(decisions[0]).toMatchObject({ evidenceReviewed: true, decision: "APPROVED" });
     if (accountOwned) expect(decisions[0]).toMatchObject({ reviewedLegalName: 'Reviewed Complete Legal Name' });

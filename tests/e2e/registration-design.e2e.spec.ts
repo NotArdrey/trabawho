@@ -41,11 +41,11 @@ test('manual Previous navigation preserves evidence and associates corrective er
   const flow = await mockAccountJourney(page, { state: 'identity_pending' });
   await page.goto('/register');
   await page.getByRole('checkbox', { name: /I consent to identity/ }).check();
-  await page.getByRole('button', { name: 'Use manual identity review instead' }).click();
+  await page.getByRole('button', { name: 'Submit manually' }).click();
   await fillManualEvidence(page);
-  await page.getByRole('button', { name: 'Previous', exact: true }).click();
+  await page.getByRole('button', { name: 'Back to verification options', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Verify your identity', exact: true })).toBeFocused();
-  await page.getByRole('button', { name: 'Use manual identity review instead' }).click();
+  await page.getByRole('button', { name: 'Submit manually' }).click();
   await expect(page.getByLabel('Name on ID', { exact: true })).toHaveValue('Manual User');
   expect(await page.locator('#manual-front-image').evaluate((element) => (element as HTMLInputElement).files?.[0]?.name)).toBe('front.png');
   await page.locator('#manual-front-image').setInputFiles({ name: 'invalid.pdf', mimeType: 'application/pdf', buffer: Buffer.from('pdf') });
@@ -66,7 +66,7 @@ test('failed account creation keeps the entered password available for retry', a
   await page.getByLabel('Password', { exact: true }).fill('Password123!');
   await page.getByLabel('Confirm password', { exact: true }).fill('Password123!');
   await page.getByRole('checkbox', { name: 'I agree to the Terms and Conditions', exact: true }).check();
-  await page.getByRole('button', { name: 'Create account', exact: true }).click();
+  await page.getByRole('button', { name: 'Continue', exact: true }).click();
   await expect(page.getByRole('alert')).toContainText('Retry');
   await expect(page.getByLabel('Password', { exact: true })).toHaveValue('Password123!');
   await expect(page.getByLabel('Confirm password', { exact: true })).toHaveValue('Password123!');
@@ -81,7 +81,7 @@ test('restoration failure shows retry rather than a fresh account form', async (
     : route.fulfill({ status: fail ? 503 : 200, headers: corsHeaders, json: fail ? { error: 'Registration could not be loaded. Retry.' } : { state: 'identity_pending' } }));
   await page.goto('/register');
   await expect(page.getByRole('button', { name: 'Retry loading registration' })).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Create account', exact: true })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Continue', exact: true })).toHaveCount(0);
   fail = false;
   await page.getByRole('button', { name: 'Retry loading registration' }).click();
   await expect(page.getByRole('heading', { name: 'Verify your identity', exact: true })).toBeVisible();

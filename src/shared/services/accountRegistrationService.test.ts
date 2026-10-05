@@ -1,9 +1,22 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { pendingAccount, registrationRequest, RegistrationRequestError, savePendingAccount, resumeRegistration, signInForRegistration, subscribeToRegistrationAuth } from './accountRegistrationService';
+import { pendingAccount, registrationRequest, RegistrationRequestError, savePendingAccount, resumeRegistration, signInForRegistration, subscribeToRegistrationAuth, resendFromSignIn } from './accountRegistrationService';
 const { invoke, getSession, signInWithPassword, onAuthStateChange, setSession } = vi.hoisted(() => ({ invoke: vi.fn(), getSession: vi.fn(), signInWithPassword: vi.fn(), onAuthStateChange: vi.fn(), setSession: vi.fn() }));
 vi.mock('@/integrations/supabase', () => ({ supabase: { functions: { invoke }, auth: { getSession, signInWithPassword, onAuthStateChange, setSession } } }));
 beforeEach(() => { vi.resetAllMocks(); sessionStorage.clear(); });
 describe('account registration transport and recovery', () => {
+  it('requests confirmation through the identity-gated server endpoint', async () => {
+    invoke.mockResolvedValue({data:{requested:true},error:null});
+    await resendFromSignIn('person@example.com');
+    expect(invoke).toHaveBeenCalledWith('account-registration',{body:{action:'resend_from_sign_in',email:'person@example.com',redirectTo:`${window.location.origin}/register`}});
+  });
+  it('keeps approved but email-pending recovery unsigned and available',async()=>{
+    savePendingAccount({userId:'pending',nonce:'recovery',email:'person@example.com'});
+    getSession.mockResolvedValue({data:{session:null},error:null});
+    invoke.mockResolvedValue({data:{state:'email_pending'},error:null});
+    await expect(resumeRegistration()).resolves.toMatchObject({state:'email_pending'});
+    expect(setSession).not.toHaveBeenCalled();
+    expect(pendingAccount()?.userId).toBe('pending');
+  });
   it('retains pending recovery on refresh while signed out', async () => {
     savePendingAccount({ userId: 'pending', nonce: 'recovery', email: 'pending@example.com' });
     getSession.mockResolvedValue({ data: { session: null }, error: null });

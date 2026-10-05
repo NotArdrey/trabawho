@@ -10,7 +10,7 @@ for (const width of [390, 768, 1024, 1280, 1440]) {
     await expect(tabs.nth(0)).toHaveText('Sign in');
     await expect(tabs.nth(1)).toHaveText('Create an account');
     await expect(page.getByRole('list', { name: 'Account verification steps' }).getByRole('listitem')).toHaveText([
-      '1Account, current step', '2Name, upcoming', '3Identity, upcoming',
+      '1Account Details, current step', '2Identity Verification, upcoming',
     ]);
     const terms = page.getByRole('button', { name: 'Terms and Conditions', exact: true });
     await terms.focus();
@@ -25,17 +25,13 @@ for (const width of [390, 768, 1024, 1280, 1440]) {
     expect(flow.requests).toHaveLength(0);
     await fillRegistration(page);
     await page.getByRole('button', { name: 'Back', exact: true }).click();
-    await expect(page.getByRole('heading', { name: 'Your name', exact: true })).toBeFocused();
-    await expect(page.getByLabel('Complete name', { exact: true })).toHaveValue('Maria Isabel de la Cruz Santos');
-    await page.getByRole('button', { name: 'Back', exact: true }).click();
-    await expect(page.getByRole('heading', { name: 'Continue your registration', exact: true })).toBeVisible();
-    await page.getByRole('button', { name: 'Continue to name', exact: true }).click();
+    await expect(page.getByRole('heading', { name: 'Continue your registration', exact: true })).toBeFocused();
     await page.getByRole('button', { name: 'Continue to identity', exact: true }).click();
     await expect(page.getByRole('heading', { name: 'Verify your identity', exact: true })).toBeVisible();
     expect(flow.requests.filter((item) => item.body.action === 'create')).toHaveLength(1);
-    expect(flow.requests.filter((item) => item.body.action === 'save_name')).toHaveLength(1);
+    expect(flow.requests.filter((item) => item.body.action === 'save_name')).toHaveLength(0);
     expect(flow.requests.some((item) => ['resend', 'change_email'].includes(String(item.body.action)))).toBe(false);
-    const primary = page.getByRole('button', { name: 'Start identity verification' });
+    const primary = page.getByRole('button', { name: 'Verify with Didit' });
     const back = page.getByRole('button', { name: 'Back', exact: true });
     expect((await back.boundingBox())!.y).toBeGreaterThan((await primary.boundingBox())!.y);
     await expect(page.getByTestId('auth-task-panel')).toHaveCSS('scrollbar-width', 'none');
@@ -45,33 +41,14 @@ for (const width of [390, 768, 1024, 1280, 1440]) {
   });
 }
 
-test('account creation precedes name entry and identity verification; invalid names cannot advance', async ({ page }) => {
+test('account details go directly to identity without a name or email step', async ({ page }) => {
   const flow = await mockAccountJourney(page);
   await page.goto('/register');
-  await page.getByRole('radio', { name: 'Client: Book a service', exact: true }).check();
-  await page.getByLabel('Email', { exact: true }).fill('person@example.com');
-  await page.getByLabel('Password', { exact: true }).fill('Password123!');
-  await page.getByLabel('Confirm password', { exact: true }).fill('Password123!');
-  await page.getByRole('checkbox', { name: 'I agree to the Terms and Conditions', exact: true }).check();
-  expect(flow.requests).toHaveLength(0);
-  await page.getByRole('button', { name: 'Create account', exact: true }).click();
-  await expect(page.getByRole('heading', { name: 'Your name', exact: true })).toBeVisible();
-  expect(flow.requests.map((item) => item.body.action)).toEqual(['create']);
-  await expect(page.getByRole('heading', { name: 'Confirm your email', exact: true })).toHaveCount(0);
-  await page.getByRole('button', { name: 'Continue to identity', exact: true }).click();
-  await expect(page.getByLabel('Complete name', { exact: true })).toBeFocused();
-  await expect(page.getByLabel('Complete name', { exact: true })).toHaveAttribute('aria-invalid', 'true');
-  expect(flow.requests).toHaveLength(1);
-  await page.getByLabel('Complete name', { exact: true }).fill('Ana María Santos');
-  await page.getByRole('button', { name: 'Back', exact: true }).click();
-  await page.getByRole('button', { name: 'Back to home' }).click();
-  await expect(page.getByRole('alertdialog', { name: 'Leave registration?' })).toBeVisible();
-  await page.getByRole('button', { name: 'Stay on registration' }).click();
-  await page.getByRole('button', { name: 'Continue to name', exact: true }).click();
-  await expect(page.getByLabel('Complete name', { exact: true })).toHaveValue('Ana María Santos');
-  await page.getByRole('button', { name: 'Continue to identity', exact: true }).click();
+  await fillRegistration(page);
   await expect(page.getByRole('heading', { name: 'Verify your identity', exact: true })).toBeVisible();
-  expect(flow.requests.map((item) => item.body.action)).toEqual(['create', 'save_name']);
+  expect(flow.requests.map(item => item.body.action)).toEqual(['create']);
+  await expect(page.getByLabel('Complete name', { exact: true })).toHaveCount(0);
+  await expect(page.getByRole('heading', { name: 'Confirm your email', exact: true })).toHaveCount(0);
   await page.reload();
   await expect(page.getByRole('heading', { name: 'Verify your identity', exact: true })).toBeVisible();
 });
@@ -81,7 +58,7 @@ test('Back from identity keeps the name and consent without requesting email', a
   await page.goto('/register');
   await page.getByRole('checkbox', { name: /I consent to identity/ }).check();
   await page.getByRole('button', { name: 'Back', exact: true }).click();
-  await expect(page.getByRole('heading', { name: 'Your name', exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Continue your registration', exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Resend confirmation email', exact: true })).toHaveCount(0);
   await page.getByRole('button', { name: 'Continue to identity', exact: true }).click();
   await expect(page.getByRole('checkbox', { name: /I consent to identity/ })).toBeChecked();
@@ -94,7 +71,7 @@ for (const width of [390, 1440]) test(`hidden scrollbar preserves scrolling and 
   await mockAccountJourney(page, { state: 'identity_pending', signupName: 'Ana Santos' });
   await page.goto('/register');
   await page.getByRole('checkbox', { name: /I consent to identity/ }).check();
-  await page.getByRole('button', { name: 'Use manual identity review instead' }).click();
+  await page.getByRole('button', { name: 'Submit manually' }).click();
   const panel = page.getByTestId('auth-task-panel');
   await expect(panel).toHaveCSS('scrollbar-width', 'none');
   if (width >= 1024) {
@@ -123,7 +100,7 @@ test('manual approval is detected automatically without an email screen', async 
 });
 
 
-test('a newly created account receives its session automatically after identity approval', async ({ page }) => {
+test('a legacy confirmed account resumes its session after identity approval', async ({ page }) => {
   await mockAccountJourney(page);
   let approved = false;
   const expires = Math.floor(Date.now() / 1000) + 3600;
@@ -143,7 +120,7 @@ test('a newly created account receives its session automatically after identity 
   await page.goto('/register');
   await fillRegistration(page);
   await page.getByRole('checkbox', { name: /I consent to identity/ }).check();
-  await page.getByRole('button', { name: 'Start identity verification' }).click();
+  await page.getByRole('button', { name: 'Verify with Didit' }).click();
   await page.getByRole('button', { name: 'Check verification status' }).click();
   await expect(page.getByRole('heading', { name: 'Name on your verified ID' })).toBeVisible();
   approved = true;

@@ -6,9 +6,9 @@ for(const width of [390,768,1024,1280,1440]) {
     const flow=await mockAccountJourney(page,{state:'identity_pending'});
     await page.goto('/register');
     await expect(page.getByRole('heading',{name:'Verify your identity',exact:true})).toBeVisible();
-    await expect(page.getByRole('button',{name:'Start identity verification'})).toBeDisabled();
+    await expect(page.getByRole('button',{name:'Verify with Didit'})).toBeDisabled();
     await page.getByRole('checkbox',{name:/I consent to identity/}).check();
-    await page.getByRole('button',{name:'Start identity verification'}).click();
+    await page.getByRole('button',{name:'Verify with Didit'}).click();
     await expect(page.getByRole('link',{name:/Continue in Didit/})).toHaveAttribute('href',/didit\.me/);
     await page.getByRole('button',{name:'Check verification status'}).click();
     await expect(page.getByRole('heading',{name:'Name on your verified ID'})).toBeVisible();
@@ -47,7 +47,7 @@ test('manual fallback submits evidence for the existing confirmed account withou
   const flow=await mockAccountJourney(page,{state:'identity_pending'});
   await page.goto('/register');
   await page.getByRole('checkbox',{name:/I consent to identity/}).check();
-  await page.getByRole('button',{name:'Use manual identity review instead'}).click();
+  await page.getByRole('button',{name:'Submit manually'}).click();
   await fillManualEvidence(page);
   await page.getByRole('button',{name:'Submit for human review'}).click();
   await expect(page.getByRole('heading',{name:'Identity review pending'})).toBeVisible();
@@ -66,7 +66,7 @@ test('worker intent survives verification responses from older identity endpoint
   await mockAccountJourney(page, { state: 'identity_pending', signupRole: 'worker' });
   await page.goto('/register');
   await page.getByRole('checkbox', { name: /I consent to identity/ }).check();
-  await page.getByRole('button', { name: 'Start identity verification' }).click();
+  await page.getByRole('button', { name: 'Verify with Didit' }).click();
   await page.getByRole('button', { name: 'Check verification status' }).click();
   await page.getByRole('button', { name: 'Confirm my legal name' }).click();
   await expect(page.getByTestId('auth-task-panel').getByRole('link').last()).toHaveText('Offer services');

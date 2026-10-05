@@ -104,7 +104,7 @@ export async function deliverIdentityConfirmation(client: AdminClient, reviewId:
   if (lease.error) throw new ReviewError("Email delivery could not be started. Retry.", 503);
   if (lease.data !== true) return { sent: false, required: true, status: review.decision_email_sent_at ? "rate_limited" : "sending" };
   const appUrl = Deno.env.get("TRABAWHO_APP_URL") || "";
-  const delivery = await sendEmailConfirmation(String(review.submitted_by_email), appUrl ? `${new URL(appUrl).origin}/#login` : "");
+  const delivery = await sendEmailConfirmation(String(review.submitted_by_email), appUrl ? `${new URL(appUrl).origin}/register` : "");
   const saved = await client.from("manual_identity_reviews").update({
     email_delivery_status: delivery.sent ? "sent" : "failed",
     decision_email_sent_at: delivery.sent ? new Date().toISOString() : null,

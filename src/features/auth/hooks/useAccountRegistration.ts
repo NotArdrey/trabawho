@@ -66,7 +66,7 @@ export function useAccountRegistration() {
     setRestoreFailed(!restored); setInitializing(false);
   };
   const create = (email: string, password: string, acceptedTerms: boolean, signupRole: SignupRole) => run(async () => {
-    const result = await registrationRequest('account-registration', { action: 'create', email, password, acceptedTerms, signupRole });
+    const result = await registrationRequest('account-registration', { action: 'create', registrationVersion: 3, email, password, acceptedTerms, signupRole });
     if (!result.pendingAccount) throw new Error('Account recovery information is unavailable. Use sign in to resume.');
     const account = { ...result.pendingAccount, email: result.email || email };
     savePendingAccount(account); setPending(account); setRegistration(result);
@@ -107,7 +107,7 @@ export function useAccountRegistration() {
   });
   const registrationState = registration?.state;
   useEffect(() => {
-    if (!registrationState || !['identity_in_progress', 'identity_review', 'ready'].includes(registrationState)) return;
+    if (!registrationState || !['identity_in_progress', 'identity_review', 'email_pending', 'ready'].includes(registrationState)) return;
     if (registrationState === 'ready' && !pending) return;
     const check = () => { if (document.visibilityState === 'visible') void refresh(); };
     const timer = window.setInterval(check, 5000);

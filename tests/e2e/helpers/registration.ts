@@ -33,8 +33,7 @@ export async function fillRegistration(page: Page, email = 'person@example.com',
   await page.getByLabel('Password',{exact:true}).fill('Password123!');
   await page.getByLabel('Confirm password',{exact:true}).fill('Password123!');
   await page.getByRole('checkbox',{name:'I agree to the Terms and Conditions',exact:true}).check();
-  await page.getByRole('button',{name:'Create account',exact:true}).click();
-  await fillSignupName(page);
+  await page.getByRole('button',{name:'Continue',exact:true}).click();
 }
 export async function fillSignupName(page: Page, name = 'Maria Isabel de la Cruz Santos') {
   await page.getByLabel('Complete name', { exact: true }).fill(name);

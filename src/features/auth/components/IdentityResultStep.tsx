@@ -15,6 +15,12 @@ export function IdentityResultStep({ flow, state, onDraftChange }: { flow: Accou
   const nextAction = worker
     ? { href: state.providerSetupComplete ? '/worker/dashboard' : '/seller/onboarding', label: state.providerSetupComplete ? 'Open worker dashboard' : 'Offer services' }
     : { href: '/dashboard', label: 'Start booking services' };
+  if (state.state === 'email_pending') return <section className="space-y-4">
+    {state.legalName && <p className="break-words text-sm">Verified name: {state.legalName}</p>}
+    <p className="break-words text-sm leading-6 text-muted-foreground">A confirmation email is sent automatically to {state.email}. Open the link in your inbox to activate sign-in. Check your spam folder too.</p>
+    {state.emailDelivery?.sent === false && <p role="status" className="text-sm leading-6">Your account is saved, but email delivery failed. Use Sign in to request another confirmation email.</p>}
+    <Button asChild className="w-full"><a href="/sign-in">Go to sign in<ArrowRight aria-hidden="true" /></a></Button>
+  </section>;
   return (
     <section className="space-y-6">
       {namePending && <div className="space-y-2 rounded-lg bg-muted/60 p-4">

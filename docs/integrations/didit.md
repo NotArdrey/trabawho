@@ -34,8 +34,36 @@ removed after verification.
 The identity-first follow-up adds `20261006108000_identity_before_email_confirmation.sql`
 and changes `account-registration`, `account-didit-session`, `account-manual-review`,
 and `account-identity-name` plus their shared helpers. Apply this migration and
-redeploy these functions together before publishing the new frontend. These changes
-are prepared locally; deployment is not recorded as completed here.
+redeploy these functions together before publishing the new frontend. This rollout
+was deployed on 2026-10-05 after the published frontend was found to be ahead of
+the backend. The migration is recorded in the linked project's history.
+`account-registration` is active at version 6, `account-didit-session` at version 5,
+and `account-manual-review` and `account-identity-name` at version 4.
+Live Client and Worker browser rehearsals passed signup, name saving, identity-page
+refresh, and Back navigation without email confirmation or a login prompt.
+Valid pending recovery reached the identity-consent gate; all four endpoints
+rejected forged recovery. Both synthetic accounts were removed. Rollback-only
+`account-registration.sql` and `account-roles.sql` passed against the live database.
+
+The V3 draft-based registration change adds `20261006111000_registration_drafts.sql`
+and `20261006112000_registration_draft_events.sql`, plus updated registration,
+Didit, manual, name, admin-review, and webhook functions. The backend supports both
+V3 drafts and the published V2 contract. Publish the new frontend after backend
+rollout to activate the two-step wizard on the public site.
+
+On 2026-10-05, both V3 migrations were applied to the linked Supabase project.
+`account-registration` is active at version 7, `account-didit-session` at version 6,
+`account-manual-review` and `account-identity-name` at version 5,
+`account-admin-identity-review` at version 3, and `didit-webhook` at version 28.
+Live Client and Worker drafts passed creation, unsigned refresh, encrypted-password
+storage, deferred Auth creation, consent enforcement, forged-recovery rejection,
+and deferred email checks. Both synthetic drafts were removed. Rollback-only
+`registration-drafts.sql`, `account-registration.sql`, and `account-roles.sql`
+passed against the live database, including real inbox-confirmation triggers.
+The new frontend has not been published. No human ID scan or real email delivery
+was claimed by these draft probes. Local verification passed `npm run check`
+(561 unit tests and 63 standards/database checks), the 80 selected browser journeys
+after correcting timing-sensitive assertions, and 12 Deno helper tests.
 
 ## Account and email
 
@@ -44,17 +72,21 @@ journey. It starts with an explicit **Client — Book a service** or
 **Worker — Offer services** choice, with neither preselected, then collects email,
 password, password confirmation, and Terms and Conditions agreement. It does
 not ask for a document type, legal name, or service address at this stage.
-The visible steps are **Account → Name → Identity**. Account creation leaves
-email unconfirmed and sends no confirmation email. The second step collects the
-complete applicant name; `account-registration` validates the recovery capability
-or authenticated session and saves unverified `user_metadata.signup_name`.
-Saving or revisiting a name never modifies the protected profile name or approves
-identity. Identity approval, including the verified-name check or administrator
-review, atomically confirms email through the server-only profile access guard.
-Declined, pending, duplicate, and expired identities remain blocked. Email is not
-a wizard page. Back appears below the primary action, and account-access tabs
-hide once registration has started. The registration scrollbar is hidden while
-native scrolling and keyboard access remain available.
+The current V3 wizard has two steps: **Account Details → Identity Verification**.
+The first submission requests `registrationVersion: 3` and creates only a private
+registration draft; it creates neither an Auth user nor a profile and sends no
+email. Didit extracts the legal name. There is no separate applicant-name page,
+email-confirmation page, video upload, address, or Worker qualification collection.
+Back appears below the primary action, and account-access tabs hide after starting.
+Manual verification collects the name on ID, document type/number, expiration
+or no-expiration choice, front, back when applicable, selfie holding ID, and consent.
+After trusted Didit approval or a complete manual submission, the backend creates
+the Auth account, fixed role, profile, and identity records. Duplicates, ambiguous
+names, and provider review decisions create restricted pending accounts. Confirmation
+email is sent automatically only after local identity approval. New accounts must
+use the link in their inbox; identity approval never confirms their email.
+The submitted wizard shows inbox instructions or the pending-review result.
+The registration scrollbar is hidden while native scrolling and keyboard access remain available.
 Terms and Conditions opens an accessible modal from the agreement's text link.
 Sign in precedes Create an account in the account-access navigation.
 The server validates the choice, saves it in protected Auth app metadata as
@@ -81,63 +113,41 @@ checks the matching document fingerprint; it does not establish that different
 IDs belong to the same person. Existing-email signup remains rejected because
 Supabase Auth uses a unique email for each account.
 
-`account-registration` creates an unconfirmed Auth account and initializes its
-restricted profile and `account_registrations` record. Profile initialization and
-consent/recovery metadata are transactional. A failed initialization removes the
-new Auth account. An existing email cannot have its password replaced through
-registration. Creation does not depend on SMTP delivery.
+V3 drafts are stored in `registration_drafts`, accessible only to the service role.
+Passwords are encrypted with AES-GCM using the server nonce secret and bound to
+the draft ID. A random IV protects each ciphertext; the password is never stored
+in browser storage, logs, Didit payloads, or plaintext database columns. Finalization
+removes the encrypted password. Draft recovery expires after 14 days; retain the
+nonce encryption secret during that window. Expired drafts cannot finalize.
+Auth creation uses the draft UUID and protected ownership metadata. A creation
+lease and transactional finalization permit safe retries after an interrupted
+Auth/API operation without changing an existing account's password. Local identity
+claims and database uniqueness enforce one approved document per role even when
+approval requests compete. Finalized accounts retain both the identity and email
+marketplace gates. SMTP failure leaves the saved account available for retry.
 
-An expiring recovery capability permits only registration state, applicant-name
-entry, and identity actions before email confirmation. Handlers validate its hash,
-expiry, and live account status; it cannot authorize marketplace operations.
-The recovery window is 14 days to cover the seven-day manual review period.
-Expired capabilities require support recovery; after identity approval users can
-sign in normally. Existing resend/change-email actions remain for older bundles.
-Confirmation callbacks still return to `/register` for those earlier accounts.
-
-The page polls active identity sessions and pending reviews every five seconds
-while visible and refreshes when the user returns. When a capability-owned account
-is ready, a server-generated and redeemed Auth token creates its session without
-storing a password or sending a confirmation email. The service client is kept
-separate from the client redeeming the token. The browser persists the returned
-Auth session and clears the pending recovery capability.
-
-The pending account ID, expiring recovery capability, email, and entered signup
-name are stored
-in session storage. The retired password-bearing signup state is removed. Auth
-credentials are never saved by the registration journey; normal Supabase Auth
-session persistence continues to support returning users.
-
-Successful sign-in or authenticated session restoration clears older pending
-recovery. All application logout paths clear pending and retired signup storage
-after successful sign-out. Unsigned page refresh still preserves the current
-pending signup. Registration listens for sign-out to clear its in-memory state;
-an earlier restoration request cannot repopulate the screen after logout.
-**Register another account** abandons the browser's pending journey without
-deleting the server account or sending another email. Signed-in applicants can
-use **Sign out and register another account** to start a fresh signup.
-
-Back navigation revisits completed steps without creating another account,
-resending email, or clearing the current form. A created account shows an
-account summary; a confirmed email shows its completed state. Verification of
-the name extracted from the ID remains part of the final Identity step.
-
-The updated `account-registration` function was deployed before the frontend.
-Live endpoint checks verified nonce rejection and successful signup-name saving
-without changing confirmation delivery, protected names, identity gates, or
-account roles. The temporary verification account was removed afterward.
-All 22 registration Playwright journeys passed against the production frontend,
-including a real login/logout cycle followed by an empty new-account form, modal
-keyboard focus, Back navigation, and all five documented responsive widths.
+The pending draft/account UUID, expiring recovery capability, and email are stored
+in session storage. The retired password-bearing state is removed. Recovery allows
+registration actions only; it grants no marketplace access. The page polls active
+identity sessions and pending reviews while visible, including after returning
+from Didit. A signed Didit webhook can finish account creation even if the browser
+has closed. Confirmation callbacks return to `/register`. Manual approval triggers
+confirmation delivery through the admin handler. Sign-in resend uses a server
+identity/expiry/access check and gives the same response for unknown or blocked
+emails. Existing V2 creation requests and applicant-name actions remain compatible
+with already published bundles. Existing account decisions and legacy confirmation
+behavior are preserved; new V3 requests require real inbox confirmation.
 
 ## Identity and name confirmation
 
-`account-didit-session` authenticates the account using `auth.getUser`, checks its
-live account restrictions and confirmed email, and requires identity consent
-before creating a hosted workflow. Didit handles document selection, ID capture,
-liveness, and face matching. Session creation has a database lease, and the
-session belongs to the account from the start. Retries reuse the current pending
-session; returns and polling resume it across devices after sign-in.
+`account-didit-session` validates draft ownership or authenticates an existing
+account, checks expiry/access restrictions, and requires identity consent before
+creating a hosted workflow. Didit handles document selection, ID capture,
+liveness, face matching, and legal-name extraction. V3 sessions belong to the
+private draft until account creation; V2 sessions remain account-owned. Database
+leases serialize creation. Retries reuse an existing pending session. Draft
+returns resume in the browser with its recovery capability; after account and
+email completion, sign-in supports resumption on another device.
 
 Existing ID-photo upload is controlled by the Didit workflow's **ID verification
 → Advanced → Document upload** option, not a TrabaWho form field or session
@@ -147,9 +157,9 @@ conditionally because the configured workflow has not been changed by this code.
 See [Didit's document upload guidance](https://help.didit.me/documents-coverage/document-upload-problems).
 Manual review remains the clearly labeled upload fallback.
 
-Email verification occurs before identity verification. The confirmation link
-proves inbox access; an identity-review decision notification follows the admin
-decision and does not replace email verification.
+V3 identity approval sends the confirmation email without confirming it. Existing
+V2 identity approval retains its atomic confirmation behavior for compatibility.
+Confirming email alone does not approve identity or open marketplace access.
 
 The browser return bridge preserves an allowlisted `/register` destination.
 Callback status and session query parameters are informational. Polling fetches
@@ -158,9 +168,10 @@ access; approved ID/face nodes cannot override an overall decline or review.
 V3 reports use plural arrays such as `id_verifications`, `liveness_checks`, and
 `face_matches`.
 
-Server-fetched reports supply the complete legal name and document type. The
-profile remains restricted after provider approval until the user confirms
-**Name on your verified ID** through `account-identity-name`. The protected
+Server-fetched reports supply the complete legal name and document type. V3
+finalization stores a complete, unambiguous legal name automatically. Earlier
+account-owned sessions retain **Name on your verified ID** confirmation through
+`account-identity-name`. The protected
 `full_name` uses the complete source value without a forced first/middle/last
 split. Missing names or document types, incomplete/conflicting extracted names,
 duplicates, disputed names, and overall review decisions enter the admin queue.
@@ -178,9 +189,10 @@ access. Duplicate/stale events and superseded sessions cannot open access.
 ## Manual fallback
 
 The identity screen provides a clearly labeled manual fallback, including when
-an unfinished hosted workflow cannot verify a document. It reuses the same
-confirmed account. It collects the document type, name shown on the document,
-number, expiry if shown, front/back images, selfie, and identity consent. A
+an unfinished hosted workflow cannot verify a document. V3 creates a pending
+account only after evidence is submitted; existing sessions reuse their account.
+It collects document type, name on ID, number, expiration/no-expiration choice,
+front, back when applicable, selfie holding ID, and identity consent. A
 successful Didit journey does not request a second ID upload.
 
 `account-manual-review` accepts JPEG/PNG/WebP evidence up to 7 MB per image and
@@ -255,8 +267,8 @@ Server-only secrets are `DIDIT_API_KEY`, `DIDIT_WORKFLOW_ID`,
 `DIDIT_SESSION_NONCE_SECRET`, `TRABAWHO_APP_URL`, and optional
 `IDENTITY_ALLOWED_ORIGINS`. Supabase supplies its URL, anonymous key, and service
 role key. Browser configuration contains only the public URL/key. Auth email
-confirmation remains enabled globally. Version 2 accounts are confirmed automatically
-only upon final identity approval; legacy email confirmation behavior is retained. The confirmation
+confirmation remains enabled globally. V3 identity approval leaves email unconfirmed;
+V2 final-approval confirmation remains compatible with existing accounts. The confirmation
 allowlist must include the application origin's `/register` route; existing `/**`
 entries also cover it.
 
@@ -271,6 +283,8 @@ Apply the maintained identity/email migrations followed by:
 - `20261006106000_fixed_account_roles.sql`
 - `20261006107000_identity_duplicates_per_role.sql`
 - `20261006108000_identity_before_email_confirmation.sql`
+- `20261006111000_registration_drafts.sql`
+- `20261006112000_registration_draft_events.sql`
 
 Deploy `account-registration`, `account-didit-session`, `account-identity-name`,
 `account-manual-review`, `account-admin-identity-review`, `provider-setup`,
@@ -343,6 +357,6 @@ npx deno test --allow-env --allow-net supabase/functions/_shared/identityDomain_
 ```
 
 Run `tests/integration/account-registration.sql`, `tests/integration/account-roles.sql`,
-`tests/integration/identity-registration.sql`, and
+`tests/integration/registration-drafts.sql`, `tests/integration/identity-registration.sql`, and
 `tests/integration/email-notifications.sql` through a privileged linked-project
 connection; each suite rolls its fixtures back.

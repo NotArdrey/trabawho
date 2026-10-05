@@ -32,11 +32,9 @@ begin
   if not exists(select 1 from public.profiles where user_id=u and role='worker' and is_worker and not is_client) or
     not exists(select 1 from public.profiles where user_id=u2 and role='client' and is_client and not is_worker) then
     raise exception 'Base account role was not fixed at signup'; end if;
-  begin
-    perform public.claim_account_identity_session(u,lease);
-    raise exception 'Unconfirmed email could start Didit';
-  exception when insufficient_privilege then null; end;
-  update auth.users set email_confirmed_at=now() where id in (u,u2,u3,u4);
+  -- Keep identity fixtures unconfirmed; only the legacy email-change fixture
+  -- needs confirmation before exercising its existing protection.
+  update auth.users set email_confirmed_at=now() where id=u3;
   begin
     perform public.claim_pending_account_email(u3,'test','changed-after-confirmation@account-test.invalid');
     raise exception 'A confirmed account allowed a pending email change';
@@ -47,6 +45,8 @@ begin
   result:=public.apply_didit_identity_event(sid||'-approved','hash',sid,'APPROVED','{"timestamp":100}',
     jsonb_build_object('fullName',name,'documentType','passport','expiry','2099-01-01'),'test-fingerprint-'||sid);
   if exists(select 1 from public.profiles where user_id=u and is_verified) then raise exception 'Approval bypassed name confirmation'; end if;
+  if exists(select 1 from auth.users where id=u and email_confirmed_at is not null) then
+    raise exception 'Provider approval confirmed email before name confirmation'; end if;
   if not exists(select 1 from public.account_registrations where user_id=u and source_legal_name=name and provider_status='APPROVED') then
     raise exception 'Server-derived name was not preserved'; end if;
   begin
@@ -55,6 +55,8 @@ begin
   exception when insufficient_privilege then null; end;
   perform public.confirm_account_identity_name(u);
   perform public.confirm_account_identity_name(u);
+  if not exists(select 1 from auth.users where id=u and email_confirmed_at is not null) then
+    raise exception 'Final identity approval did not confirm email atomically'; end if;
   if not exists(select 1 from public.profiles where user_id=u and is_verified and full_name=name and first_name is null) then
     raise exception 'Name confirmation did not open access using the complete source name'; end if;
   if (select count(*) from public.identity_name_actions where user_id=u and action='CONFIRMED')<>1 then

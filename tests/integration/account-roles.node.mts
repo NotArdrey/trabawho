@@ -19,6 +19,7 @@ before(async () => {
     '20261006104000_registration_event_gate_hardening.sql', '20261006105000_registration_retry_hardening.sql',
     '20261006106000_fixed_account_roles.sql', '20261006107000_identity_duplicates_per_role.sql',
     '20261006108000_identity_before_email_confirmation.sql',
+    '20261006111000_registration_drafts.sql', '20261006112000_registration_draft_events.sql',
   ]) {
     if (file === '20261006106000_fixed_account_roles.sql') {
       for (let i = 0; i < 2; i++) {
@@ -188,4 +189,76 @@ test('unconfirmed manual review confirms email only after administrator approval
     assert.equal(Boolean((await db.query('select email_confirmed_at from auth.users where id=$1', [id])).rows[0].email_confirmed_at), decision === 'APPROVED');
     assert.equal((await db.query('select is_verified from public.profiles where user_id=$1', [id])).rows[0].is_verified, decision === 'APPROVED');
   }
+});
+
+async function draft(role: 'client' | 'worker', status='APPROVED', evidence: Record<string,string> | null=null) {
+  const id=crypto.randomUUID(),lease=crypto.randomUUID(),session=crypto.randomUUID();
+  await db.query(`insert into public.registration_drafts(id,email,account_role,password_ciphertext,nonce_hash,
+    session_id,session_url,provider_status,document,fingerprint,payload,evidence,creation_lease)
+    values($1,$2,$3,'encrypted-only','nonce',$4,'https://verification.didit.me/test',$5,$6,$7,$8,$9,$10)`,
+    [id,id+'@test.invalid',role,session,status,{...document,backNotApplicable:true},'draft-'+id,{timestamp:100},evidence,lease]);
+  return {id,lease,session};
+}
+async function draftAuth(id:string,role:string) {
+  await db.query('insert into auth.users(id,email,raw_app_meta_data) values($1,$2,$3)',
+    [id,id+'@test.invalid',{registration_version:3,registration_draft_id:id,signup_role:role}]);
+}
+for (const role of ['client','worker'] as const) test(`V3 ${role} draft finalizes an approved identity without confirming email or allowing marketplace access`, async()=>{
+  const {id,lease}=await draft(role);
+  assert.equal((await db.query('select id from auth.users where id=$1',[id])).rows.length,0);
+  assert.equal((await db.query('select user_id from public.profiles where user_id=$1',[id])).rows.length,0);
+  await assert.rejects(db.query('select public.finalize_registration_draft($1,$2)',[id,lease]),/Identity must finish/);
+  await draftAuth(id,role);
+  await db.query('select public.finalize_registration_draft($1,$2)',[id,lease]);
+  const profile=await db.query('select role,verification_status,is_verified,full_name from public.profiles where user_id=$1',[id]);
+  assert.deepEqual(profile.rows[0],{role,verification_status:'APPROVED',is_verified:false,full_name:document.fullName});
+  assert.equal((await db.query('select email_confirmed_at from auth.users where id=$1',[id])).rows[0].email_confirmed_at,null);
+  assert.equal((await db.query('select password_ciphertext from public.registration_drafts where id=$1',[id])).rows[0].password_ciphertext,null);
+  await db.query('select public.finalize_registration_draft($1,$2)',[id,lease]);
+  assert.equal((await db.query('select user_id from public.account_registrations where user_id=$1',[id])).rows.length,1);
+  if (role==='worker') await assert.rejects(db.query('select public.complete_account_provider_setup($1,$2)',[id,providerSetup]),/verification/);
+});
+test('V3 manual submission permits IDs without a back side and keeps email blocked until admin approval',async()=>{
+  const {id,lease}=await draft('worker','PENDING_REVIEW',{front:'front.png',selfie:'selfie.png'});
+  await draftAuth(id,'worker');
+  await db.query('select public.finalize_registration_draft($1,$2)',[id,lease]);
+  await assert.rejects(db.query('select public.claim_pending_account_email($1,$2)',[id,'nonce']),/after identity approval/);
+  const review=await db.query<{id:string}>('select id from public.manual_identity_reviews where user_id=$1',[id]);
+  await db.query('select public.decide_account_identity_review($1,$2,$3,$4,$5,$6)',
+    [review.rows[0].id,await admin(),'APPROVED','Verified name and document against submitted evidence.',crypto.randomUUID(),document.fullName]);
+  assert.equal((await db.query('select email_confirmed_at from auth.users where id=$1',[id])).rows[0].email_confirmed_at,null);
+  assert.equal((await db.query('select is_verified from public.profiles where user_id=$1',[id])).rows[0].is_verified,false);
+  await db.query('select public.claim_pending_account_email($1,$2)',[id,'nonce']);
+});
+test('V3 draft event blocks expired and ambiguous identities, rejects forged status, and deduplicates deliveries',async()=>{
+  for(const [patch,status] of [[{expiry:'2000-01-01'},'EXPIRED'],[{nameAmbiguous:true},'PENDING_REVIEW']] as const) {
+    const {id,session}=await draft('client','PENDING');
+    const event=crypto.randomUUID();
+    const args=[event,'hash',session,'APPROVED',{timestamp:100},{...document,...patch},'fingerprint-'+id];
+    await db.query('select public.apply_registration_draft_event($1,$2,$3,$4,$5,$6,$7)',args);
+    assert.equal((await db.query('select provider_status from public.registration_drafts where id=$1',[id])).rows[0].provider_status,status);
+    await db.query('select public.apply_registration_draft_event($1,$2,$3,$4,$5,$6,$7)',args);
+    assert.equal((await db.query('select event_key from public.didit_webhook_events where event_key=$1',[event])).rows.length,1);
+    await assert.rejects(db.query('select public.apply_registration_draft_event($1,$2,$3,$4,$5,$6,$7)',[crypto.randomUUID(),'hash',session,'FORGED',{timestamp:200},document,'fingerprint']),/Unsupported status/);
+  }
+});
+test('V3 duplicate identity is held for review while opposite-role registration is allowed',async()=>{
+  const fingerprint='draft-duplicate-'+crypto.randomUUID();
+  const original=await account('client');await approve(original,fingerprint);await db.query('select public.confirm_account_identity_name($1)',[original]);
+  for(const role of ['client','worker'] as const) {
+    const {id,lease,session}=await draft(role,'PENDING');
+    await db.query('select public.apply_registration_draft_event($1,$2,$3,$4,$5,$6,$7)',[crypto.randomUUID(),'hash',session,'APPROVED',{timestamp:100},document,fingerprint]);
+    assert.equal((await db.query('select provider_status from public.registration_drafts where id=$1',[id])).rows[0].provider_status,role==='client'?'PENDING_REVIEW':'APPROVED');
+    await draftAuth(id,role);
+    await db.query('select public.finalize_registration_draft($1,$2)',[id,lease]);
+    assert.equal((await db.query('select verification_status from public.profiles where user_id=$1',[id])).rows[0].verification_status,role==='client'?'PENDING_REVIEW':'APPROVED');
+  }
+});
+test('V3 pending and expired drafts cannot obtain an account creation lease or finalize',async()=>{
+  const {id,lease}=await draft('client','PENDING');await draftAuth(id,'client');
+  const claim=await db.query<{claimed:boolean}>("select public.claim_registration_draft($1,$2,'finalize') as claimed",[id,lease]);
+  assert.equal(claim.rows[0].claimed,false);
+  await assert.rejects(db.query('select public.finalize_registration_draft($1,$2)',[id,lease]),/Identity must finish/);
+  await db.query("update public.registration_drafts set provider_status='APPROVED',expires_at=now()-interval '1 day' where id=$1",[id]);
+  await assert.rejects(db.query('select public.finalize_registration_draft($1,$2)',[id,lease]),/Identity must finish/);
 });

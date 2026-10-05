@@ -159,12 +159,12 @@ test.describe('AI redesign smoke verification', () => {
       await page.setViewportSize({ width: viewport.width, height: viewport.height });
       await page.goto('/register');
 
-      await expect(page.getByRole('heading', { name: 'Create account', exact: true })).toBeVisible();
+      await expect(page.getByRole('heading', { name: 'Create your account', exact: true })).toBeVisible();
       await expect(page.getByLabel('Email', { exact: true })).toBeVisible();
       await expect(page.getByLabel('Password', { exact: true })).toBeVisible();
       await expect(page.getByLabel('Account Type')).toHaveCount(0);
       await expect(page.getByLabel('Identity document')).toHaveCount(0);
-      await expect(page.getByRole('button', { name: 'Create account', exact: true })).toBeVisible();
+      await expect(page.getByRole('button', { name: 'Continue', exact: true })).toBeVisible();
       await expectNoHorizontalOverflow(page);
     });
   }
@@ -177,7 +177,7 @@ test.describe('AI redesign smoke verification', () => {
 
     await page.getByRole('button', { name: 'Create an account', exact: true }).click();
     await expect(page).toHaveURL(/\/register$/);
-    await expect(page.getByRole('heading', { name: 'Create account', exact: true })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Create your account', exact: true })).toBeVisible();
   });
 
   test('password recovery route is direct, accessible, and validates safely', async ({ page }) => {

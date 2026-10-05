@@ -16,7 +16,7 @@ export function AuthVisual() {
         <div className="space-y-4">
           <span className="inline-flex rounded-lg bg-white/15 px-3 py-2 text-xs font-semibold">Built for local work</span>
           <h2 className="max-w-md text-4xl font-semibold leading-tight tracking-tight xl:text-5xl">A clear connection.<br />A job well done.</h2>
-          <p className="max-w-md text-base leading-7 text-white/90">Create one account to book local services and, when you’re ready, offer your own.</p>
+          <p className="max-w-md text-base leading-7 text-white/90">Choose a Client account to book local services or a Worker account to offer your skills.</p>
         </div>
         <ul className="space-y-4 border-t border-white/25 pt-6">
           {capabilities.map(({ icon: Icon, title, detail }) => <li key={title} className="flex items-start gap-3">

@@ -80,8 +80,7 @@ export async function signInForRegistration(email: string, password: string) {
   return registrationRequest('account-registration', { action: 'state' });
 }
 export async function resendFromSignIn(email: string) {
-  const result = await supabase.auth.resend({ type: 'signup', email, options: { emailRedirectTo: `${window.location.origin}/register` } });
-  if (result.error) throw new Error(result.error.message);
+  await accountRequest('account-registration', { action: 'resend_from_sign_in', email, redirectTo: `${window.location.origin}/register` });
 }
 export async function routePendingRegistration(pathname: string): Promise<boolean> {
   if (pathname === '/register') return true;

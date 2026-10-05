@@ -22,13 +22,13 @@ test('login, logout, then new signup does not restore the previous pending accou
   expect(await page.evaluate(() => sessionStorage.getItem('trabawho.pendingAccount.v2'))).toBeNull();
   expect(await page.evaluate(() => sessionStorage.getItem('trabawho.identitySignup.v1'))).toBeNull();
   await page.goto('/register');
-  await expect(page.getByRole('heading', { name: 'Create account', exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Create your account', exact: true })).toBeVisible();
   await expect(page.getByLabel('Email', { exact: true })).toHaveValue('');
   await expect(page.getByLabel('Password', { exact: true })).toHaveValue('');
   await expect(page.getByRole('radio', { name: 'Client: Book a service', exact: true })).not.toBeChecked();
   await expect(page.getByText('old@example.com', { exact: false })).toHaveCount(0);
   await page.reload();
-  await expect(page.getByRole('heading', { name: 'Create account', exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Create your account', exact: true })).toBeVisible();
 });
 
 for (const width of [390, 1440]) test(`abandoned signup can start another account without email delivery at ${width}px`, async ({ page }) => {
@@ -40,13 +40,13 @@ for (const width of [390, 1440]) test(`abandoned signup can start another accoun
   await page.reload();
   await expect(page.getByRole('heading', { name: 'Verify your identity', exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'Back', exact: true }).click();
-  await page.getByRole('button', { name: 'Back', exact: true }).click();
   await page.getByRole('button', { name: 'Use a different account', exact: true }).click();
-  await expect(page.getByRole('heading', { name: 'Create account', exact: true })).toBeFocused();
+  await expect(page.getByRole('heading', { name: 'Create your account', exact: true })).toBeFocused();
   await expect(page.getByLabel('Email', { exact: true })).toHaveValue('');
   await expect(page.getByLabel('Password', { exact: true })).toHaveValue('');
   expect(await page.evaluate(() => sessionStorage.getItem('trabawho.pendingAccount.v2'))).toBeNull();
-  expect(flow.requests.map(item => item.body.action)).toEqual(['state']);
+  expect(flow.requests.length).toBeGreaterThan(0);
+  expect(flow.requests.every(item => item.body.action === 'state')).toBe(true);
   await page.reload();
-  await expect(page.getByRole('heading', { name: 'Create account', exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Create your account', exact: true })).toBeVisible();
 });

@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { corsHeaders, fillRegistration, fillSignupName, mockAccountJourney, expectNoRegistrationOverflow } from './helpers/registration';
+import { corsHeaders, fillRegistration, mockAccountJourney, expectNoRegistrationOverflow } from './helpers/registration';
 for(const width of [390,768,1024,1280,1440]) test(`base account defers identity and service details at ${width}px`,async({page})=>{
   await page.setViewportSize({width,height:900});
   const flow=await mockAccountJourney(page);
@@ -18,7 +18,7 @@ for(const width of [390,768,1024,1280,1440]) test(`base account defers identity 
   await expect(page.getByRole('navigation', { name: 'Account access' })).toHaveCount(0);
   await expect(page.getByRole('heading', { name: 'Confirm your email' })).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Register another account' })).toHaveCount(0);
-  const primary = page.getByRole('button', { name: 'Start identity verification' });
+  const primary = page.getByRole('button', { name: 'Verify with Didit' });
   expect((await primary.boundingBox())!.height).toBeGreaterThanOrEqual(44);
   await expectNoRegistrationOverflow(page);
   await page.screenshot({path:test.info().outputPath(`identity-${width}.png`),fullPage:true});
@@ -36,7 +36,7 @@ test('signup requires an explicit choice and supports changing it with the keybo
   await page.getByLabel('Password', { exact: true }).fill('Password123!');
   await page.getByLabel('Confirm password', { exact: true }).fill('Password123!');
   await page.getByRole('checkbox', { name: 'I agree to the Terms and Conditions', exact: true }).check();
-  await page.getByRole('button', { name: 'Create account', exact: true }).click();
+  await page.getByRole('button', { name: 'Continue', exact: true }).click();
   const client = page.getByRole('radio', { name: 'Client: Book a service', exact: true });
   const worker = page.getByRole('radio', { name: 'Worker: Offer services', exact: true });
   await expect(client).toBeFocused();
@@ -47,8 +47,7 @@ test('signup requires an explicit choice and supports changing it with the keybo
   await page.keyboard.press('ArrowRight');
   await expect(worker).toBeChecked();
   await expect(client).not.toBeChecked();
-  await page.getByRole('button', { name: 'Create account', exact: true }).click();
-  await fillSignupName(page);
+  await page.getByRole('button', { name: 'Continue', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Verify your identity', exact: true })).toBeVisible();
   expect(flow.requests.find(item => item.body.action === 'create')?.body.signupRole).toBe('worker');
   expect(flow.requests.some(item => item.name === 'account-didit-session')).toBe(false);
@@ -59,14 +58,14 @@ test('field validation prevents malformed email, short password, and missing ter
   await page.getByRole('radio', { name: 'Client: Book a service', exact: true }).check();
   await page.getByLabel('Email',{exact:true}).fill('invalid');
   await page.getByLabel('Password',{exact:true}).fill('short');
-  await page.getByRole('button',{name:'Create account',exact:true}).click();
+  await page.getByRole('button',{name:'Continue',exact:true}).click();
   await expect(page.getByText('Enter a valid email address.', { exact: true })).toBeVisible();
   await expect(page.getByLabel('Email', { exact: true })).toBeFocused();
   expect(flow.requests).toHaveLength(0);
   await page.getByLabel('Email',{exact:true}).fill('person@example.com');
   await page.getByLabel('Password',{exact:true}).fill('Password123!');
   await page.getByLabel('Confirm password',{exact:true}).fill('Password123!');
-  await page.getByRole('button',{name:'Create account',exact:true}).click();
+  await page.getByRole('button',{name:'Continue',exact:true}).click();
   expect(flow.requests).toHaveLength(0);
 });
 test('password confirmation blocks creation, focuses its error, and never reaches the server',async({page})=>{
@@ -76,19 +75,18 @@ test('password confirmation blocks creation, focuses its error, and never reache
   await page.getByLabel('Password',{exact:true}).fill('Password123!');
   await page.getByRole('checkbox',{name:'I agree to the Terms and Conditions',exact:true}).check();
   const confirmation = page.getByLabel('Confirm password',{exact:true});
-  await page.getByRole('button',{name:'Create account',exact:true}).click();
+  await page.getByRole('button',{name:'Continue',exact:true}).click();
   await expect(confirmation).toBeFocused();
   await expect(confirmation).toHaveAttribute('aria-invalid','true');
   await expect(page.getByText('Re-enter your password to confirm it.',{exact:true})).toBeVisible();
   await confirmation.fill('DifferentPassword123!');
   await page.getByRole('button',{name:'Show confirm password'}).click();
   await expect(confirmation).toHaveAttribute('type','text');
-  await page.getByRole('button',{name:'Create account',exact:true}).click();
+  await page.getByRole('button',{name:'Continue',exact:true}).click();
   await expect(page.getByText('Passwords do not match. Re-enter the same password.',{exact:true})).toBeVisible();
   expect(flow.requests).toHaveLength(0);
   await confirmation.fill('Password123!');
-  await page.getByRole('button',{name:'Create account',exact:true}).click();
-  await fillSignupName(page);
+  await page.getByRole('button',{name:'Continue',exact:true}).click();
   await expect(page.getByRole('heading',{name:'Verify your identity',exact:true})).toBeVisible();
   const request=flow.requests.find(item=>item.body.action==='create');
   expect(request?.body).toMatchObject({email:'person@example.com',password:'Password123!',acceptedTerms:true});
@@ -100,12 +98,12 @@ test('registration does not wait for SMTP or expose an email-confirmation page',
   await page.goto('/register');
   await fillRegistration(page);
   await expect(page.getByRole('heading', { name: 'Verify your identity', exact: true })).toBeVisible();
-  expect(flow.requests.map(item => item.body.action)).toEqual(['create', 'save_name']);
+  expect(flow.requests.filter(item => item.body.action !== 'state').map(item => item.body.action)).toEqual(['create']);
   await expect(page.getByRole('button', { name: 'Resend confirmation email' })).toHaveCount(0);
 });
 
 test('sign-in email recovery uses the shared resend design and preserves its response',async({page})=>{
-  await page.route('**/auth/v1/resend',async route=>route.request().method()==='OPTIONS'
+  await page.route('**/functions/v1/account-registration',async route=>route.request().method()==='OPTIONS'
     ? route.fulfill({status:204,headers:corsHeaders})
     : route.fulfill({headers:corsHeaders,json:{}}));
   await page.setViewportSize({width:390,height:844});
@@ -126,6 +124,6 @@ test('sign-in email recovery uses the shared resend design and preserves its res
 });
 for(const url of ['/#register','/#identity-register']) test(`legacy entry ${url} opens the same base-account journey`,async({page})=>{
   await mockAccountJourney(page); await page.goto(url);
-  await expect(page.getByRole('heading',{name:'Create account',exact:true})).toBeVisible();
+  await expect(page.getByRole('heading',{name:'Create your account',exact:true})).toBeVisible();
   await expect(page.getByLabel('Email',{exact:true})).toBeVisible();
 });

@@ -3,6 +3,7 @@ import type { ReactNode } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Checkbox } from '@/components/ui/checkbox';
 import { evidenceLabels } from '../domain/manualReviewValidation';
 import { useManualAccountReview } from '../hooks/useManualAccountReview';
 import type { DraftListener } from '../hooks/useRegistrationDraft';
@@ -37,14 +38,17 @@ export function ManualAccountReview({ busy, submit, canSubmit = true, consentCon
           </div>
         ))}
         <div className="space-y-2"><Label htmlFor="manual-expiry">ID expiry date (if shown)</Label>
-          <Input id="manual-expiry" type="date" value={form.fields.expiry} onChange={(event) => form.update('expiry', event.target.value)} />
+          <Input id="manual-expiry" type="date" disabled={form.fields.noExpiration} value={form.fields.expiry} aria-invalid={Boolean(form.errors.expiry)} aria-describedby={form.errors.expiry ? 'manual-expiry-error' : undefined} onChange={(event) => form.update('expiry', event.target.value)} />
+          {form.errors.expiry && <p id="manual-expiry-error" className="text-sm text-destructive">{form.errors.expiry}</p>}
+          <label htmlFor="manual-no-expiration" className="flex min-h-11 cursor-pointer items-center gap-3 text-sm"><Checkbox id="manual-no-expiration" checked={Boolean(form.fields.noExpiration)} onChange={(event) => form.setOption('noExpiration', event.target.checked)} />My ID has no expiration date</label>
         </div>
       </fieldset>
       <fieldset className="space-y-4 border-t pt-6" disabled={disabled} aria-describedby="manual-evidence-help">
         <legend className="mb-3 pt-6 text-lg font-semibold">Identity evidence</legend>
-        <p id="manual-evidence-help" className="text-xs leading-5 text-muted-foreground">Use clear JPEG, PNG, or WebP images, up to 7 MB each. All three images are required.</p>
+        <p id="manual-evidence-help" className="text-xs leading-5 text-muted-foreground">Use clear JPEG, PNG, or WebP images, up to 7 MB each. Include the back if your ID has one.</p>
+        <label htmlFor="manual-no-back" className="flex min-h-11 cursor-pointer items-center gap-3 text-sm"><Checkbox id="manual-no-back" checked={Boolean(form.fields.backNotApplicable)} onChange={(event) => form.setOption('backNotApplicable', event.target.checked)} />My ID has no back side</label>
         {(['front', 'back', 'selfie'] as const).map((slot) => (
-          <div key={slot} className="space-y-2">
+          <div key={slot} hidden={slot === 'back' && form.fields.backNotApplicable} className="space-y-2">
             <Label htmlFor={'manual-' + slot + '-image'} className="flex items-center gap-2"><Upload className="size-4 text-muted-foreground" aria-hidden="true" />{evidenceLabels[slot]}</Label>
             <Input id={'manual-' + slot + '-image'} type="file" accept="image/jpeg,image/png,image/webp" required
               className="h-auto min-h-12 min-w-0 py-3 text-xs file:mr-3 file:rounded-md file:border-0 file:bg-muted file:px-3 file:py-1 file:font-medium file:text-foreground"

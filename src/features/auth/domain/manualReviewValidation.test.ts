@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { manualReviewErrors } from './manualReviewValidation';
 
-const fields = { name: 'Manual Applicant', document: 'Postal ID', number: 'POSTAL-123', expiry: '' };
+const fields = { name: 'Manual Applicant', document: 'Postal ID', number: 'POSTAL-123', expiry: '', noExpiration: true };
 const valid = new File(['image'], 'id.png', { type: 'image/png' });
 
 describe('manual evidence validation', () => {
@@ -9,6 +9,10 @@ describe('manual evidence validation', () => {
     expect(manualReviewErrors({ name: '', document: '', number: '', expiry: '' }, { front: null, back: null, selfie: null }))
       .toHaveProperty('front', 'Choose an image for id front.');
     expect(manualReviewErrors({ ...fields, name: ' ' }, { front: valid, back: valid, selfie: valid })).toHaveProperty('name');
+  });
+  it('allows documents without expiration or a back side, and still requires a selfie', () => {
+    expect(manualReviewErrors({ ...fields, backNotApplicable: true }, { front: valid, back: null, selfie: valid })).toEqual({});
+    expect(manualReviewErrors({ ...fields, noExpiration: false }, { front: valid, back: valid, selfie: valid })).toHaveProperty('expiry');
   });
   it('rejects unsupported, empty, and oversized images without rejecting valid evidence', () => {
     expect(manualReviewErrors(fields, { front: new File(['pdf'], 'id.pdf', { type: 'application/pdf' }), back: new File([], 'empty.png', { type: 'image/png' }), selfie: new File([new Uint8Array(7 * 1024 * 1024 + 1)], 'large.png', { type: 'image/png' }) }))
