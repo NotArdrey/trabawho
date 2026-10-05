@@ -93,6 +93,8 @@ export function useMarketplaceBookingFlow({ isPublic, services, schedulesByProvi
     }
     setSelectedWorker(worker);
     setIsWorkerModalOpen(false);
+    setBookingError("");
+    refreshSchedules();
     setIsBookingCalendarOpen(true);
   };
 
@@ -109,6 +111,7 @@ export function useMarketplaceBookingFlow({ isPublic, services, schedulesByProvi
       refreshSchedules();
       return;
     }
+    setBookingError("");
     setPendingBooking({
       workerId, serviceId: worker.rawService?.id, sellerId: worker.rawService?.seller_id,
       rawService: worker.rawService, workerName: worker.name, serviceType: getDisplayServiceType(worker),
@@ -138,7 +141,7 @@ export function useMarketplaceBookingFlow({ isPublic, services, schedulesByProvi
         { oneClickTest: details.testCheckout });
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unable to reserve this booking.";
-      if (/time (?:is|was).*(?:unavailable|booked)|slot.*(?:unavailable|full)|date is no longer bookable/i.test(message)) {
+      if (/time (?:is|was).*(?:unavailable|booked)|slot.*(?:unavailable|full)|date is no longer bookable|provider already has a booking at that time|time was just booked/i.test(message)) {
         setIsPaymentModalOpen(false);
         setPendingBooking(null);
         refreshSchedules();

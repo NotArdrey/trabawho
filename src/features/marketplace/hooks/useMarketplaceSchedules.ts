@@ -17,7 +17,6 @@ export function useMarketplaceSchedules(services: MarketplaceProvider[]) {
   const [schedules, setSchedules] = useState<Record<string, MarketplaceSchedule>>({});
   const [revision, setRevision] = useState(0);
   const refreshSchedules = useCallback(() => {
-    setSchedules({});
     setRevision((value) => value + 1);
   }, []);
 

@@ -1,8 +1,11 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import BookingCalendarModal from "./BookingCalendarModal";
+
+const availability = vi.hoisted(() => ({ fetchPublicServiceSlots: vi.fn() }));
+vi.mock("@/features/bookings/services/bookingAvailability", () => availability);
 
 const worker = { id: "provider-1", name: "Nina Mercado Flores", title: "Event Setup & Cleanup" };
 const schedule = {
@@ -15,6 +18,7 @@ const schedule = {
 
 describe("BookingCalendarModal", () => {
   beforeEach(() => {
+    availability.fetchPublicServiceSlots.mockReset();
     vi.useFakeTimers({ shouldAdvanceTime: true });
     vi.setSystemTime(new Date("2026-09-09T08:00:00Z"));
   });
@@ -77,7 +81,7 @@ describe("BookingCalendarModal", () => {
       />,
     );
 
-    expect(screen.getByText("No booking times are published yet")).toBeInTheDocument();
+    expect(screen.getByText("No booking times are available right now")).toBeInTheDocument();
     expect(screen.getAllByText("No times").length).toBeGreaterThan(0);
     expect(screen.queryByText("Full")).not.toBeInTheDocument();
   });
@@ -96,5 +100,57 @@ describe("BookingCalendarModal", () => {
     render(<BookingCalendarModal isOpen worker={worker} schedule={schedule} onClose={vi.fn()} onConfirmBooking={vi.fn()} />);
     expect(screen.getByRole("gridcell", { name: /Thursday, September 10, 2026, booking available from tomorrow onward/i })).toBeDisabled();
     expect(screen.getByText("Choose a date from tomorrow onward, Philippine time.")).toBeVisible();
+  });
+
+  it("hides an already reserved time while leaving another time on the same date selectable", async () => {
+    const user = userEvent.setup();
+    const slot = { id: 11, service_id: 7, start_ts: "2026-09-10T02:00:00Z", end_ts: "2026-09-10T03:00:00Z", capacity: 1, booked_count: 0 };
+    availability.fetchPublicServiceSlots.mockResolvedValue([slot]);
+    render(<BookingCalendarModal isOpen worker={{ ...worker, rawService: { id: 7 } }} schedule={{ dayBlocks: { "2026-09-10": [
+      { id: "claimed", startTime: "09:00", endTime: "10:00", slotsLeft: 1, rawSlot: { id: 10, start_ts: "2026-09-10T01:00:00Z", end_ts: "2026-09-10T02:00:00Z" } },
+      { id: "free", startTime: "10:00", endTime: "11:00", slotsLeft: 1, rawSlot: slot },
+    ] } }} onClose={vi.fn()} onConfirmBooking={vi.fn()} />);
+
+    await waitFor(() => expect(screen.queryByRole("status", { name: /checking/i })).not.toBeInTheDocument());
+    await user.click(screen.getByRole("gridcell", { name: /Thursday, September 10, 2026, 1 slot available/i }));
+    expect(screen.getByRole("button", { name: /9:00 AM.*10:00 AM.*No spots left/i })).toBeDisabled();
+    expect(screen.getByRole("button", { name: /10:00 AM.*11:00 AM/i })).toBeEnabled();
+  });
+
+  it("stops review if another client reserves the selected time", async () => {
+    const user = userEvent.setup();
+    const slot = { id: 11, service_id: 7, start_ts: "2026-09-10T02:00:00Z", end_ts: "2026-09-10T03:00:00Z", capacity: 1, booked_count: 0 };
+    availability.fetchPublicServiceSlots.mockResolvedValueOnce([slot]).mockResolvedValueOnce([]);
+    const onConfirmBooking = vi.fn();
+    render(<BookingCalendarModal isOpen worker={{ ...worker, rawService: { id: 7 } }} schedule={{ dayBlocks: { "2026-09-10": [
+      { id: "free", startTime: "10:00", endTime: "11:00", slotsLeft: 1, rawSlot: slot },
+    ] } }} onClose={vi.fn()} onConfirmBooking={onConfirmBooking} />);
+
+    await waitFor(() => expect(availability.fetchPublicServiceSlots).toHaveBeenCalledOnce());
+    await user.click(screen.getByRole("gridcell", { name: /Thursday, September 10, 2026, 1 slot available/i }));
+    await user.click(screen.getByRole("button", { name: /10:00 AM.*11:00 AM/i }));
+    await user.click(screen.getByRole("button", { name: "Review booking" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("That time was just reserved");
+    expect(screen.queryByRole("dialog", { name: "Confirm booking request" })).not.toBeInTheDocument();
+    expect(onConfirmBooking).not.toHaveBeenCalled();
+  });
+
+  it("rechecks after review and blocks final confirmation when the time is claimed", async () => {
+    const user = userEvent.setup();
+    const slot = { id: 11, service_id: 7, start_ts: "2026-09-10T02:00:00Z", end_ts: "2026-09-10T03:00:00Z", capacity: 1, booked_count: 0 };
+    availability.fetchPublicServiceSlots.mockResolvedValueOnce([slot]).mockResolvedValueOnce([slot]).mockResolvedValueOnce([]);
+    const onConfirmBooking = vi.fn();
+    render(<BookingCalendarModal isOpen worker={{ ...worker, rawService: { id: 7 } }} schedule={{ dayBlocks: { "2026-09-10": [
+      { id: "free", startTime: "10:00", endTime: "11:00", slotsLeft: 1, rawSlot: slot },
+    ] } }} onClose={vi.fn()} onConfirmBooking={onConfirmBooking} />);
+
+    await waitFor(() => expect(availability.fetchPublicServiceSlots).toHaveBeenCalledOnce());
+    await user.click(screen.getByRole("gridcell", { name: /Thursday, September 10, 2026, 1 slot available/i }));
+    await user.click(screen.getByRole("button", { name: /10:00 AM.*11:00 AM/i }));
+    await user.click(screen.getByRole("button", { name: "Review booking" }));
+    expect(await screen.findByRole("dialog", { name: "Confirm booking request" })).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Send booking request" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("That time was just reserved");
+    expect(onConfirmBooking).not.toHaveBeenCalled();
   });
 });

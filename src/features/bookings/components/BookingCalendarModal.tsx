@@ -24,15 +24,17 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
+import { useLiveBookingSchedule } from "@/features/bookings/hooks/useLiveBookingSchedule";
 import { isFutureClientBookingDate, philippineDateKey } from "@/shared/domain/clientBookingDate";
 
 const DAY_KEYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"] as const;
 
 interface ScheduleBlock {
-  id: string;
+  id: number | string;
   startTime: string;
   endTime: string;
   slotsLeft: number;
+  rawSlot?: { id?: number | string; start_ts?: string; end_ts?: string };
 }
 
 interface BookingSchedule {
@@ -42,17 +44,18 @@ interface BookingSchedule {
 }
 
 interface BookingWorker {
-  id: string;
+  id: number | string;
   name?: string;
   title?: string;
+  rawService?: { id?: number | string };
   [key: string]: unknown;
 }
 
 interface ConfirmedBooking {
-  workerId: string;
+  workerId: number | string;
   date: string;
   dayKey: string | null;
-  blockId: string;
+  blockId: number | string;
   manualScheduling?: boolean;
 }
 
@@ -154,13 +157,14 @@ function getDateMeta(schedule: BookingSchedule, dateValue: string): DateMeta {
 }
 
 function BookingCalendarDialog({ onClose, worker, schedule, onConfirmBooking }: Omit<BookingCalendarModalProps, "isOpen"> & { worker: BookingWorker; schedule: BookingSchedule }) {
+  const { checking, error: availabilityError, refresh, setError: setAvailabilityError, verify, visibleSchedule } = useLiveBookingSchedule(schedule, worker.rawService?.id);
   const [now, setNow] = useState(() => new Date());
   const [visibleMonth, setVisibleMonth] = useState(() => {
     const today = philippineDateKey(new Date()) || formatDateValue(new Date());
     return new Date(Number(today.slice(0, 4)), Number(today.slice(5, 7)) - 1, 1);
   });
   const [selectedDate, setSelectedDate] = useState("");
-  const [selectedBlockId, setSelectedBlockId] = useState("");
+  const [selectedBlockId, setSelectedBlockId] = useState<number | string>("");
   const [isReviewOpen, setIsReviewOpen] = useState(false);
   const [missingStep, setMissingStep] = useState<"date" | "time" | null>(null);
   const calendarSectionRef = useRef<HTMLElement>(null);
@@ -179,12 +183,13 @@ function BookingCalendarDialog({ onClose, worker, schedule, onConfirmBooking }: 
     return () => { window.clearInterval(timer); window.removeEventListener("focus", refreshClock); };
   }, [selectedDate]);
   const monthCells = getMonthCells(visibleMonth);
-  const selectedDateMeta = getDateMeta(schedule, selectedDate);
-  const selectedBlock = selectedDateMeta.dayBlocks.find((block) => block.id === selectedBlockId);
-  const canConfirmManual = Boolean(schedule.manualScheduling && selectedDate);
-  const canConfirmFixed = Boolean(!schedule.manualScheduling && selectedDate && selectedBlock && selectedBlock.slotsLeft > 0);
-  const canReview = isFutureClientBookingDate(selectedDate, now) && (canConfirmManual || canConfirmFixed);
-  const hasPublishedTimes = Boolean(schedule.manualScheduling || Object.values(schedule.dayBlocks || {}).some((blocks) => blocks.some((block) => block.slotsLeft > 0)));
+  const selectedDateMeta = getDateMeta(visibleSchedule, selectedDate);
+  const selectedBlock = selectedDateMeta.dayBlocks.find((block) => block.id === selectedBlockId && block.slotsLeft > 0);
+  const claimedSelection = Boolean(selectedBlockId && !selectedBlock && !checking && !visibleSchedule.manualScheduling);
+  const canConfirmManual = Boolean(visibleSchedule.manualScheduling && selectedDate);
+  const canConfirmFixed = Boolean(!visibleSchedule.manualScheduling && selectedDate && selectedBlock && selectedBlock.slotsLeft > 0);
+  const canReview = !checking && isFutureClientBookingDate(selectedDate, now) && (canConfirmManual || canConfirmFixed);
+  const hasPublishedTimes = Boolean(visibleSchedule.manualScheduling || Object.values(visibleSchedule.dayBlocks || {}).some((blocks) => blocks.some((block) => block.slotsLeft > 0)));
 
   const changeMonth = (offset: number) => {
     setVisibleMonth((current) => new Date(current.getFullYear(), current.getMonth() + offset, 1));
@@ -194,46 +199,50 @@ function BookingCalendarDialog({ onClose, worker, schedule, onConfirmBooking }: 
   };
 
   const selectDate = (dateValue: string) => {
-    if (!isFutureClientBookingDate(dateValue) || !getDateMeta(schedule, dateValue).canBookDate) return;
+    if (checking || !isFutureClientBookingDate(dateValue) || !getDateMeta(visibleSchedule, dateValue).canBookDate) return;
     setSelectedDate(dateValue);
     setSelectedBlockId("");
     setMissingStep(null);
+    setAvailabilityError("");
   };
 
-  const confirmBooking = () => {
+  const confirmBooking = async () => {
     if (!isFutureClientBookingDate(selectedDate)) {
       setIsReviewOpen(false); setSelectedDate(""); setSelectedBlockId(""); setMissingStep("date");
       return;
     }
+    if (!await verify(selectedBlock)) { setIsReviewOpen(false); return; }
     onConfirmBooking({
       workerId: worker.id,
       date: selectedDate,
       dayKey: getDayKeyFromDate(selectedDate),
       blockId: selectedBlockId,
-      manualScheduling: schedule.manualScheduling,
+      manualScheduling: visibleSchedule.manualScheduling,
     });
     setIsReviewOpen(false);
   };
 
   const confirmHint = !selectedDate
     ? "Next: choose an available date."
-    : !schedule.manualScheduling && !selectedBlock
+    : !visibleSchedule.manualScheduling && !selectedBlock
       ? "Required: select one of the available times above."
       : "Your date and time are ready to review.";
 
-  const reviewBooking = () => {
+  const reviewBooking = async () => {
+    if (checking) return;
     if (!isFutureClientBookingDate(selectedDate)) {
       setMissingStep("date");
       calendarSectionRef.current?.focus();
       calendarSectionRef.current?.scrollIntoView?.({ behavior: "smooth", block: "start" });
       return;
     }
-    if (!schedule.manualScheduling && !selectedBlock) {
+    if (!visibleSchedule.manualScheduling && !selectedBlock) {
       setMissingStep("time");
       timeSectionRef.current?.focus();
       timeSectionRef.current?.scrollIntoView?.({ behavior: "smooth", block: "center" });
       return;
     }
+    if (!await verify(selectedBlock)) return;
     setMissingStep(null);
     setIsReviewOpen(true);
   };
@@ -255,12 +264,14 @@ function BookingCalendarDialog({ onClose, worker, schedule, onConfirmBooking }: 
           </DialogHeader>
 
           <div className="grid gap-5 px-4 py-5 sm:px-6 sm:py-6">
-            {!hasPublishedTimes ? (
+            {checking ? <p className="rounded-xl bg-primary/5 p-4 text-sm font-medium text-primary" role="status">Checking current availability…</p> : null}
+            {availabilityError || claimedSelection ? <div className="flex flex-wrap items-center gap-3 rounded-xl border border-destructive/30 bg-destructive/5 p-4" role="alert"><p className="min-w-0 flex-1 text-sm font-medium text-destructive">{availabilityError || "That time was just reserved. Choose another available time."}</p><Button type="button" variant="outline" onClick={() => void refresh()}>Try again</Button></div> : null}
+            {!checking && !availabilityError && !hasPublishedTimes ? (
               <div className="flex gap-3 rounded-xl border border-brand-highlight/30 bg-brand-highlight-soft p-4" role="status">
                 <AlertCircle className="mt-0.5 size-5 shrink-0 text-brand-highlight-foreground" aria-hidden="true" />
                 <div>
-                  <p className="font-semibold text-foreground">No booking times are published yet</p>
-                  <p className="mt-1 text-sm leading-5 text-muted-foreground">This provider currently has no future availability. Close this window and try another provider, or check again later.</p>
+                  <p className="font-semibold text-foreground">No booking times are available right now</p>
+                  <p className="mt-1 text-sm leading-5 text-muted-foreground">All published times may be reserved, or this provider has not added future times. Check again later or choose another provider.</p>
                 </div>
               </div>
             ) : null}
@@ -278,10 +289,10 @@ function BookingCalendarDialog({ onClose, worker, schedule, onConfirmBooking }: 
                 <div className="grid grid-cols-7 gap-px" role="grid" aria-label={formatMonthHeading(visibleMonth)}>
                   {monthCells.map((cell) => {
                     const dateValue = formatDateValue(cell.date);
-                    const meta = getDateMeta(schedule, dateValue);
+                    const meta = getDateMeta(visibleSchedule, dateValue);
                     const tooSoon = !isFutureClientBookingDate(dateValue, now);
-                    const disabled = !cell.isCurrentMonth || tooSoon || !meta.canBookDate;
-                    const selected = selectedDate === dateValue;
+                    const disabled = checking || !cell.isCurrentMonth || tooSoon || !meta.canBookDate;
+                    const selected = selectedDate === dateValue && meta.canBookDate;
                     const dateLabel = formatLongDate(dateValue);
                     const availability = tooSoon ? "booking available from tomorrow onward" : meta.manualScheduling
                       ? "open scheduling"
@@ -333,7 +344,7 @@ function BookingCalendarDialog({ onClose, worker, schedule, onConfirmBooking }: 
               </div>
             </section>
 
-            {schedule.manualScheduling ? (
+            {visibleSchedule.manualScheduling ? (
               <section className="rounded-xl bg-brand-highlight-soft/70 p-4" aria-labelledby="manual-scheduling-heading">
                 <div className="flex gap-3">
                   <MessageSquareText className="mt-0.5 size-5 shrink-0 text-brand-highlight-foreground" aria-hidden="true" />
@@ -361,7 +372,7 @@ function BookingCalendarDialog({ onClose, worker, schedule, onConfirmBooking }: 
                 <div className="mt-3 grid gap-3 sm:grid-cols-2">
                   {selectedDateMeta.dayBlocks.map((block) => {
                     const full = block.slotsLeft <= 0;
-                    const selected = selectedBlockId === block.id;
+                    const selected = !full && selectedBlockId === block.id;
                     return (
                       <button
                         key={block.id}
@@ -372,8 +383,8 @@ function BookingCalendarDialog({ onClose, worker, schedule, onConfirmBooking }: 
                           selected && "bg-primary text-primary-foreground hover:bg-primary",
                           full && "cursor-not-allowed opacity-50",
                         )}
-                        disabled={full}
-                        onClick={() => { setSelectedBlockId(block.id); setMissingStep(null); }}
+                        disabled={checking || full}
+                        onClick={() => { setSelectedBlockId(block.id); setMissingStep(null); setAvailabilityError(""); }}
                         aria-pressed={selected}
                       >
                         <span><span className="block font-semibold">{formatTime(block.startTime)}–{formatTime(block.endTime)}</span><span className={cn("mt-1 block text-xs", selected ? "text-primary-foreground/80" : "text-muted-foreground")}>{full ? "No spots left" : `${block.slotsLeft} ${block.slotsLeft === 1 ? "spot" : "spots"} left`}</span></span>
@@ -393,7 +404,7 @@ function BookingCalendarDialog({ onClose, worker, schedule, onConfirmBooking }: 
               {canReview ? <CheckCircle2 className="size-4 shrink-0" aria-hidden="true" /> : <AlertCircle className="size-4 shrink-0" aria-hidden="true" />}
               <p>{confirmHint}</p>
             </div>
-            <Button className="w-full sm:w-auto" onClick={reviewBooking}>Review booking</Button>
+            <Button className="w-full sm:w-auto" onClick={() => void reviewBooking()} disabled={checking}>{checking ? "Checking times…" : "Review booking"}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -432,7 +443,7 @@ function BookingCalendarDialog({ onClose, worker, schedule, onConfirmBooking }: 
               </div>
               <div className="flex items-start gap-3 py-4">
                 <Clock className="mt-0.5 size-5 shrink-0 text-primary" aria-hidden="true" />
-                <div className="min-w-0"><dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Time</dt><dd className="mt-1 text-lg font-bold text-foreground">{schedule.manualScheduling ? "Confirmed through chat" : selectedBlock ? `${formatTime(selectedBlock.startTime)}–${formatTime(selectedBlock.endTime)}` : "Not selected"}</dd></div>
+                <div className="min-w-0"><dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Time</dt><dd className="mt-1 text-lg font-bold text-foreground">{visibleSchedule.manualScheduling ? "Confirmed through chat" : selectedBlock ? `${formatTime(selectedBlock.startTime)}–${formatTime(selectedBlock.endTime)}` : "Not selected"}</dd></div>
               </div>
             </dl>
 
@@ -444,7 +455,7 @@ function BookingCalendarDialog({ onClose, worker, schedule, onConfirmBooking }: 
 
           <DialogFooter className="bg-muted/40 px-6 py-4">
             <Button className="w-full sm:w-auto" variant="outline" onClick={() => setIsReviewOpen(false)}>Back to schedule</Button>
-            <Button className="w-full sm:w-auto" onClick={confirmBooking}><Send aria-hidden="true" />Send booking request</Button>
+            <Button className="w-full sm:w-auto" onClick={() => void confirmBooking()} disabled={checking}><Send aria-hidden="true" />{checking ? "Checking time…" : "Send booking request"}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

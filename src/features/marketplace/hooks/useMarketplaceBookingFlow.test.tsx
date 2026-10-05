@@ -1,5 +1,6 @@
 import { act, renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type { PaymentSelectionDetails } from "@/features/bookings";
 import { useMarketplaceBookingFlow } from "./useMarketplaceBookingFlow";
 
 const api = vi.hoisted(() => ({ startServiceConversation: vi.fn(), createPayMongoCheckout: vi.fn(), redirectToPayMongo: vi.fn() }));
@@ -29,8 +30,10 @@ describe("marketplace booking flow", () => {
   });
 
   it("opens the calendar before payment and does not create a reservation when Book now is clicked", () => {
-    const { result } = renderHook(() => useMarketplaceBookingFlow(options()));
+    const opts = options();
+    const { result } = renderHook(() => useMarketplaceBookingFlow(opts));
     act(() => { result.current.handleBookNow(provider); });
+    expect(opts.refreshSchedules).toHaveBeenCalledOnce();
     expect(result.current.isBookingCalendarOpen).toBe(true);
     expect(result.current.isPaymentModalOpen).toBe(false);
     expect(api.createPayMongoCheckout).not.toHaveBeenCalled();
@@ -47,7 +50,22 @@ describe("marketplace booking flow", () => {
     act(() => { result.current.handleConfirmBooking({ workerId: 1, date: "2026-10-05", dayKey: "Mon", blockId: 2 }); });
     expect(result.current.isPaymentModalOpen).toBe(false);
     expect(result.current.bookingError).toMatch(/tomorrow onward/i);
-    expect(opts.refreshSchedules).toHaveBeenCalledOnce();
+    expect(opts.refreshSchedules).toHaveBeenCalledTimes(2);
+  });
+
+  it("returns to refreshed times when another client claimed the slot at checkout", async () => {
+    api.createPayMongoCheckout.mockRejectedValueOnce(new Error("This provider already has a booking at that time"));
+    const opts = options();
+    const { result } = renderHook(() => useMarketplaceBookingFlow(opts));
+    act(() => {
+      result.current.handleBookNow(provider);
+      result.current.handleConfirmBooking({ workerId: 1, date: "2026-10-06", dayKey: "Tue", blockId: 2 });
+    });
+    await act(async () => { await result.current.handleSelectPayment("paymongo-card", { paymentPlan: "full" } as PaymentSelectionDetails); });
+    expect(result.current.isPaymentModalOpen).toBe(false);
+    expect(result.current.isBookingCalendarOpen).toBe(true);
+    expect(result.current.bookingError).toMatch(/no longer available/i);
+    expect(opts.refreshSchedules).toHaveBeenCalledTimes(2);
   });
 
   it("routes request-only services to chat to agree on scope and price", async () => {
