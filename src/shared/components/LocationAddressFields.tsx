@@ -20,7 +20,7 @@ export interface LocationAddressFieldsProps {
   enablePin?: boolean;
 }
 
-export function LocationAddressFields({ value, onChange, disabled, prefix, legend = 'Where will the service take place?', description = 'Select your province, city or municipality, and barangay. Then enter the street and house or unit number.', addressLabel, enablePin = false }: LocationAddressFieldsProps) {
+export function LocationAddressFields({ value, onChange, disabled, prefix, legend = 'Where will the service take place?', description, addressLabel, enablePin = false }: LocationAddressFieldsProps) {
   const [retry, setRetry] = useState(0);
   const [manual, setManual] = useState(false);
   const provinces = useLocationOptions('/provinces/', retry);
@@ -46,7 +46,10 @@ export function LocationAddressFields({ value, onChange, disabled, prefix, legen
 
   return <fieldset className="space-y-3" disabled={disabled}>
     <legend className="mb-2 font-semibold">{legend}</legend>
-    <p className="text-sm text-muted-foreground">{description}</p>
+    <p className="text-sm text-muted-foreground">{description ?? (enablePin
+      ? 'Select your address on the map, then review the details below. You can also enter the address manually.'
+      : 'Select your province, city or municipality, and barangay. Then enter the street and house or unit number.')}</p>
+    {enablePin && <ServiceLocationPin value={value} onChange={onChange} disabled={disabled} />}
     <div className="grid items-start gap-3 sm:grid-cols-2">
       {fields.map(({ key, label, list, placeholder, available }) => manual
         ? <div key={key} className="min-w-0 space-y-2"><Label htmlFor={`${prefix}-${key}`}>{label}</Label>
@@ -59,7 +62,6 @@ export function LocationAddressFields({ value, onChange, disabled, prefix, legen
       <SpecificAddressField key={[value.province, value.city, value.barangay].join('|')} value={value} onChange={(address) => onChange({ ...value, address })}
         disabled={disabled} prefix={prefix} label={addressLabel} />
     </div>
-    {enablePin && <ServiceLocationPin value={value} onChange={onChange} disabled={disabled} />}
     {locationError && !manual && <div className="space-y-2">
       <p role="alert" className="text-sm text-destructive">Location options could not be loaded. Retry or enter your location manually.</p>
       <div className="flex flex-wrap gap-2">
