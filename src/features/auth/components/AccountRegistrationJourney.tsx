@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { useAccountRegistration } from '../hooks/useAccountRegistration';
 import type { DraftListener } from '../hooks/useRegistrationDraft';
 import { BaseAccountForm } from './BaseAccountForm';
+import { EmailConfirmationStep } from './EmailConfirmationStep';
 import { IdentityResultStep } from './IdentityResultStep';
 import { IdentityVerificationStep } from './IdentityVerificationStep';
 import { RegistrationFeedback } from './RegistrationFeedback';
@@ -36,10 +37,10 @@ export function AccountRegistrationJourney({ onDraftChange, onStartedChange }: {
       </p> : <>
         <RegistrationFeedback error={flow.error} message={flow.message} busy={flow.busy} />
         {flow.restoreFailed ? <div className="space-y-4">
-          {state && step < 2 ? <>
+          {state && step < registrationProgress(state) ? <>
             <p className="break-words text-sm leading-6">{state.email}</p>
             <p className="text-sm leading-6 text-muted-foreground">Your saved details are kept. Restore your registration to make changes or continue verification.</p>
-            <Button variant="outline" className="w-full" onClick={() => goTo(2)}>Continue to identity</Button>
+            <Button variant="outline" className="w-full" onClick={() => goTo(registrationProgress(state))}>Continue registration</Button>
           </> : null}
           <p className="text-sm leading-6 text-muted-foreground">{flow.restoreNeedsSignIn
             ? 'Sign in with your existing account to resume registration. Your saved details will be restored.'
@@ -51,11 +52,15 @@ export function AccountRegistrationJourney({ onDraftChange, onStartedChange }: {
         </div> : !state ? <BaseAccountForm flow={flow} onDraftChange={drafts.account} /> : <>
           <div hidden={step !== 1}><RegistrationStepSummary state={state} step="account" busy={flow.busy} onContinue={() => goTo(2)} /></div>
           <div hidden={step !== 2}>
-            {['identity_pending', 'identity_in_progress', 'declined'].includes(state.state)
-              ? <IdentityVerificationStep flow={flow} state={state} active={step === 2} onDraftChange={drafts.identity} />
-              : <IdentityResultStep flow={flow} state={state} onDraftChange={drafts.identity} />}
+            {state.state === 'email_pending' ? <EmailConfirmationStep flow={flow} email={state.email || ''} onDraftChange={drafts.email} />
+              : <RegistrationStepSummary state={state} step="email" busy={flow.busy} onContinue={() => goTo(3)} />}
           </div>
-          {!['ready', 'email_pending', 'identity_review'].includes(state.state) && step > 1 && <Button variant="ghost" className="w-full" disabled={flow.busy} onClick={() => goTo(step - 1)}><ArrowLeft aria-hidden="true" />Back</Button>}
+          {state.state !== 'email_pending' && <div hidden={step < 3}>
+            {['identity_pending', 'identity_in_progress', 'declined'].includes(state.state)
+              ? <IdentityVerificationStep flow={flow} state={state} active={step === 3} onDraftChange={drafts.identity} />
+              : <IdentityResultStep flow={flow} state={state} onDraftChange={drafts.identity} />}
+          </div>}
+          {!['ready', 'identity_review'].includes(state.state) && step > 1 && <Button variant="ghost" className="w-full" disabled={flow.busy} onClick={() => goTo(step - 1)}><ArrowLeft aria-hidden="true" />Back</Button>}
           {step === 1 && <Button variant="ghost" disabled={flow.busy} className="h-auto min-h-11 w-full whitespace-normal text-primary" onClick={() => void flow.startNewRegistration()}>Use a different account</Button>}
         </>}
       </>}

@@ -8,6 +8,7 @@ const source = readFileSync(new URL('../../supabase/functions/_shared/accountReg
 const compiled = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
 interface AccessModule {
   accountUser: (request: Request, client: unknown) => Promise<unknown>;
+  registrationState: (client: unknown, user: unknown) => Promise<{state:string}>;
 }
 const exports: Record<string, unknown> = {};
 const modules: Record<string, Record<string, unknown>> = {
@@ -123,3 +124,38 @@ for (const options of [{ nonce: 'forged' }, { expired: true }, { malformedExpiry
     assert.equal(flow.userReads(), 0);
   });
 }
+
+test('unconfirmed email takes precedence over identity status in registration state',async()=>{
+  for(const status of ['UNVERIFIED','PENDING_REVIEW','APPROVED','DECLINED']) {
+    const client={from:(table:string)=>({select:()=>({eq:()=>({
+      maybeSingle:async()=>({error:null,data:table==='account_registrations'?{account_role:'client'}:null}),
+      single:async()=>({error:null,data:{verification_status:status,is_verified:status==='APPROVED'}}),
+    })})})};
+    assert.equal((await access.registrationState(client,{id:'email-pending',email:'person@example.com',email_confirmed_at:null,user_metadata:{}})).state,'email_pending');
+  }
+});
+
+for(const name of ['account-didit-session','account-manual-review','account-identity-name']) test(`${name} rejects unconfirmed account recovery before identity writes`,async()=>{
+  let handler:((request:Request)=>Promise<Response>)|undefined;
+  const unconfirmed={id:'unconfirmed',email:'person@example.com',email_confirmed_at:null};
+  const endpointModules:Record<string,Record<string,unknown>>={
+    '../_shared/accountRegistration.ts':{...exports,accountClient:()=>({})},
+    '../_shared/pendingRegistrationAccess.ts':{registrationUser:async()=>unconfirmed},
+    '../_shared/registrationDrafts.ts':{ownedDraft:async()=>null},
+    '../_shared/registrationDraftIdentity.ts':{},
+    '../_shared/identityRegistration.ts':{corsHeaders:{},jsonResponse:(value:unknown,status=200)=>new Response(JSON.stringify(value),{status})},
+    '../_shared/identityDomain.ts':modules['./identityDomain.ts'],
+    '../_shared/identityRedirect.ts':{},
+    '../_shared/manualRegistrationEvidence.ts':{manualDocument:()=>({fullName:'Person'})},
+    '../_shared/accountConfirmation.ts':{},
+  };
+  const code=readFileSync(new URL(`../../supabase/functions/${name}/index.ts`,import.meta.url),'utf8');
+  runInNewContext(ts.transpileModule(code,{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText,{
+    exports:{},require:(dependency:string)=>{assert.ok(endpointModules[dependency]);return endpointModules[dependency];},
+    Deno:{env:{get:()=>''},serve:(value:typeof handler)=>{handler=value;}},Response,
+  });
+  assert.ok(handler);
+  const response=await handler(new Request('https://example.invalid/identity',{method:'POST',body:JSON.stringify({userId:'unconfirmed',nonce:'valid',acceptedIdentityTerms:true})}));
+  assert.equal(response.status,403);
+  assert.deepEqual(await response.json(),{error:'Confirm your email before identity verification.'});
+});

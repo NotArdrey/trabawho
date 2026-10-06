@@ -39,7 +39,7 @@ test('an authenticated account can retry a temporary registration lookup failure
   await expect(page.getByRole('button', { name: 'Verify with Didit' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Retry loading registration' })).toHaveCount(0);
   await page.getByRole('button', { name: 'Back', exact: true }).click();
-  await expect(page.getByText('person@example.com', { exact: true })).toBeVisible();
+  await expect(page.getByText('person@example.com', { exact: true }).filter({visible:true})).toBeVisible();
 });
 
 test('a rejected authenticated session requires sign-in and cannot use stale anonymous progress', async ({ page }) => {

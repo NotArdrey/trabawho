@@ -15,12 +15,6 @@ export function IdentityResultStep({ flow, state, onDraftChange }: { flow: Accou
   const nextAction = worker
     ? { href: state.providerSetupComplete ? '/worker/dashboard' : '/seller/onboarding', label: state.providerSetupComplete ? 'Open worker dashboard' : 'Offer services' }
     : { href: '/dashboard', label: 'Start booking services' };
-  if (state.state === 'email_pending') return <section className="space-y-4">
-    {state.legalName && <p className="break-words text-sm">Verified name: {state.legalName}</p>}
-    <p className="break-words text-sm leading-6 text-muted-foreground">Check {state.email} for the email titled “TrabaWho: Confirm your email”. Click the “Confirm my email” button in that email to finish registration and activate sign-in. Check your spam folder too.</p>
-    {state.emailDelivery?.sent === false && <p role="status" className="text-sm leading-6">Your account is saved, but email delivery failed. Use Sign in to request another confirmation email.</p>}
-    <Button asChild className="w-full"><a href="/sign-in">Go to sign in<ArrowRight aria-hidden="true" /></a></Button>
-  </section>;
   return (
     <section className="space-y-6">
       {namePending && <div className="space-y-2 rounded-lg bg-muted/60 p-4">
@@ -32,7 +26,7 @@ export function IdentityResultStep({ flow, state, onDraftChange }: { flow: Accou
         {state.nameIssue && <p className="break-words">{state.nameIssue}</p>}
         {state.legalName && <p className="break-words">Name from ID: {state.legalName}</p>}
         {state.requestedName && <p className="break-words">Requested correction: {state.requestedName}</p>}
-        <p className="text-muted-foreground">You can close this page. Watch your inbox and spam folder for the decision. Approval requires email confirmation before sign-in.</p>
+        <p className="text-muted-foreground">You can close this page. Watch your inbox and spam folder for the identity review decision. Once approved, sign in to use your account.</p>
       </div>}
       {!ready && state.sessionId && <div className="space-y-4 border-t pt-4">
         <Button variant="ghost" className="h-auto min-h-11 w-full justify-start whitespace-normal px-0 text-left text-primary" disabled={flow.busy}

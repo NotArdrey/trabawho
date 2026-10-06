@@ -1,7 +1,7 @@
 import { registrationUser } from "../_shared/pendingRegistrationAccess.ts";
 import { corsHeaders, jsonResponse, buildIdentityDocumentFingerprint, recordRegistrationAttempt } from "../_shared/identityRegistration.ts";
 import { asRecord } from "../_shared/identityDomain.ts";
-import { accountClient, AccountError, registrationState, text } from "../_shared/accountRegistration.ts";
+import { accountClient, AccountError, registrationState, requireConfirmed, text } from "../_shared/accountRegistration.ts";
 import { ownedDraft, finalizeRegistrationDraft } from '../_shared/registrationDrafts.ts';
 import { manualDocument, uploadManualEvidence } from '../_shared/manualRegistrationEvidence.ts';
 Deno.serve(async (request: Request) => {
@@ -16,6 +16,7 @@ Deno.serve(async (request: Request) => {
     const user=draft && !draft.finalized_at ? null : await registrationUser(request,client,body);
     const id=user?.id || text(draft?.id);
     if (user) {
+      requireConfirmed(user);
       const state=await registrationState(client,user);
       if (!['identity_pending','declined','identity_in_progress'].includes(state.state)) throw new AccountError('This identity is awaiting review or approved.',409);
     } else {

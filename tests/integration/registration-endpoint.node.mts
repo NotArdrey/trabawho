@@ -22,12 +22,15 @@ function endpoint(options: { expired?: boolean; confirmed?: boolean; initializat
   const client = {
     auth: { admin: {
       getUserById: async () => ({ data: { user }, error: null }),
-      createUser: async () => { calls.push('create_account'); return { data: { user: options.duplicate ? null : user }, error: options.duplicate ? {} : null }; },
+      createUser: async (payload: Record<string, unknown>) => { calls.push('create_account'); updates.push(payload); return { data: { user: options.duplicate ? null : user }, error: options.duplicate ? {} : null }; },
       deleteUser: async () => { calls.push('delete_account'); return { error: null }; },
       updateUserById: async (_id: string, payload: Record<string, unknown>) => { calls.push('save_name'); updates.push(payload); return { error: null }; },
     } },
-    rpc: async () => { calls.push('initialize_account'); return { error: options.initializationFails ? {} : null }; },
-    from: () => ({ select: () => ({eq: () => ({maybeSingle: async () => ({error:null,data:options.missingProfile?null:{account_status:'active',identity_required:true,verification_status:options.profileStatus || 'PENDING_REVIEW'}})})}), insert: async () => { calls.push('save_draft'); return { error: options.initializationFails ? {} : null }; }, update: () => ({ eq: async () => { calls.push('record_email_delivery'); return { error: null }; } }) }),
+    rpc: async (name:string) => { calls.push(name==='initialize_account_registration'?'initialize_account':'claim_email'); return { error: options.initializationFails ? {} : null,data:user.email }; },
+    from: () => ({ select: () => ({eq: () => ({
+      maybeSingle: async () => ({error:null,data:options.missingProfile?null:{account_status:'active',identity_required:true,verification_status:options.profileStatus || 'PENDING_REVIEW'}}),
+      single:async()=>({error:null,data:row}),
+    })}), insert: async () => { calls.push('save_draft'); return { error: options.initializationFails ? {} : null }; }, update: () => ({ eq: async () => { calls.push('record_email_delivery'); return { error: null }; } }) }),
   };
   const modules: Record<string, Record<string, unknown>> = {
     '../_shared/identityRegistration.ts': {
@@ -48,7 +51,7 @@ function endpoint(options: { expired?: boolean; confirmed?: boolean; initializat
     '../_shared/identityRedirect.ts': { identityReturnUrl: () => new URL('http://localhost:3000/register') },
     '../_shared/accountRegistration.ts': {
       accountClient: () => client, AccountError, accountUser: async () => user,
-      registrationRow: async () => row, registrationState: async () => ({ state: 'identity_pending', email: user.email, signupRole: 'worker' }),
+      registrationRow: async () => row, registrationState: async () => ({ state: options.confirmed ? 'identity_pending' : 'email_pending', email: user.email, signupRole: 'worker' }),
       signupRole: (value: unknown) => value === 'worker' ? 'worker' : 'client', text: (value: unknown) => typeof value === 'string' ? value.trim() : '',
     },
   };
@@ -59,7 +62,19 @@ function endpoint(options: { expired?: boolean; confirmed?: boolean; initializat
       ? { encryptRegistrationPassword: async () => 'encrypted-password' } : name === './accountConfirmation.ts' ? {}
       : modules['../_shared/' + name.slice(2)], crypto, Date,
   });
-  modules['../_shared/legacyAccountCreation.ts'] = { createLegacyRegistration: async () => { calls.push('legacy_create'); return {state:'identity_pending'}; } };
+  const confirmationExports:Record<string,unknown>={};
+  const confirmationSource=readFileSync(new URL('../../supabase/functions/_shared/accountConfirmation.ts',import.meta.url),'utf8');
+  runInNewContext(ts.transpileModule(confirmationSource,{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText,{
+    exports:confirmationExports,require:(name:string)=>modules['../_shared/'+name.slice(2)],Date,URL,
+    Deno:{env:{get:()=>'http://localhost:3000'}},
+  });
+  modules['../_shared/accountConfirmation.ts'] = confirmationExports;
+  const accountExports: Record<string,unknown> = {};
+  const accountSource=readFileSync(new URL('../../supabase/functions/_shared/emailFirstRegistration.ts',import.meta.url),'utf8');
+  runInNewContext(ts.transpileModule(accountSource,{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText,{
+    exports:accountExports,require:(name:string)=>modules['../_shared/'+name.slice(2)],crypto,Date,
+  });
+  modules['../_shared/emailFirstRegistration.ts'] = accountExports;
   modules['../_shared/registrationDrafts.ts'] = { ...draftExports, ownedDraft: async () => null };
   runInNewContext(compiled, {
     exports: {}, require: (name: string) => { assert.ok(modules[name], `Unexpected import: ${name}`); return modules[name]; },
@@ -74,34 +89,42 @@ function endpoint(options: { expired?: boolean; confirmed?: boolean; initializat
   } };
 }
 
-const validAccount = { action: 'create', registrationVersion: 3, email: 'person@example.com', password: 'Password123!', acceptedTerms: true, signupRole: 'worker' };
+const validAccount = { action: 'create', registrationVersion: 4, email: 'person@example.com', password: 'Password123!', acceptedTerms: true, signupRole: 'worker' };
 const validName = { action: 'save_name', userId: 'pending-test', nonce: 'capability', signupName: 'Ana María Santos' };
 
-test('account details create only a private draft and defer Auth creation and email', async () => {
+test('account details create an unconfirmed account and request email verification before identity', async () => {
   const flow = endpoint();
   const response = await flow.request(validAccount);
   assert.equal(response.status, 200);
-  assert.deepEqual(flow.calls, ['record_attempt', 'save_draft']);
-  assert.equal(response.body.state, 'identity_pending');
+  assert.deepEqual(flow.calls, ['record_attempt', 'create_account', 'initialize_account', 'claim_email', 'send_email', 'record_email_delivery']);
+  assert.equal(response.body.state, 'email_pending');
+  assert.equal(flow.updates[0].email_confirm,false);
+  assert.equal((flow.updates[0].app_metadata as Record<string,unknown>).registration_version,4);
 });
-for (const failure of ['initializationFails'] as const) test(`${failure} prevents confirmation email delivery`, async () => {
+for (const failure of ['initializationFails','duplicate'] as const) test(`${failure} prevents confirmation email delivery`, async () => {
   const flow = endpoint({ [failure]: true });
   const response = await flow.request(validAccount);
   assert.ok(response.status >= 400);
   assert.ok(!flow.calls.includes('send_email'));
-  assert.ok(!flow.calls.includes('create_account'));
+  assert.equal(flow.calls.includes('delete_account'),failure==='initializationFails');
 });
-test('SMTP availability does not block identity-first account creation', async () => {
+test('SMTP failure keeps account recovery and the email gate available for retry', async () => {
   const flow = endpoint({ deliveryFails: true });
   const response = await flow.request(validAccount);
   assert.equal(response.status, 200);
-  assert.equal(response.body.emailDelivery, undefined);
-  assert.ok(!flow.calls.includes('send_email'));
+  assert.deepEqual(response.body.emailDelivery, {sent:false});
+  assert.equal(response.body.state,'email_pending');
+  assert.ok(flow.calls.includes('send_email'));
   assert.ok(response.body.pendingAccount);
   assert.ok(!flow.calls.includes('delete_account'));
 });
+for(const override of [{email:'invalid'},{password:'short'},{acceptedTerms:false}]) test(`server rejects malformed account input ${JSON.stringify(override)} before Auth creation`,async()=>{
+  const flow=endpoint();
+  assert.equal((await flow.request({...validAccount,...override})).status,400);
+  assert.deepEqual(flow.calls,[]);
+});
 test('name entry updates only unverified metadata and sends no email', async () => {
-  const flow = endpoint();
+  const flow = endpoint({confirmed:true});
   const response = await flow.request({ ...validName, full_name: 'Forged verified name', confirmed: true });
   assert.equal(response.status, 200);
   assert.deepEqual(response.body, { state: 'identity_pending', email: 'person@example.com', signupName: 'Ana María Santos', signupRole: 'worker' });
@@ -119,16 +142,16 @@ test('name entry rejects an invalid recovery capability', async () => {
   assert.equal(flow.updates.length, 0);
 });
 for (const name of ['', '123', 'a'.repeat(201), 'Ana\nSantos']) test(`name entry rejects malformed input ${JSON.stringify(name)}`, async () => {
-  const flow = endpoint();
+  const flow = endpoint({confirmed:true});
   assert.equal((await flow.request({ ...validName, signupName: name })).status, 400);
   assert.equal(flow.updates.length, 0);
 });
 
-for(const status of ['PENDING_REVIEW','DECLINED','APPROVED']) test(`sign-in resend respects the ${status} identity gate without disclosing account state`,async()=>{
+for(const status of ['UNVERIFIED','PENDING_REVIEW','DECLINED','APPROVED']) test(`sign-in resend permits email verification for an active ${status} account without disclosing state`,async()=>{
   const flow=endpoint({profileStatus:status});
   const response=await flow.request({action:'resend_from_sign_in',email:'person@example.com'});
   assert.equal(response.status,200);assert.deepEqual(response.body,{requested:true});
-  assert.equal(flow.calls.includes('send_email'),status==='APPROVED');
+  assert.equal(flow.calls.includes('send_email'),true);
 });
 test('sign-in resend returns the same result for an unknown email',async()=>{
   const flow=endpoint({missingProfile:true});

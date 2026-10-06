@@ -1,25 +1,34 @@
 import { expect, test } from '@playwright/test';
 import { expectNoRegistrationOverflow, fillRegistration, mockAccountJourney } from './helpers/registration';
 
-for (const width of [390, 768, 1024, 1280, 1440]) test(`Didit submission waits for admin before email confirmation at ${width}px`, async ({ page }) => {
+for (const width of [390, 768, 1024, 1280, 1440]) test(`email confirmation precedes Didit and administrator review at ${width}px`, async ({ page }) => {
   await page.setViewportSize({width,height:900});
   const flow=await mockAccountJourney(page,null,{state:'identity_review',email:'person@example.com',legalName:'Verified Legal Person'});
   await page.goto('/register');
-  await fillRegistration(page,'person@example.com','worker');
+  await fillRegistration(page,'person@example.com','worker',false);
+  await expect(page.getByRole('heading',{name:'Confirm your email',exact:true})).toBeFocused();
+  await expect(page.getByRole('list',{name:'Account verification steps'}).locator('[aria-current="step"]')).toContainText('Email Verification');
+  await expect(page.getByRole('button',{name:'Verify with Didit'})).toHaveCount(0);
+  await expect(page.getByRole('button',{name:'Submit manually'})).toHaveCount(0);
+  await page.getByRole('button',{name:'Check email verification'}).click();
+  await expect(page.getByRole('heading',{name:'Confirm your email',exact:true})).toBeVisible();
+  expect(flow.requests.some(item=>item.name==='account-didit-session')).toBe(false);
+  await expectNoRegistrationOverflow(page);
+  await page.screenshot({path:test.info().outputPath(`email-pending-${width}.png`),fullPage:true});
+  flow.confirmEmail();
+  await page.getByRole('button',{name:'Check email verification'}).click();
+  await expect(page.getByRole('heading',{name:'Verify your identity',exact:true})).toBeVisible();
   await expect(page.getByLabel('Complete name',{exact:true})).toHaveCount(0);
   await page.getByRole('button',{name:'Verify with Didit'}).click();
   await expect(page.getByRole('button', { name: 'Check verification status' })).toHaveCount(0);
   await expect(page.getByRole('heading',{name:'Identity review pending',exact:true})).toBeVisible();
-  await expect(page.getByText(/If approved, confirm your email/)).toBeVisible();
+  await expect(page.getByText(/Once approved, sign in to use your account/)).toBeVisible();
   await expect(page.getByRole('checkbox',{name:/consent/})).toHaveCount(0);
-  flow.setState({state:'email_pending',email:'person@example.com',legalName:'Verified Legal Person'});
-  await expect(page.getByRole('heading',{name:'Registration complete',exact:true})).toBeVisible();
-  await expect(page.getByText('Verified name: Verified Legal Person',{exact:true})).toBeVisible();
-  await expect(page.getByRole('link',{name:'Go to sign in'})).toHaveAttribute('href','/sign-in');
+  await expect(page.getByRole('list',{name:'Account verification steps'}).locator('[aria-current="step"]')).toContainText('Identity Review');
   await expect(page.getByRole('button',{name:'Confirm my legal name'})).toHaveCount(0);
   await expect(page.getByRole('heading',{name:'Confirm your email'})).toHaveCount(0);
   await expect(page.getByRole('link',{name:'Offer services'})).toHaveCount(0);
-  expect(flow.requests.find(item=>item.body.action==='create')?.body).toMatchObject({registrationVersion:3,signupRole:'worker'});
+  expect(flow.requests.find(item=>item.body.action==='create')?.body).toMatchObject({registrationVersion:4,signupRole:'worker'});
   expect(flow.requests.some(item=>['save_name','resend'].includes(String(item.body.action)))).toBe(false);
   expect(flow.requests.filter(item=>item.name==='account-didit-session').every(item=>!('password' in item.body))).toBe(true);
   expect(await page.evaluate(()=>JSON.stringify(sessionStorage))).not.toContain('Password123!');
@@ -118,7 +127,5 @@ test('manual registration accepts IDs without expiration or a back side and wait
   const submission=flow.requests.find(item=>item.name==='account-manual-review')?.body;
   expect(submission).toMatchObject({noExpiration:true,backNotApplicable:true,backImage:null,expiry:'',fullName:'Manual Applicant'});
   for(const field of ['video','address','password','serviceType']) expect(submission).not.toHaveProperty(field);
-  flow.setState({state:'email_pending',email:'person@example.com'});
-  await expect(page.getByRole('heading',{name:'Registration complete'})).toBeVisible({timeout:12000});
   await expect(page.getByRole('link',{name:'Start booking services'})).toHaveCount(0);
 });

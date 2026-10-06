@@ -31,7 +31,7 @@ test('login, logout, then new signup does not restore the previous pending accou
   await expect(page.getByRole('heading', { name: 'Create your account', exact: true })).toBeVisible();
 });
 
-for (const width of [390, 1440]) test(`abandoned signup can start another account without email delivery at ${width}px`, async ({ page }) => {
+for (const width of [390, 1440]) test(`abandoned signup clears browser entries at ${width}px`, async ({ page }) => {
   await page.setViewportSize({ width, height: 900 });
   const flow = await mockAccountJourney(page);
   await page.route('**/auth/v1/logout*', async (route) => route.fulfill({ headers: corsHeaders, status: 204 }));

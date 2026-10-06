@@ -56,14 +56,19 @@ Identity updates explain the review and email-confirmation steps separately;
 they omit internal account UUIDs. Authentication templates preserve Supabase's
 `{{ .ConfirmationURL }}` and `{{ .Token }}` placeholders and include a fallback link.
 
-The final registration screen identifies the confirmation email by its subject,
+The email verification screen identifies the confirmation email by its subject,
 `TrabaWho: Confirm your email`, and tells users to click its blue **Confirm my email**
 button. That button uses Supabase's secure signup verification URL, with a copyable
-fallback link. Confirmation is sent after identity approval; accounts awaiting
-manual review receive it after administrator approval. A read-only check on
-2026-10-06 verified that the hosted confirmation template has the button and secure
-URL placeholder, with email confirmation required and no overriding email hook.
-This check did not send an email or establish actual inbox delivery.
+fallback link. New V4 accounts receive confirmation immediately after saving
+email/password. Email must be confirmed before Didit or manual evidence submission;
+the identity review decision arrives separately afterward. Older V3 pending accounts
+retain confirmation after administrator approval. The updated template copy was
+deployed with the email-first backend correction on 2026-10-07 (Philippine time).
+All six hosted Auth designs match the generated templates; SMTP credentials,
+confirmation requirements, redirects, and email hook settings match the pre-rollout
+configuration. Live rollback checks verify the email and administrator gates for
+both account types. This rollout did not send a diagnostic email or establish
+actual inbox delivery.
 
 Run `npm run email:design` to generate reviewable HTML in `exports/email-design`.
 After verification, run `npm run email:design -- --apply` to deploy the notification
@@ -86,8 +91,9 @@ actual inbox rendering has not been checked for this design.
 
 ## Events and preferences
 
-Admin approval sends a secure Supabase Auth confirmation link to the account's
-current email. Approval never confirms an unconfirmed email automatically,
+New V4 registration sends the secure Supabase Auth confirmation link before identity
+verification. Admin approval sends a link only when the account's email is still
+unconfirmed, including older pending registrations. Approval never confirms an email automatically,
 including pending accounts from older registration versions. Approval and decline
 also enqueue identity status notifications, which remain enabled for unconfirmed
 accounts. The scheduled worker retries a failed approval confirmation before

@@ -7,9 +7,9 @@ export function RegistrationStepSummary({ state, step, busy, onContinue }: {
 }) {
   return <div className="space-y-4">
     <p className="break-words text-sm leading-6">{state.email}</p>
-    {step === 'account' && <p className="text-sm leading-6 text-muted-foreground">Your account details are saved. Continue with identity verification to finish registration.</p>}
+    <p className="text-sm leading-6 text-muted-foreground">{step === 'account' ? 'Your account details are saved.' : 'Your email is confirmed.'} {state.state === 'email_pending' ? 'Confirm your email before verifying your identity.' : 'Continue with identity verification to finish registration.'}</p>
     <Button disabled={busy} className="w-full" onClick={onContinue}>
-      Continue to identity<ArrowRight aria-hidden="true" />
+      {state.state === 'email_pending' ? 'Continue to email verification' : 'Continue to identity'}<ArrowRight aria-hidden="true" />
     </Button>
   </div>;
 }

@@ -20,7 +20,7 @@ git show snapshot/registration-ui-warranty-20261005:src/features/auth/pages/Auth
 
 ## How to rebuild on `main`
 
-Use the snapshot as a visual and interaction reference, not as a wholesale replacement. `main` has a newer typed registration journey and draft/identity flow that must continue to work. Start a dedicated redesign branch from current `main`, then work in the existing `src/features/auth` components and hooks. Keep registration presentation, navigation state, and backend calls separate; do not copy the old oversized JSX pages or revert the current registration service.
+Use the snapshot as a visual and interaction reference, not as a wholesale replacement. The typed registration journey follows **Account Details → Email Verification → Identity Verification → Identity Review**. Email confirmation must finish before Didit or manual submission; administrator approval opens marketplace access. Start a dedicated redesign branch from current `main`, then work in the existing `src/features/auth` components and hooks. Keep registration presentation, navigation state, and backend calls separate; do not copy the old oversized JSX pages or revert the current registration service.
 
 Navigation behavior to preserve and test: the logo and Back-to-home action return to `/`; leaving with an unsaved registration draft opens the existing confirmation dialog; cancelling that dialog retains the draft and focus; sign-in/create-account changes use the expected route; browser Back/Forward and a refreshed registration URL remain usable. Check client/worker identity paths, Didit/manual review outcomes, and the documented mobile and desktop widths.
 

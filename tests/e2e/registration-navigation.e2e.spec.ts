@@ -10,7 +10,7 @@ for (const width of [390, 768, 1024, 1280, 1440]) {
     await expect(tabs.nth(0)).toHaveText('Sign in');
     await expect(tabs.nth(1)).toHaveText('Create an account');
     await expect(page.getByRole('list', { name: 'Account verification steps' }).getByRole('listitem')).toHaveText([
-      '1Account Details, current step', '2Identity Verification, upcoming',
+      '1Account Details, current step', '2Email Verification, upcoming', '3Identity Verification, upcoming', '4Identity Review, upcoming',
     ]);
     const terms = page.getByRole('button', { name: 'Terms and Conditions', exact: true });
     await terms.focus();
@@ -41,18 +41,18 @@ for (const width of [390, 768, 1024, 1280, 1440]) {
   });
 }
 
-test('account details go directly to identity and reloading starts a fresh registration', async ({ page }) => {
+test('account details require email confirmation and reloading clears browser entries', async ({ page }) => {
   const flow = await mockAccountJourney(page);
   await page.goto('/register');
   await fillRegistration(page);
   await expect(page.getByRole('heading', { name: 'Verify your identity', exact: true })).toBeVisible();
-  expect(flow.requests.map(item => item.body.action)).toEqual(['create']);
+  expect(flow.requests.map(item => item.body.action)).toEqual(['create', 'state']);
   await expect(page.getByLabel('Complete name', { exact: true })).toHaveCount(0);
   await expect(page.getByRole('heading', { name: 'Confirm your email', exact: true })).toHaveCount(0);
   await page.reload();
   await expect(page.getByRole('heading', { name: 'Create your account', exact: true })).toBeVisible();
   await expect(page.getByLabel('Email',{exact:true})).toHaveValue('');
-  expect(flow.requests.map(item=>item.body.action)).toEqual(['create']);
+  expect(flow.requests.map(item=>item.body.action)).toEqual(['create', 'state']);
 });
 
 test('Back from identity keeps account details without requesting email', async ({ page }) => {

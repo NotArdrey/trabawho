@@ -49,8 +49,8 @@ export async function registrationState(client: ReturnType<typeof accountClient>
   const value = asRecord(profile.data);
   const status = text(value.verification_status);
   const expired = text(value.id_document_expiry) && text(value.id_document_expiry) < new Date().toISOString().slice(0, 10);
-  const state = expired || ["DECLINED", "ABANDONED", "EXPIRED"].includes(status) ? "declined"
-    : status === "APPROVED" && !user.email_confirmed_at ? "email_pending"
+  const state = !user.email_confirmed_at ? "email_pending"
+    : expired || ["DECLINED", "ABANDONED", "EXPIRED"].includes(status) ? "declined"
     : status === "APPROVED" && value.is_verified === true && (row.name_confirmed_at || row.reviewed_legal_name) ? "ready"
     : status === "PENDING_REVIEW" ? "identity_review"
     : row.provider_status === "APPROVED" && row.source_legal_name && !row.name_issue ? "name_pending"
@@ -62,6 +62,7 @@ export async function registrationState(client: ReturnType<typeof accountClient>
     sessionUrl = text(asRecord(asRecord(session.data).verification_data).session_url) || null;
   }
   return { state, email: user.email, signupName: text(user.user_metadata.signup_name), signupRole: row.account_role === 'worker' ? 'worker' : 'client', legalName: row.source_legal_name, documentType: row.document_type,
+    ...(state === 'email_pending' ? { emailDelivery: { sent: row.confirmation_delivery_status === 'sent' } } : {}),
     requestedName: row.requested_legal_name, nameIssue: row.name_issue, sessionId: row.current_session_id,
     sessionUrl, providerStatus: row.provider_status, providerSetupComplete: Boolean(row.provider_setup_completed_at) };
 }

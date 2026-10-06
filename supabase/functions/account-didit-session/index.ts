@@ -4,7 +4,7 @@ import { registrationUser } from "../_shared/pendingRegistrationAccess.ts";
 import { corsHeaders, jsonResponse, recordRegistrationAttempt } from "../_shared/identityRegistration.ts";
 import { asRecord } from "../_shared/identityDomain.ts";
 import { identityReturnUrl } from "../_shared/identityRedirect.ts";
-import { accountClient, AccountError, registrationRow, registrationState, pollAccountIdentity, text } from "../_shared/accountRegistration.ts";
+import { accountClient, AccountError, registrationRow, registrationState, pollAccountIdentity, requireConfirmed, text } from "../_shared/accountRegistration.ts";
 
 Deno.serve(async (request: Request) => {
   if (request.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
@@ -16,6 +16,7 @@ Deno.serve(async (request: Request) => {
     const draft = await ownedDraft(client,body);
     if (draft && !draft.finalized_at) return jsonResponse(await draftDidit(request,client,draft,body));
     const user = await registrationUser(request, client, body); userId = user.id;
+    requireConfirmed(user);
     const row = await registrationRow(client, user.id);
     if (!row) throw new AccountError("Contact support to resume an existing identity registration.", 409);
     if (body.action === "get_session") return jsonResponse(await pollAccountIdentity(client, user));

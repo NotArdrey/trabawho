@@ -49,7 +49,7 @@ test('signup requires an explicit choice and supports changing it with the keybo
   await expect(worker).toBeChecked();
   await expect(client).not.toBeChecked();
   await page.getByRole('button', { name: 'Continue', exact: true }).click();
-  await expect(page.getByRole('heading', { name: 'Verify your identity', exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Confirm your email', exact: true })).toBeVisible();
   expect(flow.requests.find(item => item.body.action === 'create')?.body.signupRole).toBe('worker');
   expect(flow.requests.some(item => item.name === 'account-didit-session')).toBe(false);
 });
@@ -88,19 +88,19 @@ test('password confirmation blocks creation, focuses its error, and never reache
   expect(flow.requests).toHaveLength(0);
   await confirmation.fill('Password123!');
   await page.getByRole('button',{name:'Continue',exact:true}).click();
-  await expect(page.getByRole('heading',{name:'Verify your identity',exact:true})).toBeVisible();
+  await expect(page.getByRole('heading',{name:'Confirm your email',exact:true})).toBeVisible();
   const request=flow.requests.find(item=>item.body.action==='create');
   expect(request?.body).toMatchObject({email:'person@example.com',password:'Password123!',acceptedTerms:true});
   expect(request?.body).not.toHaveProperty('confirmPassword');
   expect(await page.evaluate(()=>JSON.stringify(sessionStorage))).not.toContain('DifferentPassword123!');
 });
-test('registration does not wait for SMTP or expose an email-confirmation page', async ({ page }) => {
+test('registration shows email confirmation before identity verification', async ({ page }) => {
   const flow = await mockAccountJourney(page);
   await page.goto('/register');
-  await fillRegistration(page);
-  await expect(page.getByRole('heading', { name: 'Verify your identity', exact: true })).toBeVisible();
+  await fillRegistration(page,'person@example.com','client',false);
+  await expect(page.getByRole('heading', { name: 'Confirm your email', exact: true })).toBeVisible();
   expect(flow.requests.filter(item => item.body.action !== 'state').map(item => item.body.action)).toEqual(['create']);
-  await expect(page.getByRole('button', { name: 'Resend confirmation email' })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Resend confirmation email' })).toBeVisible();
 });
 
 for (const width of [390, 768, 1024, 1280, 1440]) test(`sign-in only offers email recovery after confirmation is required at ${width}px`,async({page})=>{
