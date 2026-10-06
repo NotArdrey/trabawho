@@ -7,8 +7,11 @@ export async function deliverAccountConfirmation(client: ReturnType<typeof accou
   if (user.error || !user.data.user) throw new AccountError('Your account could not be loaded. Retry.', 503);
   const state = await registrationState(client, user.data.user);
   if (state.state !== 'email_pending') return state;
-  const row = await client.from('account_registrations').select('pending_nonce_hash,email_sent_at,confirmation_delivery_status').eq('user_id',userId).single();
+  const row = await client.from('account_registrations').select('pending_nonce_hash,email_sent_at,confirmation_delivery_status,reviewed_legal_name').eq('user_id',userId).single();
   if (row.error) throw new AccountError('Email delivery could not be checked. Retry.', 503);
+  // Human approval owns initial delivery through the admin action and durable queue.
+  // Polling or a repeated provider event must not request a second inbox link.
+  if (asRecord(row.data).reviewed_legal_name) return state;
   if (asRecord(row.data).confirmation_delivery_status==='sent') return state;
   if (Date.parse(text(asRecord(row.data).email_sent_at)) > Date.now()-60000) return state;
   const claim = await client.rpc('claim_pending_account_email', { p_user_id:userId,p_expected_hash:asRecord(row.data).pending_nonce_hash });

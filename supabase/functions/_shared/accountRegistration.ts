@@ -39,7 +39,7 @@ export async function registrationRow(client: ReturnType<typeof accountClient>, 
   return result.data ? asRecord(result.data) : null;
 }
 export function requireConfirmed(user: User) {
-  if (!user.email_confirmed_at) throw new AccountError("Confirm your email before identity verification.", 403);
+  if (!user.email_confirmed_at) throw new AccountError("Confirm your email before using your account.", 403);
 }
 export async function registrationState(client: ReturnType<typeof accountClient>, user: User) {
   const row = await registrationRow(client, user.id);
@@ -49,9 +49,10 @@ export async function registrationState(client: ReturnType<typeof accountClient>
   const value = asRecord(profile.data);
   const status = text(value.verification_status);
   const expired = text(value.id_document_expiry) && text(value.id_document_expiry) < new Date().toISOString().slice(0, 10);
-  const state = !user.email_confirmed_at ? "email_pending"
-    : expired || ["DECLINED", "ABANDONED", "EXPIRED"].includes(status) ? "declined"
-    : status === "APPROVED" && value.is_verified === true && (row.name_confirmed_at || row.reviewed_legal_name) ? "ready"
+  const identityApproved = status === "APPROVED" && Boolean(row.name_confirmed_at || row.reviewed_legal_name);
+  const state = expired || ["DECLINED", "ABANDONED", "EXPIRED"].includes(status) ? "declined"
+    : identityApproved && !user.email_confirmed_at ? "email_pending"
+    : identityApproved && value.is_verified === true ? "ready"
     : status === "PENDING_REVIEW" ? "identity_review"
     : row.provider_status === "APPROVED" && row.source_legal_name && !row.name_issue ? "name_pending"
     : row.current_session_id ? "identity_in_progress" : "identity_pending";
@@ -62,7 +63,8 @@ export async function registrationState(client: ReturnType<typeof accountClient>
     sessionUrl = text(asRecord(asRecord(session.data).verification_data).session_url) || null;
   }
   return { state, email: user.email, signupName: text(user.user_metadata.signup_name), signupRole: row.account_role === 'worker' ? 'worker' : 'client', legalName: row.source_legal_name, documentType: row.document_type,
-    ...(state === 'email_pending' ? { emailDelivery: { sent: row.confirmation_delivery_status === 'sent' } } : {}),
+    ...(state === 'email_pending' && ['sent','failed'].includes(text(row.confirmation_delivery_status))
+      ? { emailDelivery: { sent: row.confirmation_delivery_status === 'sent' } } : {}),
     requestedName: row.requested_legal_name, nameIssue: row.name_issue, sessionId: row.current_session_id,
     sessionUrl, providerStatus: row.provider_status, providerSetupComplete: Boolean(row.provider_setup_completed_at) };
 }

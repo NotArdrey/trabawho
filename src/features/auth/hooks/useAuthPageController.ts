@@ -35,7 +35,7 @@ export function useAuthPageController({ mode = 'login', onSubmit, onForgotPasswo
   });
   const resend = () => run(async () => {
     await resendFromSignIn(email);
-    setMessage('Confirmation requested. Check your inbox and open the link to verify your email, then continue registration.');
+    setMessage('If your identity review is approved, a confirmation link has been requested. Check your inbox and spam folder.');
   });
   const canResend = mode === 'login' && confirmationRequired;
   return { email, setEmail, password, setPassword, busy, error, message, canResend, submit, resend };

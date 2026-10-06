@@ -26,7 +26,7 @@ export function IdentityResultStep({ flow, state, onDraftChange }: { flow: Accou
         {state.nameIssue && <p className="break-words">{state.nameIssue}</p>}
         {state.legalName && <p className="break-words">Name from ID: {state.legalName}</p>}
         {state.requestedName && <p className="break-words">Requested correction: {state.requestedName}</p>}
-        <p className="text-muted-foreground">You can close this page. Watch your inbox and spam folder for the identity review decision. Once approved, sign in to use your account.</p>
+        <p className="text-muted-foreground">You can close this page. Watch your inbox and spam folder for the identity review decision. After approval, confirm your email using the verification link before signing in.</p>
       </div>}
       {!ready && state.sessionId && <div className="space-y-4 border-t pt-4">
         <Button variant="ghost" className="h-auto min-h-11 w-full justify-start whitespace-normal px-0 text-left text-primary" disabled={flow.busy}

@@ -2,12 +2,12 @@ import type { AccountRegistration } from '@/shared/services/accountRegistrationS
 
 export function registrationProgress(registration: AccountRegistration | null) {
   switch (registration?.state) {
-    case 'email_pending': return 2;
+    case 'email_pending': return 4;
     case 'identity_pending':
     case 'identity_in_progress':
     case 'declined':
-    case 'name_pending': return 3;
-    case 'identity_review':
+    case 'name_pending': return 2;
+    case 'identity_review': return 3;
     case 'ready': return 4;
     default: return 1;
   }

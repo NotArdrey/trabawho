@@ -3,12 +3,14 @@ import path from 'node:path';
 import { projectTokenCandidates, readServerEnvironment, selectProjectToken } from './system-email-config.mts';
 
 const emailFirst = process.argv.includes('--email-first');
-const version = emailFirst ? '20261007100000' : '20261006121000';
-const migrationName = emailFirst ? 'email_first_registration' : 'registration_review_and_reset';
+const reviewBeforeEmail = process.argv.includes('--review-before-email');
+if (emailFirst && reviewBeforeEmail) throw new Error('Choose only one registration correction.');
+const version = reviewBeforeEmail ? '20261007120000' : emailFirst ? '20261007100000' : '20261006121000';
+const migrationName = reviewBeforeEmail ? 'registration_review_before_email' : emailFirst ? 'email_first_registration' : 'registration_review_and_reset';
 const migrationFile = `supabase/migrations/${version}_${migrationName}.sql`;
 const names = ['account-registration', 'account-didit-session', 'account-manual-review',
   'account-identity-name', 'account-admin-identity-review', 'didit-webhook', 'send-system-emails'];
-if (emailFirst) names.push('provider-setup');
+if (emailFirst || reviewBeforeEmail) names.push('provider-setup');
 const functionRoot = path.resolve('supabase/functions');
 
 function functionFiles(entrypoint: string): string[] {
@@ -52,9 +54,10 @@ if (process.argv.includes('--apply')) {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ query: statement }),
   });
   const history = await query(`select version,name,statements from supabase_migrations.schema_migrations
-    where version in ('20261006112000','20261006121000','${version}')`) as Array<{ version: string; name: string; statements: string[] }>;
+    where version in ('20261006112000','20261006121000','20261007100000','${version}')`) as Array<{ version: string; name: string; statements: string[] }>;
   if (!history.some(row => row.version === '20261006112000')) throw new Error('Deploy the registration draft migrations before this correction.');
   if (emailFirst && !history.some(row => row.version === '20261006121000')) throw new Error('Deploy the registration review/reset correction before the email-first migration.');
+  if (reviewBeforeEmail && !history.some(row => row.version === '20261007100000')) throw new Error('Apply the maintained email-first migration before the review-before-email correction.');
   const existing = history.find(row => row.version === version);
   if (existing && (existing.name !== migrationName || existing.statements.length !== 1 ||
     existing.statements[0].replaceAll('\r\n', '\n').trim() !== sql.replaceAll('\r\n', '\n').trim()))

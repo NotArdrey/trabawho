@@ -3,7 +3,7 @@ import { cn } from '@/lib/utils';
 import type { AccountRegistration } from '@/shared/services/accountRegistrationService';
 import { registrationProgress } from '../domain/registrationProgress';
 
-const steps = ['Account Details', 'Email Verification', 'Identity Verification', 'Identity Review'];
+const steps = ['Account Details', 'Identity Verification', 'Identity Review', 'Email Verification'];
 
 export function RegistrationProgress({ registration, step }: { registration: AccountRegistration | null; step?: number }) {
   const current = step ?? registrationProgress(registration);

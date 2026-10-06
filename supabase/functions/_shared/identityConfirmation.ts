@@ -28,5 +28,10 @@ export async function deliverIdentityConfirmation(client: SupabaseClient, review
     email_delivery_error: delivery.sent ? null : "Confirmation email could not be sent. Check Supabase Auth mail settings and retry.",
   }).eq("id", reviewId);
   if (saved.error) throw new ReviewError("Approval is saved. Refresh to check email delivery.", 503);
+  const registration = await client.from('account_registrations').update({
+    confirmation_delivery_status: delivery.sent ? 'sent' : 'failed',
+    email_sent_at: new Date().toISOString(),
+  }).eq('user_id',review.user_id);
+  if (registration.error) throw new ReviewError('Approval is saved. Refresh to check confirmation delivery.',503);
   return { sent: delivery.sent, required: true, status: delivery.sent ? "sent" : "failed" };
 }

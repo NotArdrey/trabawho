@@ -7,57 +7,60 @@ Official references: [Create Session](https://docs.didit.me/sessions-api/create-
 
 ## Current registration flow
 
-**Account Details → Email Verification → Identity Verification → Identity Review**.
+**Account Details → Identity Verification → Identity Review → Email Verification**.
 
 Registration collects an explicit Client or Worker choice, email, password,
 password confirmation, and Terms and Conditions agreement. Neither role is
 preselected. It does not ask for identity evidence, legal name, or service address
 at this stage. `/register`, `#register`, and `#identity-register` use this journey.
 
-The frontend requests `registrationVersion: 4`. The server creates an unconfirmed
-Auth user and an unverified profile with the fixed account role, initializes a
-registration recovery capability, and immediately requests a Supabase Auth signup
-confirmation email. **Confirm your email** explains the inbox link, provides
-resend/change-email actions, and checks trusted server state. SMTP failure preserves
-the account and recovery capability for retry while identity stays locked. The
-confirmation link returns to `/register`.
+The frontend requests the maintained `registrationVersion: 3` draft flow. The server
+saves the account role and encrypted sign-in details with a recovery capability,
+then opens Didit or manual evidence submission. It sends no confirmation email at
+this stage. Trusted identity evidence creates an unconfirmed Auth account and a
+pending administrator review; an approved provider result cannot open access.
 
-Email ownership must be confirmed before Didit or manual review. Button presses,
-callback parameters, identity decisions, and recovery capabilities cannot confirm
-it. Visible-page polling and focus refresh pick up confirmation on another device.
-The user can also sign in with the confirmed email/password to resume identity.
-Sign-in resend accepts active accounts before identity approval, with the same
-response for unknown and restricted emails. Registration resends retain rate limits,
+Administrator approval starts the final **Confirm your email** step and requests
+the Supabase Auth signup confirmation link. The screen explains the inbox link and
+provides resend/change-email actions. SMTP failure preserves the saved review and
+account for retry. The durable notification worker retries failed approval email.
+The confirmation link returns to `/register`; polling and focus refresh detect
+confirmation, including confirmation on another device. The user can also sign in
+with the confirmed email/password to finish. Sign-in resend returns a uniform
+response and sends only for active, approved, unexpired identities (or legacy
+accounts without an identity requirement). Registration resends retain rate limits,
 expiry checks, and nonce validation. Changing email atomically revokes the old link.
 
-An approved Didit report still creates a pending administrator review for V4.
 Marketplace access requires confirmed email and approved identity with a reviewed
-legal name. Email confirmation alone leaves the profile unverified. Identity review
-notifications are separate from signup email confirmation; already-confirmed V4
-accounts do not need another confirmation email after administrator approval.
+legal name. Button presses, callback parameters, provider decisions, and recovery
+capabilities cannot confirm email or bypass administrator review. Identity review
+notifications are separate from signup email confirmation. Accounts that already
+confirmed their email in the preceding rollout do not need another link.
 
 ## Recovery and compatibility
 
 Browser form entries and unsigned recovery capabilities exist only in memory.
 Passwords never enter browser storage, logs, or Didit payloads. Leaving or reloading
-clears the form; the saved account can resume at sign-in after inbox confirmation.
+clears the form. Unfinished drafts can start again; submitted accounts finish through
+review and the emailed confirmation link before signing in.
 Sign-out removes protected client state and retired registration storage. Closing
 an unfinished Didit scan resets the form. Completed submissions remain in the
 administrator queue and can finish by signed webhook.
 
-Already-issued V2/V3 registrations retain their database contracts. V3 private drafts
-can finish their prior identity-first process; new account submissions always use
-email-first creation, including requests from older frontend bundles. V3 credentials
+Already-issued V2/V3 registrations retain their database contracts. New submissions
+use the maintained V3 identity-first draft process, including requests from older
+frontend bundles. Existing V4 accounts can capture identity before confirming email,
+but still require human review and inbox ownership before access. V3 credentials
 are AES-GCM encrypted, bound to the draft UUID, and removed at finalization/discard.
 Draft recovery expires after 14 days; retain the nonce secret during that window.
-Existing confirmed accounts retain their roles and identity decisions. The V4
-migration does not rewrite existing verification data.
+Existing confirmed accounts retain their roles and identity decisions. The correction
+uses a new migration; previously applied SQL and existing verification data are unchanged.
 
 ## Identity verification and names
 
 Account-owned Didit, manual, and name actions validate live account access/recovery
-ownership and confirmed email. V4 database session creation/attachment, manual
-submission, and provider-event RPCs also enforce email confirmation. Recovery grants
+ownership. Identity capture does not require confirmed email; confirmation delivery
+for current and V4 registrations is gated on local approval. Recovery grants
 registration access only. Session creation leases prevent duplicate hosted sessions.
 
 Didit handles ID selection/capture, liveness, face matching, and legal-name extraction.
@@ -119,17 +122,17 @@ and optional `IDENTITY_ALLOWED_ORIGINS`. Supabase supplies its URL and Auth keys
 Browser configuration contains only the public URL/anonymous key. Keep Auth email
 confirmation enabled and allow the application's `/register` return URL.
 
-The email-first backend correction was deployed on 2026-10-07 (Philippine time).
-Migration `20261007100000_email_first_registration.sql` is recorded with SQL matching
-the maintained source, all eight affected functions are active, and the updated
-Auth email templates match the generated designs. SMTP credentials, confirmation
-settings, and redirect configuration are preserved. For subsequent environments,
-apply the maintained migrations through `20261006121000_registration_review_and_reset.sql`
-before running:
+The review-before-email correction was deployed on 2026-10-07 (Philippine time).
+Migration `20261007120000_registration_review_before_email.sql` matches the maintained
+source, all eight affected functions are active, and Auth templates match the generated
+designs. SMTP credentials, confirmation requirements, and redirects are preserved.
+The preceding email-first migration remains in history. For subsequent environments,
+apply the maintained migrations through
+`20261007100000_email_first_registration.sql` before running:
 
 ```sh
-node scripts/deploy-registration-fix.mts --email-first
-node scripts/deploy-registration-fix.mts --email-first --apply
+node scripts/deploy-registration-fix.mts --review-before-email
+node scripts/deploy-registration-fix.mts --review-before-email --apply
 npm run email:design -- --apply
 ```
 
@@ -141,12 +144,13 @@ SMTP settings are preserved. Gateway JWT verification stays disabled; handlers
 validate Auth tokens, recovery ownership, administrator access, or webhook signatures.
 Coordinate backend and frontend rollout.
 
-Live rollback checks pass for V4 Client and Worker accounts: unconfirmed email
-blocks Didit and manual submission; email confirmation alone leaves access blocked;
-Didit approval waits for an administrator; human approval opens access and survives
-later provider updates. The existing account registration, role, and legacy draft
-rollback suites also pass. Protected endpoints reject anonymous requests, and the
-temporary fixtures leave no stored accounts. No diagnostic email was sent.
+Live rollback checks pass for Client and Worker identity capture before confirmation,
+provider approval waiting for an administrator, early resend/change-email denial,
+and human approval leaving access blocked until inbox confirmation. Existing account,
+role, and draft suites pass compatibility checks. Protected endpoints reject anonymous
+requests. A deployed API probe saved an encrypted draft without creating Auth or
+sending email, erased its credentials on discard, and removed the temporary draft.
+These checks do not establish inbox delivery or a real Didit scan.
 
 ## Verification
 

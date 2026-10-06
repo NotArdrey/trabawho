@@ -125,22 +125,22 @@ for (const options of [{ nonce: 'forged' }, { expired: true }, { malformedExpiry
   });
 }
 
-test('unconfirmed email takes precedence over identity status in registration state',async()=>{
-  for(const status of ['UNVERIFIED','PENDING_REVIEW','APPROVED','DECLINED']) {
+test('unconfirmed accounts progress through identity and review before the email step',async()=>{
+  for(const [status,state] of [['UNVERIFIED','identity_pending'],['PENDING_REVIEW','identity_review'],['APPROVED','email_pending'],['DECLINED','declined']]) {
     const client={from:(table:string)=>({select:()=>({eq:()=>({
-      maybeSingle:async()=>({error:null,data:table==='account_registrations'?{account_role:'client'}:null}),
+      maybeSingle:async()=>({error:null,data:table==='account_registrations'?{account_role:'client',reviewed_legal_name:status==='APPROVED'?'Reviewed Name':null}:null}),
       single:async()=>({error:null,data:{verification_status:status,is_verified:status==='APPROVED'}}),
     })})})};
-    assert.equal((await access.registrationState(client,{id:'email-pending',email:'person@example.com',email_confirmed_at:null,user_metadata:{}})).state,'email_pending');
+    assert.equal((await access.registrationState(client,{id:'email-pending',email:'person@example.com',email_confirmed_at:null,user_metadata:{}})).state,state);
   }
 });
 
-for(const name of ['account-didit-session','account-manual-review','account-identity-name']) test(`${name} rejects unconfirmed account recovery before identity writes`,async()=>{
+for(const name of ['account-didit-session','account-manual-review','account-identity-name']) test(`${name} rejects a forged recovery capability before identity writes`,async()=>{
   let handler:((request:Request)=>Promise<Response>)|undefined;
-  const unconfirmed={id:'unconfirmed',email:'person@example.com',email_confirmed_at:null};
+  const client={from:()=>({select:()=>({eq:()=>({maybeSingle:async()=>({error:null,data:{pending_nonce_hash:'stored-hash',pending_expires_at:new Date(Date.now()+3600000).toISOString()}})})})})};
   const endpointModules:Record<string,Record<string,unknown>>={
-    '../_shared/accountRegistration.ts':{...exports,accountClient:()=>({})},
-    '../_shared/pendingRegistrationAccess.ts':{registrationUser:async()=>unconfirmed},
+    '../_shared/accountRegistration.ts':{...exports,accountClient:()=>client},
+    '../_shared/pendingRegistrationAccess.ts':pendingExports,
     '../_shared/registrationDrafts.ts':{ownedDraft:async()=>null},
     '../_shared/registrationDraftIdentity.ts':{},
     '../_shared/identityRegistration.ts':{corsHeaders:{},jsonResponse:(value:unknown,status=200)=>new Response(JSON.stringify(value),{status})},
@@ -157,5 +157,5 @@ for(const name of ['account-didit-session','account-manual-review','account-iden
   assert.ok(handler);
   const response=await handler(new Request('https://example.invalid/identity',{method:'POST',body:JSON.stringify({userId:'unconfirmed',nonce:'valid',acceptedIdentityTerms:true})}));
   assert.equal(response.status,403);
-  assert.deepEqual(await response.json(),{error:'Confirm your email before identity verification.'});
+  assert.deepEqual(await response.json(),{error:'Your pending registration could not be validated. Sign in to resume.'});
 });

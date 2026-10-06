@@ -16,7 +16,7 @@ export function EmailConfirmationStep({ flow, email, onDraftChange }: { flow: Ac
         <p className="break-words text-sm leading-6">Check {email} for the email titled “TrabaWho: Confirm your email”. Click “Confirm my email” in that email. Check your spam folder too.</p>
         {flow.registration?.emailDelivery?.sent === false && <p role="status" className="text-sm leading-6">Your account is saved, but the confirmation email could not be sent. Request another email below.</p>}
         <Button className="h-auto min-h-11 w-full whitespace-normal py-3" isLoading={flow.busy} onClick={() => void flow.refresh()}>Check email verification<ArrowRight aria-hidden="true" /></Button>
-        <p className="text-xs leading-5 text-muted-foreground">Identity verification stays locked until your email is confirmed.</p>
+        <p className="text-xs leading-5 text-muted-foreground">Your identity review is complete. Confirm your email to activate account access.</p>
       </div>
       <div className="space-y-2">
         <p className="text-sm leading-6 text-muted-foreground">No email or an expired link? Request another confirmation or correct your email.</p>

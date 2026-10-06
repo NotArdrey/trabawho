@@ -1,39 +1,47 @@
 import { expect, test } from '@playwright/test';
 import { expectNoRegistrationOverflow, fillRegistration, mockAccountJourney } from './helpers/registration';
 
-for (const width of [390, 768, 1024, 1280, 1440]) test(`email confirmation precedes Didit and administrator review at ${width}px`, async ({ page }) => {
+for (const width of [390, 768, 1024, 1280, 1440]) test(`Didit and administrator review precede email confirmation at ${width}px`, async ({ page }) => {
   await page.setViewportSize({width,height:900});
   const flow=await mockAccountJourney(page,null,{state:'identity_review',email:'person@example.com',legalName:'Verified Legal Person'});
   await page.goto('/register');
-  await fillRegistration(page,'person@example.com','worker',false);
-  await expect(page.getByRole('heading',{name:'Confirm your email',exact:true})).toBeFocused();
-  await expect(page.getByRole('list',{name:'Account verification steps'}).locator('[aria-current="step"]')).toContainText('Email Verification');
-  await expect(page.getByRole('button',{name:'Verify with Didit'})).toHaveCount(0);
-  await expect(page.getByRole('button',{name:'Submit manually'})).toHaveCount(0);
-  await page.getByRole('button',{name:'Check email verification'}).click();
-  await expect(page.getByRole('heading',{name:'Confirm your email',exact:true})).toBeVisible();
+  await fillRegistration(page,'person@example.com','worker');
+  await expect(page.getByRole('heading',{name:'Verify your identity',exact:true})).toBeFocused();
+  await expect(page.getByRole('list',{name:'Account verification steps'}).locator('[aria-current="step"]')).toContainText('Identity Verification');
+  await expect(page.getByRole('button',{name:'Verify with Didit'})).toBeEnabled();
+  await expect(page.getByRole('button',{name:'Resend confirmation email'})).toHaveCount(0);
   expect(flow.requests.some(item=>item.name==='account-didit-session')).toBe(false);
   await expectNoRegistrationOverflow(page);
-  await page.screenshot({path:test.info().outputPath(`email-pending-${width}.png`),fullPage:true});
-  flow.confirmEmail();
-  await page.getByRole('button',{name:'Check email verification'}).click();
+  await page.screenshot({path:test.info().outputPath(`identity-pending-${width}.png`),fullPage:true});
   await expect(page.getByRole('heading',{name:'Verify your identity',exact:true})).toBeVisible();
   await expect(page.getByLabel('Complete name',{exact:true})).toHaveCount(0);
   await page.getByRole('button',{name:'Verify with Didit'}).click();
   await expect(page.getByRole('button', { name: 'Check verification status' })).toHaveCount(0);
   await expect(page.getByRole('heading',{name:'Identity review pending',exact:true})).toBeVisible();
-  await expect(page.getByText(/Once approved, sign in to use your account/)).toBeVisible();
+  await expect(page.getByText(/After approval, confirm your email/)).toBeVisible();
   await expect(page.getByRole('checkbox',{name:/consent/})).toHaveCount(0);
   await expect(page.getByRole('list',{name:'Account verification steps'}).locator('[aria-current="step"]')).toContainText('Identity Review');
   await expect(page.getByRole('button',{name:'Confirm my legal name'})).toHaveCount(0);
   await expect(page.getByRole('heading',{name:'Confirm your email'})).toHaveCount(0);
   await expect(page.getByRole('link',{name:'Offer services'})).toHaveCount(0);
-  expect(flow.requests.find(item=>item.body.action==='create')?.body).toMatchObject({registrationVersion:4,signupRole:'worker'});
+  expect(flow.requests.find(item=>item.body.action==='create')?.body).toMatchObject({registrationVersion:3,signupRole:'worker'});
   expect(flow.requests.some(item=>['save_name','resend'].includes(String(item.body.action)))).toBe(false);
   expect(flow.requests.filter(item=>item.name==='account-didit-session').every(item=>!('password' in item.body))).toBe(true);
   expect(await page.evaluate(()=>JSON.stringify(sessionStorage))).not.toContain('Password123!');
   await expectNoRegistrationOverflow(page);
   await page.screenshot({path:test.info().outputPath(`draft-complete-${width}.png`),fullPage:true});
+  flow.setState({state:'email_pending',email:'person@example.com',signupRole:'worker',emailDelivery:{sent:true}});
+  await page.getByRole('button',{name:'Refresh review status',exact:true}).click();
+  await expect(page.getByRole('heading',{name:'Confirm your email',exact:true})).toBeVisible();
+  await expect(page.getByRole('list',{name:'Account verification steps'}).locator('[aria-current="step"]')).toContainText('Email Verification');
+  await expect(page.getByText('Registration complete',{exact:true})).toHaveCount(0);
+  await expect(page.getByRole('link',{name:'Offer services'})).toHaveCount(0);
+  await expectNoRegistrationOverflow(page);
+  await page.screenshot({path:test.info().outputPath(`email-pending-${width}.png`),fullPage:true});
+  flow.confirmEmail();
+  await page.getByRole('button',{name:'Check email verification'}).click();
+  await expect(page.getByRole('heading',{name:'Your account is ready',exact:true})).toBeVisible();
+  await expect(page.getByText('Registration complete',{exact:true})).toBeVisible();
 });
 
 for (const exit of ['button','provider','callback']) test(`unfinished Didit ${exit} exit resets every field without restoring progress`,async({page})=>{

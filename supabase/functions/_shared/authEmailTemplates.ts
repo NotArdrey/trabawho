@@ -5,7 +5,7 @@ const securityNote = 'This link is personal to your account. Do not forward it. 
 const authContent: Record<string, EmailLayout> = {
   confirmation: {
     eyebrow: 'Verify your email', title: 'Confirm your email',
-    intro: 'Confirm this email address to continue your TrabaWho registration. Next, verify your identity and submit it for administrator review.',
+    intro: 'Your TrabaWho identity review is approved. Confirm this email address to finish registration and activate account access.',
     action: { label: 'Confirm my email', url: confirmationUrl }, fallbackLink: true,
     footnote: securityNote,
   },

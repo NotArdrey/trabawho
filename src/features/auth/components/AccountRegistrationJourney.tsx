@@ -52,15 +52,15 @@ export function AccountRegistrationJourney({ onDraftChange, onStartedChange }: {
         </div> : !state ? <BaseAccountForm flow={flow} onDraftChange={drafts.account} /> : <>
           <div hidden={step !== 1}><RegistrationStepSummary state={state} step="account" busy={flow.busy} onContinue={() => goTo(2)} /></div>
           <div hidden={step !== 2}>
-            {state.state === 'email_pending' ? <EmailConfirmationStep flow={flow} email={state.email || ''} onDraftChange={drafts.email} />
-              : <RegistrationStepSummary state={state} step="email" busy={flow.busy} onContinue={() => goTo(3)} />}
-          </div>
-          {state.state !== 'email_pending' && <div hidden={step < 3}>
             {['identity_pending', 'identity_in_progress', 'declined'].includes(state.state)
-              ? <IdentityVerificationStep flow={flow} state={state} active={step === 3} onDraftChange={drafts.identity} />
-              : <IdentityResultStep flow={flow} state={state} onDraftChange={drafts.identity} />}
-          </div>}
-          {!['ready', 'identity_review'].includes(state.state) && step > 1 && <Button variant="ghost" className="w-full" disabled={flow.busy} onClick={() => goTo(step - 1)}><ArrowLeft aria-hidden="true" />Back</Button>}
+              ? <IdentityVerificationStep flow={flow} state={state} active={step === 2} onDraftChange={drafts.identity} />
+              : state.state === 'name_pending' ? <IdentityResultStep flow={flow} state={state} onDraftChange={drafts.identity} /> : null}
+          </div>
+          {state.state === 'identity_review' && step === 3 && <IdentityResultStep flow={flow} state={state} onDraftChange={drafts.identity} />}
+          {step === 4 && (state.state === 'email_pending'
+            ? <EmailConfirmationStep flow={flow} email={state.email || ''} onDraftChange={drafts.email} />
+            : state.state === 'ready' ? <IdentityResultStep flow={flow} state={state} /> : null)}
+          {!['ready', 'identity_review', 'email_pending'].includes(state.state) && step > 1 && <Button variant="ghost" className="w-full" disabled={flow.busy} onClick={() => goTo(step - 1)}><ArrowLeft aria-hidden="true" />Back</Button>}
           {step === 1 && <Button variant="ghost" disabled={flow.busy} className="h-auto min-h-11 w-full whitespace-normal text-primary" onClick={() => void flow.startNewRegistration()}>Use a different account</Button>}
         </>}
       </>}

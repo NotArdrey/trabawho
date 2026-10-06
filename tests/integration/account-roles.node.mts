@@ -22,6 +22,7 @@ before(async () => {
     '20261006111000_registration_drafts.sql', '20261006112000_registration_draft_events.sql',
     '20261006121000_registration_review_and_reset.sql',
     '20261007100000_email_first_registration.sql',
+    '20261007120000_registration_review_before_email.sql',
   ]) {
     if (file === '20261006106000_fixed_account_roles.sql') {
       for (let i = 0; i < 2; i++) {
@@ -304,25 +305,25 @@ test('discarding an unfinished draft erases credentials and prevents late approv
   assert.equal((await db.query<{result:boolean}>('select public.discard_registration_draft($1) as result',[submitted.id])).rows[0].result,false);
 });
 
-for (const role of ['client','worker'] as const) test(`V4 ${role} verifies email before identity and still needs human approval`,async()=>{
+for (const role of ['client','worker'] as const) test(`existing V4 ${role} completes identity review before email confirmation`,async()=>{
   const id=await account(role,false,4);
-  const lease=crypto.randomUUID();
-  const evidence={front:'front.png',back:'back.png',selfie:'selfie.png'};
-  // Email delivery can be claimed before any identity evidence exists.
-  assert.equal((await db.query<{email:string}>('select public.claim_pending_account_email($1,$2) as email',[id,'test-nonce'])).rows[0].email,id+'@test.invalid');
-  await assert.rejects(db.query('select public.claim_account_identity_session($1,$2)',[id,lease]),/Confirm your email/);
-  await assert.rejects(db.query('select public.attach_account_identity_session($1,$2,$3,$4)',[id,lease,'forged','https://verification.didit.me/test']),/Confirm your email/);
-  await assert.rejects(db.query('select public.submit_account_manual_review($1,$2,$3,$4)',[id,document,'fp-'+id,evidence]),/Confirm your email/);
+  await assert.rejects(db.query('select public.claim_pending_account_email($1,$2)',[id,'test-nonce']),/after identity approval/);
+  await assert.rejects(db.query('select public.claim_pending_account_email($1,$2,$3)',[id,'test-nonce','changed@example.invalid']),/after identity approval/);
+  assert.equal((await db.query('select email from auth.users where id=$1',[id])).rows[0].email,id+'@test.invalid');
   assert.equal((await db.query('select current_session_id from public.account_registrations where user_id=$1',[id])).rows[0].current_session_id,null);
-  await db.query('update auth.users set email_confirmed_at=now() where id=$1',[id]);
   assert.equal((await db.query('select is_verified from public.profiles where user_id=$1',[id])).rows[0].is_verified,false);
   const session=await approve(id,'fp-'+id);
   assert.deepEqual((await db.query('select verification_status,is_verified from public.profiles where user_id=$1',[id])).rows[0],{verification_status:'PENDING_REVIEW',is_verified:false});
   await assert.rejects(db.query('select public.confirm_account_identity_name($1)',[id]),/needs review/);
   const review=await db.query<{id:string}>('select id from public.manual_identity_reviews where user_id=$1',[id]);
   assert.equal(review.rows.length,1);
+  await assert.rejects(db.query('select public.claim_pending_account_email($1,$2)',[id,'test-nonce']),/after identity approval/);
   await db.query('select public.decide_account_identity_review($1,$2,$3,$4,$5,$6)',
     [review.rows[0].id,await admin(),'APPROVED','Document and selfie reviewed by the administrator.',crypto.randomUUID(),document.fullName]);
+  assert.equal((await db.query('select email_confirmed_at from auth.users where id=$1',[id])).rows[0].email_confirmed_at,null);
+  assert.equal((await db.query('select is_verified from public.profiles where user_id=$1',[id])).rows[0].is_verified,false);
+  assert.equal((await db.query<{email:string}>('select public.claim_pending_account_email($1,$2) as email',[id,'test-nonce'])).rows[0].email,id+'@test.invalid');
+  await db.query('update auth.users set email_confirmed_at=now() where id=$1',[id]);
   assert.equal((await db.query('select is_verified from public.profiles where user_id=$1',[id])).rows[0].is_verified,true);
   // A later trusted provider update preserves the completed human decision.
   await db.query('select public.apply_didit_identity_event($1,$2,$3,$4,$5,$6,$7)',

@@ -1,5 +1,4 @@
-import { createEmailFirstRegistration } from '../_shared/emailFirstRegistration.ts';
-import { ownedDraft, finalizeRegistrationDraft } from '../_shared/registrationDrafts.ts';
+import { createRegistrationDraft, ownedDraft, finalizeRegistrationDraft } from '../_shared/registrationDrafts.ts';
 import { registrationUser, completedRegistrationSession } from "../_shared/pendingRegistrationAccess.ts";
 import { corsHeaders, verifySessionNonce, recordRegistrationAttempt,
   sendEmailConfirmation, jsonResponse, RegistrationRateLimitError } from "../_shared/identityRegistration.ts";
@@ -22,12 +21,15 @@ Deno.serve(async (request: Request) => {
       const profile = await client.from('profiles').select('user_id,identity_required,verification_status,id_document_expiry,account_status').eq('email',email).maybeSingle();
       if (profile.error) throw new AccountError('Email recovery is unavailable. Retry shortly.',503);
       const value = asRecord(profile.data);
-      // Email ownership is checked before identity; restricted accounts stay blocked.
-      if (value.account_status === 'active') await sendEmailConfirmation(email,returnUrl.toString());
+      // Confirmation follows approved identity review; keep recovery responses uniform.
+      const expiry = text(value.id_document_expiry);
+      if (value.account_status === 'active' && (!value.identity_required ||
+        (value.verification_status === 'APPROVED' && (!expiry || expiry >= new Date().toISOString().slice(0,10)))))
+        await sendEmailConfirmation(email,returnUrl.toString());
       // Keep the same response for nonexistent, restricted, and pending accounts.
       return jsonResponse({requested:true});
     }
-    if (body.action === "create") return jsonResponse(await createEmailFirstRegistration(request,client,body));
+    if (body.action === "create") return jsonResponse(await createRegistrationDraft(request,client,body));
     const draft = await ownedDraft(client,body);
     if (draft && !draft.finalized_at) {
       if (body.action === 'discard') {
@@ -47,7 +49,7 @@ Deno.serve(async (request: Request) => {
     if (body.action === 'discard' && body.userId) {
       const user = await registrationUser(request, client, body);
       const state = await registrationState(client, user);
-      // Closing the form clears browser entries; the email-verified account can resume at sign-in.
+      // Closing the form clears browser entries without deleting existing accounts.
       return jsonResponse(['identity_pending', 'identity_in_progress', 'declined'].includes(state.state)
         ? { state: 'identity_pending' } : state);
     }
@@ -72,6 +74,8 @@ Deno.serve(async (request: Request) => {
         throw new AccountError("This pending registration expired. Use Sign in to resume or resend confirmation from there.", 410);
       const result = await client.auth.admin.getUserById(userId); const user = result.data.user;
       if (result.error || !user || user.email_confirmed_at) throw new AccountError("This email is already confirmed. Sign in to continue.", 409);
+      if ((await registrationState(client,user)).state !== 'email_pending')
+        throw new AccountError('Email confirmation is available after identity approval.',409);
       await recordRegistrationAttempt(client, request, { action: "registration_email", email: user.email, userId });
       if (new Date(text(row.email_sent_at)).getTime() > Date.now() - 60000) throw new AccountError("Wait one minute before requesting another confirmation email.", 429);
       let email = user.email || "";

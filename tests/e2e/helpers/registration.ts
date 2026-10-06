@@ -1,7 +1,6 @@
 import { expect, type Page } from '@playwright/test';
 export const corsHeaders = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': '*', 'Access-Control-Allow-Methods': 'POST, OPTIONS' };
 export type JourneyState = { state: string; signupRole?: 'client' | 'worker'; signupName?: string; email?: string; legalName?: string; documentType?: string; sessionId?: string; sessionUrl?: string; nameIssue?: string; requestedName?: string; emailDelivery?: { sent: boolean } };
-const journeys = new WeakMap<Page, { confirmEmail: () => void }>();
 export async function mockAccountJourney(page: Page, initial: JourneyState | null = null, next: JourneyState = {state:'name_pending',legalName:'Maria Isabel de la Cruz Santos',documentType:'passport',sessionId:'didit-owned'}) {
   let state = initial;
   let signupRole = initial?.signupRole;
@@ -17,37 +16,31 @@ export async function mockAccountJourney(page: Page, initial: JourneyState | nul
     requests.push({name,body});
     if(name==='account-registration' && body.action==='create') {
       signupRole = body.signupRole === 'worker' ? 'worker' : 'client';
-      state = { state: 'email_pending', email: String(body.email), signupName: '', signupRole, emailDelivery: { sent: true } };
+      state = { state: 'identity_pending', email: String(body.email), signupName: '', signupRole };
     }
     if(name==='account-registration' && ['resend','change_email'].includes(String(body.action))) state={...state,state:'email_pending',email:body.action==='change_email'?String(body.email):state?.email,emailDelivery:{sent:true}};
     if(name==='account-registration' && body.action==='discard') state={state:'identity_pending'};
     if(name==='account-registration' && body.action==='save_name') state = { ...state, state: 'identity_pending', signupName: String(body.signupName) };
     if(name==='account-registration' && body.action==='state' && body.userId && !state) state={state:'identity_pending',email:String(body.email),signupName:typeof body.signupName === 'string' ? body.signupName : ''};
     if (state?.state === 'email_pending' && ['account-didit-session','account-manual-review','account-identity-name'].includes(name)) {
-      await route.fulfill({status:403,headers:corsHeaders,json:{error:'Confirm your email before identity verification.'}}); return;
+      await route.fulfill({status:409,headers:corsHeaders,json:{error:'Your identity is already approved. Confirm your email to continue.'}}); return;
     }
     if(name==='account-didit-session') state=body.action==='get_session'?next:{state:'identity_in_progress',sessionId:'didit-owned',sessionUrl:'https://verification.didit.me/session/test'};
     if(name==='account-identity-name') state=body.action==='request_correction'?{...state,state:'identity_review',requestedName:String(body.requestedName),nameIssue:'Applicant requested a correction.'}:{state:'ready'};
     if(name==='account-manual-review') state={state:'identity_review',nameIssue:'Manual evidence needs review.'};
-    await route.fulfill({headers:corsHeaders,json:{...state,...(name === 'account-registration' && signupRole ? { signupRole } : {}),...(body.action==='create'?{pendingAccount:{userId:'account-test',nonce:'recovery-test'},emailDelivery:{sent:true}}:{})}});
+    await route.fulfill({headers:corsHeaders,json:{...state,...(name === 'account-registration' && signupRole ? { signupRole } : {}),...(body.action==='create'?{pendingAccount:{userId:'account-test',nonce:'recovery-test'}}:{})}});
   });
-  const confirmEmail = () => { if (state?.state === 'email_pending') state={...state,state:'identity_pending'}; };
-  journeys.set(page,{confirmEmail});
+  const confirmEmail = () => { if (state?.state === 'email_pending') state={...state,state:'ready'}; };
   return {requests,confirmEmail,setState:(value:JourneyState)=>{state=value;}};
 }
-export async function fillRegistration(page: Page, email = 'person@example.com', signupRole: 'client' | 'worker' = 'client', confirmEmail = true) {
+export async function fillRegistration(page: Page, email = 'person@example.com', signupRole: 'client' | 'worker' = 'client') {
   await page.getByRole('radio', { name: signupRole === 'worker' ? 'Worker: Offer services' : 'Client: Book a service', exact: true }).check();
   await page.getByLabel('Email',{exact:true}).fill(email);
   await page.getByLabel('Password',{exact:true}).fill('Password123!');
   await page.getByLabel('Confirm password',{exact:true}).fill('Password123!');
   await page.getByRole('checkbox',{name:'I agree to the Terms and Conditions',exact:true}).check();
   await page.getByRole('button',{name:'Continue',exact:true}).click();
-  await expect(page.getByRole('heading',{name:'Confirm your email',exact:true})).toBeVisible();
-  if (confirmEmail) {
-    journeys.get(page)?.confirmEmail();
-    await page.getByRole('button',{name:'Check email verification',exact:true}).click();
-    await expect(page.getByRole('heading',{name:'Verify your identity',exact:true})).toBeVisible();
-  }
+  await expect(page.getByRole('heading',{name:'Verify your identity',exact:true})).toBeVisible();
 }
 export async function fillSignupName(page: Page, name = 'Maria Isabel de la Cruz Santos') {
   await page.getByLabel('Complete name', { exact: true }).fill(name);

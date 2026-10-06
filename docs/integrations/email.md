@@ -59,16 +59,22 @@ they omit internal account UUIDs. Authentication templates preserve Supabase's
 The email verification screen identifies the confirmation email by its subject,
 `TrabaWho: Confirm your email`, and tells users to click its blue **Confirm my email**
 button. That button uses Supabase's secure signup verification URL, with a copyable
-fallback link. New V4 accounts receive confirmation immediately after saving
-email/password. Email must be confirmed before Didit or manual evidence submission;
-the identity review decision arrives separately afterward. Older V3 pending accounts
-retain confirmation after administrator approval. The updated template copy was
-deployed with the email-first backend correction on 2026-10-07 (Philippine time).
-All six hosted Auth designs match the generated templates; SMTP credentials,
-confirmation requirements, redirects, and email hook settings match the pre-rollout
-configuration. Live rollback checks verify the email and administrator gates for
-both account types. This rollout did not send a diagnostic email or establish
-actual inbox delivery.
+fallback link. Registration follows email/password → Didit → administrator identity
+review → email verification. Current registrations use the maintained encrypted
+draft flow and request confirmation only after identity approval. The email subject
+and button are unchanged; its copy now describes the approved review and final
+account activation. Identity review notifications arrive separately. Existing V4
+accounts from the preceding email-first rollout can complete identity capture first,
+and their confirmation resends also require an approved review. Already-confirmed
+accounts do not require a second inbox link. SMTP credentials, confirmation
+requirements, redirects, and email hook settings are preserved during the correction.
+
+The correction was deployed on 2026-10-07 (Philippine time). All six Auth designs
+match the maintained templates. Live transaction checks verify administrator review
+before confirmation eligibility and inbox confirmation before account access. A
+synthetic deployed registration probe created no Auth account or confirmation email,
+and its temporary encrypted draft was removed after discard. No diagnostic email
+was sent; inbox receipt has not been rehearsed for this correction.
 
 Run `npm run email:design` to generate reviewable HTML in `exports/email-design`.
 After verification, run `npm run email:design -- --apply` to deploy the notification
@@ -91,8 +97,8 @@ actual inbox rendering has not been checked for this design.
 
 ## Events and preferences
 
-New V4 registration sends the secure Supabase Auth confirmation link before identity
-verification. Admin approval sends a link only when the account's email is still
+Current registration sends the secure Supabase Auth confirmation link after identity
+review approval. Admin approval sends a link only when the account's email is still
 unconfirmed, including older pending registrations. Approval never confirms an email automatically,
 including pending accounts from older registration versions. Approval and decline
 also enqueue identity status notifications, which remain enabled for unconfirmed
