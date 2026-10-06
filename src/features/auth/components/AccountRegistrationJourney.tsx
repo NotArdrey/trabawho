@@ -52,7 +52,7 @@ export function AccountRegistrationJourney({ onDraftChange, onStartedChange }: {
           <div hidden={step !== 1}><RegistrationStepSummary state={state} step="account" busy={flow.busy} onContinue={() => goTo(2)} /></div>
           <div hidden={step !== 2}>
             {['identity_pending', 'identity_in_progress', 'declined'].includes(state.state)
-              ? <IdentityVerificationStep flow={flow} state={state} active={step === 2} onDraftChange={drafts.identity} />
+              ? <IdentityVerificationStep flow={flow} state={state} active={step === 2} />
               : <IdentityResultStep flow={flow} state={state} onDraftChange={drafts.identity} />}
           </div>
           {!['ready', 'email_pending', 'identity_review'].includes(state.state) && step > 1 && <Button variant="ghost" className="w-full" disabled={flow.busy} onClick={() => goTo(step - 1)}><ArrowLeft aria-hidden="true" />Back</Button>}
