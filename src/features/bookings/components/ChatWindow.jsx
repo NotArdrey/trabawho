@@ -9,6 +9,7 @@ import { getThemeTokens } from '../../../shared/styles/themeTokens';
 import { useBookingConversation } from '../hooks/useBookingConversation';
 import { BookingMessageComposer } from './BookingMessageComposer';
 import { ChatArchiveBrowser } from './ChatArchiveBrowser';
+import { cn } from '@/lib/utils';
 const normalizeChatKeyPart = (value) => String(value || '').trim().toLowerCase();
 const getChatListKey = (booking = {}, viewerRole = 'buyer') => {
   const otherParticipantKey = viewerRole === 'seller'
@@ -21,8 +22,7 @@ const getChatListKey = (booking = {}, viewerRole = 'buyer') => {
     serviceKey,
   ].map(normalizeChatKeyPart).join('|');
 };
-
-const ChatWindow = ({ appTheme = 'light', booking, onApproveQuote, onRespondQuote, onProposeQuote, onStopServiceAccepted, bookings, onSelectBooking, selectedBookingId, onOpenSlotSelection, onOpenPaymentSelection, onRequestRefund, onConfirmRefundReceived, onLeaveRating, onArchiveChat, onDeleteChat, onChatRestored, viewerRole = 'buyer', initialMobileListOpen = false }) => {
+const ChatWindow = ({ appTheme = 'light', booking, highlighted = false, onApproveQuote, onRespondQuote, onProposeQuote, onStopServiceAccepted, bookings, onSelectBooking, selectedBookingId, onOpenSlotSelection, onOpenPaymentSelection, onRequestRefund, onConfirmRefundReceived, onLeaveRating, onArchiveChat, onDeleteChat, onChatRestored, viewerRole = 'buyer', initialMobileListOpen = false }) => {
   const { messages, setMessages, isLoading, isSending, messageError, send } = useBookingConversation(booking);
   const [hoveredChatId, setHoveredChatId] = useState(null);
   const [activeSidebarPanel, setActiveSidebarPanel] = useState(null);
@@ -448,7 +448,7 @@ const ChatWindow = ({ appTheme = 'light', booking, onApproveQuote, onRespondQuot
         </div>
 
         {/* CENTER COLUMN: Chat Messages */}
-        <div className="booking-chat-thread" style={styles.chatContainer}>
+        <div id="chat-conversation" tabIndex={-1} data-highlighted={highlighted || undefined} className={cn('booking-chat-thread outline outline-2 outline-offset-2 outline-transparent motion-safe:transition-[outline-color] motion-safe:duration-700', highlighted && 'outline-primary')} style={styles.chatContainer}>
           <div style={styles.header}>
             <button
               type="button"

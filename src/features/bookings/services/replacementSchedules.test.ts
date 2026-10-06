@@ -24,7 +24,7 @@ it("uses the confirmed replacement slot as the effective booking schedule", asyn
   slotQuery.in.mockResolvedValue({ data: [{ id: 12, start_ts: "2026-10-10T08:00:00+08:00", end_ts: "2026-10-10T09:00:00+08:00" }], error: null });
   const schedules = await getActiveReplacementSchedules(["booking-1"]);
   expect(visitQuery.in).toHaveBeenCalledWith("status", ["accepted", "delivered", "completed"]);
-  expect(schedules.get("booking-1")).toEqual({ bookingId: "booking-1", caseId: "case-1", status: "accepted",
+  expect(schedules.get("booking-1")).toEqual({ bookingId: "booking-1", caseId: "case-1", status: "accepted", acceptedAt: "2026-10-04T08:00:00Z",
     startAt: "2026-10-10T08:00:00+08:00", endAt: "2026-10-10T09:00:00+08:00" });
 });
 

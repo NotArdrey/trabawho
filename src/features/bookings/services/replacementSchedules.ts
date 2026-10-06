@@ -4,6 +4,7 @@ import type { Database } from "@/integrations/supabase/database.types";
 type Visit = Database["public"]["Tables"]["booking_case_replacement_visits"]["Row"];
 
 export interface ActiveReplacementSchedule {
+  acceptedAt?: string | null;
   bookingId: string;
   caseId: string;
   status: Visit["status"];
@@ -31,6 +32,7 @@ export async function getActiveReplacementSchedules(bookingIds: string[]): Promi
       const slot = slotsById.get(visit.slot_id);
       if (!slot) throw new Error("The confirmed replacement time is not visible to this account. Ask support to check access, then retry.");
       schedules.set(visit.booking_id, {
+        acceptedAt: visit.accepted_at,
         bookingId: visit.booking_id, caseId: visit.case_id, status: visit.status,
         startAt: slot.start_ts, endAt: slot.end_ts,
       });

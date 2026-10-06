@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Link, useLocation, useSearchParams } from "react-router-dom";
 import { ArrowLeft, ArrowRight, Bell, CalendarCheck2, LifeBuoy, MessageCircle, RefreshCw } from "lucide-react";
 import { paths } from "@/app/router/routes";
@@ -8,6 +8,7 @@ import { DataPagination } from "@/components/ui/data-pagination";
 import { SearchFilterBar } from "@/components/ui/search-filter-bar";
 import { WorkflowEmptyState, WorkflowPanel } from "@/components/ui/workflow-panel";
 import DashboardNavigation, { type DashboardNavigationProps } from "@/shared/components/DashboardNavigation";
+import { useTemporaryTargetHighlight } from "@/shared/hooks/useTemporaryTargetHighlight";
 import { useParticipantSupportCases } from "../hooks/useParticipantSupportCases";
 import { ParticipantCaseDetail } from "../components/ParticipantCaseDetail";
 
@@ -29,15 +30,9 @@ export function ParticipantSupportCases(props: DashboardNavigationProps) {
   const selectedId = params.get("case");
   const selectedItem = selectedId ? items.find((item) => item.report.id === selectedId) : undefined;
   const selectedCaseId = selectedItem?.report.id;
-  useEffect(() => {
-    if (!selectedCaseId || location.hash !== "#case-conversation") return;
-    const frame = window.requestAnimationFrame(() => {
-      const target = document.getElementById("case-conversation");
-      target?.scrollIntoView({ block: "start" });
-      target?.focus({ preventScroll: true });
-    });
-    return () => window.cancelAnimationFrame(frame);
-  }, [selectedCaseId, location.hash, location.key]);
+  const highlightConversation = useTemporaryTargetHighlight(
+    "case-conversation", Boolean(selectedCaseId && location.hash === "#case-conversation"), location.key, "start",
+  );
   const visible = items.filter(({ report, serviceTitle, counterpartName }) => {
     if (filter === "active" && report.status === "closed" || filter === "closed" && report.status !== "closed") return false;
     const query = search.trim().toLowerCase();
@@ -64,7 +59,7 @@ export function ParticipantSupportCases(props: DashboardNavigationProps) {
       <div className="mx-auto max-w-5xl space-y-5">
         {selectedId && <Button type="button" variant="ghost" onClick={() => updateParams("case", null)}><ArrowLeft aria-hidden="true" />Back to support cases</Button>}
         {selectedId && !loading && !error && !selectedItem && <div role="alert" className="rounded-xl border bg-card p-6"><p className="font-semibold">This case is not available to your account.</p><p className="mt-1 text-sm text-muted-foreground">Check that you signed in with the account on the booking, or return to your cases.</p></div>}
-        {selectedItem && <div className="grid gap-4"><header><h1 className="text-2xl font-bold">{selectedItem.serviceTitle} support case</h1><p className="mt-1 text-sm text-muted-foreground">{selectedItem.report.case_type.replaceAll("_", " ")} · Reported {new Date(selectedItem.report.created_at).toLocaleString("en-PH")}</p></header><ParticipantCaseDetail item={selectedItem} onUpdated={() => { void refresh(); }} /></div>}
+        {selectedItem && <div className="grid gap-4"><header><h1 className="text-2xl font-bold">{selectedItem.serviceTitle} support case</h1><p className="mt-1 text-sm text-muted-foreground">{selectedItem.report.case_type.replaceAll("_", " ")} · Reported {new Date(selectedItem.report.created_at).toLocaleString("en-PH")}</p></header><ParticipantCaseDetail item={selectedItem} highlightConversation={highlightConversation} onUpdated={() => { void refresh(); }} /></div>}
         {!selectedId && <>
         <header className="flex flex-wrap items-start justify-between gap-3"><div><h1 className="text-3xl font-bold">Support cases</h1><p className="mt-2 text-sm text-muted-foreground">Track disputes and reported problems for services you booked or provided.</p></div><Button variant="outline" disabled={loading} onClick={() => { void refresh(); }}><RefreshCw aria-hidden="true" />Refresh cases</Button></header>
         <p className="text-sm text-muted-foreground">Open a case to review the report, support updates, rework steps, and refund progress.</p>

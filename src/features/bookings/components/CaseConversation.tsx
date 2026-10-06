@@ -5,6 +5,7 @@ import { SelectField } from "@/components/forms";
 import { Button } from "@/components/ui/button";
 import { FilePicker } from "@/components/ui/file-picker";
 import { Badge } from "@/components/ui/badge";
+import { cn } from "@/lib/utils";
 import { PrivateEvidencePreview } from "@/shared/components/PrivateEvidencePreview";
 import { useBookingActivity } from "@/features/bookings/hooks/useBookingActivity";
 import { getCaseConversation, markCaseRead, openCaseImage, sendCaseMessage,
@@ -12,8 +13,8 @@ import { getCaseConversation, markCaseRead, openCaseImage, sendCaseMessage,
 
 const date = (value: string) => new Date(value).toLocaleString("en-PH", { dateStyle: "medium", timeStyle: "short" });
 
-export function CaseConversation({ caseId, bookingId, viewerRole, closed = false, readOnly = false, onChanged }: {
-  caseId: string; bookingId: string; viewerRole: "admin" | "client" | "provider"; closed?: boolean; readOnly?: boolean; onChanged?: () => void;
+export function CaseConversation({ caseId, bookingId, viewerRole, closed = false, readOnly = false, highlighted = false, onChanged }: {
+  caseId: string; bookingId: string; viewerRole: "admin" | "client" | "provider"; closed?: boolean; readOnly?: boolean; highlighted?: boolean; onChanged?: () => void;
 }) {
   const [messages, setMessages] = useState<CaseMessage[]>([]);
   const [visits, setVisits] = useState<ReplacementVisit[]>([]);
@@ -56,7 +57,7 @@ export function CaseConversation({ caseId, bookingId, viewerRole, closed = false
     finally { setPending(false); }
   };
 
-  return <section id="case-conversation" tabIndex={-1} aria-label="Case conversation" className="grid scroll-mt-24 gap-4 rounded-xl border bg-primary/5 p-4 outline-none focus-visible:ring-2 focus-visible:ring-ring sm:p-5">
+  return <section id="case-conversation" tabIndex={-1} aria-label="Case conversation" data-highlighted={highlighted || undefined} className={cn("grid scroll-mt-24 gap-4 rounded-xl border bg-primary/5 p-4 outline outline-2 outline-offset-2 outline-transparent motion-safe:transition-[outline-color] motion-safe:duration-700 focus-visible:ring-2 focus-visible:ring-ring sm:p-5", highlighted && "outline-primary")}>
     <div className="flex flex-wrap items-center justify-between gap-2"><div><h3 className="flex items-center gap-2 font-semibold text-primary"><MessageSquareText className="size-4" aria-hidden="true" />Case conversation</h3><p className="mt-1 text-xs text-muted-foreground">Updates here are visible to their selected recipient. Private admin notes are separate.</p></div><div className="flex items-center gap-2">{unread > 0 && <Badge variant="brand">{unread} new</Badge>}<Button type="button" variant="outline" size="sm" className="min-h-11" disabled={loading} onClick={() => { void refresh(); }}><RefreshCw aria-hidden="true" />Refresh</Button></div></div>
     {loading && <p role="status" className="text-sm text-muted-foreground">Loading case updates…</p>}
     {error && <p role="alert" className="rounded-lg bg-destructive/10 p-3 text-sm text-destructive">{error}</p>}

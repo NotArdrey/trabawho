@@ -68,7 +68,9 @@ function WorkflowEmptyState({ action, className, description, icon: Icon, title,
 
 export interface WorkflowStatItem {
   id: string;
+  icon?: LucideIcon;
   label: ReactNode;
+  tone?: WorkflowTone;
   value: ReactNode;
 }
 
@@ -80,9 +82,12 @@ function WorkflowStatGrid({ className, items, ...props }: WorkflowStatGridProps)
   return (
     <dl className={cn("grid grid-cols-2 bg-muted/15 lg:grid-cols-4", className)} {...props}>
       {items.map((item, index) => (
-        <div key={item.id} className={cn("flex min-h-24 flex-col justify-center px-4 py-4", index % 2 === 1 && "border-l", index >= 2 && "border-t", index > 0 && "lg:border-l", "lg:border-t-0")}>
-          <dt className="text-xs font-medium leading-4 text-muted-foreground">{item.label}</dt>
-          <dd className="order-first mb-1 text-xl font-bold tracking-tight text-foreground">{item.value}</dd>
+        <div key={item.id} className={cn("flex min-h-28 items-center gap-3 px-4 py-4", index % 2 === 1 && "border-l", index >= 2 && "border-t", index > 0 && "lg:border-l", "lg:border-t-0")}>
+          {item.icon ? <span className={cn("flex size-10 shrink-0 items-center justify-center rounded-lg", toneStyles[item.tone ?? "primary"].icon)}><item.icon className="size-5" aria-hidden="true" /></span> : null}
+          <div className="flex min-w-0 flex-col">
+            <dt className="order-2 text-xs font-medium leading-4 text-muted-foreground">{item.label}</dt>
+            <dd className="order-1 mb-1 text-xl font-bold tracking-tight text-foreground">{item.value}</dd>
+          </div>
         </div>
       ))}
     </dl>

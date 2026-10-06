@@ -25,6 +25,7 @@ When documents disagree, follow the highest applicable document and update the l
 
 ## Active roadmaps
 
+- [`roadmaps/registration-frontend-redesign.md`](roadmaps/registration-frontend-redesign.md) — preserved registration UI reference and navigation redesign handoff.
 - [`roadmaps/booking-transactions.md`](roadmaps/booking-transactions.md) — booking lifecycle, PayMongo integration, refunds, disputes, and provider payouts.
 - [`roadmaps/admin-operations.md`](roadmaps/admin-operations.md) — admin support workflows, exception handling, moderation, and launch gates.
 

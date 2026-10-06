@@ -1,3 +1,7 @@
+import { isBookingTerminal } from "@/features/bookings/utils/bookingFilters";
+import { buildClientBookingActions } from "@/features/dashboard/domain/clientNextSteps";
+import { parsePhilippineSlot, philippineDayKey } from "@/shared/lib/philippineDateTime";
+
 export type DashboardMetricId = "active" | "upcoming" | "messages" | "actions";
 
 interface DashboardRawBooking {
@@ -7,11 +11,18 @@ interface DashboardRawBooking {
 }
 
 export interface DashboardBooking {
+  activeReplacementAcceptedAt?: string;
+  activeReplacementStartAt?: string;
   canRate?: boolean;
+  cashCollectionStatus?: string;
+  deliveryStatus?: string;
   id?: string | number;
+  paymentMethod?: string;
+  paymentStatus?: string;
   paymentProofSubmitted?: boolean;
   raw?: { booking?: DashboardRawBooking };
   requestDate?: string;
+  refundSimulated?: boolean;
   selectedSlot?: {
     date?: string;
     dateKey?: string;
@@ -56,6 +67,7 @@ export interface DashboardMetric {
 
 export interface UpcomingBooking {
   id: string | number | null;
+  isReplacement: boolean;
   provider: string;
   schedule: string;
   service: string;
@@ -63,7 +75,9 @@ export interface UpcomingBooking {
 }
 
 export interface RecentUpdate {
+  category: "message" | "visit" | "payment" | "refund" | "support" | "cancelled" | "general";
   detail: string;
+  href?: string;
   id: string;
   time: string;
   title: string;
@@ -77,16 +91,18 @@ export const emptyDashboardData: DashboardSnapshot = {
   unreadMessageCount: 0,
 };
 
-const terminalStatuses = new Set(["Completed Service", "Service Stopped", "Cancelled", "Cancelled (Cash)", "Refunded"]);
-const scheduledStatuses = new Set(["Service Scheduled", "Payment Confirmed", "Payment Submitted", "Cash Verification Pending", "Cash Verification Denied", "Active Service"]);
-const clientActionStatuses = new Set(["Awaiting Slot Selection", "Payment Pending", "Slot Selected - Payment Pending", "Cash Verification Denied"]);
+const filterableBooking = (booking: DashboardBooking) => ({ ...booking, status: booking.status || "" });
 
 function getBookingUpdatedAt(booking: DashboardBooking) {
   const raw = booking.raw?.booking || {};
-  return raw.updated_at || raw.created_at || booking.requestDate || null;
+  return booking.activeReplacementAcceptedAt || raw.updated_at || raw.created_at || booking.requestDate || null;
 }
 
 function getBookingStartDate(booking: DashboardBooking) {
+  if (booking.activeReplacementStartAt) {
+    const replacement = new Date(booking.activeReplacementStartAt);
+    return Number.isNaN(replacement.getTime()) ? null : replacement;
+  }
   const rawStart = booking.raw?.booking?.start_ts || booking.startTs;
   if (rawStart) {
     const parsed = new Date(rawStart);
@@ -95,27 +111,19 @@ function getBookingStartDate(booking: DashboardBooking) {
   const selectedDate = booking.selectedSlot?.date || booking.selectedSlot?.dateKey;
   const startTime = booking.selectedSlot?.timeBlock?.startTime;
   if (!selectedDate) return null;
-  const parsed = new Date(`${selectedDate}T${startTime || "00:00"}:00`);
-  return Number.isNaN(parsed.getTime()) ? null : parsed;
+  return parsePhilippineSlot(selectedDate, startTime);
 }
 
-function formatDayLabel(date: Date | null) {
-  if (!date) return "Coordinated through chat";
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const target = new Date(date);
-  target.setHours(0, 0, 0, 0);
-  const diffDays = Math.round((target.getTime() - today.getTime()) / 86400000);
+function formatDayLabel(date: Date, now: Date) {
+  const diffDays = Math.round((Date.parse(`${philippineDayKey(date)}T00:00:00Z`) - Date.parse(`${philippineDayKey(now)}T00:00:00Z`)) / 86400000);
   if (diffDays === 0) return "Today";
   if (diffDays === 1) return "Tomorrow";
-  return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+  return date.toLocaleDateString("en-PH", { timeZone: "Asia/Manila", month: "short", day: "numeric" });
 }
 
-function formatSchedule(booking: DashboardBooking) {
-  const startDate = getBookingStartDate(booking);
-  if (!startDate) return "Coordinated through chat";
-  const time = startDate.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
-  return `${formatDayLabel(startDate)}, ${time}`;
+function formatSchedule(date: Date, now: Date) {
+  const time = date.toLocaleTimeString("en-PH", { timeZone: "Asia/Manila", hour: "numeric", minute: "2-digit" });
+  return `${formatDayLabel(date, now)}, ${time}`;
 }
 
 function formatTimeAgo(value?: string | null) {
@@ -135,25 +143,56 @@ function getMessagePreview(message: DashboardMessage) {
   return String(message.body ?? message.content ?? "").trim() || "New message in chat";
 }
 
-export function buildDashboardModel(data: DashboardSnapshot, isLoading: boolean) {
+function bookingUpdateTitle(booking: DashboardBooking) {
+  if (booking.refundSimulated) return "Test refund recorded";
+  if (booking.paymentStatus === "refund_pending") return "Refund review in progress";
+  if (booking.paymentStatus === "refunded") return "Refund result recorded";
+  if (["Cancelled", "Cancelled (Cash)"].includes(booking.status || "")) return "Booking cancelled";
+  if (booking.status === "Dispute Open") return booking.activeReplacementStartAt && getBookingStartDate(booking) ? "Replacement visit confirmed" : "Support case open";
+  if (booking.status === "Refund Processing") return "Refund review in progress";
+  if (booking.status === "Refund Pending") return "Refund review in progress";
+  if (booking.status === "Completed Service") return "Service completed";
+  if (booking.canRate) return "Review window open";
+  if (booking.status === "Payment Confirmed") return "Payment confirmed";
+  if (booking.status === "Reservation Expired") return "Choose a new time";
+  if (booking.status === "Service Delivered") return "Service marked delivered";
+  if (["Payment Submitted", "Cash Verification Pending"].includes(booking.status || "")) return "Payment submitted for review";
+  return "Booking updated";
+}
+
+function bookingUpdateDetail(booking: DashboardBooking, now: Date) {
+  if (booking.refundSimulated) return `${booking.serviceType || "Service"} · No real money returned`;
+  const replacement = booking.activeReplacementStartAt ? getBookingStartDate(booking) : null;
+  return `${booking.serviceType || "Service"} · ${replacement ? `New visit ${formatSchedule(replacement, now)} PHT` : booking.status || "Updated"}`;
+}
+
+function bookingUpdateCategory(booking: DashboardBooking): RecentUpdate["category"] {
+  if (booking.refundSimulated || ["refunded", "refund_pending"].includes(booking.paymentStatus || "") || ["Refund Processing", "Refund Pending"].includes(booking.status || "")) return "refund";
+  if (["Cancelled", "Cancelled (Cash)"].includes(booking.status || "")) return "cancelled";
+  if (booking.status === "Dispute Open") return booking.activeReplacementStartAt ? "visit" : "support";
+  if (["Payment Confirmed", "Payment Submitted", "Cash Verification Pending"].includes(booking.status || "")) return "payment";
+  if (["Reservation Expired", "Service Delivered", "Completed Service"].includes(booking.status || "")) return "visit";
+  return "general";
+}
+
+export function buildDashboardModel(data: DashboardSnapshot, isLoading: boolean, now = new Date()) {
   const bookings = data.bookings || [];
   const messages = data.messages || [];
-  const now = new Date();
   const bookingById = Object.fromEntries(bookings.map((booking) => [String(booking.id), booking]));
   const conversationById = Object.fromEntries((data.conversations || []).map((conversation) => [String(conversation.id), conversation]));
-  const activeBookings = bookings.filter((booking) => !terminalStatuses.has(booking.status || ""));
-  const awaitingReplyCount = activeBookings.filter((booking) => ["Negotiating", "Awaiting Slot Selection", "Payment Pending", "Slot Selected - Payment Pending"].includes(booking.status || "")).length;
-  const upcomingBookings: UpcomingBooking[] = bookings
+  const activeBookings = bookings.filter((booking) => !isBookingTerminal(filterableBooking(booking)));
+  const upcoming = bookings
     .map((booking) => ({ booking, startDate: getBookingStartDate(booking) }))
-    .filter(({ booking, startDate }) => !terminalStatuses.has(booking.status || "") && (scheduledStatuses.has(booking.status || "") || Boolean(startDate)) && (!startDate || startDate.getTime() >= now.getTime() - 86400000))
-    .sort((a, b) => !a.startDate ? 1 : !b.startDate ? -1 : a.startDate.getTime() - b.startDate.getTime())
+    .filter((entry): entry is { booking: DashboardBooking; startDate: Date } => !isBookingTerminal(filterableBooking(entry.booking)) && (entry.booking.status !== "Dispute Open" || Boolean(entry.booking.activeReplacementStartAt)) && Boolean(entry.startDate) && entry.startDate!.getTime() >= now.getTime())
+    .sort((a, b) => a.startDate.getTime() - b.startDate.getTime());
+  const upcomingBookings: UpcomingBooking[] = upcoming
     .slice(0, 3)
-    .map(({ booking }) => ({ id: booking.id ?? null, service: booking.serviceType || "Service", provider: booking.workerName || "Provider", schedule: formatSchedule(booking), status: booking.status || "Pending" }));
-  const actionNeededCount = bookings.filter((booking) => clientActionStatuses.has(booking.status || "") || Boolean(booking.canRate)).length;
+    .map(({ booking, startDate }) => ({ id: booking.id ?? null, service: booking.serviceType || "Service", provider: booking.workerName || "Provider", schedule: formatSchedule(startDate, now), status: booking.status || "Pending", isReplacement: Boolean(booking.activeReplacementStartAt) }));
+  const actionNeededCount = buildClientBookingActions(bookings).length;
   const loadingBookings = isLoading && bookings.length === 0;
   const metrics: DashboardMetric[] = [
-    { id: "active", label: "Active bookings", value: loadingBookings ? "..." : String(activeBookings.length), detail: loadingBookings ? "Loading bookings" : `${awaitingReplyCount} awaiting provider reply` },
-    { id: "upcoming", label: "Upcoming bookings", value: loadingBookings ? "..." : String(upcomingBookings.length), detail: loadingBookings ? "Loading schedule" : upcomingBookings[0] ? `Next service ${upcomingBookings[0].schedule.toLowerCase()}` : "No scheduled services" },
+    { id: "active", label: "Active bookings", value: loadingBookings ? "..." : String(activeBookings.length), detail: loadingBookings ? "Loading bookings" : "Requests and visits in progress" },
+    { id: "upcoming", label: "Upcoming visits", value: loadingBookings ? "..." : String(upcoming.length), detail: loadingBookings ? "Loading schedule" : upcomingBookings[0] ? `Next visit ${upcomingBookings[0].schedule} PHT` : "No upcoming visits" },
     { id: "messages", label: "Unread messages", value: isLoading && messages.length === 0 ? "..." : String(data.unreadMessageCount || 0), detail: isLoading && messages.length === 0 ? "Loading chats" : data.unreadMessageCount ? "Across active chats" : "No unread messages" },
     { id: "actions", label: "Action needed", value: loadingBookings ? "..." : String(actionNeededCount), detail: loadingBookings ? "Checking bookings" : actionNeededCount ? "Review booking updates" : "You're all caught up" },
   ];
@@ -161,18 +200,21 @@ export function buildDashboardModel(data: DashboardSnapshot, isLoading: boolean)
     const conversation = conversationById[String(message.conversation_id)];
     const booking = bookingById[String(conversation?.booking_id)];
     const fromCurrentUser = data.user?.id && String(message.sender_id) === String(data.user.id);
-    return { id: `message-${String(message.id)}`, title: fromCurrentUser ? "Message sent" : "Provider message received", detail: `${booking?.serviceType || "Booking"} · ${getMessagePreview(message)}`, time: formatTimeAgo(message.created_at), sortDate: message.created_at };
+    return { id: `message-${String(message.id)}`, category: "message" as const, title: fromCurrentUser ? "Message sent" : "Provider message received", detail: `${booking?.serviceType || "Booking"} · ${getMessagePreview(message)}`, time: formatTimeAgo(message.created_at), sortDate: message.created_at,
+      href: conversation?.booking_id ? `/messages/${encodeURIComponent(String(conversation.booking_id))}?scope=purchases&focus=conversation` : undefined };
   });
   const bookingUpdates = bookings.map((booking) => ({
     id: `booking-${String(booking.id)}`,
-    title: booking.status === "Refund Processing" ? "Refund request updated" : booking.paymentProofSubmitted ? "Payment proof received" : booking.canRate ? "Review window open" : "Booking updated",
-    detail: `${booking.serviceType || "Service"} · ${booking.status || "Updated"}`,
+    category: bookingUpdateCategory(booking),
+    title: bookingUpdateTitle(booking),
+    detail: bookingUpdateDetail(booking, now),
+    href: booking.id != null ? `/bookings?scope=purchases&filter=all&q=${encodeURIComponent(String(booking.id))}&focus=${encodeURIComponent(String(booking.id))}` : undefined,
     time: formatTimeAgo(getBookingUpdatedAt(booking)),
     sortDate: getBookingUpdatedAt(booking),
   }));
   const recentUpdates: RecentUpdate[] = [...messageUpdates, ...bookingUpdates]
     .sort((a, b) => new Date(b.sortDate || 0).getTime() - new Date(a.sortDate || 0).getTime())
     .slice(0, 3)
-    .map(({ id, title, detail, time }) => ({ id, title, detail, time }));
-  return { metrics, upcomingBookings, recentUpdates };
+    .map(({ id, category, title, detail, time, href }) => ({ id, category, title, detail, time, href }));
+  return { metrics, upcomingBookings, upcomingCount: upcoming.length, recentUpdates };
 }

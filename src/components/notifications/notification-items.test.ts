@@ -15,9 +15,11 @@ describe("notification destinations", () => {
     const booking = { id: "booking-123", buyer_id: "client-1", seller_id: "provider-1",
       status: "confirmed", updated_at: "2026-10-04T01:00:00Z" } as Booking;
     expect(bookingNotification(booking, "client-1", new Set()).href)
-      .toBe("/bookings?scope=purchases&q=booking-123");
+      .toBe("/bookings?scope=purchases&filter=all&q=booking-123&focus=booking-123");
     expect(bookingNotification(booking, "provider-1", new Set()).href)
-      .toBe("/worker/bookings?scope=incoming&q=booking-123");
+      .toBe("/worker/bookings?scope=incoming&filter=all&q=booking-123&focus=booking-123");
+    expect(bookingNotification({ ...booking, status: "cancelled" }, "provider-1", new Set()).href)
+      .toBe("/worker/bookings?scope=incoming&filter=all&q=booking-123&focus=booking-123");
   });
 
   it("opens the message's actual conversation instead of a general inbox", () => {
@@ -26,9 +28,9 @@ describe("notification destinations", () => {
     const message = { id: "message-1", conversation_id: "conversation-1", body: "Hello",
       read_by: null, created_at: "2026-10-04T01:00:00Z" } as Message;
     expect(messageNotification(message, conversation, "client-1", new Set()).href)
-      .toBe("/messages/booking-123?scope=purchases");
+      .toBe("/messages/booking-123?scope=purchases&focus=conversation");
     expect(messageNotification(message, conversation, "provider-1", new Set()).href)
-      .toBe("/messages/booking-123?scope=incoming");
+      .toBe("/messages/booking-123?scope=incoming&focus=conversation");
   });
 
   it("opens the exact case conversation and uses server-owned read status", () => {
@@ -46,9 +48,9 @@ describe("notification destinations", () => {
     const booking = { id: "booking-123", buyer_id: "client-1", seller_id: "provider-1" } as Booking;
     const quote = { id: "quote-1", booking_id: "booking-123", status: "proposed", updated_at: "2026-10-04T01:00:00Z" } as Quote;
     expect(quoteNotification(quote, booking, "client-1", new Set())?.href)
-      .toBe("/messages/booking-123?scope=purchases");
+      .toBe("/messages/booking-123?scope=purchases&focus=conversation");
     expect(quoteNotification(quote, booking, "provider-1", new Set())).toBeNull();
     expect(quoteNotification({ ...quote, status: "changes_requested" }, booking, "provider-1", new Set())?.href)
-      .toBe("/messages/booking-123?scope=incoming");
+      .toBe("/messages/booking-123?scope=incoming&focus=conversation");
   });
 });

@@ -63,14 +63,14 @@ function MetricCard({ actionLabel, detail, icon: Icon, label, onClick, tone = "b
           <ArrowUpRight className="size-3.5" />
         </span>
       ) : null}
-      <CardContent className="relative flex items-start gap-2.5 p-3 pr-9 sm:gap-3 sm:p-4 sm:pr-11">
+      <CardContent className="relative grid grid-cols-[auto_minmax(0,1fr)] gap-x-2 gap-y-1 p-3 pr-9 sm:flex sm:items-start sm:gap-3 sm:p-4 sm:pr-11">
         <span className={cn("flex size-9 shrink-0 items-center justify-center rounded-lg sm:size-10", styles.icon)}>
           <Icon className="size-5" aria-hidden="true" />
         </span>
-        <div className="min-w-0">
-          <p className="text-xl font-bold tracking-tight sm:text-2xl">{value}</p>
-          <h2 className="text-sm font-semibold leading-tight">{label}</h2>
-          {detail ? <p className="mt-1 line-clamp-2 text-xs leading-4 text-muted-foreground sm:max-w-[12rem] sm:leading-5">{detail}</p> : null}
+        <div className="contents sm:block sm:min-w-0">
+          <p className="col-start-2 row-start-1 self-center text-xl font-bold tracking-tight sm:text-2xl">{value}</p>
+          <h2 className="col-span-2 text-sm font-semibold leading-tight">{label}</h2>
+          {detail ? <p className="col-span-2 line-clamp-2 text-xs leading-4 text-muted-foreground sm:mt-1 sm:max-w-[12rem] sm:leading-5">{detail}</p> : null}
         </div>
       </CardContent>
     </>

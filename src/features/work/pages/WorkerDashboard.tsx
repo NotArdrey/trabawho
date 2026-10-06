@@ -8,8 +8,6 @@ import {
   ListChecks,
   MessageSquareText,
   RefreshCw,
-  Star,
-  Store,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
@@ -17,10 +15,11 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { MetricCard } from "@/components/ui/metric-card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { WorkflowEmptyState, WorkflowPanel, WorkflowStatGrid } from "@/components/ui/workflow-panel";
+import { WorkflowPanel } from "@/components/ui/workflow-panel";
 import DashboardNavigation from "@/shared/components/DashboardNavigation";
+import { ProviderServicesPanel } from "@/features/work/components/ProviderServicesPanel";
 import { useProviderDashboard } from "@/features/work/hooks/useProviderDashboard";
-import type { ProviderActionItem, ProviderScheduleItem, ProviderServiceHealth } from "@/features/work/types/provider-dashboard";
+import type { ProviderActionItem, ProviderScheduleItem } from "@/features/work/types/provider-dashboard";
 import { providerActionPath, providerBookingPath } from "@/features/work/domain/providerQuickNav";
 import { paths } from "@/app/router/routes";
 
@@ -67,7 +66,6 @@ const metricActionLabels = {
   inquiries: "Open incoming bookings",
   today: "Open today's incoming bookings",
   messages: "Open client messages",
-  earnings: "Open earnings in My Work",
 } as const;
 
 function DashboardSkeleton() {
@@ -84,30 +82,31 @@ function AttentionPanel({ actions, onOpen }: { actions: readonly ProviderActionI
           {action.status ? <Badge variant="outline" className="hidden shrink-0 sm:inline-flex">{action.status}</Badge> : null}
           <ArrowRight className="size-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5 group-hover:text-primary" aria-hidden="true" />
         </button>
-      ))}</div> : <WorkflowEmptyState icon={ListChecks} title="You're all caught up" description="New requests and account actions will appear here." tone="success" />}
+      ))}</div> : <div className="flex items-start gap-3 px-4 py-5 sm:px-5"><span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-200"><ListChecks className="size-5" aria-hidden="true" /></span><div><h3 className="font-semibold">You’re all caught up</h3><p className="mt-1 text-sm text-muted-foreground">Requests that need a response will appear here.</p></div></div>}
     </WorkflowPanel>
   );
 }
 
-function SchedulePanel({ items, nextAppointment, onOpenBooking, onManageAvailability }: { items: readonly ProviderScheduleItem[]; nextAppointment: ProviderScheduleItem | null; onOpenBooking: (bookingId: string) => void; onManageAvailability?: () => void }) {
-  return (
-    <WorkflowPanel icon={CalendarCheck} title="Today's schedule" description={items.length ? `${items.length} job${items.length === 1 ? "" : "s"} scheduled` : "No jobs scheduled today"} tone="primary">
-      {items.length ? <div className="divide-y px-2 py-1">{items.slice(0, 4).map((item) => <button key={item.id} type="button" className="group flex min-h-[68px] w-full items-start gap-3 rounded-lg px-2 py-3 text-left hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:px-3" onClick={() => onOpenBooking(item.bookingId)}><Clock3 className="mt-0.5 size-4 shrink-0 text-primary" aria-hidden="true" /><span className="min-w-0 flex-1"><strong className="block text-sm">{item.service}</strong><span className="mt-1 block text-xs leading-5 text-muted-foreground">{item.client} · {item.schedule}</span></span><ArrowRight className="mt-1 size-4 shrink-0 text-muted-foreground group-hover:text-primary" aria-hidden="true" /></button>)}</div> : <WorkflowEmptyState icon={CalendarCheck} title="Your day is clear" description="Set availability so clients can book a time that works for you." tone="primary" action={<Button type="button" size="sm" onClick={onManageAvailability}>Manage availability</Button>} />}
-      {nextAppointment && !items.some((item) => item.id === nextAppointment.id) ? <button type="button" className="group flex min-h-20 w-full items-center justify-between gap-3 border-t bg-muted/20 px-4 py-4 text-left hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring sm:px-5" onClick={() => onOpenBooking(nextAppointment.bookingId)}><span><span className="block text-xs font-bold uppercase tracking-wide text-muted-foreground">Next appointment</span><span className="mt-2 block text-sm font-semibold">{nextAppointment.service}</span><span className="mt-1 block text-xs text-muted-foreground">{nextAppointment.client} · {nextAppointment.schedule}</span></span><ArrowRight className="size-4 shrink-0 text-muted-foreground group-hover:text-primary" aria-hidden="true" /></button> : null}
-    </WorkflowPanel>
-  );
+function ProviderVisitRow({ item, next = false, onOpen }: { item: ProviderScheduleItem; next?: boolean; onOpen: (bookingId: string) => void }) {
+  return <button type="button" className="group flex min-h-20 w-full items-start gap-3 px-4 py-4 text-left transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring sm:px-5" onClick={() => onOpen(item.bookingId)}>
+    <Clock3 className="mt-0.5 size-4 shrink-0 text-primary" aria-hidden="true" />
+    <span className="min-w-0 flex-1">
+      {next && <span className="mb-1 block text-xs font-semibold text-primary">Next appointment</span>}
+      <strong className="block text-sm text-foreground">{item.service}</strong>
+      <span className="mt-1 block text-sm text-muted-foreground">{item.client} · <span className="font-semibold text-foreground">{item.schedule}</span></span>
+      {item.supportCaseOpen && <span className="mt-1 block text-xs text-muted-foreground">Agreed new time · Support case open</span>}
+      <Badge variant={item.status === "Replacement visit confirmed" ? "default" : item.status === "Payment Confirmed" ? "success" : "outline"} className="mt-2">{item.status}</Badge>
+    </span>
+    <ArrowRight className="mt-1 size-4 shrink-0 text-muted-foreground group-hover:text-primary" aria-hidden="true" />
+  </button>;
 }
 
-function ServiceHealthPanel({ health, onManageServices }: { health: ProviderServiceHealth; onManageServices?: () => void }) {
-  const action = <Button type="button" size="sm" onClick={onManageServices}><Store aria-hidden="true" />Manage services</Button>;
+function SchedulePanel({ items, nextAppointment, onOpenBooking, onOpenAll, onManageAvailability }: { items: readonly ProviderScheduleItem[]; nextAppointment: ProviderScheduleItem | null; onOpenBooking: (bookingId: string) => void; onOpenAll: () => void; onManageAvailability?: () => void }) {
   return (
-    <WorkflowPanel icon={Store} title="Service health" description="Live status for your published services and availability." tone="neutral" action={action}>
-      <WorkflowStatGrid aria-label="Service health statistics" items={[
-        { id: "listings", label: "Active listings", value: <>{health.activeListings} <span className="text-sm font-medium text-muted-foreground">of {health.totalListings}</span></> },
-        { id: "slots", label: "Available slots", value: health.availableSlots },
-        { id: "rating", label: "Provider rating", value: <span className="inline-flex items-center gap-1"><Star className="size-4 fill-brand-highlight text-brand-highlight" aria-hidden="true" />{health.rating ?? "—"}</span> },
-        { id: "reviews", label: "Published reviews", value: health.reviewCount },
-      ]} />
+    <WorkflowPanel icon={CalendarCheck} title="Today's schedule" description={items.length ? `${items.length} visit${items.length === 1 ? "" : "s"} today · Philippine time` : "No visits today · Philippine time"} tone="primary" action={<Button type="button" variant="outline" onClick={onOpenAll}>View bookings<ArrowRight aria-hidden="true" /></Button>}>
+      {items.length ? <div className="divide-y">{items.slice(0, 4).map((item) => <ProviderVisitRow key={item.id} item={item} onOpen={onOpenBooking} />)}{items.length > 4 && <p className="px-4 py-3 text-sm text-muted-foreground sm:px-5">Showing 4 of {items.length} visits today. View bookings for the full schedule.</p>}</div>
+        : <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-5 text-sm text-muted-foreground sm:px-5"><p>{nextAppointment ? "Your next appointment is below." : "No appointments are scheduled for today."}</p>{!nextAppointment && onManageAvailability && <Button type="button" variant="outline" size="sm" onClick={onManageAvailability}>Manage availability</Button>}</div>}
+      {nextAppointment && !items.some((item) => item.id === nextAppointment.id) && <div className="border-t bg-muted/20"><ProviderVisitRow item={nextAppointment} next onOpen={onOpenBooking} /></div>}
     </WorkflowPanel>
   );
 }
@@ -134,15 +133,14 @@ function WorkerDashboard({
   const { snapshot, isLoading, error, refresh } = useProviderDashboard(userId, sellerProfile);
 
   const openAction = (action: ProviderActionItem) => {
-    if (action.destination === "messages") onOpenChatPage?.(action.bookingId || action.conversationId || null, "incoming");
-    else { const path = providerActionPath(action); if (path) void navigate(path); }
+    const path = providerActionPath(action);
+    if (path) void navigate(path);
   };
 
   const openMetric = (metricId: keyof typeof metricIcons) => {
     if (metricId === "messages") onOpenChatPage?.(null, "incoming");
     else if (metricId === "inquiries") void navigate(`${paths.workerBookings}?scope=incoming&filter=inquiries`);
     else if (metricId === "today") onOpenMyBookings?.();
-    else onOpenMyWork?.();
   };
 
   return (
@@ -172,7 +170,7 @@ function WorkerDashboard({
             <section className="flex flex-col justify-between gap-4 md:flex-row md:items-center" aria-labelledby="provider-dashboard-title">
               <div className="min-w-0">
                 <h1 id="provider-dashboard-title" className="text-3xl font-bold tracking-tight md:text-4xl">Good to see you, {snapshot?.providerName || "Provider"}.</h1>
-                <p className="mt-2 max-w-2xl text-muted-foreground">Review work that needs attention, today’s schedule, and the health of your services.</p>
+                <p className="mt-2 max-w-2xl text-muted-foreground">Review requests, upcoming visits, and how your services are performing.</p>
               </div>
               <Button type="button" className="hidden md:inline-flex" onClick={snapshot?.hasProviderSetup ? onOpenMyWork : onOpenSellerSetup}>
                 <BriefcaseBusiness aria-hidden="true" />{snapshot?.hasProviderSetup ? "Manage My Work" : "Complete provider setup"}
@@ -184,15 +182,15 @@ function WorkerDashboard({
             {snapshot ? (
               <>
                 <section className="grid grid-cols-2 gap-3 lg:grid-cols-4" aria-label="Provider summary">
-                  {snapshot.metrics.map((metric) => <MetricCard key={metric.id} actionLabel={metricActionLabels[metric.id]} detail={metric.detail} icon={metricIcons[metric.id]} label={metric.label} onClick={() => openMetric(metric.id)} tone={metricTones[metric.id]} value={metric.value} />)}
+                  {snapshot.metrics.map((metric) => <MetricCard key={metric.id} actionLabel={metric.id === "earnings" ? undefined : metricActionLabels[metric.id]} detail={metric.detail} icon={metricIcons[metric.id]} label={metric.label} onClick={metric.id === "earnings" ? undefined : () => openMetric(metric.id)} tone={metricTones[metric.id]} value={metric.value} />)}
                 </section>
 
                 <section className="grid gap-4 lg:grid-cols-[minmax(0,1.65fr)_minmax(18rem,0.85fr)]">
                   <AttentionPanel actions={snapshot.actions} onOpen={openAction} />
-                  <SchedulePanel items={snapshot.todaySchedule} nextAppointment={snapshot.nextAppointment} onOpenBooking={(bookingId) => { void navigate(providerBookingPath(bookingId)); }} onManageAvailability={onOpenMyWork} />
+                  <SchedulePanel items={snapshot.todaySchedule} nextAppointment={snapshot.nextAppointment} onOpenBooking={(bookingId) => { void navigate(providerBookingPath(bookingId)); }} onOpenAll={() => { void navigate(providerBookingPath()); }} onManageAvailability={onOpenMyWork} />
                 </section>
 
-                <ServiceHealthPanel health={snapshot.serviceHealth} onManageServices={onOpenMyWork} />
+                <ProviderServicesPanel health={snapshot.serviceHealth} listings={snapshot.serviceListings} onManageServices={onOpenMyWork} />
               </>
             ) : null}
           </>

@@ -1,6 +1,7 @@
 import { useChatScope } from "@/features/bookings/hooks/useChatScope";
 import { buildBookingHubView } from '@/features/bookings/utils/bookingHubView';
 import { useBookingFocus } from '@/features/bookings/hooks/useBookingFocus';
+import { useTemporaryTargetHighlight } from '@/shared/hooks/useTemporaryTargetHighlight';
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import {
@@ -92,7 +93,6 @@ const formatPhp = (value) => `PHP ${Number(value || 0).toLocaleString('en-PH', {
   minimumFractionDigits: Number(value || 0) % 1 === 0 ? 0 : 2,
   maximumFractionDigits: 2,
 })}`;
-
 const formatBookingTime = (value) => {
   const rawTime = String(value || '').trim();
   if (!rawTime || /\b(?:am|pm)\b/i.test(rawTime)) return rawTime;
@@ -530,7 +530,8 @@ const MyBookings = ({
   const { displayFilters, displayedBookings, bookingPage } = buildBookingHubView(
     allBookings, replacementSchedules, activeScope, selectedDisplayFilter, bookingSearch, searchParams.get('page'), filterDefinitions
   );
-  const focusedBookingId = useBookingFocus(searchParams.get('focus'), bookingPage.items.some((booking) => booking.id === searchParams.get('focus')));
+  const focusedBookingId = useBookingFocus(searchParams.get('focus'), bookingPage.items.some((booking) => booking.id === searchParams.get('focus')), location.key);
+  const highlightedConversation = useTemporaryTargetHighlight('chat-conversation', isChatRoute && searchParams.get('focus') === 'conversation' && Boolean(currentBooking), location.key);
   const updateSearchParams = (updates, replace = false) => {
     const nextParams = new URLSearchParams(searchParams);
     Object.entries(updates).forEach(([key, value]) => {
@@ -561,7 +562,7 @@ const MyBookings = ({
         key={booking.id}
         id={`booking-card-${booking.id}`}
         tabIndex={searchParams.get('focus') === booking.id ? -1 : undefined}
-        className={cn('booking-card-modern', focusedBookingId === booking.id && 'outline outline-2 outline-offset-2 outline-primary bg-primary/5')}
+        className={cn('booking-card-modern outline outline-2 outline-offset-2 outline-transparent motion-safe:transition-[outline-color] motion-safe:duration-700', focusedBookingId === booking.id && 'outline-primary')}
         data-highlighted={focusedBookingId === booking.id ? 'true' : undefined}
         data-testid={`booking-card-${booking.id}`}
       >
@@ -705,8 +706,6 @@ const MyBookings = ({
           )}
         </div>
       </section>
-
-
       {/* KPI Overview Metrics Grid */}
       <section className="grid auto-cols-[minmax(15rem,1fr)] grid-flow-col gap-3 overflow-x-auto pb-2 md:grid-flow-row md:grid-cols-2 md:overflow-visible lg:grid-cols-4" aria-label="Bookings metrics snapshot">
         {metrics.map((item) => <MetricCard key={item.label} icon={item.icon} label={item.label} tone={item.tone} value={item.value} />)}
@@ -828,6 +827,7 @@ const MyBookings = ({
         <>
           {isChatRoute && uiState === 'chat' && (
             <ChatWindow
+              highlighted={highlightedConversation}
               appTheme={appTheme}
               booking={currentBooking}
               bookings={bookingListCtrl.bookings}

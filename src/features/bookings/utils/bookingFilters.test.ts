@@ -16,10 +16,19 @@ describe("booking filter meaning", () => {
     expect(matchesBookingDisplayFilter(booking, "cash-approvals")).toBe(true);
     expect(matchesBookingDisplayFilter({ ...booking, status: "Service Scheduled", paymentStatus: "paid" }, "cash-approvals")).toBe(false);
   });
+  it.each(["Cash Verification Denied", "Reservation Expired"])("keeps %s visible as a client action", (status) => {
+    expect(matchesBookingHubFilter({ status }, "action-needed", "purchases")).toBe(true);
+    expect(matchesBookingHubFilter({ status }, "action-needed", "incoming")).toBe(false);
+  });
   it("includes outstanding balances and excludes paid or refunded payments", () => {
     expect(matchesBookingHubFilter({ status: "Active Service", paymentStatus: "partially_paid" }, "payment-due", "purchases")).toBe(true);
     expect(matchesBookingHubFilter({ status: "Payment Pending", paymentStatus: "paid" }, "payment-due", "purchases")).toBe(false);
     expect(matchesBookingHubFilter({ status: "Refund Processing", paymentStatus: "partially_paid" }, "payment-due", "purchases")).toBe(false);
+  });
+  it("surfaces client cash confirmation and rating without surfacing refunded ratings", () => {
+    expect(isBookingActionNeeded({ status: "Active Service", cashCollectionStatus: "seller_claimed" }, "purchases")).toBe(true);
+    expect(isBookingActionNeeded({ status: "Completed Service", canRate: true }, "purchases")).toBe(true);
+    expect(isBookingActionNeeded({ status: "Completed Service", canRate: true, refundSimulated: true }, "purchases")).toBe(false);
   });
   it("does not silently show all records for an unknown filter", () => {
     expect(matchesBookingHubFilter({ status: "Active Service" }, "unknown", "incoming")).toBe(false);

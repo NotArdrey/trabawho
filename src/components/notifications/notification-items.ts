@@ -43,7 +43,7 @@ export function bookingNotification(row: BookingRow, userId: string, readIds: Se
   return {
     id, title: `Booking ${status}`, message: `Booking ${row.id.slice(0, 8)} is now ${status.toLowerCase()}.`,
     time: formatRelativeTime(row.updated_at), createdAt: row.updated_at, isRead: readIds.has(id), type: "booking",
-    href: `${route}?scope=${scope}&q=${encodeURIComponent(row.id)}`,
+    href: `${route}?scope=${scope}&filter=all&q=${encodeURIComponent(row.id)}&focus=${encodeURIComponent(row.id)}`,
   };
 }
 
@@ -56,7 +56,7 @@ export function messageNotification(row: MessageRow, conversation: ConversationR
     message: body ? (body.length > 90 ? `${body.slice(0, 87)}...` : body) : "You received a new attachment.",
     time: formatRelativeTime(row.created_at), createdAt: row.created_at,
     isRead: readIds.has(id) || hasReadBy(row.read_by, userId), type: "message",
-    href: `${paths.messages}/${encodeURIComponent(conversation.booking_id || conversation.id)}?scope=${scope}`,
+    href: `${paths.messages}/${encodeURIComponent(conversation.booking_id || conversation.id)}?scope=${scope}&focus=conversation`,
   };
 }
 
@@ -76,7 +76,7 @@ export function quoteNotification(row: QuoteRow, booking: BookingRow, userId: st
   const [title, message] = labels[row.status];
   return { id, title, message, time: formatRelativeTime(row.updated_at), createdAt: row.updated_at,
     isRead: readIds.has(id), type: "quote",
-    href: `${paths.messages}/${encodeURIComponent(row.booking_id)}?scope=${isClient ? "purchases" : "incoming"}` };
+    href: `${paths.messages}/${encodeURIComponent(row.booking_id)}?scope=${isClient ? "purchases" : "incoming"}&focus=conversation` };
 }
 
 export function caseNotification(notice: CaseNoticeRow, message: CaseMessageRow | undefined): AppNotification {

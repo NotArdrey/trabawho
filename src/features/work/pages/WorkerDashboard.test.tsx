@@ -26,12 +26,13 @@ const snapshot: ProviderDashboardSnapshot = {
     { id: "inquiries", label: "Open inquiries", value: "2", detail: "Waiting for your response" },
     { id: "today", label: "Today's jobs", value: "1", detail: "Scheduled for today" },
     { id: "messages", label: "Unread messages", value: "3", detail: "From active conversations" },
-    { id: "earnings", label: "Confirmed earnings", value: "₱1,500", detail: "1 confirmed payment" },
+    { id: "earnings", label: "Verified booking value", value: "₱1,500", detail: "1 paid, undisputed booking" },
   ],
   actions: [{ id: "booking-1", priority: 2, title: "Respond to client request", detail: "Maria · Home repair", status: "Negotiating", bookingId: "booking-1", destination: "bookings" }],
   todaySchedule: [{ id: "booking-2", service: "Home repair", client: "Ana", schedule: "Sep 8, 2:00 PM", status: "Scheduled", bookingId: "booking-2" }],
   nextAppointment: null,
   serviceHealth: { totalListings: 2, activeListings: 1, availableSlots: 4, rating: 4.8, reviewCount: 12, verificationStatus: "approved" },
+  serviceListings: [{ id: 11, title: "Home repair", description: "Fixes fixtures and appliances", bookingType: "Time-slot booking", availableSlots: 4, nextOpenAt: "Oct 10, 4:00 PM PHT" }],
   confirmedEarnings: { amount: 1500, currency: "PHP", bookingCount: 1 },
   conversationIds: [],
 };
@@ -48,7 +49,8 @@ describe("WorkerDashboard", () => {
     useProviderDashboard.mockReturnValue({ snapshot: { ...snapshot, actions: [{ id: "message-1", priority: 3, title: "Unread client message", detail: "Hello", conversationId: "conversation-1", destination: "messages" }] }, isLoading: false, error: "", refresh });
     render(<WorkerDashboard sellerProfile={{ userId: "worker-1" }} onOpenChatPage={onOpenChatPage} />);
     fireEvent.click(screen.getByRole("button", { name: /Unread client message/ }));
-    expect(onOpenChatPage).toHaveBeenLastCalledWith("conversation-1", "incoming");
+    expect(navigate).toHaveBeenCalledWith("/messages/conversation-1?scope=incoming&focus=conversation");
+    expect(onOpenChatPage).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole("button", { name: "Open client messages" }));
     expect(onOpenChatPage).toHaveBeenLastCalledWith(null, "incoming");
   });
@@ -58,8 +60,10 @@ describe("WorkerDashboard", () => {
     render(<WorkerDashboard sellerProfile={{ userId: "worker-1", role: "worker" }} onOpenMyBookings={onOpenMyBookings} />);
 
     expect(screen.getByRole("heading", { name: /Good to see you, Jose Miguel/i })).toBeVisible();
-    expect(screen.getByText("Confirmed earnings")).toBeVisible();
+    expect(screen.getByText("Verified booking value")).toBeVisible();
     expect(screen.getByText("₱1,500")).toBeVisible();
+    expect(screen.getByRole("list", { name: "Active service listings" })).toHaveTextContent("Home repair");
+    expect(screen.getByRole("list", { name: "Active service listings" })).toHaveTextContent("Next: Oct 10, 4:00 PM PHT");
     fireEvent.click(screen.getByRole("button", { name: "Open incoming bookings" }));
     fireEvent.click(screen.getByRole("button", { name: /Respond to client request/i }));
     expect(onOpenMyBookings).not.toHaveBeenCalled();
@@ -91,8 +95,8 @@ describe("WorkerDashboard", () => {
     useProviderDashboard.mockReturnValue({ snapshot: { ...snapshot, actions: [], todaySchedule: [] }, isLoading: false, error: "", refresh });
     render(<WorkerDashboard sellerProfile={{ userId: "worker-1" }} onOpenMyWork={onOpenMyWork} />);
 
-    expect(screen.getByRole("heading", { name: "You're all caught up" })).toBeVisible();
-    expect(screen.getByRole("heading", { name: "Your day is clear" })).toBeVisible();
+    expect(screen.getByRole("heading", { name: /all caught up/ })).toBeVisible();
+    expect(screen.getByText("No appointments are scheduled for today.")).toBeVisible();
     fireEvent.click(screen.getByRole("button", { name: "Manage availability" }));
     expect(onOpenMyWork).toHaveBeenCalledOnce();
   });
@@ -101,16 +105,42 @@ describe("WorkerDashboard", () => {
     useProviderDashboard.mockReturnValue({ snapshot: { ...snapshot, todaySchedule: [], nextAppointment: snapshot.todaySchedule[0] }, isLoading: false, error: "", refresh });
     render(<WorkerDashboard sellerProfile={{ userId: "worker-1" }} />);
     expect(screen.getByText("Next appointment")).toBeVisible();
-    expect(screen.getByText("Ana · Sep 8, 2:00 PM")).toBeVisible();
+    expect(screen.getByText("Sep 8, 2:00 PM")).toBeVisible();
     fireEvent.click(screen.getByRole("button", { name: /Next appointment/ }));
     expect(navigate).toHaveBeenCalledWith("/worker/bookings?scope=incoming&filter=all&q=booking-2&focus=booking-2");
   });
 
-  it("shows incomplete service health without inventing a rating", () => {
-    useProviderDashboard.mockReturnValue({ snapshot: { ...snapshot, serviceHealth: { ...snapshot.serviceHealth, totalListings: 0, activeListings: 0, availableSlots: 0, rating: null, reviewCount: 0 } }, isLoading: false, error: "", refresh });
+  it("shows a service overview without inventing a rating", () => {
+    useProviderDashboard.mockReturnValue({ snapshot: { ...snapshot, serviceHealth: { ...snapshot.serviceHealth, totalListings: 0, activeListings: 0, availableSlots: 0, rating: null, reviewCount: 0 }, serviceListings: [] }, isLoading: false, error: "", refresh });
     render(<WorkerDashboard sellerProfile={{ userId: "worker-1" }} />);
-    expect(screen.getByLabelText("Service health statistics")).toHaveTextContent("0 of 0");
-    expect(screen.getByLabelText("Service health statistics")).toHaveTextContent("—");
+    expect(screen.getByRole("region", { name: "Your services" })).toBeVisible();
+    expect(screen.getByLabelText("Your services statistics")).toHaveTextContent("Active listings");
+    expect(screen.getByLabelText("Your services statistics")).toHaveTextContent("—");
+    expect(screen.getByText(/No active listings yet/)).toBeVisible();
+  });
+
+  it("reveals additional listings without making the overview permanently crowded", () => {
+    useProviderDashboard.mockReturnValue({ snapshot: { ...snapshot, serviceListings: [1, 2, 3, 4, 5].map((id) => ({
+      id, title: `Service ${id}`, description: "", bookingType: "Time-slot booking" as const, availableSlots: 0, nextOpenAt: null,
+    })) }, isLoading: false, error: "", refresh });
+    render(<WorkerDashboard sellerProfile={{ userId: "worker-1" }} />);
+    expect(screen.getByRole("list", { name: "Active service listings" })).not.toHaveTextContent("Service 5");
+    const toggle = screen.getByRole("button", { name: "Show all 5 listings" });
+    expect(toggle).toHaveAttribute("aria-expanded", "false");
+    fireEvent.click(toggle);
+    expect(screen.getByRole("list", { name: "Active service listings" })).toHaveTextContent("Service 5");
+    expect(screen.getByRole("button", { name: "Show fewer listings" })).toHaveAttribute("aria-expanded", "true");
+  });
+
+  it("distinguishes request-based work from a service with no bookable times", () => {
+    useProviderDashboard.mockReturnValue({ snapshot: { ...snapshot, serviceListings: [
+      { id: 1, title: "Custom project", description: "Discuss the scope first", bookingType: "Request-based booking", availableSlots: 0, nextOpenAt: null },
+      { id: 2, title: "Home cleaning", description: "", bookingType: "Time-slot booking", availableSlots: 0, nextOpenAt: null },
+    ] }, isLoading: false, error: "", refresh });
+    render(<WorkerDashboard sellerProfile={{ userId: "worker-1" }} />);
+    const listings = screen.getByRole("list", { name: "Active service listings" });
+    expect(listings).toHaveTextContent("Schedule arranged with client");
+    expect(listings).toHaveTextContent("No upcoming open times");
   });
 
   it("preserves loading and recoverable error states", () => {

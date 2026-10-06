@@ -8,7 +8,7 @@ import { ParticipantSupportCases } from "./ParticipantSupportCases";
 
 vi.mock("@/shared/components/DashboardNavigation", () => ({ default: () => null }));
 vi.mock("../hooks/useParticipantSupportCases", () => ({ useParticipantSupportCases: vi.fn() }));
-vi.mock("../components/ParticipantCaseDetail", () => ({ ParticipantCaseDetail: () => <section id="case-conversation" tabIndex={-1}>Case conversation</section> }));
+vi.mock("../components/ParticipantCaseDetail", () => ({ ParticipantCaseDetail: ({ highlightConversation }: { highlightConversation: boolean }) => <section id="case-conversation" tabIndex={-1} data-highlighted={highlightConversation || undefined}>Case conversation</section> }));
 
 const item = { report: { id: "case-123", booking_id: "booking-123", case_type: "provider_no_show",
   reason: "The provider did not arrive.", status: "under_review", created_at: "2026-10-03T08:00:00Z" },
@@ -28,7 +28,8 @@ describe("participant case notification destination", () => {
     </MemoryRouter>);
     const conversation = screen.getByText("Case conversation");
     await waitFor(() => expect(conversation).toHaveFocus());
-    expect(scrollIntoView).toHaveBeenCalledWith({ block: "start" });
+    expect(conversation).toHaveAttribute("data-highlighted", "true");
+    expect(scrollIntoView).toHaveBeenCalledWith({ block: "start", behavior: "auto" });
   });
 
   it("shows a confirmed replacement cue before either participant opens the case", () => {

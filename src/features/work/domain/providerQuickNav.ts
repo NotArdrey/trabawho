@@ -12,6 +12,10 @@ export function providerBookingPath(bookingId?: string) {
 
 export function providerActionPath(action: ProviderActionItem) {
   if (action.destination === "bookings") return providerBookingPath(action.bookingId);
+  if (action.destination === "messages") {
+    const id = action.bookingId || action.conversationId;
+    return id ? `${paths.messages}/${encodeURIComponent(id)}?scope=incoming&focus=conversation` : `${paths.messages}?scope=incoming`;
+  }
   if (action.destination === "work") {
     const params = new URLSearchParams();
     if (action.workSection) params.set("section", action.workSection);

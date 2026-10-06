@@ -1,20 +1,20 @@
 import { supabase } from "@/integrations/supabase";
 import { fetchSellerBookings } from "@/features/bookings/services/bookingService";
-import { isBookingInquiry } from "@/features/bookings/utils/bookingFilters";
+import { isBookingInquiry, isBookingTerminal } from "@/features/bookings/utils/bookingFilters";
 import { getActiveReplacementSchedules } from "@/features/bookings/services/replacementSchedules";
 import { loadWorkerProfileServices } from "@/features/work/services/workerService";
+import { formatPhilippineSchedule, parsePhilippineSlot, samePhilippineDay } from "@/shared/lib/philippineDateTime";
 import type {
   ConfirmedEarningsSummary,
   ProviderActionItem,
   ProviderDashboardMetric,
   ProviderDashboardSnapshot,
   ProviderScheduleItem,
+  ProviderServiceListing,
 } from "@/features/work/types/provider-dashboard";
 
 type UnknownRecord = Record<string, unknown>;
 const loadProviderServices = loadWorkerProfileServices as unknown as (input: { userId: string; fallbackProfile: unknown }) => Promise<unknown>;
-
-const TERMINAL_STATUSES = new Set(["completed service", "service stopped", "cancelled", "cancelled (cash)", "refunded"]);
 
 const asRecord = (value: unknown): UnknownRecord => value && typeof value === "object" ? value as UnknownRecord : {};
 const text = (...values: unknown[]) => values.find((value): value is string => typeof value === "string" && Boolean(value.trim()))?.trim() || "";
@@ -23,12 +23,26 @@ const number = (...values: unknown[]) => {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : 0;
 };
+const requestBasedService = (service: UnknownRecord) => {
+  const metadata = asRecord(service.metadata);
+  return text(metadata.pricing_model, service.price_type).toLowerCase() === "inquiry"
+    || text(service.price_type).toLowerCase() === "custom"
+    || text(metadata.booking_mode).toLowerCase() === "calendar-only";
+};
+const terminalBooking = (booking: UnknownRecord) => isBookingTerminal({
+  status: text(booking.status), paymentStatus: text(booking.paymentStatus), refundSimulated: booking.refundSimulated === true,
+});
 
 function bookingDate(booking: UnknownRecord) {
   const raw = asRecord(asRecord(booking.raw).booking);
   const selectedSlot = asRecord(booking.selectedSlot);
   const timeBlock = asRecord(selectedSlot.timeBlock);
-  const timestamp = text(booking.activeReplacementStartAt, raw.start_ts, booking.startTs, selectedSlot.startTs);
+  const replacementStart = text(booking.activeReplacementStartAt);
+  if (replacementStart) {
+    const replacement = new Date(replacementStart);
+    return Number.isNaN(replacement.getTime()) ? null : replacement;
+  }
+  const timestamp = text(raw.start_ts, booking.startTs, selectedSlot.startTs);
   if (timestamp) {
     const parsed = new Date(timestamp);
     if (!Number.isNaN(parsed.getTime())) return parsed;
@@ -36,19 +50,12 @@ function bookingDate(booking: UnknownRecord) {
   const date = text(selectedSlot.date, selectedSlot.dateKey);
   if (!date) return null;
   const startTime = text(timeBlock.startTime) || "00:00";
-  const parsed = new Date(`${date}T${startTime}:00`);
-  return Number.isNaN(parsed.getTime()) ? null : parsed;
-}
-
-function sameDay(left: Date, right: Date) {
-  return left.getFullYear() === right.getFullYear()
-    && left.getMonth() === right.getMonth()
-    && left.getDate() === right.getDate();
+  return parsePhilippineSlot(date, startTime);
 }
 
 function formatSchedule(date: Date | null) {
   if (!date) return "Schedule coordinated in chat";
-  return date.toLocaleString("en-PH", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+  return `${formatPhilippineSchedule(date)} PHT`;
 }
 
 function currency(amount: number, code = "PHP") {
@@ -67,7 +74,7 @@ function isReadByUser(value: unknown, userId: string) {
 function confirmedEarnings(bookings: UnknownRecord[]): ConfirmedEarningsSummary {
   const confirmed = bookings.filter((booking) => {
     const status = text(booking.status).toLowerCase();
-    const excluded = ["service stopped", "cancelled", "cancelled (cash)", "refunded"].includes(status) || status.includes("refund");
+    const excluded = terminalBooking(booking) || status === "dispute open" || status.includes("refund") || Boolean(text(booking.refundStatus));
     const paid = text(booking.paymentStatus).toLowerCase() === "paid";
     const acknowledgedCash = text(booking.cashCollectionStatus).toLowerCase() === "buyer_acknowledged";
     return !excluded && (paid || acknowledgedCash);
@@ -83,6 +90,7 @@ function scheduleItem(booking: UnknownRecord): ProviderScheduleItem {
   const date = bookingDate(booking);
   return {
     id: text(booking.id),
+    supportCaseOpen: text(booking.status).toLowerCase() === "dispute open" && Boolean(text(booking.activeReplacementStartAt)),
     service: text(booking.serviceType) || "Service",
     client: text(booking.clientName) || "Client",
     schedule: formatSchedule(date),
@@ -92,9 +100,9 @@ function scheduleItem(booking: UnknownRecord): ProviderScheduleItem {
 }
 
 function bookingAction(booking: UnknownRecord, now: Date): ProviderActionItem | null {
+  if (terminalBooking(booking)) return null;
   const id = text(booking.id);
   const status = text(booking.status) || "Updated";
-  const normalizedStatus = status.toLowerCase();
   const date = bookingDate(booking);
   const base = {
     id: `booking-${id}`,
@@ -108,33 +116,57 @@ function bookingAction(booking: UnknownRecord, now: Date): ProviderActionItem | 
   };
   if (text(booking.cashConfirmationStatus) === "pending-worker-review") return { ...base, priority: 1, title: "Review payment confirmation", destination: "work", workSection: "cash-approvals" };
   if (text(booking.refundStatus) && !["completed", "approved"].includes(text(booking.refundStatus).toLowerCase())) return { ...base, priority: 1, title: "Review refund request", destination: "work", workSection: "refunds" };
-  if (text(booking.activeReplacementStartAt)) return { ...base, priority: 2, title: "Replacement visit confirmed", destination: "bookings" };
   if (isBookingInquiry({ status })) return { ...base, priority: 2, title: "Respond to client request", destination: "bookings" };
-  if (date && sameDay(date, now) && !TERMINAL_STATUSES.has(normalizedStatus)) return { ...base, priority: 4, title: "Job scheduled today", destination: "bookings" };
-  if (!TERMINAL_STATUSES.has(normalizedStatus)) return { ...base, priority: 5, title: "Active booking update", destination: "bookings" };
+  if (date && samePhilippineDay(date, now) && (status.toLowerCase() !== "dispute open" || text(booking.activeReplacementStartAt))) return { ...base, priority: 4, title: "Visit scheduled today", status: text(booking.activeReplacementStartAt) ? "Replacement visit" : status, destination: "bookings" };
   return null;
 }
 
 export async function fetchProviderDashboardSnapshot(userId: string, fallbackProfile: unknown): Promise<ProviderDashboardSnapshot> {
-  const [bookingsValue, providerValue, conversationsResult, slotsResult] = await Promise.all([
+  const [bookingsValue, providerValue, conversationsResult] = await Promise.all([
     fetchSellerBookings(userId),
     loadProviderServices({ userId, fallbackProfile }),
     supabase.from("conversations").select("id,booking_id").eq("seller_id", userId).limit(100),
-    supabase.from("service_slots").select("id,start_ts,status").eq("seller_id", userId).gte("start_ts", new Date().toISOString()).order("start_ts", { ascending: true }).limit(100),
   ]);
   if (conversationsResult.error) throw conversationsResult.error;
-  if (slotsResult.error) throw slotsResult.error;
 
   const storedBookings = Array.isArray(bookingsValue) ? bookingsValue.map(asRecord) : [];
   const replacements = await getActiveReplacementSchedules(storedBookings.map((booking) => text(booking.id)));
   const bookings = storedBookings.map((booking) => {
     const replacement = replacements.get(text(booking.id));
-    return replacement ? { ...booking, activeReplacementStartAt: replacement.startAt } : booking;
+    return replacement && ["accepted", "delivered"].includes(replacement.status)
+      ? { ...booking, activeReplacementStartAt: replacement.startAt } : booking;
   });
   const provider = asRecord(providerValue);
   const seller = asRecord(provider.sellerData);
   const profile = asRecord(fallbackProfile);
   const services = Array.isArray(provider.sellerDbServices) ? provider.sellerDbServices.map(asRecord).filter((service) => asRecord(service.metadata).deleted_from_work !== true) : [];
+  const activeServices = services.filter((service) => service.active === true);
+  const serviceIds = activeServices.filter((service) => !requestBasedService(service))
+    .map((service) => Number(service.id)).filter((id) => Number.isSafeInteger(id) && id > 0);
+  const availabilityResult = serviceIds.length
+    ? await supabase.rpc("list_available_service_slots", { p_service_ids: serviceIds })
+    : { data: [], error: null };
+  if (availabilityResult.error) throw availabilityResult.error;
+  const availableSlots = availabilityResult.data || [];
+  const slotsByService = new Map<number, typeof availableSlots>();
+  for (const slot of availableSlots) {
+    const group = slotsByService.get(slot.service_id) || [];
+    group.push(slot);
+    slotsByService.set(slot.service_id, group);
+  }
+  const serviceListings: ProviderServiceListing[] = activeServices.map((service) => {
+    const requestBased = requestBasedService(service);
+    const slots = slotsByService.get(Number(service.id)) || [];
+    const nextSlot = slots.reduce<string | null>((earliest, slot) => !earliest || slot.start_ts < earliest ? slot.start_ts : earliest, null);
+    return {
+      id: Number(service.id),
+      title: text(service.title) || "Untitled service",
+      description: text(service.short_description, service.description),
+      bookingType: requestBased ? "Request-based booking" : "Time-slot booking",
+      availableSlots: slots.length,
+      nextOpenAt: nextSlot ? `${formatPhilippineSchedule(new Date(nextSlot))} PHT` : null,
+    };
+  });
   const rating = asRecord(provider.sellerRatingAggregate);
   const conversations = conversationsResult.data || [];
   const conversationIds = conversations.map((row) => row.id);
@@ -148,12 +180,12 @@ export async function fetchProviderDashboardSnapshot(userId: string, fallbackPro
   const unreadMessages = messages.filter((message) => !isReadByUser(message.read_by, userId));
   const earnings = confirmedEarnings(bookings);
   const now = new Date();
-  const activeBookings = bookings.filter((booking) => !TERMINAL_STATUSES.has(text(booking.status).toLowerCase()));
+  const activeBookings = bookings.filter((booking) => !terminalBooking(booking));
   const openInquiries = activeBookings.filter((booking) => isBookingInquiry({ status: text(booking.status) }));
   const scheduled = activeBookings
-    .filter((booking) => bookingDate(booking))
+    .filter((booking) => bookingDate(booking) && (text(booking.status).toLowerCase() !== "dispute open" || text(booking.activeReplacementStartAt)))
     .sort((left, right) => (bookingDate(left)?.getTime() || 0) - (bookingDate(right)?.getTime() || 0));
-  const todaySchedule = scheduled.filter((booking) => sameDay(bookingDate(booking) as Date, now)).map(scheduleItem);
+  const todaySchedule = scheduled.filter((booking) => samePhilippineDay(bookingDate(booking) as Date, now)).map(scheduleItem);
   const nextBooking = scheduled.find((booking) => (bookingDate(booking)?.getTime() || 0) >= now.getTime()) || null;
 
   const messageActions: ProviderActionItem[] = unreadMessages.map((message) => ({
@@ -169,12 +201,11 @@ export async function fetchProviderDashboardSnapshot(userId: string, fallbackPro
     .sort((left, right) => left.priority - right.priority)
     .slice(0, 5);
   const verificationStatus = text(seller.verification_status) || (seller.is_verified === true ? "approved" : "") || null;
-  const availableSlots = (slotsResult.data || []).filter((slot) => slot.status === "available").length;
   const metrics: ProviderDashboardMetric[] = [
     { id: "inquiries", label: "Open inquiries", value: String(openInquiries.length), detail: openInquiries.length ? "Waiting for your response" : "No requests waiting" },
-    { id: "today", label: "Today's jobs", value: String(todaySchedule.length), detail: todaySchedule.length ? "Scheduled for today" : "Your day is clear" },
+    { id: "today", label: "Today's visits", value: String(todaySchedule.length), detail: todaySchedule.length ? "Scheduled for today" : "No visits today" },
     { id: "messages", label: "Unread messages", value: String(unreadMessages.length), detail: unreadMessages.length ? "From active conversations" : "No unread messages" },
-    { id: "earnings", label: "Confirmed earnings", value: currency(earnings.amount, earnings.currency), detail: `${earnings.bookingCount} confirmed payment${earnings.bookingCount === 1 ? "" : "s"}` },
+    { id: "earnings", label: "Verified booking value", value: currency(earnings.amount, earnings.currency), detail: `${earnings.bookingCount} paid, undisputed booking${earnings.bookingCount === 1 ? "" : "s"}` },
   ];
 
   return {
@@ -186,12 +217,13 @@ export async function fetchProviderDashboardSnapshot(userId: string, fallbackPro
     nextAppointment: nextBooking ? scheduleItem(nextBooking) : null,
     serviceHealth: {
       totalListings: services.length,
-      activeListings: services.filter((service) => service.active === true).length,
-      availableSlots,
+      activeListings: activeServices.length,
+      availableSlots: availableSlots.length,
       rating: number(rating.avg_rating) || null,
       reviewCount: number(rating.rating_count),
       verificationStatus,
     },
+    serviceListings,
     confirmedEarnings: earnings,
     conversationIds,
   };

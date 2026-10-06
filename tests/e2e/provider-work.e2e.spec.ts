@@ -16,7 +16,8 @@ test.beforeEach(async ({ page }) => {
         { id: 'booking-1', priority: 5, title: 'Active booking update', detail: 'Reservation Expired', bookingId: 'expired-1', destination: 'bookings' },
         { id: 'refund-1', priority: 1, title: 'Review refund request', detail: 'Ana', bookingId: 'refund-1', destination: 'work', workSection: 'refunds' },
       ],
-      todaySchedule: [], nextAppointment: null, serviceHealth: { activeListings: 1, totalListings: 1, availableSlots: 1, rating: null, reviewCount: 0 }
+      todaySchedule: [], nextAppointment: null, serviceHealth: { activeListings: 1, totalListings: 1, availableSlots: 1, rating: null, reviewCount: 0 },
+      serviceListings: [{ id: 11, title: 'Home repair', description: '', bookingType: 'Time-slot booking', availableSlots: 1, nextOpenAt: 'Oct 10, 4:00 PM PHT' }]
     }}; }` });
   });
   await page.route("**/src/features/bookings/services/bookingService.js*", async (route) => {
@@ -40,7 +41,7 @@ for (const width of [390, 768, 1024, 1280, 1440]) {
     await page.setViewportSize({ width, height: 900 });
     await page.goto("/__provider-journey");
     await page.getByRole("button", { name: /Unread client message/ }).click();
-    await expect(page).toHaveURL(/messages\/chat-1\?scope=incoming/);
+    await expect(page).toHaveURL(/messages\/chat-1\?scope=incoming&focus=conversation/);
     await expect(page.getByRole("heading", { name: "Incoming chats" })).toBeVisible();
     await expect(page.getByRole("region", { name: "Incoming messages" }).getByText("Hello from Ana")).toBeVisible();
     await expect(page.getByText("New incoming message")).toBeVisible();

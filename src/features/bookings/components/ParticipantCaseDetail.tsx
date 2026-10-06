@@ -14,7 +14,7 @@ import type { BookingActionRecord } from "../types/booking-action-record";
 import { isShowcasePaymentReference } from "../utils/bookingPaymentPresentation";
 import { isBookingFullyFunded } from "../utils/bookingPaymentGuard";
 
-export function ParticipantCaseDetail({ item, onUpdated }: { item: ParticipantSupportCase; onUpdated: () => void }) {
+export function ParticipantCaseDetail({ item, highlightConversation = false, onUpdated }: { item: ParticipantSupportCase; highlightConversation?: boolean; onUpdated: () => void }) {
   const [booking, setBooking] = useState<BookingActionRecord | null>(null);
   const [error, setError] = useState("");
   const [previewOpen, setPreviewOpen] = useState(false);
@@ -34,7 +34,7 @@ export function ParticipantCaseDetail({ item, onUpdated }: { item: ParticipantSu
     <PrivateEvidencePreview path={previewOpen ? item.report.storage_path : null} title="Reported issue image" description={`Attached to this report · ${new Date(item.report.created_at).toLocaleString("en-PH", { dateStyle: "medium", timeStyle: "short" })}`} loadUrl={getParticipantReportImage} onClose={() => setPreviewOpen(false)} />
     {error ? <div role="alert" className="grid gap-2 text-sm text-destructive"><p>{error}</p><Button variant="outline" className="w-fit" onClick={() => setRevision((value) => value + 1)}><RefreshCw aria-hidden="true" />Retry loading case</Button></div>
       : !booking && <p role="status" className="text-sm text-muted-foreground">Loading case progress…</p>}
-    <CaseConversation caseId={item.report.id} bookingId={bookingId} viewerRole={item.viewerRole} closed={item.report.status === "closed"} onChanged={onUpdated} />
+    <CaseConversation caseId={item.report.id} bookingId={bookingId} viewerRole={item.viewerRole} closed={item.report.status === "closed"} highlighted={highlightConversation} onChanged={onUpdated} />
     <div className="grid gap-4 border-t pt-5" aria-label="Resolution options">
       <div><h3 className="text-base font-semibold">Resolution and next steps</h3><p className="mt-1 text-sm text-muted-foreground">Track the available remedies and any action needed from you.</p></div>
       {item.report.case_type === "provider_no_show" && <ReplacementVisitActions caseId={item.report.id} bookingId={bookingId} viewerRole={item.viewerRole} funded={Boolean(booking && isBookingFullyFunded(booking))} onChanged={() => { setRevision((value) => value + 1); onUpdated(); }} />}

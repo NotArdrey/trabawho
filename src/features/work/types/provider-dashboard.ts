@@ -23,6 +23,7 @@ export interface ProviderActionItem {
 
 export interface ProviderScheduleItem {
   id: string;
+  supportCaseOpen?: boolean;
   service: string;
   client: string;
   schedule: string;
@@ -39,6 +40,15 @@ export interface ProviderServiceHealth {
   verificationStatus: string | null;
 }
 
+export interface ProviderServiceListing {
+  id: number;
+  title: string;
+  description: string;
+  bookingType: "Time-slot booking" | "Request-based booking";
+  availableSlots: number;
+  nextOpenAt: string | null;
+}
+
 export interface ConfirmedEarningsSummary {
   amount: number;
   currency: string;
@@ -53,6 +63,7 @@ export interface ProviderDashboardSnapshot {
   todaySchedule: ProviderScheduleItem[];
   nextAppointment: ProviderScheduleItem | null;
   serviceHealth: ProviderServiceHealth;
+  serviceListings: ProviderServiceListing[];
   confirmedEarnings: ConfirmedEarningsSummary;
   conversationIds: string[];
 }

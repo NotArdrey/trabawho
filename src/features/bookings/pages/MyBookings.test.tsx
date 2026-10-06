@@ -12,7 +12,7 @@ vi.mock('@/shared/components/DashboardNavigation', () => ({
 
 // Mock child modals
 vi.mock('@/features/bookings/components/ChatWindow', () => ({
-  default: ({ viewerRole, onOpenSlotSelection }: { viewerRole: string; onOpenSlotSelection: () => void }) => <div data-testid="mock-chat-window" data-viewer-role={viewerRole}>Chat<button onClick={onOpenSlotSelection}>Open schedule</button></div>,
+  default: ({ viewerRole, highlighted, onOpenSlotSelection }: { viewerRole: string; highlighted: boolean; onOpenSlotSelection: () => void }) => <div id="chat-conversation" tabIndex={-1} data-testid="mock-chat-window" data-highlighted={highlighted || undefined} data-viewer-role={viewerRole}>Chat<button onClick={onOpenSlotSelection}>Open schedule</button></div>,
 }));
 vi.mock('@/features/bookings/components/SlotSelectionModal', () => ({
   default: ({ onConfirmSlot }: { onConfirmSlot: (slot: { slotId: number; date: string }) => void }) => <div data-testid="mock-slot-modal">Slots<button onClick={() => onConfirmSlot({ slotId: 42, date: '2026-10-10' })}>Review booking</button></div>,
@@ -311,6 +311,15 @@ describe('MyBookings Redesign Component', () => {
     fireEvent.click(screen.getByTestId('mock-terms-modal'));
 
     expect(screen.getByTestId('mock-payment-modal')).toBeInTheDocument();
+  });
+
+  test('highlights the conversation opened from a message notification', async () => {
+    mockCurrentBookings = [mockBookings[0]];
+    renderBookings(<MyBookings currentView="chat" selectedChatBookingId="b1" />,
+      '/messages/b1?scope=purchases&focus=conversation');
+    const conversation = screen.getByTestId('mock-chat-window');
+    await waitFor(() => expect(conversation).toHaveAttribute('data-highlighted', 'true'));
+    expect(conversation).toHaveFocus();
   });
 
   test('closes schedule before opening terms and payment review', () => {

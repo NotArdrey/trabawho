@@ -1,6 +1,6 @@
 export { default as MyWork } from './pages/MyWork';
 export { default as WorkerDashboard } from './pages/WorkerDashboard';
-export type { ProviderDashboardSnapshot, ProviderDashboardMetric, ProviderActionItem, ProviderScheduleItem, ProviderServiceHealth, ConfirmedEarningsSummary } from './types/provider-dashboard';
+export type { ProviderDashboardSnapshot, ProviderDashboardMetric, ProviderActionItem, ProviderScheduleItem, ProviderServiceHealth, ProviderServiceListing, ConfirmedEarningsSummary } from './types/provider-dashboard';
 export { default as CalendarAvailabilityModal } from './components/CalendarAvailabilityModal';
 export { default as ProfileEditModal } from './components/ProfileEditModal';
 export type { ServiceProfileDraft, ServiceProfileUpdate } from './components/ProfileEditModal';
