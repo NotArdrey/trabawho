@@ -56,7 +56,7 @@ export function LocationAddressFields({ value, onChange, disabled, prefix, legen
           disabled={disabled || !available || list.loading || list.error}
           options={list.options.map((option) => ({ value: option.name, label: option.name }))}
           onValueChange={(name) => selectLocation(key, name)} />)}
-      <SpecificAddressField key={[value.province, value.city, value.barangay].join('|')} value={value} onChange={(address) => onChange({ ...value, address, pin: undefined })}
+      <SpecificAddressField key={[value.province, value.city, value.barangay].join('|')} value={value} onChange={(address) => onChange({ ...value, address })}
         disabled={disabled} prefix={prefix} label={addressLabel} />
     </div>
     {enablePin && <ServiceLocationPin value={value} onChange={onChange} disabled={disabled} />}

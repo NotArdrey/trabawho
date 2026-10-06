@@ -4,6 +4,7 @@ import { chooseBookingArea, chooseLocation, mockLocationOptions } from './helper
 
 test.beforeEach(async ({ page }) => {
   await mockLocationOptions(page);
+  await page.route('https://photon.komoot.io/reverse**', route => route.fulfill({ json: { features: [] } }));
   await page.route('https://tile.openstreetmap.org/**', route => route.fulfill({ contentType: 'image/png',
     body: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=', 'base64') }));
   await page.route("**/__trabawho_paymongo_sandbox_ready", (route) => route.fulfill({ json: { status: "ready" } }));
@@ -34,7 +35,7 @@ for (const width of [390, 768, 1024, 1280, 1440]) test(`confirms an exact servic
   });
   await page.route('https://checkout.paymongo.com/pin-test', route => route.fulfill({ contentType: 'text/html', body: '<h1>Pin captured</h1>' }));
   await page.goto('/__booking-journey?address');
-  await expect(page.getByRole('button', { name: 'Pin service location', exact: true })).toBeDisabled();
+  await expect(page.getByRole('button', { name: 'Pin service location', exact: true })).toBeEnabled();
   await chooseBookingArea(page);
   await page.getByLabel('Specific service address', { exact: true }).fill('12 Service Street');
   await page.getByRole('button', { name: 'Pin service location', exact: true }).click();
@@ -57,7 +58,7 @@ for (const width of [390, 768, 1024, 1280, 1440]) test(`confirms an exact servic
   expect(errors).toEqual([]);
 });
 
-test('supports tapping, dragging, keyboard placement, cancel, and invalidates pins after address changes', async ({ page }) => {
+test('supports tapping, dragging, keyboard placement, cancel, and invalidates pins after area changes', async ({ page }) => {
   await page.goto('/__booking-journey?address');
   await chooseBookingArea(page);
   await page.getByLabel('Specific service address', { exact: true }).fill('12 Service Street');
@@ -94,8 +95,8 @@ test('supports tapping, dragging, keyboard placement, cancel, and invalidates pi
   await expect(saved).toHaveAttribute('href', /query=14\.833%2C120\.883/);
   await expect(page.getByRole('button', { name: 'Edit service location pin' })).toBeFocused();
   await page.getByLabel('Specific service address', { exact: true }).fill('13 Service Street');
-  await expect(page.getByRole('link', { name: /View saved pin/ })).toHaveCount(0);
-  await page.getByRole('button', { name: 'Pin service location', exact: true }).click();
+  await expect(saved).toHaveAttribute('href', /query=14\.833%2C120\.883/);
+  await page.getByRole('button', { name: 'Edit service location pin', exact: true }).click();
   await picker.locator('summary').click();
   await picker.getByLabel('Latitude', { exact: true }).fill('14.833');
   await picker.getByLabel('Longitude', { exact: true }).fill('120.883');
