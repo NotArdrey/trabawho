@@ -103,24 +103,49 @@ test('registration does not wait for SMTP or expose an email-confirmation page',
   await expect(page.getByRole('button', { name: 'Resend confirmation email' })).toHaveCount(0);
 });
 
-test('sign-in email recovery uses the shared resend design and preserves its response',async({page})=>{
-  await page.route('**/functions/v1/account-registration',async route=>route.request().method()==='OPTIONS'
-    ? route.fulfill({status:204,headers:corsHeaders})
-    : route.fulfill({headers:corsHeaders,json:{}}));
-  await page.setViewportSize({width:390,height:844});
+for (const width of [390, 768, 1024, 1280, 1440]) test(`sign-in only offers email recovery after confirmation is required at ${width}px`,async({page})=>{
+  let attempts = 0;
+  await page.route('**/auth/v1/token*', async route => {
+    if (route.request().method() === 'OPTIONS') return route.fulfill({ status: 204, headers: corsHeaders });
+    attempts += 1;
+    await route.fulfill({ status: 400, headers: corsHeaders, json: attempts === 1
+      ? { code: 'invalid_credentials', msg: 'Invalid login credentials' }
+      : { code: 'email_not_confirmed', msg: 'Email not confirmed' } });
+  });
+  const requests: Record<string, unknown>[] = [];
+  await page.route('**/functions/v1/account-registration', async route => {
+    if (route.request().method() === 'OPTIONS') return route.fulfill({status:204,headers:corsHeaders});
+    requests.push(route.request().postDataJSON() as Record<string, unknown>);
+    await route.fulfill({headers:corsHeaders,json:{}});
+  });
+  await page.setViewportSize({width,height:900});
   await page.goto('/sign-in');
   const resend=page.getByRole('button',{name:'Resend confirmation email',exact:true});
-  await expect(resend).toBeDisabled();
+  await expect(resend).toHaveCount(0);
   await expect(page.getByLabel('Email',{exact:true})).toHaveAttribute('placeholder','you@example.com');
   await expect(page.getByLabel('Password',{exact:true})).toHaveAttribute('placeholder','Enter your password');
   await page.getByLabel('Email',{exact:true}).fill('person@example.com');
+  await expect(resend).toHaveCount(0);
+  await page.getByLabel('Password',{exact:true}).fill('Password123!');
+  const signIn = page.locator('form').getByRole('button', { name: 'Sign in', exact: true });
+  await signIn.click();
+  await expect(page.getByRole('alert')).toContainText('Invalid login credentials');
+  await expect(resend).toHaveCount(0);
+  await signIn.click();
+  await expect(page.getByRole('alert')).toContainText('Email not confirmed');
+  await expect(resend).toBeEnabled();
   await resend.click();
   await expect(page.getByRole('status')).toContainText('Confirmation requested');
+  expect(requests).toEqual([{ action: 'resend_from_sign_in', email: 'person@example.com', redirectTo: `${new URL(page.url()).origin}/register` }]);
   expect((await resend.boundingBox())!.height).toBeGreaterThanOrEqual(44);
   expect((await resend.boundingBox())!.width).toBeCloseTo((await page.getByRole('button',{name:'Sign in',exact:true}).last().boundingBox())!.width,0);
   await expectNoRegistrationOverflow(page);
-  await page.screenshot({path:test.info().outputPath('sign-in-recovery-390.png'),fullPage:true});
+  await page.screenshot({path:test.info().outputPath(`sign-in-recovery-${width}.png`),fullPage:true});
+  await page.getByLabel('Email', { exact: true }).fill('another@example.com');
+  await expect(resend).toHaveCount(0);
+  await expect(page.getByRole('status')).toHaveCount(0);
   await page.getByRole('button',{name:'Forgot password?'}).click();
+  await expect(resend).toHaveCount(0);
   await expect(page.getByLabel('Email',{exact:true})).toHaveAttribute('placeholder','you@example.com');
 });
 for(const url of ['/#register','/#identity-register']) test(`legacy entry ${url} opens the same base-account journey`,async({page})=>{

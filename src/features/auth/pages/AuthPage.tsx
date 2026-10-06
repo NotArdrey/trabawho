@@ -16,7 +16,7 @@ import { useAuthPageController, type AuthPageProps } from '../hooks/useAuthPageC
 import { useAuthPageNavigation } from '../hooks/useAuthPageNavigation';
 
 export default function AuthPage({ mode = 'login', onModeChange, onBack, onSubmit, onForgotPasswordSubmit }: AuthPageProps) {
-  const { email, setEmail, password, setPassword, busy, error, message, submit, resend } = useAuthPageController({ mode, onSubmit, onForgotPasswordSubmit });
+  const { email, setEmail, password, setPassword, busy, error, message, canResend, submit, resend } = useAuthPageController({ mode, onSubmit, onForgotPasswordSubmit });
   const navigation = useAuthPageNavigation();
   const [registrationStarted, setRegistrationStarted] = useState(false);
   const title = mode === 'register' ? 'Create account' : mode === 'forgot' ? 'Reset Password' : 'Sign in';
@@ -53,7 +53,7 @@ export default function AuthPage({ mode = 'login', onModeChange, onBack, onSubmi
                 {mode === 'login' && <PasswordField id="auth-password" label="Password" required autoComplete="current-password" disabled={busy} value={password} onChange={(event) => setPassword(event.target.value)} />}
                 {mode === 'login' && <div className="flex flex-col gap-2">
                   <Button variant="ghost" type="button" className="self-start px-0 text-primary" onClick={() => onModeChange?.('forgot')}>Forgot password?</Button>
-                  <ResendConfirmationButton disabled={busy || !email} onClick={() => void resend()} />
+                  {canResend && <ResendConfirmationButton disabled={busy || !email} onClick={() => void resend()} />}
                 </div>}
                 <Button type="submit" isLoading={busy} className="w-full">{mode === 'forgot' ? 'Send reset link' : 'Sign in'}<ArrowRight aria-hidden="true" /></Button>
               </form>}
