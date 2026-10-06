@@ -1,4 +1,4 @@
-import { isBookingFullyFunded } from "@/features/bookings/utils/bookingPaymentGuard";
+import { getWorkPaymentBlockReason, isBookingFullyFunded } from "@/features/bookings/utils/bookingPaymentGuard";
 import type { BookingActionRecord } from "@/features/bookings/types/booking-action-record";
 
 export interface StartWorkAvailability {
@@ -30,7 +30,7 @@ export function getStartWorkAvailability(
     return { visible, enabled: false, reason: "This payment is in a refund process. Work cannot start." };
   }
   if (!isBookingFullyFunded(booking)) {
-    return { visible, enabled: false, reason: "Waiting for client balance before work. Do not begin until full payment is verified." };
+    return { visible, enabled: false, reason: getWorkPaymentBlockReason(booking) };
   }
   if (booking.scheduleStatus !== "confirmed") {
     return { visible, enabled: false, reason: "The appointment is not confirmed yet." };

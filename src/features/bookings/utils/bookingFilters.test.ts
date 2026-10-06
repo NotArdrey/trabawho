@@ -52,4 +52,9 @@ describe("booking filter meaning", () => {
     expect(matchesBookingHubFilter({ status: "Refund Simulated" }, "refunds", "purchases")).toBe(true);
     expect(matchesBookingHubFilter({ status: "Refund Simulated" }, "active", "purchases")).toBe(false);
   });
+  it("treats a confirmed replacement visit as scheduled without making other disputes scheduled", () => {
+    expect(matchesBookingHubFilter({ status: "Dispute Open", activeReplacementStartAt: "2026-10-10T08:00:00Z" }, "scheduled", "incoming")).toBe(true);
+    expect(matchesBookingHubFilter({ status: "Dispute Open" }, "scheduled", "incoming")).toBe(false);
+    expect(matchesBookingHubFilter({ status: "Cancelled", activeReplacementStartAt: "2026-10-10T08:00:00Z" }, "scheduled", "incoming")).toBe(false);
+  });
 });

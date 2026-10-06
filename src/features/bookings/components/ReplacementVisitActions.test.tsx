@@ -97,6 +97,20 @@ it("lets the funded client confirm delivered replacement work", async () => {
 it("does not offer start or completion when full payment is not verified", async () => {
   vi.mocked(getLatestReplacement).mockResolvedValue(replacement("accepted", null));
   render(<ReplacementVisitActions caseId="case-1" bookingId="booking-1" viewerRole="provider" funded={false} onChanged={vi.fn()} />);
-  expect(await screen.findByText(/completion is paused until this booking shows full verified payment/i)).toBeVisible();
-  expect(screen.queryByRole("button", { name: "Start replacement work" })).not.toBeInTheDocument();
+  const start = await screen.findByRole("button", { name: "Start replacement work" });
+  expect(start).toBeDisabled();
+  expect(start).toHaveAccessibleDescription(/payment verification is incomplete/i);
+  expect(startReplacement).not.toHaveBeenCalled();
+});
+
+it("shows the provider when a confirmed replacement visit can start", async () => {
+  const futureSlot = new Date(Date.now() + 5 * 24 * 60 * 60_000).toISOString();
+  vi.mocked(getLatestReplacement).mockResolvedValue({ ...proposal("accepted", true, true),
+    slot: { ...slot, start_ts: futureSlot } } as Detail);
+  render(<ReplacementVisitActions caseId="case-1" bookingId="booking-1" viewerRole="provider" funded onChanged={vi.fn()} />);
+  const start = await screen.findByRole("button", { name: "Start replacement work" });
+  expect(start).toBeDisabled();
+  expect(start).toHaveAccessibleDescription(/Start work becomes available 30 minutes before the visit, at .* PHT/);
+  fireEvent.click(start);
+  expect(startReplacement).not.toHaveBeenCalled();
 });

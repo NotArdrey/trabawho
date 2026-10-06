@@ -3,9 +3,9 @@ import { providerActionPath, providerBookingPath } from "./providerQuickNav";
 
 describe("provider quick navigation", () => {
   it("isolates a booking even when its status is outside the Scheduled tab", () => {
-    expect(providerBookingPath("expired-1")).toBe("/worker/bookings?scope=incoming&filter=all&q=expired-1");
+    expect(providerBookingPath("expired-1")).toBe("/worker/bookings?scope=incoming&filter=all&q=expired-1&focus=expired-1");
     expect(providerActionPath({ id: "alert", priority: 5, title: "Active booking update", detail: "Reservation Expired", bookingId: "expired-1", destination: "bookings" }))
-      .toBe("/worker/bookings?scope=incoming&filter=all&q=expired-1");
+      .toBe("/worker/bookings?scope=incoming&filter=all&q=expired-1&focus=expired-1");
   });
 
   it("opens the correct payment review section and keeps the booking reference", () => {

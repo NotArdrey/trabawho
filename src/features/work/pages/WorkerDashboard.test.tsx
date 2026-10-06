@@ -63,7 +63,7 @@ describe("WorkerDashboard", () => {
     fireEvent.click(screen.getByRole("button", { name: "Open incoming bookings" }));
     fireEvent.click(screen.getByRole("button", { name: /Respond to client request/i }));
     expect(onOpenMyBookings).not.toHaveBeenCalled();
-    expect(navigate).toHaveBeenCalledWith("/worker/bookings?scope=incoming&filter=all&q=booking-1");
+    expect(navigate).toHaveBeenCalledWith("/worker/bookings?scope=incoming&filter=all&q=booking-1&focus=booking-1");
   });
 
   it("routes payment and refund alerts to the matching My Work queue", () => {
@@ -83,7 +83,7 @@ describe("WorkerDashboard", () => {
     fireEvent.click(screen.getByRole("button", { name: "Open incoming bookings" }));
     expect(navigate).toHaveBeenCalledWith("/worker/bookings?scope=incoming&filter=inquiries");
     fireEvent.click(screen.getByRole("button", { name: /Home repairAna/ }));
-    expect(navigate).toHaveBeenCalledWith("/worker/bookings?scope=incoming&filter=all&q=booking-2");
+    expect(navigate).toHaveBeenCalledWith("/worker/bookings?scope=incoming&filter=all&q=booking-2&focus=booking-2");
   });
 
   it("makes clear queues and an empty day recognizable and actionable", () => {
@@ -103,7 +103,7 @@ describe("WorkerDashboard", () => {
     expect(screen.getByText("Next appointment")).toBeVisible();
     expect(screen.getByText("Ana · Sep 8, 2:00 PM")).toBeVisible();
     fireEvent.click(screen.getByRole("button", { name: /Next appointment/ }));
-    expect(navigate).toHaveBeenCalledWith("/worker/bookings?scope=incoming&filter=all&q=booking-2");
+    expect(navigate).toHaveBeenCalledWith("/worker/bookings?scope=incoming&filter=all&q=booking-2&focus=booking-2");
   });
 
   it("shows incomplete service health without inventing a rating", () => {

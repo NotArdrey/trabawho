@@ -1,5 +1,6 @@
 export interface FilterableBooking {
   status: string;
+  activeReplacementStartAt?: string | null;
   paymentStatus?: string | null;
   paymentMethod?: string | null;
   refundStatus?: string | null;
@@ -46,7 +47,8 @@ export function matchesBookingHubFilter(booking: FilterableBooking, filter: stri
     || ["Refund Processing", "Refunded", "Refund Simulated"].includes(booking.status);
   if (filter === "delivered") return !isBookingTerminal(booking) && (booking.deliveryStatus === "seller_claimed" || booking.status === "Service Delivered");
   if (filter === "inquiries") return scope === "incoming" && isBookingInquiry(booking);
-  if (filter === "scheduled") return !isBookingTerminal(booking) && ["Payment Confirmed", "Service Scheduled", "Active Service"].includes(booking.status);
+  if (filter === "scheduled") return !isBookingTerminal(booking) && (Boolean(booking.activeReplacementStartAt)
+    || ["Payment Confirmed", "Service Scheduled", "Active Service"].includes(booking.status));
   if (filter === "payment-due") return isBookingPaymentDue(booking);
   if (filter === "action-needed") return isBookingActionNeeded(booking, scope);
   if (filter === "active") return !isBookingTerminal(booking);

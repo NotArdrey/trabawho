@@ -15,3 +15,11 @@ export function isBookingFullyFunded(booking: BookingFunding): boolean {
   }
   return true;
 }
+
+export function getWorkPaymentBlockReason(booking: BookingFunding): string {
+  const balance = Number(booking.balanceDueAmount);
+  if (booking.balanceDueAmount != null && Number.isFinite(balance) && balance > 0) {
+    return "Waiting for client balance before work. Do not begin until full payment is verified.";
+  }
+  return "Payment verification is incomplete. Do not begin work; contact support if the client has already paid.";
+}

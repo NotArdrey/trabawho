@@ -1,5 +1,6 @@
 import { useChatScope } from "@/features/bookings/hooks/useChatScope";
-import { matchesBookingSearch } from '@/features/bookings/utils/bookingSearch';
+import { buildBookingHubView } from '@/features/bookings/utils/bookingHubView';
+import { useBookingFocus } from '@/features/bookings/hooks/useBookingFocus';
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import {
@@ -44,8 +45,8 @@ import { Button } from '@/components/ui/button';
 import { MetricCard } from '@/components/ui/metric-card';
 import { SearchFilterBar } from '@/components/ui/search-filter-bar';
 import { DataPagination } from '@/components/ui/data-pagination';
-import { paginateBookings } from '../utils/bookingPagination';
 import { isBookingActionNeeded, matchesBookingHubFilter } from '../utils/bookingFilters';
+import { cn } from '@/lib/utils';
 import { WorkflowEmptyState } from '@/components/ui/workflow-panel';
 import { paths } from '@/app/router/routes';
 import { hasPastUnpaidSchedule } from '@/features/bookings/utils/bookingSchedule';
@@ -463,6 +464,7 @@ const MyBookings = ({
   const ratingBooking = bookingListCtrl.bookings.find((b) => String(b.id) === String(ratingCtrl.ratingTargetId));
 
   const allBookings = useMemo(() => bookingListCtrl.bookings || [], [bookingListCtrl.bookings]);
+  const firstLoad = bookingListCtrl.isLoading && !bookingListCtrl.hasLoaded;
   const replacementSchedules = useProviderReplacementSchedules(allBookings, shouldLoadSellerBookings);
   const activeBookingsCount = useMemo(() => allBookings.filter((booking) => matchesBookingHubFilter(booking, 'active', activeScope)).length, [activeScope, allBookings]);
   const completedBookingsCount = useMemo(() => (
@@ -478,29 +480,29 @@ const MyBookings = ({
   const metrics = useMemo(() => [
     {
       label: shouldLoadSellerBookings ? 'Client bookings' : 'Total bookings',
-      value: bookingListCtrl.isLoading && allBookings.length === 0 ? '...' : String(allBookings.length),
+      value: firstLoad && allBookings.length === 0 ? '...' : String(allBookings.length),
       icon: CalendarCheck,
       tone: 'blue',
     },
     {
       label: shouldLoadSellerBookings ? 'Active jobs' : 'Active & scheduled',
-      value: bookingListCtrl.isLoading && allBookings.length === 0 ? '...' : String(activeBookingsCount),
+      value: firstLoad && allBookings.length === 0 ? '...' : String(activeBookingsCount),
       icon: Clock,
       tone: 'green',
     },
     {
       label: shouldLoadSellerBookings ? 'Completed jobs' : 'Completed',
-      value: bookingListCtrl.isLoading && allBookings.length === 0 ? '...' : String(completedBookingsCount),
+      value: firstLoad && allBookings.length === 0 ? '...' : String(completedBookingsCount),
       icon: CheckCircle2,
       tone: 'neutral',
     },
     {
       label: 'Action Needed',
-      value: bookingListCtrl.isLoading && allBookings.length === 0 ? '...' : String(pendingActionCount),
+      value: firstLoad && allBookings.length === 0 ? '...' : String(pendingActionCount),
       icon: AlertCircle,
       tone: 'orange',
     },
-  ], [bookingListCtrl.isLoading, allBookings.length, activeBookingsCount, completedBookingsCount, pendingActionCount, shouldLoadSellerBookings]);
+  ], [firstLoad, allBookings.length, activeBookingsCount, completedBookingsCount, pendingActionCount, shouldLoadSellerBookings]);
   const filterDefinitions = shouldLoadSellerBookings
     ? [
         ['inquiries', 'Inquiries'], ['action-needed', 'Action needed'],
@@ -524,29 +526,21 @@ const MyBookings = ({
   const defaultFilter = shouldLoadSellerBookings ? 'scheduled' : 'active';
   const requestedFilter = searchParams.get('filter') || defaultFilter;
   const selectedDisplayFilter = allowedFilters.includes(requestedFilter) ? requestedFilter : defaultFilter;
-  const displayFilters = filterDefinitions.map(([value, label]) => ({
-    value,
-    label,
-    count: allBookings.filter((booking) => matchesBookingHubFilter(booking, value, activeScope)).length,
-  }));
+  const bookingSearch = searchParams.get('q') || '';
+  const { displayFilters, displayedBookings, bookingPage } = buildBookingHubView(
+    allBookings, replacementSchedules, activeScope, selectedDisplayFilter, bookingSearch, searchParams.get('page'), filterDefinitions
+  );
+  const focusedBookingId = useBookingFocus(searchParams.get('focus'), bookingPage.items.some((booking) => booking.id === searchParams.get('focus')));
   const updateSearchParams = (updates, replace = false) => {
     const nextParams = new URLSearchParams(searchParams);
     Object.entries(updates).forEach(([key, value]) => {
       if (value && (key === 'filter' || value !== 'all')) nextParams.set(key, value);
       else nextParams.delete(key);
     });
-    if ('filter' in updates || 'q' in updates) nextParams.delete('page');
+    if ('filter' in updates || 'q' in updates) { nextParams.delete('page'); nextParams.delete('focus'); }
     nextParams.set('scope', activeScope);
     setSearchParams(nextParams, { replace });
   };
-  const bookingSearch = searchParams.get('q') || '';
-  const activeSearch = bookingSearch.trim().toLowerCase();
-  const displayedBookings = useMemo(() => {
-    let list = allBookings.filter((booking) => matchesBookingHubFilter(booking, selectedDisplayFilter, activeScope));
-    if (activeSearch) list = list.filter((booking) => matchesBookingSearch(booking, activeSearch));
-    return list;
-  }, [activeScope, activeSearch, allBookings, selectedDisplayFilter]);
-  const bookingPage = paginateBookings(displayedBookings, searchParams.get('page'));
   const renderBookingCard = (booking) => {
     const scheduleHasPassed = hasPastUnpaidSchedule(booking);
     const quoteCanCheckout = isQuoteCheckoutAvailable(booking);
@@ -565,7 +559,10 @@ const MyBookings = ({
     return (
       <article
         key={booking.id}
-        className="booking-card-modern"
+        id={`booking-card-${booking.id}`}
+        tabIndex={searchParams.get('focus') === booking.id ? -1 : undefined}
+        className={cn('booking-card-modern', focusedBookingId === booking.id && 'outline outline-2 outline-offset-2 outline-primary bg-primary/5')}
+        data-highlighted={focusedBookingId === booking.id ? 'true' : undefined}
         data-testid={`booking-card-${booking.id}`}
       >
         <div className="booking-card-header">
@@ -723,7 +720,7 @@ const MyBookings = ({
           onSearchChange?.({ target: { value } });
         }}
         options={displayFilters}
-        resultLabel={bookingListCtrl.isLoading ? 'Updating bookings...' : displayedBookings.length ? `Showing ${bookingPage.first}–${bookingPage.last} of ${displayedBookings.length} matching bookings` : 'No matching bookings'}
+        resultLabel={displayedBookings.length ? `Showing ${bookingPage.first}–${bookingPage.last} of ${displayedBookings.length} matching bookings` : 'No matching bookings'}
         searchLabel="Search bookings"
         searchPlaceholder="Search by worker, service, or reference..."
         searchValue={bookingSearch}
@@ -736,7 +733,7 @@ const MyBookings = ({
       />}
 
       {/* Loading State Skeletons */}
-      {bookingListCtrl.isLoading && allBookings.length === 0 && (
+      {firstLoad && allBookings.length === 0 && (
         <div className="bookings-list" aria-busy="true">
           {[1, 2, 3].map((key) => (
             <div key={key} className="booking-skeleton-card">
@@ -754,7 +751,7 @@ const MyBookings = ({
         </div>
       )}
 
-      {!bookingListCtrl.isLoading && !bookingListCtrl.loadError && allBookings.length === 0 && (
+      {!firstLoad && !bookingListCtrl.loadError && allBookings.length === 0 && (
         <WorkflowEmptyState
           className="rounded-xl border bg-card"
           data-testid="bookings-empty-state"
@@ -766,7 +763,7 @@ const MyBookings = ({
         />
       )}
 
-      {!bookingListCtrl.isLoading && allBookings.length > 0 && displayedBookings.length === 0 && (
+      {!firstLoad && allBookings.length > 0 && displayedBookings.length === 0 && (
         <WorkflowEmptyState
           className="rounded-xl border bg-card"
           data-testid="bookings-filter-empty-state"

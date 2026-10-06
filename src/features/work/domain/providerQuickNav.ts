@@ -3,7 +3,10 @@ import type { ProviderActionItem } from "@/features/work/types/provider-dashboar
 
 export function providerBookingPath(bookingId?: string) {
   const params = new URLSearchParams({ scope: "incoming", filter: "all" });
-  if (bookingId) params.set("q", bookingId);
+  if (bookingId) {
+    params.set("q", bookingId);
+    params.set("focus", bookingId);
+  }
   return `${paths.workerBookings}?${params}`;
 }
 

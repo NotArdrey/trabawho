@@ -72,6 +72,7 @@ describe("BookingTransactionActions", () => {
       viewerRole="provider" onUpdated={onUpdated} />);
     const workflow = await screen.findByRole("button", { name: "Replacement workflow for provider" });
     expect(workflow).toHaveAttribute("data-funded", "true");
+    expect(screen.queryByRole("button", { name: "Start work" })).not.toBeInTheDocument();
     expect(screen.queryByText("Support case open")).not.toBeInTheDocument();
     fireEvent.click(workflow);
     await waitFor(() => expect(onUpdated).toHaveBeenCalledWith(expect.objectContaining({ status: "Completed Service" })));
@@ -81,7 +82,7 @@ describe("BookingTransactionActions", () => {
   });
 
   it("blocks work controls while the balance is unpaid", () => {
-    render(<BookingTransactionActions booking={{ ...booking, paymentStatus: "partially_paid" }} viewerRole="provider" onUpdated={vi.fn()} />);
+    render(<BookingTransactionActions booking={{ ...booking, paymentStatus: "partially_paid", balanceDueAmount: 400 }} viewerRole="provider" onUpdated={vi.fn()} />);
     expect(screen.getByText(/waiting for client balance/i)).toBeVisible();
     expect(screen.getByRole("button", { name: "Start work" })).toBeDisabled();
     expect(screen.queryByRole("button", { name: "Submit delivery" })).not.toBeInTheDocument();

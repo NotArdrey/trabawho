@@ -55,7 +55,7 @@ for (const width of [390, 768, 1024, 1280, 1440]) {
 
     await page.goto("/__provider-journey");
     await page.getByRole("button", { name: /Active booking update/ }).click();
-    await expect(page).toHaveURL(/worker\/bookings\?scope=incoming&filter=all&q=expired-1/);
+    await expect(page).toHaveURL(/worker\/bookings\?scope=incoming&filter=all&q=expired-1&focus=expired-1/);
 
     await page.goto("/__provider-journey");
     await page.getByRole("button", { name: /Review refund request/ }).click();

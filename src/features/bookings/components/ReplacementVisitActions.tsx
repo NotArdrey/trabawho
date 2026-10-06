@@ -90,6 +90,14 @@ export function ReplacementVisitActions({ caseId, bookingId, viewerRole, funded,
   const startAvailableAt = slot ? new Date(slot.start_ts).getTime() - 30 * 60_000 : NaN;
   const canStart = viewerRole === "provider" && funded && visit?.status === "accepted" && !visit.started_at
     && Number.isFinite(startAvailableAt) && now >= startAvailableAt;
+  const startTimeReason = Number.isFinite(startAvailableAt) && now < startAvailableAt
+    ? `Start work becomes available 30 minutes before the visit, at ${new Date(startAvailableAt).toLocaleString("en-PH", { timeZone: "Asia/Manila", dateStyle: "medium", timeStyle: "short" })} PHT.`
+    : "";
+  const startBlockReason = !funded
+    ? `Payment verification is incomplete. Do not begin work; contact support if the client has already paid.${startTimeReason ? ` ${startTimeReason}` : ""}`
+    : !Number.isFinite(startAvailableAt)
+      ? "The replacement time is unavailable. Refresh this visit or contact support."
+      : startTimeReason;
   const status = visit ? visitStatus(visit.status, Boolean(visit.started_at)) : null;
   const visitTime = slot ? new Date(slot.start_ts).toLocaleString("en-PH", {
     timeZone: "Asia/Manila", dateStyle: "full", timeStyle: "short",
@@ -179,9 +187,12 @@ export function ReplacementVisitActions({ caseId, bookingId, viewerRole, funded,
         <p className="text-muted-foreground">Both participants accepted. The original appointment remains in booking history.</p>
         {visit.started_at && <p className="font-medium text-primary">The provider has started replacement work.</p>}
         {viewerRole === "client" && !visit.started_at && <p className="font-medium text-primary">The provider can start work near the visit time.</p>}
-        {viewerRole === "provider" && funded && !visit.started_at && !canStart && Number.isFinite(startAvailableAt) &&
-          <p role="status" className="text-muted-foreground">Start work becomes available 30 minutes before the visit, at {new Date(startAvailableAt).toLocaleString("en-PH", { timeZone: "Asia/Manila", dateStyle: "medium", timeStyle: "short" })} PHT.</p>}
-        {canStart && <Button type="button" className="w-full sm:w-fit" disabled={pending} onClick={() => setDecision("start")}><Play aria-hidden="true" />Start replacement work</Button>}
+        {viewerRole === "provider" && !visit.started_at && <div className="grid gap-2">
+          <Button type="button" className="min-h-11 w-full sm:w-fit" disabled={pending || !canStart}
+            aria-describedby={startBlockReason ? `replacement-start-${visit.id}` : undefined}
+            onClick={() => setDecision("start")}><Play aria-hidden="true" />Start replacement work</Button>
+          {startBlockReason && <p id={`replacement-start-${visit.id}`} role="status" className="text-muted-foreground">{startBlockReason}</p>}
+        </div>}
         {viewerRole === "provider" && funded && visit.started_at && <div className="grid gap-3">
           <label className="grid gap-1 font-medium">Completed work notes
             <textarea className="min-h-24 rounded-md border border-input bg-background p-3 font-normal focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
@@ -195,7 +206,7 @@ export function ReplacementVisitActions({ caseId, bookingId, viewerRole, funded,
         </div>}
       </div>}
 
-      {!funded && ["accepted", "delivered"].includes(visit.status) && <p role="status"
+      {!funded && visit.status === "delivered" && <p role="status"
         className="rounded-lg bg-amber-50 p-3 text-amber-950 dark:bg-amber-950/30 dark:text-amber-100">
         Work completion is paused until this booking shows full verified payment. No new payment is requested here; contact support if the booking was already paid.
       </p>}

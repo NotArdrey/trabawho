@@ -10,6 +10,8 @@ for (const width of [390, 768, 1024, 1280, 1440]) {
   test(`both participants see the confirmed replacement at ${width}px`, async ({ page }) => {
     await page.setViewportSize({ width, height: 900 });
     let accepted = false;
+    const futureStart = new Date(Date.now() + 5 * 24 * 60 * 60_000);
+    const futureEnd = new Date(futureStart.getTime() + 60 * 60_000);
     await page.route("**/rest/v1/booking_case_replacement_visits?*", (route) => route.fulfill({ json: [{
       id: "visit-1", case_id: "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb", booking_id: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
       slot_id: 12, status: accepted ? "accepted" : "proposed", reason: "The provider missed the original appointment.",
@@ -17,7 +19,7 @@ for (const width of [390, 768, 1024, 1280, 1440]) {
       started_at: null, delivery_note: null, delivery_storage_path: null,
     }] }));
     await page.route("**/rest/v1/service_slots?*", (route) => route.fulfill({ json: {
-      id: 12, start_ts: "2026-10-10T08:00:00+08:00", end_ts: "2026-10-10T09:00:00+08:00",
+      id: 12, start_ts: futureStart.toISOString(), end_ts: futureEnd.toISOString(),
     } }));
     await page.route("**/rest/v1/rpc/respond_booking_case_replacement", async (route) => {
       expect(route.request().postDataJSON()).toEqual({ p_visit_id: "visit-1", p_accept: true });
@@ -30,6 +32,9 @@ for (const width of [390, 768, 1024, 1280, 1440]) {
     await page.getByRole("button", { name: "Accept time" }).click();
     await page.getByRole("alertdialog").getByRole("button", { name: "Accept visit time" }).click();
     await expect(page.getByText(/Both participants accepted/)).toBeVisible();
+    const start = page.getByRole("button", { name: "Start replacement work" });
+    await expect(start).toBeDisabled();
+    await expect(start).toHaveAttribute("aria-describedby", /replacement-start-/);
     await page.goto("/__replacement-visit?role=client");
     await expect(page.getByText("Visit confirmed")).toHaveCount(2);
     await expect(page.getByText(/Both participants accepted/)).toBeVisible();

@@ -25,8 +25,14 @@ describe("getStartWorkAvailability", () => {
   });
 
   it("explains payment, support, and cancellation blocks without enabling work", () => {
-    expect(getStartWorkAvailability({ ...booking, paymentStatus: "partially_paid" }, "provider", now).reason)
+    expect(getStartWorkAvailability({ ...booking, paymentStatus: "partially_paid", balanceDueAmount: 400 }, "provider", now).reason)
       .toMatch(/full payment is verified/);
+    expect(getStartWorkAvailability({ ...booking, paymentStatus: "partially_paid", balanceDueAmount: 0,
+      amountPaid: 972, totalChargedAmount: 972 }, "provider", now).reason)
+      .toMatch(/payment verification is incomplete/i);
+    expect(getStartWorkAvailability({ ...booking, balanceDueAmount: 0,
+      amountPaid: 972, totalChargedAmount: 1000 }, "provider", now).reason)
+      .not.toMatch(/waiting for client balance/i);
     expect(getStartWorkAvailability({ ...booking, disputeStatus: "open" }, "provider", now).reason)
       .toMatch(/support case is open/);
     expect(getStartWorkAvailability({ ...booking, cancellationStatus: "requested" }, "provider", now).reason)

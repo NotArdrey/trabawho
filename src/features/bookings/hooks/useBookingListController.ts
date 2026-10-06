@@ -170,6 +170,7 @@ export function useBookingListController(initialBookings: BookingListItem[] = []
     handleRejectQuote,
     handleStopServiceAccepted,
     isLoading: isLoading || (loadedSourceKey !== sourceKey && !loadError),
+    hasLoaded: loadedSourceKey === sourceKey,
     loadError,
     refreshBookings,
     replaceBooking,

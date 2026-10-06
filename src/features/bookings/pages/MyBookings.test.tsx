@@ -1,6 +1,6 @@
 import type { ComponentType, ReactNode } from 'react';
 import { beforeEach, describe, expect, test, vi } from 'vitest';
-import { render, screen, fireEvent, within } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import { MemoryRouter, useLocation } from 'react-router-dom';
 import LegacyMyBookings from '@/features/bookings/pages/MyBookings';
 const MyBookings = LegacyMyBookings as unknown as ComponentType<Record<string, unknown>>;
@@ -20,8 +20,9 @@ vi.mock('@/features/bookings/components/SlotSelectionModal', () => ({
 vi.mock('@/features/bookings/components/PaymentModal', () => ({
   default: () => <div data-testid="mock-payment-modal">Payment</div>,
 }));
+const replacementState = vi.hoisted(() => ({ schedules: new Map<string, { status: string; startAt: string; endAt: string }>() }));
 vi.mock('@/features/bookings/hooks/useProviderReplacementSchedules', () => ({
-  useProviderReplacementSchedules: () => new Map(),
+  useProviderReplacementSchedules: () => replacementState.schedules,
 }));
 vi.mock('@/features/bookings/components/BookingTermsModal', () => ({
   default: ({ isOpen, onConfirm }: { isOpen: boolean; onConfirm: () => void }) => (
@@ -64,6 +65,7 @@ const mockBookings = [
 
 let mockCurrentBookings: Array<{ id: string; status: string; [key: string]: unknown }> = [];
 let mockIsLoading = false;
+let mockHasLoaded = true;
 let mockListRole = '';
 const mockHandleOpenRating = vi.fn();
 const mockRefreshBookings = vi.fn();
@@ -77,6 +79,7 @@ vi.mock('@/features/bookings/hooks', () => ({
     activeFilter: 'all',
     displayFilter: 'all',
     isLoading: mockIsLoading,
+    hasLoaded: mockHasLoaded,
     loadError: '',
     actionError: '',
     setActiveFilter: vi.fn(),
@@ -117,6 +120,8 @@ describe('MyBookings Redesign Component', () => {
   beforeEach(() => {
     mockCurrentBookings = [];
     mockIsLoading = false;
+    mockHasLoaded = true;
+    replacementState.schedules = new Map();
     mockHandleOpenRating.mockClear();
     mockRefreshBookings.mockClear();
   });
@@ -167,17 +172,50 @@ describe('MyBookings Redesign Component', () => {
     expect(screen.getByText(/Oct 5, 2026.*1:07 PM PHT/)).toBeVisible();
   });
 
-  test('a provider quick link isolates an expired booking outside the Scheduled tab', () => {
+  test('a provider quick link isolates and highlights an expired booking outside the Scheduled tab', async () => {
     mockCurrentBookings = [
       { ...mockBookings[0], id: 'expired-1', status: 'Reservation Expired' },
       { ...mockBookings[0], id: 'other-2', status: 'Service Scheduled' },
     ];
     renderBookings(<MyBookings currentView="worker-bookings" sellerProfile={{ role: 'worker', userId: 'worker-1' }} />,
-      '/worker/bookings?scope=incoming&filter=all&q=expired-1');
+      '/worker/bookings?scope=incoming&filter=all&q=expired-1&focus=expired-1');
     expect(screen.getByRole('button', { name: 'All, 2' })).toHaveAttribute('aria-pressed', 'true');
     expect(screen.getByRole('searchbox', { name: 'Search bookings' })).toHaveValue('expired-1');
     expect(screen.getByTestId('booking-card-expired-1')).toBeInTheDocument();
     expect(screen.queryByTestId('booking-card-other-2')).not.toBeInTheDocument();
+    await waitFor(() => expect(screen.getByTestId('booking-card-expired-1')).toHaveAttribute('data-highlighted', 'true'));
+    expect(screen.getByTestId('booking-card-expired-1')).toHaveFocus();
+  });
+
+  test('counts a confirmed replacement visit in the provider Scheduled tab', () => {
+    mockCurrentBookings = [{ ...mockBookings[0], id: 'case-booking', status: 'Dispute Open' }];
+    replacementState.schedules = new Map([['case-booking', { status: 'accepted',
+      startAt: '2026-10-10T08:00:00+08:00', endAt: '2026-10-10T09:00:00+08:00' }]]);
+    renderBookings(<MyBookings currentView="worker-bookings" sellerProfile={{ role: 'worker', userId: 'worker-1' }} />,
+      '/worker/bookings?scope=incoming&filter=scheduled');
+    expect(screen.getByRole('button', { name: 'Scheduled, 1' })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByTestId('booking-card-case-booking')).toBeVisible();
+  });
+
+  test('keeps empty feedback visible during silent background refresh', () => {
+    mockCurrentBookings = [{ ...mockBookings[0], status: 'Reservation Expired' }];
+    mockIsLoading = true;
+    renderBookings(<MyBookings currentView="worker-bookings" sellerProfile={{ role: 'worker', userId: 'worker-1' }} />,
+      '/worker/bookings?scope=incoming&filter=scheduled');
+    expect(screen.getByTestId('bookings-filter-empty-state')).toBeVisible();
+    expect(screen.getByRole('heading', { name: 'No matching bookings' })).toBeVisible();
+    expect(screen.queryByText('Updating bookings...')).not.toBeInTheDocument();
+  });
+
+  test('keeps zero-count metrics and the empty state stable during refresh', () => {
+    mockCurrentBookings = [];
+    mockIsLoading = true;
+    mockHasLoaded = true;
+    renderBookings(<MyBookings currentView="worker-bookings" sellerProfile={{ role: 'worker', userId: 'worker-1' }} />,
+      '/worker/bookings?scope=incoming');
+    expect(screen.getByTestId('bookings-empty-state')).toBeVisible();
+    expect(screen.getByRole('heading', { name: 'Client bookings' }).previousElementSibling).toHaveTextContent('0');
+    expect(screen.queryByText('...')).not.toBeInTheDocument();
   });
 
   test('the provider inquiry tab includes pending requests that are not scheduled', () => {
