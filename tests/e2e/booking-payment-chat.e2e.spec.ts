@@ -4,6 +4,8 @@ import { chooseBookingArea, chooseLocation, mockLocationOptions } from './helper
 
 test.beforeEach(async ({ page }) => {
   await mockLocationOptions(page);
+  await page.route('https://tile.openstreetmap.org/**', route => route.fulfill({ contentType: 'image/png',
+    body: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=', 'base64') }));
   await page.route("**/__trabawho_paymongo_sandbox_ready", (route) => route.fulfill({ json: { status: "ready" } }));
   await page.route("**/__booking-journey*", async (route) => {
     await route.fulfill({ contentType: "text/html", body: `<html><head><meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -15,6 +17,141 @@ test.beforeEach(async ({ page }) => {
         window.__vite_plugin_react_preamble_installed__ = true;
       </script></head><body><div id="root"></div><script type="module" src="/tests/e2e/fixtures/booking-payment-journey.tsx"></script></body></html>` });
   });
+});
+
+for (const width of [390, 768, 1024, 1280, 1440]) test(`confirms an exact service pin and sends it to checkout at ${width}px`, async ({ page, context }, testInfo) => {
+  const errors: string[] = [];
+  page.on('pageerror', error => errors.push(error.message));
+  page.on('console', message => { if (message.type() === 'error') errors.push(message.text()); });
+  await page.setViewportSize({ width, height: 900 });
+  await context.grantPermissions(['geolocation']);
+  await context.setGeolocation({ latitude: 14.833, longitude: 120.883 });
+  let submitted: Record<string, unknown> | null = null;
+  await page.route('**/functions/v1/create-paymongo-checkout', route => {
+    if (route.request().method() === 'OPTIONS') return route.fulfill({ status: 204, headers: corsHeaders });
+    submitted = route.request().postDataJSON() as Record<string, unknown>;
+    return route.fulfill({ headers: corsHeaders, json: { bookingId: 'booking-pin', paymentAttemptId: 'attempt-pin', checkoutUrl: 'https://checkout.paymongo.com/pin-test' } });
+  });
+  await page.route('https://checkout.paymongo.com/pin-test', route => route.fulfill({ contentType: 'text/html', body: '<h1>Pin captured</h1>' }));
+  await page.goto('/__booking-journey?address');
+  await expect(page.getByRole('button', { name: 'Pin service location', exact: true })).toBeDisabled();
+  await chooseBookingArea(page);
+  await page.getByLabel('Specific service address', { exact: true }).fill('12 Service Street');
+  await page.getByRole('button', { name: 'Pin service location', exact: true }).click();
+  const picker = page.getByRole('dialog', { name: 'Pin service location', exact: true });
+  await expect(picker).toBeVisible();
+  await expect(picker.getByRole('button', { name: 'Confirm service pin' })).toBeDisabled();
+  await expect(picker.getByRole('button', { name: 'Use current location' })).toBeEnabled();
+  await picker.getByRole('button', { name: 'Use current location' }).click();
+  await expect(picker.getByRole('button', { name: 'Confirm service pin' })).toBeEnabled();
+  await expect(picker.getByRole('link', { name: /OpenStreetMap contributors/ })).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  await page.screenshot({ path: testInfo.outputPath('service-pin-picker.png'), fullPage: true });
+  await picker.getByRole('button', { name: 'Confirm service pin' }).click();
+  const link = page.getByRole('link', { name: /View saved pin on Google Maps/ });
+  await expect(link).toHaveAttribute('href', /query=14\.833%2C120\.883/);
+  await page.getByRole('button', { name: 'Reserve and continue' }).click();
+  await expect(page.getByRole('heading', { name: 'Pin captured' })).toBeVisible();
+  expect(submitted).toMatchObject({ serviceAddress: { province: 'Bulacan', city: 'Guiguinto', barangay: 'Poblacion',
+    address: '12 Service Street', pin: { latitude: 14.833, longitude: 120.883 } } });
+  expect(errors).toEqual([]);
+});
+
+test('supports tapping, dragging, keyboard placement, cancel, and invalidates pins after address changes', async ({ page }) => {
+  await page.goto('/__booking-journey?address');
+  await chooseBookingArea(page);
+  await page.getByLabel('Specific service address', { exact: true }).fill('12 Service Street');
+  await page.getByRole('button', { name: 'Pin service location', exact: true }).click();
+  const picker = page.getByRole('dialog', { name: 'Pin service location', exact: true });
+  await expect(picker.getByRole('button', { name: 'Place pin at map center' })).toBeEnabled();
+  const map = picker.getByRole('region', { name: 'Service location map' });
+  await map.click({ position: { x: 120, y: 100 } });
+  await picker.locator('summary').click();
+  const latitude = picker.getByLabel('Latitude', { exact: true });
+  const longitude = picker.getByLabel('Longitude', { exact: true });
+  const oldLongitude = await longitude.inputValue();
+  const marker = map.locator('.leaflet-marker-icon');
+  const bounds = await marker.boundingBox();
+  if (!bounds) throw new Error('Selected pin is missing');
+  await page.mouse.move(bounds.x + 22, bounds.y + 22);
+  await page.mouse.down();
+  await page.mouse.move(bounds.x + 70, bounds.y + 22, { steps: 6 });
+  await page.mouse.up();
+  await expect(longitude).not.toHaveValue(oldLongitude);
+  await map.focus();
+  await page.keyboard.press('ArrowRight');
+  await picker.getByRole('button', { name: 'Place pin at map center' }).focus();
+  await page.keyboard.press('Enter');
+  await latitude.fill('14.833');
+  await longitude.fill('120.883');
+  await picker.getByRole('button', { name: 'Confirm service pin' }).click();
+  const saved = page.getByRole('link', { name: /View saved pin on Google Maps/ });
+  await expect(saved).toHaveAttribute('href', /query=14\.833%2C120\.883/);
+  await page.getByRole('button', { name: 'Edit service location pin' }).click();
+  await picker.locator('summary').click();
+  await picker.getByLabel('Latitude', { exact: true }).fill('15');
+  await picker.getByRole('button', { name: 'Cancel', exact: true }).click();
+  await expect(saved).toHaveAttribute('href', /query=14\.833%2C120\.883/);
+  await expect(page.getByRole('button', { name: 'Edit service location pin' })).toBeFocused();
+  await page.getByLabel('Specific service address', { exact: true }).fill('13 Service Street');
+  await expect(page.getByRole('link', { name: /View saved pin/ })).toHaveCount(0);
+  await page.getByRole('button', { name: 'Pin service location', exact: true }).click();
+  await picker.locator('summary').click();
+  await picker.getByLabel('Latitude', { exact: true }).fill('14.833');
+  await picker.getByLabel('Longitude', { exact: true }).fill('120.883');
+  await picker.getByRole('button', { name: 'Confirm service pin' }).click();
+  await chooseLocation(page, 'City/Municipality', 'City of Malolos');
+  await expect(page.getByRole('link', { name: /View saved pin/ })).toHaveCount(0);
+});
+
+test('recovers from denied GPS and missing tiles with validated coordinates', async ({ page }) => {
+  await page.route('https://tile.openstreetmap.org/**', route => route.abort());
+  await page.addInitScript(() => {
+    Object.defineProperty(navigator, 'geolocation', { configurable: true, value: {
+      getCurrentPosition: (_success: unknown, fail: (error: { code: number }) => void) => fail({ code: 1 }),
+    } });
+  });
+  await page.goto('/__booking-journey?address');
+  await chooseBookingArea(page);
+  await page.getByLabel('Specific service address', { exact: true }).fill('12 Service Street');
+  await page.getByRole('button', { name: 'Pin service location', exact: true }).click();
+  const picker = page.getByRole('dialog', { name: 'Pin service location', exact: true });
+  await expect(picker.getByText(/Map images could not be loaded/)).toBeVisible();
+  await picker.getByRole('button', { name: 'Use current location' }).click();
+  await expect(picker.getByRole('alert')).toContainText('permission was denied');
+  await picker.locator('summary').click();
+  await picker.getByLabel('Latitude', { exact: true }).fill('91');
+  await picker.getByLabel('Longitude', { exact: true }).fill('120.883');
+  await expect(picker.getByRole('button', { name: 'Confirm service pin' })).toBeDisabled();
+  await picker.getByLabel('Latitude', { exact: true }).fill('14.833');
+  await picker.getByRole('button', { name: 'Confirm service pin' }).click();
+  await expect(page.getByRole('link', { name: /View saved pin on Google Maps/ })).toBeVisible();
+  await page.getByRole('button', { name: 'Remove pin', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Pin service location', exact: true })).toBeVisible();
+});
+
+test('keeps a manually chosen pin when a delayed GPS response arrives', async ({ page }) => {
+  await page.addInitScript(() => {
+    Object.defineProperty(navigator, 'geolocation', { configurable: true, value: {
+      getCurrentPosition: (success: (position: { coords: { latitude: number; longitude: number } }) => void) => {
+        Object.assign(window, { deliverLocation: () => success({ coords: { latitude: 10, longitude: 125 } }) });
+      },
+    } });
+  });
+  await page.goto('/__booking-journey?address');
+  await chooseBookingArea(page);
+  await page.getByLabel('Specific service address', { exact: true }).fill('12 Service Street');
+  await page.getByRole('button', { name: 'Pin service location', exact: true }).click();
+  const picker = page.getByRole('dialog', { name: 'Pin service location', exact: true });
+  await expect(picker.getByRole('button', { name: 'Use current location' })).toBeEnabled();
+  await picker.getByRole('button', { name: 'Use current location' }).click();
+  await picker.locator('summary').click();
+  await picker.getByLabel('Latitude', { exact: true }).fill('14.833');
+  await picker.getByLabel('Longitude', { exact: true }).fill('120.883');
+  await page.evaluate(() => (window as Window & { deliverLocation: () => void }).deliverLocation());
+  await expect(picker.getByLabel('Latitude', { exact: true })).toHaveValue('14.833');
+  await picker.getByRole('button', { name: 'Confirm service pin' }).click();
+  await expect(page.getByRole('link', { name: /View saved pin/ })).toHaveAttribute('href', /query=14\.833%2C120\.883/);
 });
 
 test("one-click sandbox never creates a booking hold when setup is missing", async ({ page }) => {
@@ -97,7 +234,7 @@ for (const width of [390,768,1024,1280,1440]) test(`new booking collects its ser
   expect(calls).toHaveLength(0);
   await chooseBookingArea(page);
   await page.getByLabel('Specific service address', { exact: true }).fill('12 Service Street');
-  await expect(page.getByRole('link', { name: /View on Google Maps/ })).toHaveAttribute('href', /12\+Service\+Street.*Poblacion.*Guiguinto.*Bulacan/);
+  await expect(page.getByRole('link', { name: /Search address on Google Maps/ })).toHaveAttribute('href', /12\+Service\+Street.*Poblacion.*Guiguinto.*Bulacan/);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
   await page.screenshot({ path: testInfo.outputPath('booking-location.png'), fullPage: true });
   await page.getByRole('button', { name: 'Reserve and continue' }).click();
@@ -133,7 +270,7 @@ test('checkout starts with the saved profile location and lets the client change
   await page.goto('/__booking-journey?address&profile-address');
   await expect(page.getByText(/saved profile address is filled in/i)).toBeVisible();
   await expect(page.getByLabel('Specific service address', { exact: true })).toHaveValue('12 Profile Street');
-  await expect(page.getByRole('link', { name: /View on Google Maps/ })).toHaveAttribute('href', /12\+Profile\+Street.*Poblacion.*Guiguinto.*Bulacan/);
+  await expect(page.getByRole('link', { name: /Search address on Google Maps/ })).toHaveAttribute('href', /12\+Profile\+Street.*Poblacion.*Guiguinto.*Bulacan/);
   await page.getByLabel('Specific service address', { exact: true }).fill('45 Job Street');
   await page.getByRole('button', { name: 'Use profile address' }).click();
   await expect(page.getByLabel('Specific service address', { exact: true })).toHaveValue('12 Profile Street');
@@ -145,7 +282,7 @@ test('supports Metro Manila without a province', async ({ page }) => {
   await chooseLocation(page, 'City/Municipality', 'Quezon City');
   await chooseLocation(page, 'Barangay', 'Alicia');
   await page.getByLabel('Specific service address', { exact: true }).fill('12 Test Street');
-  await expect(page.getByRole('link', { name: /View on Google Maps/ })).toHaveAttribute('href', /Quezon\+City.*Metro\+Manila/);
+  await expect(page.getByRole('link', { name: /Search address on Google Maps/ })).toHaveAttribute('href', /Quezon\+City.*Metro\+Manila/);
 });
 
 test('retries failed location requests and offers manual entry without blocking checkout', async ({ page }) => {
@@ -165,7 +302,7 @@ test('retries failed location requests and offers manual entry without blocking 
   await page.getByLabel('City/Municipality', { exact: true }).fill('Guiguinto');
   await page.getByLabel('Barangay', { exact: true }).fill('Poblacion');
   await page.getByLabel('Specific service address', { exact: true }).fill('12 Service Street');
-  await expect(page.getByRole('link', { name: /View on Google Maps/ })).toBeVisible();
+  await expect(page.getByRole('link', { name: /Search address on Google Maps/ })).toBeVisible();
 });
 
 for (const width of [390, 768, 1024, 1280, 1440]) {

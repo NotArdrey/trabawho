@@ -15,6 +15,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { BookingReplacementSchedule } from "@/features/bookings/components/BookingReplacementSchedule";
 import { BookingRefundStage } from "@/features/bookings/components/BookingRefundStage";
+import { BookingServiceLocation } from './BookingServiceLocation';
 import type { ActiveReplacementSchedule } from "@/features/bookings/services/replacementSchedules";
 import { isShowcasePaymentReference } from "@/features/bookings/utils/bookingPaymentPresentation";
 import { formatBookingCreatedAt } from "@/features/bookings/utils/bookingCreatedAt";
@@ -28,6 +29,7 @@ import {
 } from "@/components/ui/dialog";
 
 export interface BookingDetails {
+  raw?: { metadata?: unknown };
   clientName?: string;
   createdAt?: string | null;
   completedAt?: string;
@@ -188,6 +190,7 @@ export function BookingDetailsDialog({ booking, isProviderView, onClose, onMessa
         </DialogHeader>
 
         <div className="grid gap-4 px-4 py-5 sm:px-6">
+          <BookingServiceLocation metadata={booking.raw?.metadata} />
           <section className={nextStep.complete ? "flex gap-3 rounded-xl border border-emerald-200 bg-emerald-50 p-4 dark:border-emerald-900 dark:bg-emerald-950/40" : "flex gap-3 rounded-xl border border-primary/20 bg-primary/5 p-4"} aria-labelledby="booking-next-step-heading">
             <span className={nextStep.complete ? "flex size-10 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-900 dark:text-emerald-300" : "flex size-10 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground"}>
               <NextStepIcon className="size-5" aria-hidden="true" />

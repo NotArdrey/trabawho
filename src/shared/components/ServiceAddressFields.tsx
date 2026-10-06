@@ -5,8 +5,8 @@ import { LocationAddressFields } from './LocationAddressFields';
 export function ServiceAddressFields({ value, onChange, precise = true, disabled = false, prefix = 'service' }: {
   value: ServiceAddress; onChange: (value: ServiceAddress) => void; precise?: boolean; disabled?: boolean; prefix?: string;
 }) {
-  if (precise) return <LocationAddressFields value={value} onChange={onChange} disabled={disabled} prefix={prefix} />;
-  const fields: { key: keyof ServiceAddress; label: string }[] = [
+  if (precise) return <LocationAddressFields value={value} onChange={onChange} disabled={disabled} prefix={prefix} enablePin />;
+  const fields: { key: 'province' | 'city' | 'barangay'; label: string }[] = [
     { key: 'province', label: 'Province' }, { key: 'city', label: 'City/Municipality' },
     { key: 'barangay', label: 'Barangay' },
   ];

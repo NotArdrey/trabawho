@@ -3,7 +3,9 @@
   "version": "0.1.0",
   "description": "TrabaWho service marketplace for trusted local work.",
   "private": true,
-  "engines": { "node": ">=22.17 <26" },
+  "engines": {
+    "node": ">=22.17 <26"
+  },
   "repository": {
     "type": "git",
     "url": "https://github.com/NotArdrey/trabawho.git"
@@ -23,6 +25,7 @@
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "jspdf": "^4.2.1",
+    "leaflet": "^1.9.4",
     "lucide-react": "^1.14.0",
     "playwright-core": "1.59.1",
     "react": "^19.2.4",
@@ -47,7 +50,7 @@
     "typecheck": "tsc -b --pretty false",
     "lint": "eslint . --max-warnings 0",
     "test": "vitest run",
-    "test:standards": "node --test scripts/standards-guards.test.mjs scripts/supabase-contracts.test.mts scripts/system-email-config.test.mts tests/integration/account-roles.node.mts tests/integration/registration-endpoint.node.mts tests/integration/account-access.node.mts tests/integration/service-availability.node.mts tests/integration/provider-booking-capacity.node.mts tests/integration/pending-refund-review.node.mts tests/integration/paid-cancellation-refund.node.mts",
+    "test:standards": "node --test scripts/standards-guards.test.mjs scripts/supabase-contracts.test.mts scripts/system-email-config.test.mts tests/integration/account-roles.node.mts tests/integration/registration-endpoint.node.mts tests/integration/account-access.node.mts tests/integration/service-availability.node.mts tests/integration/provider-booking-capacity.node.mts tests/integration/pending-refund-review.node.mts tests/integration/paid-cancellation-refund.node.mts tests/integration/booking-service-pin.node.mts",
     "test:watch": "vitest",
     "test:e2e": "playwright test",
     "test:e2e:ai-redesign": "playwright test tests/e2e/ai-redesign-smoke.e2e.spec.ts",
@@ -68,6 +71,7 @@
     "@testing-library/react": "^16.3.2",
     "@testing-library/user-event": "^14.6.1",
     "@types/google.maps": "^3.66.5",
+    "@types/leaflet": "^1.9.22",
     "@types/node": "^24.5.2",
     "@types/react": "^19.2.18",
     "@types/react-dom": "^19.2.7",

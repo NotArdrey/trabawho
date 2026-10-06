@@ -37,6 +37,7 @@ describe("AccountPrivacyPanel", () => {
     expect(screen.queryByRole("textbox", { name: "First name" })).not.toBeInTheDocument();
     expect(screen.queryByRole("textbox", { name: "Login email" })).not.toBeInTheDocument();
     expect(screen.getByLabelText("Street address")).toHaveValue("San Roque");
+    expect(screen.queryByRole("button", { name: "Pin service location" })).not.toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Save contact and location" }));
     await waitFor(() => expect(onUpdateProfile).toHaveBeenCalledWith(expect.objectContaining({

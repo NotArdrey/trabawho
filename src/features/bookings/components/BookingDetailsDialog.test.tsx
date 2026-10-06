@@ -24,6 +24,16 @@ const booking = {
 };
 
 describe("BookingDetailsDialog", () => {
+  it('shows providers the saved booking address and exact navigation pin', () => {
+    render(<BookingDetailsDialog booking={{ ...booking, raw: { metadata: { service_address: {
+      province: 'Bulacan', city: 'Guiguinto', barangay: 'Poblacion', address: '12 Service Street',
+      pin: { latitude: 14.833, longitude: 120.883 },
+    } } } }} isProviderView statusLabel="Confirmed" onClose={vi.fn()} onMessage={vi.fn()} />);
+    expect(screen.getByText(/12 Service Street, Poblacion, Guiguinto, Bulacan/)).toBeVisible();
+    const link = screen.getByRole('link', { name: /View service pin on Google Maps/ });
+    expect(new URL(link.getAttribute('href')!).searchParams.get('query')).toBe('14.833,120.883');
+    expect(link).toHaveAttribute('rel', 'noopener noreferrer');
+  });
   it("organizes details into meaningful categories", () => {
     render(<BookingDetailsDialog booking={{ ...booking, createdAt: "2026-10-05T05:07:00Z" }} isProviderView={false} statusLabel="Payment Pending" onClose={vi.fn()} onMessage={vi.fn()} />);
 

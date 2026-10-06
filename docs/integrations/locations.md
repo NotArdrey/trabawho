@@ -2,7 +2,17 @@
 
 Booking checkout uses cascading province, city/municipality, and barangay dropdowns from the [PSGC API](https://psgc.gitlab.io/api/). Metro Manila appears in the province selector and loads its cities from the NCR region endpoint. Changing a location clears dependent selections and the specific address. Failed requests offer retry and manual entry.
 
-The street, building, house, or unit address remains editable. The Google Maps search link includes the selected area and works without an API key.
+The street, building, house, or unit address remains editable. **Pin service location** opens a Leaflet map inside checkout without a Google API key. Tap the map, drag the marker, use current location (after browser permission), or enter coordinates. Keyboard users can pan with the arrow keys, zoom with +/−, and choose **Place pin at map center**. Confirm returns to payment; Cancel discards changes. Changing address text or any area clears the previous pin. Pins are optional, preserving manual checkout when map services are unavailable.
+
+The picker starts at the Philippines when no pin is selected. It does not geocode private address text or automatically match it to the selected area. Users must locate and confirm the exact destination. Map code and Leaflet's vendor CSS load only when the picker opens; application global CSS is unchanged.
+
+Coordinates travel as `serviceAddress.pin: { latitude, longitude }` through the existing checkout payload. Apply `20261006123000_booking_service_location_pin.sql` to persist them in the booking's private `metadata.service_address` snapshot. The migration validates coordinates before reserving a time and preserves authentication, account-role, payment, and retry rules. A pin supplied at first checkout captures the chosen service address, including for an existing quoted booking. Reservation retries and subsequent balance payments retain that snapshot. Checkout shows its existing processing screen while creating a reservation, preventing address or pin edits. Profile addresses do not store coordinates. The current Edge Function already forwards the address JSON and needs no code change. This migration was applied to the linked Supabase project on October 6, 2026; other environments must apply it too, because the previous database function discards pins.
+
+Booking details show the saved address and a Google Maps link using exact coordinates when available; older records use address search. Google Maps navigation links work without a key.
+
+## Map tiles
+
+The default is `https://tile.openstreetmap.org/{z}/{x}/{y}.png`. Keep visible OpenStreetMap attribution, normal browser Referer headers, and browser caching; do not add offline downloads, prefetching, or cache-busting. Tiles load only for the viewed map. Public OSM tiles are best-effort, have no SLA, and may block heavy use; follow the [tile usage policy](https://operations.osmfoundation.org/policies/tiles/). For larger deployments, configure a suitable raster provider through `VITE_MAP_TILE_URL` and rebuild. The current attribution is OpenStreetMap-only, so choose a provider permitting that attribution or update the picker credits to satisfy its terms. Public Nominatim is not used.
 
 ## Google Maps address suggestions
 

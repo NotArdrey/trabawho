@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
-import type { ServiceAddress } from '@/shared/domain/serviceAddress';
+import { serviceMapsUrl, type ServiceAddress } from '@/shared/domain/serviceAddress';
 import { useAddressSuggestions } from '@/shared/hooks/useAddressSuggestions';
 import type { AddressSuggestion } from '@/shared/services/googlePlaces';
 
@@ -29,7 +29,7 @@ export function SpecificAddressField({ value, onChange, disabled, prefix, label 
   const id = `${prefix}-address`;
   const listId = `${id}-suggestions`;
   const expanded = open && suggestions.options.length > 0;
-  const mapsUrl = `https://www.google.com/maps/search/?${new URLSearchParams({ api: '1', query })}`;
+  const mapsUrl = serviceMapsUrl(value);
 
   async function selectSuggestion(option: AddressSuggestion) {
     const version = ++selectionVersion.current;
@@ -90,14 +90,14 @@ export function SpecificAddressField({ value, onChange, disabled, prefix, label 
     </div>
     <p id={`${id}-help`} className="text-xs text-muted-foreground">{configured
       ? 'Choose a Google Maps suggestion or type the full address. Include your house or unit number.'
-      : 'Include your house or unit number. You can check the address on Google Maps.'}</p>
+      : 'Include your house or unit number.'}</p>
     <p id={`${id}-status`} role="status" className="text-xs text-muted-foreground">
       {selecting ? 'Loading selected address…' : suggestions.loading ? 'Finding addresses…'
         : suggestions.error || selectionError ? 'Google Maps suggestions are unavailable. You can still type the full address.'
         : configured && open && query && !suggestions.options.length ? 'No matching addresses. You can type the full address.' : ''}
     </p>
     {query && <Button asChild variant="ghost" className="max-w-full px-0 text-primary">
-      <a href={mapsUrl} target="_blank" rel="noopener noreferrer"><MapPin aria-hidden="true" />View on Google Maps<span className="sr-only"> (opens in a new tab)</span></a>
+      <a href={mapsUrl} target="_blank" rel="noopener noreferrer"><MapPin aria-hidden="true" />{value.pin ? 'View saved pin on Google Maps' : 'Search address on Google Maps'}<span className="sr-only"> (opens in a new tab)</span></a>
     </Button>}
   </div>;
 }

@@ -7,6 +7,7 @@ import { useLocationOptions } from '@/shared/hooks/useLocationOptions';
 import { metroManilaCode } from '@/shared/services/philippineLocations';
 import type { ServiceAddress } from '@/shared/domain/serviceAddress';
 import { SpecificAddressField } from './SpecificAddressField';
+import { ServiceLocationPin } from './ServiceLocationPin';
 
 export interface LocationAddressFieldsProps {
   value: ServiceAddress;
@@ -16,9 +17,10 @@ export interface LocationAddressFieldsProps {
   legend?: string;
   description?: string;
   addressLabel?: string;
+  enablePin?: boolean;
 }
 
-export function LocationAddressFields({ value, onChange, disabled, prefix, legend = 'Where will the service take place?', description = 'Select your province, city or municipality, and barangay. Then enter the street and house or unit number.', addressLabel }: LocationAddressFieldsProps) {
+export function LocationAddressFields({ value, onChange, disabled, prefix, legend = 'Where will the service take place?', description = 'Select your province, city or municipality, and barangay. Then enter the street and house or unit number.', addressLabel, enablePin = false }: LocationAddressFieldsProps) {
   const [retry, setRetry] = useState(0);
   const [manual, setManual] = useState(false);
   const provinces = useLocationOptions('/provinces/', retry);
@@ -35,7 +37,7 @@ export function LocationAddressFields({ value, onChange, disabled, prefix, legen
   ] as const;
 
   function selectLocation(key: 'province' | 'city' | 'barangay', name: string) {
-    onChange({ ...value, [key]: name,
+    onChange({ ...value, pin: undefined, [key]: name,
       ...(key === 'province' ? { city: '', barangay: '', address: '' } : {}),
       ...(key === 'city' ? { barangay: '', address: '' } : {}),
       ...(key === 'barangay' ? { address: '' } : {}),
@@ -54,9 +56,10 @@ export function LocationAddressFields({ value, onChange, disabled, prefix, legen
           disabled={disabled || !available || list.loading || list.error}
           options={list.options.map((option) => ({ value: option.name, label: option.name }))}
           onValueChange={(name) => selectLocation(key, name)} />)}
-      <SpecificAddressField key={[value.province, value.city, value.barangay].join('|')} value={value} onChange={(address) => onChange({ ...value, address })}
+      <SpecificAddressField key={[value.province, value.city, value.barangay].join('|')} value={value} onChange={(address) => onChange({ ...value, address, pin: undefined })}
         disabled={disabled} prefix={prefix} label={addressLabel} />
     </div>
+    {enablePin && <ServiceLocationPin value={value} onChange={onChange} disabled={disabled} />}
     {locationError && !manual && <div className="space-y-2">
       <p role="alert" className="text-sm text-destructive">Location options could not be loaded. Retry or enter your location manually.</p>
       <div className="flex flex-wrap gap-2">
