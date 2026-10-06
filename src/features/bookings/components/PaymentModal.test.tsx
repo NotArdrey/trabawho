@@ -14,6 +14,23 @@ const booking = {
 
 describe("PaymentModal", () => {
   afterEach(() => { vi.unstubAllEnvs(); vi.unstubAllGlobals(); });
+  it("prefills a complete profile address but keeps the job location editable", async () => {
+    const user = userEvent.setup();
+    const onSelectPayment = vi.fn().mockResolvedValue(undefined);
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: true, json: () => Promise.resolve([]) }));
+    render(<PaymentModal booking={booking} collectServiceAddress savedServiceAddress={{
+      province: "Bulacan", city: "Baliuag", barangay: "San Roque", address: "12 Main Street",
+    }} onSelectPayment={onSelectPayment} onCancel={vi.fn()} />);
+    expect(screen.getByText(/saved profile address is filled in/i)).toBeVisible();
+    const address = screen.getByRole("combobox", { name: "Specific service address" });
+    expect(address).toHaveValue("12 Main Street");
+    await user.clear(address);
+    await user.type(address, "45 Other Street");
+    await user.click(screen.getByRole("button", { name: "Reserve and continue" }));
+    expect(onSelectPayment).toHaveBeenCalledWith("paymongo-card", expect.objectContaining({ serviceAddress: {
+      province: "Bulacan", city: "Baliuag", barangay: "San Roque", address: "45 Other Street",
+    } }));
+  });
   it("reviews terms only after the payment summary and returns to it when cancelled", async () => {
     const user = userEvent.setup();
     const onSelectPayment = vi.fn().mockResolvedValue(undefined);

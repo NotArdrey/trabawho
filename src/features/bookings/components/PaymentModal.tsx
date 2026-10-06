@@ -89,6 +89,7 @@ export interface PaymentModalProps {
   transactionFeeRate?: number | string | null;
   requireBookingTerms?: boolean;
   collectServiceAddress?: boolean;
+  savedServiceAddress?: Partial<ServiceAddress> | null;
 }
 
 function formatPhp(value: number | string | null | undefined) {
@@ -140,6 +141,7 @@ export default function PaymentModal({
   transactionFeeRate,
   requireBookingTerms = false,
   collectServiceAddress = booking.bookingMode === 'calendar-only' && booking.paymentStatus !== 'partially_paid',
+  savedServiceAddress,
 }: PaymentModalProps) {
   const sandboxAvailable = useSandboxCheckoutAvailable();
   const allowsPayMongo = true;
@@ -155,7 +157,14 @@ export default function PaymentModal({
   const [submitError, setSubmitError] = useState("");
   const [reviewingTerms, setReviewingTerms] = useState(false);
   const [selectedTestCheckout, setSelectedTestCheckout] = useState(false);
-  const [serviceAddress, setServiceAddress] = useState(emptyServiceAddress);
+  const candidateAddress: ServiceAddress = {
+    province: savedServiceAddress?.province || "",
+    city: savedServiceAddress?.city || "",
+    barangay: savedServiceAddress?.barangay || "",
+    address: savedServiceAddress?.address || "",
+  };
+  const profileAddress = serviceAddressValid(candidateAddress) ? candidateAddress : null;
+  const [serviceAddress, setServiceAddress] = useState<ServiceAddress>(() => profileAddress || emptyServiceAddress);
 
   const amountDueNow = isPayingRemainingBalance
     ? Number(booking.balanceDueAmount || pricing.downpaymentBalanceAmount)
@@ -247,7 +256,13 @@ export default function PaymentModal({
         ) : (
           <>
           <div className="grid gap-5 px-4 py-5 sm:px-6 sm:py-6">
-          {collectServiceAddress && <ServiceAddressFields value={serviceAddress} onChange={setServiceAddress} />}
+          {collectServiceAddress && <div className="space-y-3">
+            {profileAddress && <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-primary/5 px-3 py-2 text-sm">
+              <p className="text-muted-foreground">Your saved profile address is filled in. Check that this is where the work will happen.</p>
+              <Button type="button" variant="outline" onClick={() => setServiceAddress(profileAddress)}>Use profile address</Button>
+            </div>}
+            <ServiceAddressFields value={serviceAddress} onChange={setServiceAddress} />
+          </div>}
           <section className="grid gap-4 rounded-xl bg-muted/45 p-4 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center" aria-labelledby="payment-summary-heading">
             <div className="min-w-0">
               <p id="payment-summary-heading" className="text-xs font-bold uppercase tracking-wide text-muted-foreground">Booking summary</p>

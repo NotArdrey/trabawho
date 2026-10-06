@@ -7,9 +7,9 @@ for (const width of [390, 768, 1024, 1280, 1440]) {
       <script type="module">import RefreshRuntime from '/@react-refresh';RefreshRuntime.injectIntoGlobalHook(window);window.$RefreshReg$=()=>{};window.$RefreshSig$=()=>(type)=>type;window.__vite_plugin_react_preamble_installed__=true;</script>
       </head><body><div id="root"></div><script type="module" src="/tests/e2e/fixtures/account-privacy-journey.tsx"></script></body></html>` }));
     await page.goto("/__account-privacy");
-    await expect(page.getByLabel("First name")).toHaveAttribute("readonly");
-    await expect(page.getByLabel("Middle name")).toHaveAttribute("readonly");
-    await expect(page.getByLabel("Last name")).toHaveAttribute("readonly");
+    await expect(page.getByText("First name")).toBeVisible();
+    await expect(page.getByRole("textbox", { name: "First name" })).toHaveCount(0);
+    await expect(page.getByRole("textbox", { name: "Login email" })).toHaveCount(0);
     await expect(page.getByRole("button", { name: "Save contact and location" })).toBeVisible();
     await page.getByLabel("Current password").evaluate((element: HTMLInputElement) => { element.value = "old-password"; });
     await page.getByLabel("New password", { exact: true }).fill("new-password");

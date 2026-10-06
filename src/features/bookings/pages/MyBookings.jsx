@@ -887,7 +887,7 @@ const MyBookings = ({
       />
 
       {currentBooking && uiState === 'payment' && (
-        <PaymentModal
+        <PaymentModal savedServiceAddress={sellerProfile?.location || sellerProfile}
           booking={pendingCheckoutSlot?.bookingId === currentBooking.id
             ? { ...currentBooking, selectedSlot: pendingCheckoutSlot.slot }
             : currentBooking}

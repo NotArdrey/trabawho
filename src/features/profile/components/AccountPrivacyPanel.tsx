@@ -1,21 +1,14 @@
-import { useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import { ChevronDown, LockKeyhole, ShieldCheck, UserRound } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
-
-const PSGC_BASE_URL = "https://psgc.gitlab.io/api";
-const BULACAN_CODE = "031400000";
-
-interface LocationOption {
-  code: string;
-  name: string;
-}
+import { LocationAddressFields } from "@/shared/components/LocationAddressFields";
+import { emptyServiceAddress, serviceAddressValid, type ServiceAddress } from "@/shared/domain/serviceAddress";
 
 export interface AccountProfileDetails {
   address?: string;
@@ -54,12 +47,6 @@ const splitNameParts = (value = "") => {
   return { firstName: parts[0], middleName: parts.slice(1, -1).join(" "), lastName: parts.at(-1) || "" };
 };
 
-async function fetchOptions(path: string): Promise<LocationOption[]> {
-  const response = await fetch(`${PSGC_BASE_URL}${path}`);
-  if (!response.ok) throw new Error("Location service is unavailable.");
-  return response.json() as Promise<LocationOption[]>;
-}
-
 function AccountPrivacyPanel({
   collapsible = true,
   defaultExpanded = false,
@@ -71,80 +58,46 @@ function AccountPrivacyPanel({
   const initialName = sellerProfile?.firstName || sellerProfile?.lastName
     ? { firstName: sellerProfile.firstName || "", middleName: sellerProfile.middleName || "", lastName: sellerProfile.lastName || "" }
     : splitNameParts(sellerProfile?.fullName || "");
-  const initialCity = userLocation?.city || sellerProfile?.city || "";
-  const initialBarangay = userLocation?.barangay || sellerProfile?.barangay || "";
   const [isExpanded, setIsExpanded] = useState(defaultExpanded || !collapsible);
-  const [email] = useState(sellerProfile?.email || "");
+  const editedContactRef = useRef(false);
   const [phone, setPhone] = useState(sellerProfile?.phoneNumber || "");
-  const [address, setAddress] = useState(userLocation?.address || sellerProfile?.address || "");
-  const [cities, setCities] = useState<LocationOption[]>([]);
-  const [barangays, setBarangays] = useState<LocationOption[]>([]);
-  const [selectedCityCode, setSelectedCityCode] = useState("");
-  const [selectedBarangayCode, setSelectedBarangayCode] = useState("");
+  const [location, setLocation] = useState<ServiceAddress>(() => ({
+    ...emptyServiceAddress,
+    province: userLocation?.province || sellerProfile?.province || "",
+    city: userLocation?.city || sellerProfile?.city || "",
+    barangay: userLocation?.barangay || sellerProfile?.barangay || "",
+    address: userLocation?.address || sellerProfile?.address || "",
+  }));
   const [locationError, setLocationError] = useState("");
-  const [isLoadingLocations, setIsLoadingLocations] = useState(false);
   const [isSavingProfile, setIsSavingProfile] = useState(false);
   const [passwordError, setPasswordError] = useState("");
   const [isSavingPassword, setIsSavingPassword] = useState(false);
 
-  const loadBarangays = async (cityCode: string, expectedBarangay = "") => {
-    if (!cityCode) {
-      setBarangays([]);
-      setSelectedBarangayCode("");
-      return;
-    }
-    const rows = await fetchOptions(`/cities-municipalities/${cityCode}/barangays/`);
-    setBarangays(rows);
-    const match = rows.find((item) => item.name.toLowerCase() === expectedBarangay.toLowerCase());
-    setSelectedBarangayCode(match?.code || "");
-  };
-
-  const loadLocations = async () => {
-    if (cities.length > 0 || isLoadingLocations) return;
-    try {
-      setLocationError("");
-      setIsLoadingLocations(true);
-      const rows = await fetchOptions(`/provinces/${BULACAN_CODE}/cities-municipalities/`);
-      setCities(rows);
-      const city = rows.find((item) => item.name.toLowerCase() === initialCity.toLowerCase());
-      if (city) {
-        setSelectedCityCode(city.code);
-        await loadBarangays(city.code, initialBarangay);
-      }
-    } catch (error) {
-      setLocationError(error instanceof Error ? error.message : "Could not load location options.");
-    } finally {
-      setIsLoadingLocations(false);
-    }
-  };
+  useEffect(() => {
+    if (editedContactRef.current) return;
+    setPhone(sellerProfile?.phoneNumber || "");
+    setLocation({
+      province: userLocation?.province || sellerProfile?.province || "",
+      city: userLocation?.city || sellerProfile?.city || "",
+      barangay: userLocation?.barangay || sellerProfile?.barangay || "",
+      address: userLocation?.address || sellerProfile?.address || "",
+    });
+  }, [sellerProfile?.phoneNumber, sellerProfile?.province, sellerProfile?.city, sellerProfile?.barangay, sellerProfile?.address,
+    userLocation?.province, userLocation?.city, userLocation?.barangay, userLocation?.address]);
 
   const toggleExpanded = () => {
     if (!collapsible) return;
     const next = !isExpanded;
     setIsExpanded(next);
-    if (next) void loadLocations();
-  };
-
-  const handleCityChange = async (cityCode: string) => {
-    setSelectedCityCode(cityCode);
-    setSelectedBarangayCode("");
-    try {
-      setLocationError("");
-      await loadBarangays(cityCode);
-    } catch (error) {
-      setLocationError(error instanceof Error ? error.message : "Could not load barangays.");
-    }
   };
 
   const savePersonalInfo = async () => {
-    if (!phone.trim() || !address.trim()) return setLocationError("Phone and street address are required.");
+    if (!phone.trim() || !serviceAddressValid(location)) return setLocationError("Enter your phone, province, city, barangay, and street address.");
     if (!onUpdateProfile) return setLocationError("Profile updates are unavailable right now.");
-    const city = cities.find((item) => item.code === selectedCityCode)?.name || initialCity;
-    const barangay = barangays.find((item) => item.code === selectedBarangayCode)?.name || initialBarangay;
     try {
       setLocationError("");
       setIsSavingProfile(true);
-      await onUpdateProfile({ phoneNumber: phone, province: userLocation?.province || sellerProfile?.province || "Bulacan", city, barangay, address });
+      await onUpdateProfile({ phoneNumber: phone.trim(), ...location });
       toast.success("Contact and location saved.");
     } catch (error) {
       setLocationError(error instanceof Error ? error.message : "Unable to save personal information.");
@@ -197,15 +150,16 @@ function AccountPrivacyPanel({
           <div className="mb-4 flex items-start gap-3"><UserRound className="mt-0.5 size-5 text-primary" aria-hidden="true" /><div><h2 id="personal-info-title" className="font-semibold">Personal information</h2><p className="text-sm text-muted-foreground">Your account name is protected; contact and location can be updated.</p></div></div>
           <p id="account-name-help" className="mb-4 rounded-lg bg-primary/5 px-3 py-2 text-sm text-muted-foreground">Name changes require a separate identity review. Contact support if your name needs correction.</p>
           <div className="grid gap-4 sm:grid-cols-2">
-            <div className="space-y-2"><Label htmlFor="account-first-name">First name</Label><Input id="account-first-name" value={initialName.firstName} readOnly aria-describedby="account-name-help" className="bg-muted/50" /></div>
-            <div className="space-y-2"><Label htmlFor="account-middle-name">Middle name</Label><Input id="account-middle-name" value={initialName.middleName} readOnly aria-describedby="account-name-help" className="bg-muted/50" /></div>
-            <div className="space-y-2"><Label htmlFor="account-last-name">Last name</Label><Input id="account-last-name" value={initialName.lastName} readOnly aria-describedby="account-name-help" className="bg-muted/50" /></div>
-            <div className="space-y-2"><Label htmlFor="account-email">Login email</Label><Input id="account-email" type="email" value={email} readOnly className="bg-muted/50" /><p className="text-xs text-muted-foreground">Email changes are managed through authentication.</p></div>
-            <div className="space-y-2"><Label htmlFor="account-phone">Phone</Label><Input id="account-phone" type="tel" value={phone} autoComplete="tel" onChange={(event) => setPhone(event.target.value)} /></div>
-            <div className="space-y-2"><Label htmlFor="account-address">Street address</Label><Input id="account-address" value={address} autoComplete="street-address" onChange={(event) => setAddress(event.target.value)} /></div>
-            <div className="space-y-2"><Label htmlFor="account-city">City or municipality</Label><Select value={selectedCityCode} onOpenChange={(open) => { if (open) void loadLocations(); }} onValueChange={(value) => void handleCityChange(value)} disabled={isLoadingLocations}><SelectTrigger id="account-city"><SelectValue placeholder={isLoadingLocations ? "Loading cities…" : initialCity || "Select city"} /></SelectTrigger><SelectContent>{cities.map((item) => <SelectItem key={item.code} value={item.code}>{item.name}</SelectItem>)}</SelectContent></Select></div>
-            <div className="space-y-2"><Label htmlFor="account-barangay">Barangay</Label><Select value={selectedBarangayCode} onValueChange={setSelectedBarangayCode} disabled={!selectedCityCode}><SelectTrigger id="account-barangay"><SelectValue placeholder={selectedCityCode ? initialBarangay || "Select barangay" : "Select a city first"} /></SelectTrigger><SelectContent>{barangays.map((item) => <SelectItem key={item.code} value={item.code}>{item.name}</SelectItem>)}</SelectContent></Select></div>
+            {([["First name", initialName.firstName], ["Middle name", initialName.middleName], ["Last name", initialName.lastName], ["Login email", sellerProfile?.email || ""]] as const).map(([label, value]) => <div key={label} className="space-y-2">
+              <p className="text-sm font-medium">{label}</p>
+              <p aria-label={label} aria-describedby={label === "Login email" ? "account-email-help" : "account-name-help"} className="flex min-h-11 items-center gap-2 break-all rounded-md border bg-muted/50 px-3 py-2 text-sm text-muted-foreground">
+                <LockKeyhole className="size-4 shrink-0" aria-hidden="true" />{value || "Not provided"}
+              </p>
+              {label === "Login email" && <p id="account-email-help" className="text-xs text-muted-foreground">Your login email cannot be changed here.</p>}
+            </div>)}
+            <div className="space-y-2"><Label htmlFor="account-phone">Phone</Label><Input id="account-phone" type="tel" value={phone} autoComplete="tel" onChange={(event) => { editedContactRef.current = true; setPhone(event.target.value); }} /></div>
           </div>
+          <div className="mt-5"><LocationAddressFields value={location} onChange={(next) => { editedContactRef.current = true; setLocation(next); }} disabled={isSavingProfile} prefix="account" legend="Saved location" description="Used to fill new booking addresses. You can choose a different service address at checkout." addressLabel="Street address" /></div>
           {locationError ? <p className="mt-4 rounded-lg bg-destructive/10 p-3 text-sm font-medium text-destructive" role="alert">{locationError}</p> : null}
           <div className="mt-4 flex justify-end"><Button type="button" onClick={() => void savePersonalInfo()} isLoading={isSavingProfile}>{isSavingProfile ? "Saving…" : "Save contact and location"}</Button></div>
         </section>

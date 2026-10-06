@@ -26,6 +26,7 @@ function Journey() {
     </main>;
   }
   return <PaymentModal booking={booking} confirmLabel={params.has('balance') ? 'Pay remaining balance' : undefined}
+    savedServiceAddress={params.has('profile-address') ? { province: 'Bulacan', city: 'Guiguinto', barangay: 'Poblacion', address: '12 Profile Street' } : null}
     collectServiceAddress={params.has('address')} requireBookingTerms={params.has("terms")} onCancel={() => {}} onSelectPayment={async (_method, details) => {
     if (details.testCheckout) await ensureLocalSandboxReady();
     await redirectToPayMongo(await createPayMongoCheckout({ ...booking, paymentPlan: details.paymentPlan, serviceAddress: details.serviceAddress }),

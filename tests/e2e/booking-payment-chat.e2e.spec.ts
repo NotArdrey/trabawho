@@ -129,6 +129,16 @@ test('location controls support keyboard selection and reset dependent fields', 
   await expect(page.getByRole('combobox', { name: 'Barangay', exact: true })).toBeDisabled();
 });
 
+test('checkout starts with the saved profile location and lets the client change it', async ({ page }) => {
+  await page.goto('/__booking-journey?address&profile-address');
+  await expect(page.getByText(/saved profile address is filled in/i)).toBeVisible();
+  await expect(page.getByLabel('Specific service address', { exact: true })).toHaveValue('12 Profile Street');
+  await expect(page.getByRole('link', { name: /View on Google Maps/ })).toHaveAttribute('href', /12\+Profile\+Street.*Poblacion.*Guiguinto.*Bulacan/);
+  await page.getByLabel('Specific service address', { exact: true }).fill('45 Job Street');
+  await page.getByRole('button', { name: 'Use profile address' }).click();
+  await expect(page.getByLabel('Specific service address', { exact: true })).toHaveValue('12 Profile Street');
+});
+
 test('supports Metro Manila without a province', async ({ page }) => {
   await page.goto('/__booking-journey?address');
   await chooseLocation(page, 'Province', 'Metro Manila');

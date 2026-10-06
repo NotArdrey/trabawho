@@ -8,11 +8,12 @@ import type { ServiceAddress } from '@/shared/domain/serviceAddress';
 import { useAddressSuggestions } from '@/shared/hooks/useAddressSuggestions';
 import type { AddressSuggestion } from '@/shared/services/googlePlaces';
 
-export function SpecificAddressField({ value, onChange, disabled, prefix }: {
+export function SpecificAddressField({ value, onChange, disabled, prefix, label = 'Specific service address' }: {
   value: ServiceAddress;
   onChange: (address: string) => void;
   disabled: boolean;
   prefix: string;
+  label?: string;
 }) {
   const [open, setOpen] = useState(false);
   const [activeIndex, setActiveIndex] = useState(-1);
@@ -61,7 +62,7 @@ export function SpecificAddressField({ value, onChange, disabled, prefix }: {
   }
 
   return <div className="min-w-0 space-y-2">
-    <Label htmlFor={id}>Specific service address</Label>
+    <Label htmlFor={id}>{label}</Label>
     <div className="relative">
       <Input id={id} role="combobox" aria-autocomplete="list" aria-expanded={expanded}
         aria-controls={listId} aria-activedescendant={expanded && activeIndex >= 0 ? `${id}-option-${activeIndex}` : undefined}

@@ -13,9 +13,12 @@ export interface LocationAddressFieldsProps {
   onChange: (value: ServiceAddress) => void;
   disabled: boolean;
   prefix: string;
+  legend?: string;
+  description?: string;
+  addressLabel?: string;
 }
 
-export function LocationAddressFields({ value, onChange, disabled, prefix }: LocationAddressFieldsProps) {
+export function LocationAddressFields({ value, onChange, disabled, prefix, legend = 'Where will the service take place?', description = 'Select your province, city or municipality, and barangay. Then enter the street and house or unit number.', addressLabel }: LocationAddressFieldsProps) {
   const [retry, setRetry] = useState(0);
   const [manual, setManual] = useState(false);
   const provinces = useLocationOptions('/provinces/', retry);
@@ -40,8 +43,8 @@ export function LocationAddressFields({ value, onChange, disabled, prefix }: Loc
   }
 
   return <fieldset className="space-y-3" disabled={disabled}>
-    <legend className="mb-2 font-semibold">Where will the service take place?</legend>
-    <p className="text-sm text-muted-foreground">Select your province, city or municipality, and barangay. Then enter the street and house or unit number.</p>
+    <legend className="mb-2 font-semibold">{legend}</legend>
+    <p className="text-sm text-muted-foreground">{description}</p>
     <div className="grid items-start gap-3 sm:grid-cols-2">
       {fields.map(({ key, label, list, placeholder, available }) => manual
         ? <div key={key} className="min-w-0 space-y-2"><Label htmlFor={`${prefix}-${key}`}>{label}</Label>
@@ -52,7 +55,7 @@ export function LocationAddressFields({ value, onChange, disabled, prefix }: Loc
           options={list.options.map((option) => ({ value: option.name, label: option.name }))}
           onValueChange={(name) => selectLocation(key, name)} />)}
       <SpecificAddressField key={[value.province, value.city, value.barangay].join('|')} value={value} onChange={(address) => onChange({ ...value, address })}
-        disabled={disabled} prefix={prefix} />
+        disabled={disabled} prefix={prefix} label={addressLabel} />
     </div>
     {locationError && !manual && <div className="space-y-2">
       <p role="alert" className="text-sm text-destructive">Location options could not be loaded. Retry or enter your location manually.</p>
@@ -61,6 +64,6 @@ export function LocationAddressFields({ value, onChange, disabled, prefix }: Loc
         <Button type="button" variant="ghost" disabled={disabled} onClick={() => setManual(true)}>Enter location manually</Button>
       </div>
     </div>}
-    {manual && <p role="status" className="text-sm text-muted-foreground">Enter your location manually to continue with this booking.</p>}
+    {manual && <p role="status" className="text-sm text-muted-foreground">Enter your location manually to continue.</p>}
   </fieldset>;
 }

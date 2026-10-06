@@ -69,6 +69,7 @@ export const viewMap = {
       onOpenMyBookings: context.handleOpenMyBookings,
       onOpenChatPage: context.handleOpenChatPage,
       sellerProfile: context.sellerProfile,
+      userLocation: context.userLocation,
       onOpenMyWork: context.handleOpenMyWork,
       onOpenProfile: context.handleOpenProfile,
       onOpenAccountSettings: context.handleOpenAccountSettings,

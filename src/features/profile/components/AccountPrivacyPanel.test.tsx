@@ -30,16 +30,20 @@ describe("AccountPrivacyPanel", () => {
 
     render(<AccountPrivacyPanel sellerProfile={profile} userLocation={location} onUpdateProfile={onUpdateProfile} />);
 
-    expect(screen.queryByLabelText("First name")).not.toBeInTheDocument();
+    expect(screen.queryByText("First name")).not.toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: /Account & privacy/i }));
-    expect(screen.getByLabelText("First name")).toHaveValue("Jose");
-    expect(screen.getByLabelText("First name")).toHaveAttribute("readonly");
-    expect(screen.getByLabelText("Last name")).toHaveAttribute("readonly");
+    expect(screen.getByText("Jose")).toBeVisible();
+    expect(screen.getByText("Ramos")).toBeVisible();
+    expect(screen.queryByRole("textbox", { name: "First name" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("textbox", { name: "Login email" })).not.toBeInTheDocument();
+    expect(screen.getByLabelText("Street address")).toHaveValue("San Roque");
 
     await user.click(screen.getByRole("button", { name: "Save contact and location" }));
     await waitFor(() => expect(onUpdateProfile).toHaveBeenCalledWith(expect.objectContaining({
       city: "Baliuag",
       barangay: "San Roque",
+      province: "Bulacan",
+      address: "San Roque",
     })));
     expect(onUpdateProfile.mock.calls[0][0]).not.toHaveProperty("firstName");
     expect(onUpdateProfile.mock.calls[0][0]).not.toHaveProperty("fullName");

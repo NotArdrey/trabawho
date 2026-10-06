@@ -62,6 +62,7 @@ function BrowseServicesPage({
   onOpenSellerSetup,
   onOpenMyBookings,
   sellerProfile,
+  userLocation = null,
   onOpenMyWork,
   onOpenProfile,
   onOpenAccountSettings,
@@ -384,6 +385,7 @@ function BrowseServicesPage({
       {isPaymentModalOpen && pendingBooking && (
         <PaymentModal collectServiceAddress
           booking={pendingBooking}
+          savedServiceAddress={userLocation || sellerProfile?.location || sellerProfile}
           requireBookingTerms
           onSelectPayment={handleSelectPayment}
           onCancel={() => {
