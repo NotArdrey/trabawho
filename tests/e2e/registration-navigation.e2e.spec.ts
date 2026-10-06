@@ -66,16 +66,26 @@ test('Back from identity keeps account details without requesting email', async 
 });
 
 
-for (const width of [390, 1440]) test(`Didit verification preserves keyboard access at ${width}px`, async ({ page }) => {
+for (const width of [390, 1440]) test(`hidden scrollbar preserves scrolling and keyboard access at ${width}px`, async ({ page }) => {
   await page.setViewportSize({ width, height: 640 });
   await mockAccountJourney(page, { state: 'identity_pending', signupName: 'Ana Santos' });
   await page.goto('/register');
-  await expect(page.getByTestId('auth-task-panel')).toHaveCSS('scrollbar-width', 'none');
-  await page.getByRole('button', { name: 'Verify with Didit' }).focus();
+  await page.getByRole('button', { name: 'Submit manually' }).click();
+  const panel = page.getByTestId('auth-task-panel');
+  await expect(panel).toHaveCSS('scrollbar-width', 'none');
+  if (width >= 1024) {
+    expect(await panel.evaluate(element => element.scrollHeight > element.clientHeight)).toBe(true);
+    await panel.hover();
+    await page.mouse.wheel(0, 500);
+    await expect.poll(() => panel.evaluate(element => element.scrollTop)).toBeGreaterThan(0);
+  } else {
+    await page.mouse.wheel(0, 500);
+    await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(0);
+  }
+  const input = page.getByLabel('Name on ID', { exact: true });
+  await input.focus();
   await page.keyboard.press('Tab');
-  await expect(page.getByRole('button', { name: 'Back', exact: true })).toBeFocused();
-  await page.keyboard.press('Enter');
-  await expect(page.getByRole('heading', { name: 'Continue your registration', exact: true })).toBeFocused();
+  await expect(page.getByLabel('Government document type')).toBeFocused();
   await expectNoRegistrationOverflow(page);
 });
 
@@ -109,7 +119,7 @@ test('a legacy confirmed account resumes its session after identity approval', a
   await page.goto('/register');
   await fillRegistration(page);
   await page.getByRole('button', { name: 'Verify with Didit' }).click();
-  await page.getByRole('button', { name: 'Check verification status' }).click();
+  await expect(page.getByRole('button', { name: 'Check verification status' })).toHaveCount(0);
   await expect(page.getByRole('heading', { name: 'Name on your verified ID' })).toBeVisible();
   approved = true;
   await page.getByRole('button', { name: 'Confirm my legal name' }).click();

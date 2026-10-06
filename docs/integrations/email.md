@@ -56,6 +56,15 @@ Identity updates explain the review and email-confirmation steps separately;
 they omit internal account UUIDs. Authentication templates preserve Supabase's
 `{{ .ConfirmationURL }}` and `{{ .Token }}` placeholders and include a fallback link.
 
+The final registration screen identifies the confirmation email by its subject,
+`TrabaWho: Confirm your email`, and tells users to click its blue **Confirm my email**
+button. That button uses Supabase's secure signup verification URL, with a copyable
+fallback link. Confirmation is sent after identity approval; accounts awaiting
+manual review receive it after administrator approval. A read-only check on
+2026-10-06 verified that the hosted confirmation template has the button and secure
+URL placeholder, with email confirmation required and no overriding email hook.
+This check did not send an email or establish actual inbox delivery.
+
 Run `npm run email:design` to generate reviewable HTML in `exports/email-design`.
 After verification, run `npm run email:design -- --apply` to deploy the notification
 worker and update only Auth subjects and template content using the environment
@@ -98,6 +107,23 @@ Run `node scripts/inspect-registration-email.mts` for a read-only diagnostic of
 SMTP configuration, queue counts, scheduled jobs, and review delivery states.
 It prints no credentials, recipient addresses, or identity evidence. SMTP
 acceptance and an empty failure queue do not establish inbox receipt.
+
+The diagnostic also groups recipients by role and reserved test domain without
+printing addresses. On 2026-10-06 the hosted queue showed SMTP-accepted identity,
+booking, and support notifications to reserved test addresses, including an admin
+recipient. These can produce Gmail bounce notices in the sender's inbox; that is
+different from routing the applicant's email to the sender. The worker now skips
+`.test`, `.invalid`, `.example`, `.localhost`, and the reserved `example.com`,
+`example.net`, and `example.org` domains (including subdomains), with a recorded
+skip reason. This guard runs before SMTP and approval-confirmation retries.
+The guard was deployed on 2026-10-07 (Philippine time) as `send-system-emails`
+version 8. The worker is active, and its deployed source contains the reserved
+recipient guard. An unauthorized POST returned 401 before accessing the queue;
+all Auth settings, including SMTP and the confirmation button template, matched
+the pre-deployment configuration. The 19 Deno email tests passed before deployment;
+the unchanged application source had already passed `npm run check` and the 34
+relevant registration/email Playwright journeys. No diagnostic email was sent.
+Already-sent queue rows and existing bounce messages remain historical.
 
 Database triggers enqueue new booking and lifecycle/payment/delivery/dispute/
 schedule updates, incoming messages, payment outcomes, refunds, quotes,

@@ -28,15 +28,11 @@ only this migration, record it in history, and deploy the seven function bundles
 The script rejects an existing version with a different migration name or SQL.
 Publish the verified frontend build after the backend. SMTP settings are preserved.
 
-The requested flow is now **Account details → Didit → Admin
+The requested flow is now **Account details → Didit or manual evidence → Admin
 review → Decision email → Email confirmation after approval → Sign in**. All new
 Didit submissions need admin review, including provider-approved checks. Identity
 actions explain ID/selfie processing beside their buttons and record consent when
 selected; there is no separate identity consent checkbox.
-
-Registration offers Didit verification only. The manual upload option and its
-separator have been removed from the frontend; existing submissions still proceed
-through admin review.
 
 Browser registration progress and recovery capabilities are held only in memory.
 Reloading or leaving starts a fresh form. Didit runs in a camera-enabled embedded

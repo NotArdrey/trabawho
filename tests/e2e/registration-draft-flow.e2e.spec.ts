@@ -8,7 +8,7 @@ for (const width of [390, 768, 1024, 1280, 1440]) test(`Didit submission waits f
   await fillRegistration(page,'person@example.com','worker');
   await expect(page.getByLabel('Complete name',{exact:true})).toHaveCount(0);
   await page.getByRole('button',{name:'Verify with Didit'}).click();
-  await page.getByRole('button',{name:'Check verification status'}).click();
+  await expect(page.getByRole('button', { name: 'Check verification status' })).toHaveCount(0);
   await expect(page.getByRole('heading',{name:'Identity review pending',exact:true})).toBeVisible();
   await expect(page.getByText(/If approved, confirm your email/)).toBeVisible();
   await expect(page.getByRole('checkbox',{name:/consent/})).toHaveCount(0);
@@ -71,6 +71,7 @@ test('a completed embedded Didit return checks the server and submits for admin 
   await expect(page.getByRole('link',{name:'Start booking services'})).toHaveCount(0);
 });
 
+
 test('only messages from the active Didit frame can finish verification, and messages cannot approve it',async({page})=>{
   const flow=await mockAccountJourney(page,null,{state:'identity_in_progress',sessionId:'didit-owned',sessionUrl:'https://verification.didit.me/session/test'});
   await page.context().route('https://verification.didit.me/**',route=>route.fulfill({contentType:'text/html',body:'<h1>Identity capture</h1>'}));
@@ -100,4 +101,24 @@ test('stale saved progress and forged callback status cannot restore or approve 
   await expect(page.getByRole('alert')).toHaveCount(0);
   expect(flow.requests).toHaveLength(0);
   expect(await page.evaluate(()=>sessionStorage.getItem('trabawho.pendingAccount.v2'))).toBeNull();
+});
+
+test('manual registration accepts IDs without expiration or a back side and waits for admin approval',async({page})=>{
+  const flow=await mockAccountJourney(page);
+  await page.goto('/register');await fillRegistration(page);
+  await page.getByRole('button',{name:'Submit manually'}).click();
+  await page.getByLabel('Name on ID',{exact:true}).fill('Manual Applicant');
+  await page.getByLabel('Government document type').fill('National ID');
+  await page.getByLabel('ID number',{exact:true}).fill('TEST-NATIONAL-123');
+  await page.getByRole('checkbox',{name:'My ID has no expiration date'}).check();
+  await page.getByRole('checkbox',{name:'My ID has no back side'}).check();
+  for(const slot of ['front','selfie']) await page.locator(`#manual-${slot}-image`).setInputFiles({name:`${slot}.png`,mimeType:'image/png',buffer:Buffer.from('image')});
+  await page.getByRole('button',{name:'Submit for human review'}).click();
+  await expect(page.getByRole('heading',{name:'Identity review pending'})).toBeVisible();
+  const submission=flow.requests.find(item=>item.name==='account-manual-review')?.body;
+  expect(submission).toMatchObject({noExpiration:true,backNotApplicable:true,backImage:null,expiry:'',fullName:'Manual Applicant'});
+  for(const field of ['video','address','password','serviceType']) expect(submission).not.toHaveProperty(field);
+  flow.setState({state:'email_pending',email:'person@example.com'});
+  await expect(page.getByRole('heading',{name:'Registration complete'})).toBeVisible({timeout:12000});
+  await expect(page.getByRole('link',{name:'Start booking services'})).toHaveCount(0);
 });

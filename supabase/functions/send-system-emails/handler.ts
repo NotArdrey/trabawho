@@ -1,6 +1,6 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.104.1';
 import nodemailer from 'npm:nodemailer@10.0.13';
-import { buildNotificationEmail, canEmail, deliveryFailure, type EmailEvent } from '../_shared/emailNotifications.ts';
+import { buildNotificationEmail, canEmail, deliveryFailure, isReservedEmailAddress, type EmailEvent } from '../_shared/emailNotifications.ts';
 import { deliverIdentityConfirmation } from '../_shared/identityConfirmation.ts';
 
 const json = (value: Record<string, unknown>, status = 200) => new Response(JSON.stringify(value), {
@@ -47,7 +47,9 @@ export async function handleSystemEmails(request: Request, mailerFactory = creat
       ]);
       if (account.error || preferences.error) throw new Error('Recipient could not be loaded.');
       const recipient = account.data.user;
-      if (!recipient?.email || !canEmail(event.kind, preferences.data?.email_enabled !== false, !!recipient.email_confirmed_at)) {
+      if (recipient?.email && isReservedEmailAddress(recipient.email)) {
+        outcome = { status: 'skipped', last_error: 'Reserved test email domain; delivery skipped.' }; skipped++;
+      } else if (!recipient?.email || !canEmail(event.kind, preferences.data?.email_enabled !== false, !!recipient.email_confirmed_at)) {
         outcome = { status: 'skipped', last_error: null }; skipped++;
       } else {
         // The identity event is durable: retry the inbox link if the immediate

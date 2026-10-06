@@ -97,6 +97,12 @@ export function canEmail(kind: EmailKind, enabled: boolean, confirmed: boolean) 
   return kind === 'identity' || kind === 'account' || (enabled && confirmed);
 }
 
+export function isReservedEmailAddress(email: string): boolean {
+  const domain = email.trim().toLowerCase().split('@').at(-1) || '';
+  return /(^|\.)(test|invalid|example|localhost)$/.test(domain)
+    || /(^|\.)example\.(com|net|org)$/.test(domain);
+}
+
 export function deliveryFailure(attempts: number, now = Date.now()) {
   return {
     status: attempts >= 5 ? 'failed' : 'pending',

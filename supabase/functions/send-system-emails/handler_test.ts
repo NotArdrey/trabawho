@@ -3,7 +3,7 @@ import { handleSystemEmails } from './handler.ts';
 
 const userId = '11111111-1111-4111-8111-111111111111';
 
-async function run(input: { token?: string; enabled?: boolean; confirmed?: boolean; smtpFailure?: boolean; saveFailure?: boolean; kind?: string; status?: string; confirmationFails?: boolean; alreadySent?: boolean; restricted?: boolean } = {}) {
+async function run(input: { token?: string; enabled?: boolean; confirmed?: boolean; smtpFailure?: boolean; saveFailure?: boolean; kind?: string; status?: string; confirmationFails?: boolean; alreadySent?: boolean; restricted?: boolean; recipientEmail?: string } = {}) {
   const env = { EMAIL_WORKER_SECRET: 'worker-secret', SMTP_USER: 'sender@example.test', SMTP_PASSWORD: 'test-password',
     TRABAWHO_APP_URL: 'https://trabawho.example', SUPABASE_URL: 'https://email-fixture.test', SUPABASE_ANON_KEY: 'anon-fixture', SUPABASE_SERVICE_ROLE_KEY: 'service-test-key' };
   const previous = Object.fromEntries(Object.keys(env).map((key) => [key, Deno.env.get(key)]));
@@ -22,7 +22,7 @@ async function run(input: { token?: string; enabled?: boolean; confirmed?: boole
       claims++;
       return response([{ id: 'event-1', recipient_id: userId, kind: input.kind || 'booking', payload: { status: input.status || 'confirmed', email: 'attacker@example.test' }, attempts: 1, lease_token: 'lease-1' }]);
     }
-    if (path.endsWith(`/admin/users/${userId}`)) return response({ id: userId, aud: 'authenticated', role: 'authenticated', email: 'recipient@example.test', email_confirmed_at: input.confirmed === false ? null : '2026-01-01', app_metadata: {}, user_metadata: {}, created_at: '2026-01-01' });
+    if (path.endsWith(`/admin/users/${userId}`)) return response({ id: userId, aud: 'authenticated', role: 'authenticated', email: input.recipientEmail || 'recipient@gmail.com', email_confirmed_at: input.confirmed === false ? null : '2026-01-01', app_metadata: {}, user_metadata: {}, created_at: '2026-01-01' });
     if (path.endsWith('/notification_preferences')) return response({ email_enabled: input.enabled !== false });
     if (path.endsWith('/manual_identity_reviews')) {
       if (request.method === 'PATCH') { reviewSaves.push(await request.json()); return response(null); }
@@ -33,7 +33,7 @@ async function run(input: { token?: string; enabled?: boolean; confirmed?: boole
     if (path.endsWith('/rpc/claim_identity_email_delivery')) return response(true);
     if (path.endsWith('/auth/v1/resend')) {
       confirmationRequests++;
-      assertEquals((await request.json()).email,'recipient@example.test');
+      assertEquals((await request.json()).email,'recipient@gmail.com');
       return response({},input.confirmationFails?503:200);
     }
     if (path.endsWith('/email_notification_outbox')) {
@@ -64,7 +64,8 @@ Deno.test('unauthorized worker calls cannot claim or send email', async () => {
 });
 Deno.test('delivery uses server recipient and records SMTP acceptance with a stable message ID', async () => {
   const result = await run();
-  assertEquals(result.status, 200); assertEquals(result.deliveries[0].to, 'recipient@example.test');
+  assertEquals(result.status, 200); assertEquals(result.deliveries[0].to, 'recipient@gmail.com');
+  assertEquals(result.deliveries[0].from, { name: 'TrabaWho', address: 'sender@example.test' });
   assertEquals(result.deliveries[0].messageId, '<event-1@trabawho.notifications>');
   assertEquals(result.saves[0].status, 'sent');
 });
@@ -111,4 +112,30 @@ Deno.test('decline notifications reach unconfirmed accounts without requesting c
   assertEquals(result.confirmationRequests,0);
   assertEquals(result.deliveries.length,1);
   assert(String(result.deliveries[0].subject).includes('Registration declined'));
+});
+
+Deno.test('reserved test recipients skip SMTP and approval confirmation without retrying', async () => {
+  for (const recipientEmail of ['admin@example.com', 'worker@mail.example.net', 'user@example.org',
+    'user@fixture.test', 'user@mail.invalid', 'user@fixture.example', 'user@localhost', 'Admin@EXAMPLE.COM']) {
+    const result = await run({ kind: 'identity', status: 'APPROVED', confirmed: false, recipientEmail });
+    assertEquals(result.status, 200);
+    assertEquals(result.deliveries.length, 0);
+    assertEquals(result.confirmationRequests, 0);
+    assertEquals(result.body, { sent: 0, failed: 0, skipped: 1 });
+    assertEquals(result.saves[0].status, 'skipped');
+    assertEquals(result.saves[0].lease_token, null);
+    assertEquals(result.saves[0].last_error, 'Reserved test email domain; delivery skipped.');
+  }
+  for (const kind of ['booking', 'support', 'identity']) {
+    assertEquals((await run({ kind, status: 'PENDING_REVIEW', recipientEmail: 'admin@example.com' })).deliveries.length, 0);
+  }
+});
+
+Deno.test('pending identity updates use the registered inbox even before confirmation', async () => {
+  for (const recipientEmail of ['registered-user@gmail.com', 'worker@myexample.com', 'admin@example.com.ph']) {
+    const result = await run({ kind: 'identity', status: 'PENDING_REVIEW', confirmed: false, recipientEmail });
+    assertEquals(result.deliveries[0].to, recipientEmail);
+    assertEquals(result.confirmationRequests, 0);
+    assertEquals(result.saves[0].status, 'sent');
+  }
 });

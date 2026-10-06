@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { corsHeaders, expectNoRegistrationOverflow, mockAccountJourney } from './helpers/registration';
+import { corsHeaders, expectNoRegistrationOverflow, fillManualEvidence, mockAccountJourney } from './helpers/registration';
 
 for (const width of [390, 768, 1024, 1280, 1440]) {
   test('registration uses visible progress and a responsive task panel at ' + width + 'px', async ({ page }) => {
@@ -35,6 +35,24 @@ test('keyboard navigation preserves a draft when leaving is cancelled', async ({
   await expect(page.getByLabel('Password', { exact: true })).toHaveValue('PrivatePassword123!');
   await expect(page.getByLabel('Confirm password', { exact: true })).toHaveValue('PrivatePassword123!');
   await expect(page.getByRole('button', { name: 'Already have an account? Sign in' })).toBeFocused();
+});
+
+test('manual Previous navigation preserves evidence and associates corrective errors', async ({ page }) => {
+  const flow = await mockAccountJourney(page, { state: 'identity_pending' });
+  await page.goto('/register');
+  await page.getByRole('button', { name: 'Submit manually' }).click();
+  await fillManualEvidence(page);
+  await page.getByRole('button', { name: 'Back to verification options', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Verify your identity', exact: true })).toBeFocused();
+  await page.getByRole('button', { name: 'Submit manually' }).click();
+  await expect(page.getByLabel('Name on ID', { exact: true })).toHaveValue('Manual User');
+  expect(await page.locator('#manual-front-image').evaluate((element) => (element as HTMLInputElement).files?.[0]?.name)).toBe('front.png');
+  await page.locator('#manual-front-image').setInputFiles({ name: 'invalid.pdf', mimeType: 'application/pdf', buffer: Buffer.from('pdf') });
+  await page.getByRole('button', { name: 'Submit for human review' }).click();
+  await expect(page.locator('#manual-front-image')).toBeFocused();
+  await expect(page.locator('#manual-front-image')).toHaveAttribute('aria-invalid', 'true');
+  await expect(page.locator('#manual-front-error')).toContainText('JPEG, PNG, or WebP');
+  expect(flow.requests.filter((item) => item.name === 'account-manual-review')).toHaveLength(0);
 });
 
 test('failed account creation keeps the entered password available for retry', async ({ page }) => {

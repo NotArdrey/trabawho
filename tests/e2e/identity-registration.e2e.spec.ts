@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { mockAccountJourney, expectNoRegistrationOverflow } from './helpers/registration';
+import { mockAccountJourney, fillManualEvidence, expectNoRegistrationOverflow } from './helpers/registration';
 for(const width of [390,768,1024,1280,1440]) {
   test(`approved identity requires complete name confirmation at ${width}px`,async({page})=>{
     await page.setViewportSize({width,height:900});
@@ -7,16 +7,9 @@ for(const width of [390,768,1024,1280,1440]) {
     await page.goto('/register');
     await expect(page.getByRole('heading',{name:'Verify your identity',exact:true})).toBeVisible();
     await expect(page.getByRole('button',{name:'Verify with Didit'})).toBeEnabled();
-    await expect(page.getByRole('heading', { name: 'Manual Verification', exact: true })).toHaveCount(0);
-    await expect(page.getByRole('button', { name: 'Submit manually' })).toHaveCount(0);
-    await expect(page.locator('input[type=file]')).toHaveCount(0);
     await page.getByRole('button',{name:'Verify with Didit'}).click();
     await expect(page.getByRole('button',{name:/Continue in Didit/})).toBeEnabled();
-    await expect(page.getByRole('button', { name: 'Submit manually' })).toHaveCount(0);
-    await expect(page.getByText('or', { exact: true })).toHaveCount(0);
-    await expectNoRegistrationOverflow(page);
-    await page.screenshot({ path: test.info().outputPath(`didit-only-${width}.png`), fullPage: true });
-    await page.getByRole('button',{name:'Check verification status'}).click();
+    await expect(page.getByRole('button', { name: 'Check verification status' })).toHaveCount(0);
     await expect(page.getByRole('heading',{name:'Name on your verified ID'})).toBeVisible();
     await expect(page.getByText('Maria Isabel de la Cruz Santos',{exact:true})).toBeVisible();
     await expect(page.locator('input[type=file]')).toHaveCount(0);
@@ -49,7 +42,17 @@ test('a disputed legal name stays a correction request for human review',async({
   await expect(page.getByText('Requested correction: Requested Correct Name')).toBeVisible();
   expect(flow.requests.some(item=>item.body.action==='confirm_name')).toBe(false);
 });
-
+test('manual fallback submits evidence for the existing confirmed account without credentials or address',async({page})=>{
+  const flow=await mockAccountJourney(page,{state:'identity_pending'});
+  await page.goto('/register');
+  await page.getByRole('button',{name:'Submit manually'}).click();
+  await fillManualEvidence(page);
+  await page.getByRole('button',{name:'Submit for human review'}).click();
+  await expect(page.getByRole('heading',{name:'Identity review pending'})).toBeVisible();
+  const body=flow.requests.find(item=>item.name==='account-manual-review')?.body;
+  expect(body).toMatchObject({fullName:'Manual User',documentType:'Postal ID',frontImage:{mimeType:'image/png'},acceptedIdentityTerms:true});
+  expect(body).not.toHaveProperty('password'); expect(body).not.toHaveProperty('address');
+});
 test('cross-device return resumes the server-linked session without local signup data',async({page})=>{
   const flow=await mockAccountJourney(page,{state:'identity_in_progress',sessionId:'didit-owned',sessionUrl:'https://verification.didit.me/session/test'});
   await page.goto('/register?check_verification=true&status=Approved');
@@ -61,7 +64,7 @@ test('worker intent survives verification responses from older identity endpoint
   await mockAccountJourney(page, { state: 'identity_pending', signupRole: 'worker' });
   await page.goto('/register');
   await page.getByRole('button', { name: 'Verify with Didit' }).click();
-  await page.getByRole('button', { name: 'Check verification status' }).click();
+  await expect(page.getByRole('button', { name: 'Check verification status' })).toHaveCount(0);
   await page.getByRole('button', { name: 'Confirm my legal name' }).click();
   await expect(page.getByTestId('auth-task-panel').getByRole('link').last()).toHaveText('Offer services');
 });
